@@ -30,6 +30,7 @@ import { useAutoSave } from '../hooks/use-auto-save'
 import { ProjectSyncBanner } from '../agent-sync/sync-banner'
 import { useProjectSyncStore } from '../agent-sync/sync-store'
 import { useProjectFileWatcher } from '../agent-sync/use-project-file-watcher'
+import { useProjectMediaWatcher } from '../agent-sync/use-project-media-watcher'
 import { ProjectRevisionConflictError } from '@/infrastructure/storage'
 import {
   useTimelineShortcuts,
@@ -377,6 +378,7 @@ const AutoSaveController = memo(function AutoSaveController({
   const isDirty = useTimelineStore((s: { isDirty: boolean }) => s.isDirty)
   useAutoSave({ isDirty, onSave })
   useProjectFileWatcher(projectId)
+  useProjectMediaWatcher(projectId)
   return null
 })
 
