@@ -51,7 +51,14 @@ What `shred apply` accepts and how the project behaves. Verified against the Shr
 
 ## Media categories
 
-Each media's `category` (in `media/<id>/metadata.json`) says what it is for: `speaker`, `b-roll`, `graphics`, `overlay`, `voiceover`, `music`, `sfx`, `other`. Absent means uncategorized. Set it with `shred import ... --category <c>` or `shred categorize <mediaId>=<c> ...` (`none` clears). When any media in a project has one, the editor's media pane groups by category (that order, uncategorized last) instead of by file type. Categories don't affect ops or rendering.
+Each media's `category` (in `media/<id>/metadata.json`) says what it is for: `speaker`, `b-roll`, `graphics`, `overlay`, `voiceover`, `music`, `sfx`, `other`. Absent means uncategorized. `categorySource` says who set it:
+
+- `agent`: `shred import ... --category <c>` or `shred categorize <mediaId>=<c> ...` (`none` clears, and keeps it cleared)
+- `user`: the media card's Category menu
+- `auto`: the editor's background analysis suggested it (video only: `speaker` when speech covers at least 30% of the clip and a person is in frame; `b-roll` for no audio, no or little speech, or speech over footage with nobody in frame). Never set over an explicit category; a newer suggestion may replace an older one
+- absent with a category: explicit (set before sources were recorded)
+
+Explicit categories (`agent`, `user`, no source) are never changed automatically, including after the project is reopened. Re-setting an auto suggestion with `shred categorize` confirms it. `shred media --project <id>` (or `GET /__shreditor/media/categories?projectId=`) lists every media's category, source and transcript state. The media pane shows Speaker, B-roll, Graphics, Overlays, Voiceover, Music, SFX, Other, then Analyzing (video waiting for its transcript), then the rest by file type; suggestions carry a small "auto" tag. Categories don't affect ops or rendering.
 
 ## Transcripts
 
