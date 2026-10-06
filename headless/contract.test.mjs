@@ -26,7 +26,7 @@ const samples = {
   },
   updateItem: { op: 'updateItem', id: 'i', updates: { text: 'new' } },
   moveItem: { op: 'moveItem', id: 'i', from: 2, trackId: 'v' },
-  removeItems: { op: 'removeItems', ids: ['i'] },
+  removeItems: { op: 'removeItems', ids: ['i'], linked: false },
   split: { op: 'split', id: 'i', frame: 1 },
   trimStart: { op: 'trimStart', id: 'i', amount: 1 },
   trimEnd: { op: 'trimEnd', id: 'i', amount: 1 },
@@ -47,7 +47,7 @@ const samples = {
     direction: 'from-top',
   },
   removeTransition: { op: 'removeTransition', id: 't' },
-  addTrack: { op: 'addTrack', kind: 'audio', order: 2 },
+  addTrack: { op: 'addTrack', kind: 'audio', order: 2, name: 'Music', formatRole: 'music' },
   removeTrack: { op: 'removeTrack', trackId: 'v', removeItems: true },
   addClip: { op: 'addClip', mediaId: 'm', from: 0 },
   addKeyframe: {
@@ -76,6 +76,9 @@ const samples = {
   updateEffect: { op: 'updateEffect', itemId: 'i', effectId: 'e', params: { amount: 0.2 } },
   addLut: { op: 'addLut', itemId: 'i', lut: 'Warm Look.cube', intensity: 0.8 },
   setTransform: { op: 'setTransform', id: 'i', transform: { opacity: 0.5, rotation: 2 } },
+  unlinkItems: { op: 'unlinkItems', ids: ['i'] },
+  addMarker: { op: 'addMarker', frame: 30, id: 'plan-b01', label: 'hook: the claim', color: '#F59E0B' },
+  removeMarkers: { op: 'removeMarkers', ids: ['plan-b01'] },
   addTemplate: {
     op: 'addTemplate',
     template: 'Lower third',
@@ -283,7 +286,8 @@ test('validation errors and capabilities are machine-readable and bounded', () =
   assert.ok(result.schemas.render)
   assert.ok(result.schemas.frame)
   assert.ok(result.schemas.layout)
-  assert.ok(JSON.stringify(result).length < 32_000)
+  // Bounded so an agent can read it whole (about 33 KB with the marker and link ops).
+  assert.ok(JSON.stringify(result).length < 34_000)
 })
 
 test('CLI rejects unknown options and normalizes aliases', () => {
@@ -316,4 +320,19 @@ test('project listings expose distinct actionable directory ids', () => {
   } finally {
     fs.rmSync(root, { recursive: true, force: true })
   }
+})
+
+test('marker, link and track-role ops reject what the editor could not apply', () => {
+  const bad = [
+    { op: 'addMarker', frame: -1 },
+    { op: 'addMarker', frame: 1.5 },
+    { op: 'addMarker' },
+    { op: 'removeMarkers', ids: [] },
+    { op: 'unlinkItems', ids: [] },
+    { op: 'removeItems', ids: ['i'], linked: 'no' },
+    { op: 'addTrack', kind: 'video', formatRole: 'hero' },
+    { op: 'addTrack', kind: 'video', name: '' },
+  ]
+  for (const op of bad) assert.equal(editOpSchema.safeParse(op).success, false, JSON.stringify(op))
+  assert.equal(editOpSchema.safeParse({ op: 'addMarker', frame: 0 }).success, true)
 })

@@ -254,6 +254,95 @@ describe('editProject', () => {
     })
   })
 
+  describe("a video's own audio can go without the video", () => {
+    const clipThen = (...ops: EditOp[]) =>
+      editProject({
+        project: baseProject(),
+        media: [{ mediaId: 'm-vid', metadata: videoMedia }],
+        ops: [{ op: 'addClip', mediaId: 'm-vid', from: 5, callerId: 'clip' } as EditOp, ...ops],
+      })
+    const audioRef = { $ref: 'clip#/detail/created/1/id' }
+
+    it('removeItems on the audio removes the linked video too by default, and says so', async () => {
+      const result = await clipThen({ op: 'removeItems', ids: [audioRef] } as EditOp)
+      expect(result.project.timeline!.items).toHaveLength(0)
+      const video = result.results[0]!.detail as { created: Array<{ id: string }> }
+      expect(result.results[1]!.detail).toMatchObject({ linkedRemoved: [video.created[0]!.id] })
+    })
+
+    it('removeItems linked: false removes only the audio and mutes the video', async () => {
+      const result = await clipThen({ op: 'removeItems', ids: [audioRef], linked: false } as EditOp)
+      const items = result.project.timeline!.items
+      expect(items.map((item) => item.type)).toEqual(['video'])
+      expect(items[0]).toMatchObject({ from: 5, durationInFrames: 100, embeddedAudioMuted: true })
+      expect(result.results[1]!.detail).not.toHaveProperty('linkedRemoved')
+    })
+
+    it('unlinkItems splits the pair; each side then moves and goes on its own', async () => {
+      const result = await clipThen(
+        { op: 'unlinkItems', ids: [audioRef], callerId: 'unlink' } as EditOp,
+        { op: 'updateItem', id: audioRef, updates: { from: 50 } } as EditOp,
+      )
+      const items = result.project.timeline!.items
+      const video = items.find((item) => item.type === 'video')!
+      const audio = items.find((item) => item.type === 'audio')!
+      expect(video.linkedGroupId).not.toBe(audio.linkedGroupId)
+      expect([video.from, audio.from]).toEqual([5, 50])
+      expect((result.results[1]!.detail as { unlinked: string[] }).unlinked.sort()).toEqual(
+        [video.id, audio.id].sort(),
+      )
+    })
+
+    it('unlinkItems and removeItems fail on unknown ids', async () => {
+      await expect(clipThen({ op: 'unlinkItems', ids: ['nope'] } as EditOp)).rejects.toThrow(
+        /item\(s\) nope do not exist/,
+      )
+      await expect(
+        clipThen({ op: 'removeItems', ids: ['nope'], linked: false } as EditOp),
+      ).rejects.toThrow(/item\(s\) nope do not exist/)
+    })
+  })
+
+  describe('markers', () => {
+    it('addMarker keeps a chosen id, label and colour; removeMarkers takes them out', async () => {
+      const result = await editProject({
+        project: baseProject({ markers: [{ id: 'user-1', frame: 3, color: '#3B82F6' }] }),
+        ops: [
+          { op: 'addMarker', id: 'plan-b01', frame: 0, label: 'hook: the claim' },
+          { op: 'addMarker', frame: 40, callerId: 'auto' },
+          { op: 'removeMarkers', ids: ['user-1'] },
+        ] as EditOp[],
+      })
+      const markers = result.project.timeline!.markers!
+      expect(markers.map((m) => [m.id.startsWith('plan-') ? m.id : 'auto', m.frame])).toEqual([
+        ['plan-b01', 0],
+        ['auto', 40],
+      ])
+      expect(markers[0]).toMatchObject({ label: 'hook: the claim', color: '#F59E0B' })
+      expect(result.results[1]!.detail).toMatchObject({ id: markers[1]!.id, frame: 40 })
+    })
+
+    it('refuses a duplicate id and an unknown one', async () => {
+      const project = baseProject({ markers: [{ id: 'plan-b01', frame: 3, color: '#fff' }] })
+      await expect(
+        editProject({ project, ops: [{ op: 'addMarker', id: 'plan-b01', frame: 9 } as EditOp] }),
+      ).rejects.toThrow(/already exists/)
+      await expect(
+        editProject({ project, ops: [{ op: 'removeMarkers', ids: ['plan-b02'] } as EditOp] }),
+      ).rejects.toThrow(/marker\(s\) plan-b02 do not exist/)
+    })
+  })
+
+  it('addTrack can name the track and give it its format role', async () => {
+    const result = await editProject({
+      project: baseProject(),
+      ops: [{ op: 'addTrack', kind: 'video', name: 'Shots', formatRole: 'shots' } as EditOp],
+    })
+    expect(result.results[0]!.detail).toMatchObject({ name: 'Shots' })
+    const track = result.project.timeline!.tracks.find((t) => t.name === 'Shots')!
+    expect(track).toMatchObject({ kind: 'video', formatRole: 'shots' })
+  })
+
   it('addClip image defaults to a 150-frame still', async () => {
     const result = await editProject({
       project: baseProject(),
