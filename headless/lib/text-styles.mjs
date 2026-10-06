@@ -6,7 +6,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { z } from 'zod'
 
-export const TEXT_STYLE_ROLES = ['title', 'caption', 'label', 'lower-third', 'other']
+const TEXT_STYLE_ROLES = ['title', 'caption', 'label', 'lower-third', 'other']
 const styleId = z.string().regex(/^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/)
 const finite = z.number().finite()
 
@@ -41,7 +41,7 @@ const look = z
   })
   .strict()
 
-export const captionRulesSchema = z
+const captionRulesSchema = z
   .object({
     maxWordsPerChunk: z.number().int().min(1).max(40),
     maxCharsPerLine: z.number().int().min(4).max(200),
@@ -53,7 +53,7 @@ export const captionRulesSchema = z
   .strict()
 
 /** A style as a person or the agent writes it (id, version and time are optional). */
-export const textStyleInputSchema = z
+const textStyleInputSchema = z
   .object({
     id: styleId.optional(),
     name: z.string().trim().min(1).max(80),
