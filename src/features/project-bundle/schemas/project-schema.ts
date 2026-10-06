@@ -465,6 +465,11 @@ const compositionControlSchema = z.object({
   ),
 })
 
+/** A motion template's hold: template frames start..end (inclusive). */
+const templateHoldSchema = z
+  .object({ start: z.number().int().min(0), end: z.number().int().min(0) })
+  .refine((hold) => hold.end >= hold.start, 'hold end must not be before its start')
+
 const timelineItemSchema = z
   .object({
     id: z.string().min(1),
@@ -631,6 +636,7 @@ const timelineItemSchema = z
     compositionWidth: z.number().optional(),
     compositionHeight: z.number().optional(),
     compositionControlOverrides: z.record(z.string(), z.string()).optional(),
+    templateHold: templateHoldSchema.optional(),
     // Layer compositing
     blendMode: z.string().optional(),
     cornerPin: cornerPinSchema.optional(),
@@ -716,6 +722,8 @@ const compositionSchema = z
     compositionControls: compositionControlSchema.optional(),
     templateId: z.string().min(1).optional(),
     templateVersion: z.number().int().min(1).optional(),
+    templateAspect: z.string().min(1).optional(),
+    templateHold: templateHoldSchema.optional(),
     markers: z.array(markerSchema).optional(),
     inPoint: z.number().int().min(0).optional(),
     outPoint: z.number().int().min(0).optional(),

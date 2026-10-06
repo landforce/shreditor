@@ -6,6 +6,7 @@
  */
 import type { TimelineItem } from '@/types/timeline'
 import {
+  chooseTemplateVariant,
   findMotionTemplate,
   resolveTemplateControls,
   type MotionTemplate,
@@ -73,19 +74,26 @@ function requireVideoTrack(trackId: string): void {
 
 function addTemplate(op: Op, context: TemplateOpContext): unknown {
   const template = requireTemplate(op.template)
+  // The variant for the project's aspect ratio; none is an error naming the fix.
+  const variant = chooseTemplateVariant(template, context.canvas)
   const from = frames(op.from) ?? 0
   const trackId = text(op.trackId)
   if (trackId) {
     requireVideoTrack(trackId)
     const existing = findTemplateComposition(
       useCompositionsStore.getState().compositions,
-      template.id,
+      variant.id,
+      variant.aspect,
     )
     assertNoTrackOverlap(context.overlap, {
       trackId,
       from,
       durationInFrames: resolveInstanceDuration(
-        existing ?? { name: template.name, durationInFrames: template.durationInFrames },
+        existing ?? {
+          name: variant.name,
+          durationInFrames: variant.durationInFrames,
+          templateHold: variant.hold,
+        },
         frames(op.durationInFrames),
       ),
       name: `template "${template.name}"`,
@@ -104,12 +112,14 @@ function addTemplate(op: Op, context: TemplateOpContext): unknown {
     compositionId: result.compositionId,
     trackId: result.trackId,
     templateId: template.id,
+    aspect: variant.aspect,
     templateVersion: result.projectVersion,
-    libraryVersion: template.version,
+    libraryVersion: variant.version,
     reused: result.reused,
+    ...(variant.hold ? { hold: variant.hold } : {}),
     ...(result.outdated
       ? {
-          warning: `The project uses version ${result.projectVersion} of "${template.name}"; the library has ${template.version}. Run updateTemplate to move every instance to it.`,
+          warning: `The project uses version ${result.projectVersion} of "${template.name}" (${variant.aspect}); the library has ${variant.version}. Run updateTemplate to move every instance to it.`,
         }
       : {}),
   }
@@ -222,6 +232,23 @@ function setCompositionControls(op: Op): unknown {
       defaultValue,
     })),
   }
+}
+
+/**
+ * updateItem on a template instance: it may be any length when its template
+ * holds, otherwise no longer than the template (shorter cuts the end).
+ */
+export function assertTemplateInstanceUpdate(
+  item: TimelineItem,
+  updates: Partial<TimelineItem>,
+): void {
+  if (item.type !== 'composition' || typeof updates.durationInFrames !== 'number') return
+  const composition = useCompositionsStore.getState().getComposition(item.compositionId)
+  if (!composition?.templateId) return
+  resolveInstanceDuration(
+    { ...composition, templateHold: updates.templateHold ?? item.templateHold },
+    updates.durationInFrames,
+  )
 }
 
 const HANDLERS: Record<TemplateOperationName, (op: Op, context: TemplateOpContext) => unknown> = {

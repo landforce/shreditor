@@ -9,9 +9,9 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { z } from 'zod'
+import { parseAspect } from '../../src/shared/projects/aspect.mjs'
 import {
   mergeTextStyleFamilies,
-  parseAspect,
   seedTextStyles,
   TEXT_STYLE_LIBRARY_SEED,
   textStyleLibraryNeedsSeed,

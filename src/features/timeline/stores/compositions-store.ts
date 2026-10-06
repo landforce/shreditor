@@ -31,6 +31,10 @@ export interface SubComposition {
   /** The library motion template (and its version) this composition was copied from. */
   templateId?: string
   templateVersion?: number
+  /** The template variant (aspect ratio) this copy came from. */
+  templateAspect?: string
+  /** The variant's hold frame/range; instances carry it as `templateHold`. */
+  templateHold?: { start: number; end: number }
   busAudioEq?: AudioEqSettings
   /** Per-sequence timeline markers (independent of Main's). */
   markers?: ProjectMarker[]

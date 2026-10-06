@@ -59,7 +59,8 @@ export const TEMPLATE_OP_SCHEMAS = [
 ]
 
 export const TEMPLATE_OP_DESCRIPTIONS = {
-  addTemplate: 'Place an instance of a library motion template (returns the composition item id)',
+  addTemplate:
+    'Place an instance of a library motion template: its version for the project aspect ratio (returns the composition item id)',
   updateTemplate: "Move every instance of a template to the library's latest version",
   setTemplateControls: "Change a template instance's control values by control name",
   createComposition: 'Group items into a layer composition (they keep their ids inside it)',

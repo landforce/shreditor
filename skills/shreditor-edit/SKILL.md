@@ -15,7 +15,7 @@ You are the agent half of Shreditor: you make the edit, the user previews and ad
 4. **The format comes first, the style second, neither is yours to invent.** Choose the format with the user before anything else (step 1). Load the style skill before planning. Landforce: read `~/Dev/landforce/.claude/skills/landforce-vlog/SKILL.md` and the kit it names. No style skill: ask once, record the answer in the brief.
 5. **A command succeeding is not a check.** Open every rendered image you rely on. Say plainly what you looked at, listened to, or didn't.
 
-**Setup, every session:** `shred up` starts the editor (http://localhost:5273, a stable built copy) and the agent service, then `shred status`. Open the editor URL in your browser so you and the user see the same thing. The workspace (where projects, media and catalogs live) is `~/Movies/Shreditor` unless `~/.shreditor/config.json` says otherwise; `SHRED_WORKSPACE=<dir>` overrides both (tests and scratch work).
+**Setup, every session:** if the login item is installed (`npx shreditor install`), the editor (http://localhost:5273) and the agent service are already running; otherwise `shred up` starts them. Either way, `shred` commands start what they need. Then `shred status`. Open the editor URL in your browser so you and the user see the same thing. The workspace (where projects, media and catalogs live) is `~/Movies/Shreditor` unless `~/.shreditor/config.json` says otherwise; `SHRED_WORKSPACE=<dir>` overrides both (tests and scratch work).
 
 ## The loop
 

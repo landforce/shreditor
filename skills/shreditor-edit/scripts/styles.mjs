@@ -14,10 +14,9 @@ import {
   textStylePackSchema,
   updateTextStyleLibrary,
 } from '../../../headless/lib/text-styles.mjs'
-import { aspectKey } from '../../../src/shared/projects/aspect-core.mjs'
+import { aspectKey, parseAspect } from '../../../src/shared/projects/aspect.mjs'
 import {
   addClonedTextStyleVariant,
-  parseAspect,
   textStyleAspects,
   textStyleVariantFor,
   toTextStyleFamily,

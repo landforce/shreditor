@@ -967,6 +967,7 @@ async function renderGpuSubCompChildrenToTexture(
     rctx.fps,
     subData.fps,
     effectiveRenderSpan,
+    subData.durationInFrames,
   )
   if (localFrame < 0 || localFrame >= subData.durationInFrames) return null
 

@@ -5,7 +5,7 @@
 // A variant's lengths are pixels on its aspect's reference canvas, whose
 // short side is 1080 (1080x1920 for 9:16, 1920x1080 for 16:9, 1080x1350 for
 // 4:5), and scale uniformly on other resolutions of the same aspect.
-import { aspectKey, closestAspect } from '../../projects/aspect-core.mjs'
+import { canvasForAspect, closestAspect, sortAspects } from '../../projects/aspect.mjs'
 
 /** The aspect an old single-look style becomes when nothing says otherwise. */
 export const LEGACY_TEXT_STYLE_ASPECT = '9:16'
@@ -13,34 +13,15 @@ export const LEGACY_TEXT_STYLE_ASPECT = '9:16'
 /** The short side, in pixels, of every variant's reference canvas. */
 const TEXT_STYLE_REFERENCE_SHORT_SIDE = 1080
 
-const ASPECT_ORDER = ['9:16', '16:9', '1:1', '4:5']
-
-/** "16:9", "16/9", "1920x1080" or "1920X1080" -> its aspect key. Throws otherwise. */
-export function parseAspect(text) {
-  const match = /^\s*(\d+(?:\.\d+)?)\s*[:/xX]\s*(\d+(?:\.\d+)?)\s*$/.exec(String(text ?? ''))
-  if (!match) throw new Error(`"${text}" is not an aspect ratio (use 9:16, 16:9, 1:1, 4:5 or W:H)`)
-  return aspectKey(Number(match[1]), Number(match[2]))
-}
-
 /** The canvas a variant's lengths are written for: short side 1080. */
 export function referenceCanvasForAspect(aspect) {
-  const [w, h] = aspect.split(':').map(Number)
-  const short = TEXT_STYLE_REFERENCE_SHORT_SIDE
-  return w <= h
-    ? { width: short, height: Math.round((short * h) / w) }
-    : { width: Math.round((short * w) / h), height: short }
+  return canvasForAspect(aspect, TEXT_STYLE_REFERENCE_SHORT_SIDE)
 }
 
-function aspectRank(aspect) {
-  const index = ASPECT_ORDER.indexOf(aspect)
-  return index < 0 ? ASPECT_ORDER.length : index
-}
-
-/** Variants in a stable order: 9:16, 16:9, 1:1, 4:5, then the rest by key. */
+/** Variants in the shared aspect order: 9:16, 16:9, 1:1, 4:5, then the rest. */
 function sortTextStyleVariants(variants) {
-  return [...variants].sort(
-    (a, b) => aspectRank(a.aspect) - aspectRank(b.aspect) || a.aspect.localeCompare(b.aspect),
-  )
+  const order = sortAspects(variants.map((variant) => variant.aspect))
+  return [...variants].sort((a, b) => order.indexOf(a.aspect) - order.indexOf(b.aspect))
 }
 
 function compact(record) {
@@ -157,7 +138,7 @@ export function addClonedTextStyleVariant(style, toAspect, fromAspect) {
     throw new Error(`"${style.name}" already has a ${toAspect} version`)
   }
   const from = fromAspect ?? closestAspect(toAspect, textStyleAspects(style))
-  const source = textStyleVariantFor(style, from)
+  const source = from ? textStyleVariantFor(style, from) : undefined
   if (!source) {
     throw new Error(
       `"${style.name}" has no ${from} version to copy (it has ${textStyleAspects(style).join(', ')})`,

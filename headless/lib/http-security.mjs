@@ -246,3 +246,17 @@ export function setHttpTimeouts(
   server.headersTimeout = headersTimeoutMs
   server.requestTimeout = requestTimeoutMs
 }
+
+/**
+ * Count requests that have not finished yet (except those `ignore` matches),
+ * so a health check can say whether the service is mid-request.
+ */
+export function countInFlight(server, { ignore = () => false } = {}) {
+  let inFlight = 0
+  server.on('request', (req, res) => {
+    if (ignore(req)) return
+    inFlight++
+    res.once('close', () => inFlight--)
+  })
+  return () => inFlight
+}

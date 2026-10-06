@@ -4,7 +4,6 @@ import {
   addClonedTextStyleVariant,
   cloneTextStyleVariant,
   mergeTextStyleFamilies,
-  parseAspect,
   referenceCanvasForAspect,
   seedTextStyles,
   textStyleLibraryNeedsSeed,
@@ -32,19 +31,12 @@ const style: TextStyleDefinition = {
 const bottomGap = (layout: TextStyleVariant['layout']) =>
   0.5 - layout!.yRatio! - layout!.heightRatio! / 2
 
-describe('aspect reference canvases', () => {
+describe('variant reference canvases', () => {
   it('have a short side of 1080', () => {
     expect(referenceCanvasForAspect('9:16')).toEqual({ width: 1080, height: 1920 })
     expect(referenceCanvasForAspect('16:9')).toEqual({ width: 1920, height: 1080 })
     expect(referenceCanvasForAspect('4:5')).toEqual({ width: 1080, height: 1350 })
     expect(referenceCanvasForAspect('1:1')).toEqual({ width: 1080, height: 1080 })
-  })
-
-  it('parse from W:H or WxH', () => {
-    expect(parseAspect('16:9')).toBe('16:9')
-    expect(parseAspect('1920x1080')).toBe('16:9')
-    expect(parseAspect('9/16')).toBe('9:16')
-    expect(() => parseAspect('wide')).toThrow(/not an aspect ratio/)
   })
 })
 

@@ -34,7 +34,12 @@ import { useTimelineSettingsStore } from '@/features/timeline/stores/timeline-se
 import { useMediaLibraryStore } from '@/features/media-library/stores/media-library-store'
 import { createClassicTrack } from '@/features/timeline/utils/classic-tracks'
 import { seedMediaLibrary } from './seed-media'
-import { applyTemplateOp, setTemplateEditInput, type TemplateOperationName } from './template-ops'
+import {
+  applyTemplateOp,
+  assertTemplateInstanceUpdate,
+  setTemplateEditInput,
+  type TemplateOperationName,
+} from './template-ops'
 import type { MotionTemplate } from '@/shared/motion-templates/template-core.mjs'
 import {
   addItem,
@@ -466,6 +471,7 @@ function applyOp(op: EditOp): unknown {
       }
       const problem = timelineItemProblem({ ...item, ...updates })
       if (problem) throw new Error(`updates.${problem}`)
+      assertTemplateInstanceUpdate(item, updates)
       updateItem(id, updates)
       return { id }
     }

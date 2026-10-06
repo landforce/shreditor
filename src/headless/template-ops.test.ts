@@ -86,7 +86,10 @@ const LOWER_THIRD_OPS = [
   },
 ] as unknown as EditOp[]
 
-async function buildTemplate(version?: Pick<MotionTemplate, 'id' | 'version' | 'createdAt'>) {
+async function buildTemplate(
+  version?: Pick<MotionTemplate, 'id' | 'version' | 'createdAt'>,
+  hold?: { start: number; end: number },
+) {
   const built = await editProject({ project: project(1920, 1080), ops: LOWER_THIRD_OPS })
   const detail = built.results.find((r) => r.callerId === 'group')!.detail as {
     compositionId: string
@@ -100,9 +103,12 @@ async function buildTemplate(version?: Pick<MotionTemplate, 'id' | 'version' | '
       category: 'lower-third',
       role: 'labels',
       previous: version,
+      hold,
     }),
   )
-  return { built, detail, template }
+  const controlId = (name: string) =>
+    template.variants['16:9']!.controls.find((c) => c.name === name)!.id
+  return { built, detail, template, controlId }
 }
 
 const instances = (p: Project) =>
@@ -123,8 +129,8 @@ describe('motion template ops', () => {
   })
 
   it('addTemplate copies the template once and gives each instance its own values', async () => {
-    const { template } = await buildTemplate()
-    const target = project(1080, 1920, {}, 'target')
+    const { template, controlId } = await buildTemplate()
+    const target = project(1280, 720, {}, 'target')
     const result = await editProject({
       project: target,
       templates: [template],
@@ -147,16 +153,24 @@ describe('motion template ops', () => {
     })
     const compositions = result.project.timeline!.compositions!
     expect(compositions).toHaveLength(1)
-    expect(compositions[0]).toMatchObject({ templateId: template.id, templateVersion: 1 })
+    expect(compositions[0]).toMatchObject({
+      templateId: template.id,
+      templateVersion: 1,
+      templateAspect: '16:9',
+    })
     const [a, b] = instances(result.project)
     expect(a!.compositionId).toBe(b!.compositionId)
-    const nameId = template.controls.find((c) => c.name === 'Name')!.id
-    const barId = template.controls.find((c) => c.name === 'Bar colour')!.id
+    const nameId = controlId('Name')
+    const barId = controlId('Bar colour')
     expect(a!.compositionControlOverrides).toEqual({ [nameId]: 'Ana' })
     expect(b!.compositionControlOverrides).toEqual({ [nameId]: 'Bo', [barId]: '#00ff00' })
-    expect(result.results[1]!.detail).toMatchObject({ reused: true, templateVersion: 1 })
-    // A 1920x1080 template in a 1080x1920 project fills the width, aspect kept.
-    expect(a!.transform).toMatchObject({ width: 1080, height: 608 })
+    expect(result.results[1]!.detail).toMatchObject({
+      reused: true,
+      templateVersion: 1,
+      aspect: '16:9',
+    })
+    // The 16:9 variant in a 1280x720 project: same aspect, scaled uniformly.
+    expect(a!.transform).toMatchObject({ x: 0, y: 0, width: 1280, height: 720 })
     // Both instances share a template track created on top.
     expect(a!.trackId).toBe(b!.trackId)
   })
@@ -174,7 +188,20 @@ describe('motion template ops', () => {
     ).rejects.toThrow(/Unknown control "Nmae". Controls: "Name", "Bar colour"/)
   })
 
-  it('an instance cannot be longer than the template', async () => {
+  it('a project of another aspect ratio gets no silent fit: the error names the versions and the fix', async () => {
+    const { template } = await buildTemplate()
+    await expect(
+      editProject({
+        project: project(1080, 1920),
+        templates: [template],
+        ops: [{ op: 'addTemplate', template: 'Lower third' }] as unknown as EditOp[],
+      }),
+    ).rejects.toThrow(
+      '"Lower third" has no 9:16 version (it has 16:9). Make one with: shred templates clone "Lower third" --aspect 9:16',
+    )
+  })
+
+  it('an instance cannot be longer than a template without a hold', async () => {
     const { template } = await buildTemplate()
     await expect(
       editProject({
@@ -184,11 +211,49 @@ describe('motion template ops', () => {
           { op: 'addTemplate', template: 'Lower third', durationInFrames: 61 },
         ] as unknown as EditOp[],
       }),
-    ).rejects.toThrow(/longer than/)
+    ).rejects.toThrow(/longer than .* no hold/)
+  })
+
+  it('with a hold an instance can be any length, by addTemplate or updateItem', async () => {
+    const { template } = await buildTemplate(undefined, { start: 20, end: 20 })
+    const placed = await editProject({
+      project: project(1920, 1080),
+      templates: [template],
+      ops: [
+        { op: 'addTemplate', template: 'Lower third', durationInFrames: 120 },
+      ] as unknown as EditOp[],
+    })
+    const [instance] = instances(placed.project)
+    expect(instance).toMatchObject({ durationInFrames: 120, templateHold: { start: 20, end: 20 } })
+    expect(placed.project.timeline!.compositions![0]!.templateHold).toEqual({ start: 20, end: 20 })
+    expect(placed.results[0]!.detail).toMatchObject({ hold: { start: 20, end: 20 } })
+    const longer = await editProject({
+      project: placed.project,
+      ops: [
+        { op: 'updateItem', id: instance!.id, updates: { durationInFrames: 300 } },
+      ] as unknown as EditOp[],
+    })
+    expect(instances(longer.project)[0]!.durationInFrames).toBe(300)
+  })
+
+  it('updateItem cannot stretch an instance of a template without a hold', async () => {
+    const { template } = await buildTemplate()
+    const placed = await editProject({
+      project: project(1920, 1080),
+      templates: [template],
+      ops: [{ op: 'addTemplate', template: 'Lower third' }] as unknown as EditOp[],
+    })
+    const id = instances(placed.project)[0]!.id
+    await expect(
+      editProject({
+        project: placed.project,
+        ops: [{ op: 'updateItem', id, updates: { durationInFrames: 90 } }] as unknown as EditOp[],
+      }),
+    ).rejects.toThrow(/no hold/)
   })
 
   it('setTemplateControls changes and resets one instance', async () => {
-    const { template } = await buildTemplate()
+    const { template, controlId } = await buildTemplate()
     const placed = await editProject({
       project: project(1920, 1080),
       templates: [template],
@@ -203,8 +268,9 @@ describe('motion template ops', () => {
         { op: 'setTemplateControls', id, controls: { Name: null, 'Bar colour': 'blue' } },
       ] as unknown as EditOp[],
     })
-    const barId = template.controls.find((c) => c.name === 'Bar colour')!.id
-    expect(instances(changed.project)[0]!.compositionControlOverrides).toEqual({ [barId]: 'blue' })
+    expect(instances(changed.project)[0]!.compositionControlOverrides).toEqual({
+      [controlId('Bar colour')]: 'blue',
+    })
   })
 
   it('updateTemplate moves every instance to the new version and keeps values by name', async () => {
@@ -223,16 +289,23 @@ describe('motion template ops', () => {
       ] as unknown as EditOp[],
     })
     // Version 2 renames the colour control and re-authors the name control.
+    const variant = template.variants['16:9']!
     const v2 = parseMotionTemplate({
       ...template,
       version: 2,
-      composition: {
-        ...template.composition,
-        compositionControls: {
-          version: 1,
-          controls: template.controls.map((c) =>
-            c.name === 'Name' ? { ...c, id: 'new-name-id' } : { ...c, name: 'Accent' },
-          ),
+      variants: {
+        '16:9': {
+          ...variant,
+          version: 2,
+          composition: {
+            ...variant.composition,
+            compositionControls: {
+              version: 1,
+              controls: variant.controls.map((c) =>
+                c.name === 'Name' ? { ...c, id: 'new-name-id' } : { ...c, name: 'Accent' },
+              ),
+            },
+          },
         },
       },
     })

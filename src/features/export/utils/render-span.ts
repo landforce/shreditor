@@ -1,6 +1,7 @@
 import type { CompositionItem, TimelineItem, VideoItem } from '@/types/timeline'
 import type { ActiveTransition } from './canvas-transitions'
 import { timelineToSourceFrames } from '@/features/export/deps/timeline-frame'
+import { resolveHeldInstanceFrame } from '@/shared/motion-templates/instance-time'
 
 /**
  * Linear source-time ramp applied during a transition window.
@@ -73,13 +74,29 @@ export function getRenderTimelineSourceStart(
   return span?.sourceStart ?? getSourceTimedItemStart(item)
 }
 
+/**
+ * The sub-composition frame a composition item shows at a parent frame: its
+ * trim (sourceStart) and speed, or, on a motion template instance with a hold,
+ * the in / hold / out mapping (shared/motion-templates/instance-time.ts) over the
+ * instance's own length. `subCompositionDurationInFrames` is the composition's
+ * live length (the hold mapping needs it; defaults to the item's sourceDuration).
+ */
 export function resolveCompositionSourceFrame(
   item: CompositionItem,
   frame: number,
   parentFps: number,
   subCompositionFps: number,
   span: RenderTimelineSpan = getItemRenderTimelineSpan(item),
+  subCompositionDurationInFrames?: number,
 ): number {
+  const held = resolveHeldInstanceFrame(
+    item,
+    frame - item.from,
+    parentFps,
+    subCompositionFps,
+    subCompositionDurationInFrames ?? item.sourceDuration,
+  )
+  if (held !== null) return held
   return (
     getRenderTimelineSourceStart(item, span) +
     timelineToSourceFrames(

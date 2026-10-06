@@ -37,10 +37,13 @@ async function loadLibrary(): Promise<LibraryTemplate[]> {
 export function useMotionTemplateLibrary(active: boolean) {
   const [entries, setEntries] = useState<LibraryTemplate[]>([])
   const [loaded, setLoaded] = useState(false)
+  // Bumped on every read, so thumbnails written after their template.json show up.
+  const [epoch, setEpoch] = useState(0)
 
   const reload = useCallback(async () => {
     try {
       setEntries(await loadLibrary())
+      setEpoch((value) => value + 1)
     } catch (error) {
       logger.warn('Could not read the template library', error)
     } finally {
@@ -66,16 +69,21 @@ export function useMotionTemplateLibrary(active: boolean) {
     return () => window.clearInterval(timer)
   }, [active, reload])
 
-  return { entries, loaded, reload }
+  return { entries, loaded, reload, epoch }
 }
 
-/** An object URL for a template's thumbnail (re-read when the template changes). */
-export function useTemplateThumbnail(id: string, updatedAt: number): string | null {
+/** An object URL for a variant's thumbnail (re-read when the template changes). */
+export function useTemplateThumbnail(
+  id: string,
+  fileName: string | undefined,
+  epoch: number,
+): string | null {
   const [url, setUrl] = useState<string | null>(null)
   useEffect(() => {
     let objectUrl: string | null = null
     let cancelled = false
-    void readMotionTemplateThumbnail(id)
+    setUrl(null)
+    void readMotionTemplateThumbnail(id, fileName)
       .then((blob) => {
         if (cancelled || !blob) return
         objectUrl = URL.createObjectURL(blob)
@@ -86,6 +94,6 @@ export function useTemplateThumbnail(id: string, updatedAt: number): string | nu
       cancelled = true
       if (objectUrl) URL.revokeObjectURL(objectUrl)
     }
-  }, [id, updatedAt])
+  }, [id, fileName, epoch])
   return url
 }

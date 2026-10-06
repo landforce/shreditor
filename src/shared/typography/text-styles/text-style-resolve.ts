@@ -22,7 +22,7 @@ import {
   type TextStyleVariant,
 } from '@/types/text-style'
 import type { FormatRole } from '@formats/registry.mjs'
-import { aspectKey } from '@/shared/projects/aspect'
+import { aspectKey } from '@/shared/projects/aspect.mjs'
 import { missingTextStyleVariantMessage, textStyleVariantFor } from './text-style-family.mjs'
 
 interface StyleCanvas {

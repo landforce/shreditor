@@ -12,9 +12,10 @@ import type { Transition } from '@/types/transition'
 import type { ItemKeyframes } from '@/types/keyframe'
 import {
   compositionClosure,
-  type MotionTemplate,
+  type MotionTemplateVariantView,
   type StoredComposition,
 } from '@/shared/motion-templates/template-core.mjs'
+import { aspectKey } from '@/shared/projects/aspect.mjs'
 import { getCompositionControlSourceValue } from '@/shared/utils/composition-controls'
 import type { SubComposition } from '../stores/compositions-store'
 
@@ -106,9 +107,9 @@ export interface TemplateCompositionCopy {
   compositions: SubComposition[]
 }
 
-/** A fresh copy of a template's compositions with new ids, the root tagged with the template. */
+/** A fresh copy of a template variant's compositions with new ids, the root tagged with it. */
 export function cloneTemplateCompositions(
-  template: MotionTemplate,
+  template: MotionTemplateVariantView,
   newId: NewId = defaultNewId,
 ): TemplateCompositionCopy {
   const sources = [template.composition, ...template.subCompositions].map(toSubComposition)
@@ -142,21 +143,42 @@ export function cloneTemplateCompositions(
     ...compositions[0]!,
     templateId: template.id,
     templateVersion: template.version,
+    templateAspect: template.aspect,
+    ...(template.hold ? { templateHold: { ...template.hold } } : {}),
   }
   return { root, compositions: [root, ...compositions.slice(1)] }
 }
 
-/** The project's copy of a template (the newest version when there are several). */
+/** The template variant (aspect ratio) a project copy came from. */
+export function templateCompositionAspect(
+  composition: Pick<SubComposition, 'templateAspect' | 'width' | 'height'>,
+): string {
+  return composition.templateAspect ?? aspectKey(composition.width, composition.height)
+}
+
+/**
+ * The project's copy of a template (the newest version when there are several),
+ * of one variant when `aspect` is given.
+ */
 export function findTemplateComposition(
   compositions: readonly SubComposition[],
   templateId: string,
+  aspect?: string,
 ): SubComposition | undefined {
   return compositions
-    .filter((composition) => composition.templateId === templateId)
+    .filter(
+      (composition) =>
+        composition.templateId === templateId &&
+        (aspect === undefined || templateCompositionAspect(composition) === aspect),
+    )
     .sort((a, b) => (b.templateVersion ?? 0) - (a.templateVersion ?? 0))[0]
 }
 
-/** Instances fill the project width and keep the template's aspect ratio. */
+/**
+ * An instance's size on the canvas. The variant has the canvas's aspect ratio, so
+ * this is the canvas itself: 1:1 when the sizes match, scaled uniformly when only
+ * the resolution differs (720x1280 vs 1080x1920).
+ */
 export function fitTemplateToCanvas(
   template: { width: number; height: number },
   canvas: { width: number },
@@ -208,19 +230,26 @@ function wrapperSourceFields(composition: Pick<SubComposition, 'durationInFrames
   }
 }
 
-/** Check a requested instance length against the template's (no hold/stretch yet). */
+/**
+ * Check a requested instance length against the template's: shorter is always
+ * fine (the end is cut, or hold frames go first); longer needs a hold.
+ */
 export function resolveInstanceDuration(
-  composition: Pick<SubComposition, 'durationInFrames' | 'name'>,
+  composition: Pick<SubComposition, 'durationInFrames' | 'name' | 'templateHold'>,
   requested: number | undefined,
 ): number {
   if (requested === undefined) return composition.durationInFrames
-  if (requested > composition.durationInFrames) {
+  if (requested > composition.durationInFrames && !composition.templateHold) {
     throw new Error(
-      `durationInFrames ${requested} is longer than "${composition.name}" (${composition.durationInFrames} frames); an instance can be shorter, not longer`,
+      `durationInFrames ${requested} is longer than "${composition.name}" (${composition.durationInFrames} frames) and the template has no hold. ` +
+        'Set one (shred templates save ... --hold <frame>, or Hold in Save as Template) so a longer instance animates in, holds, then animates out',
     )
   }
   return requested
 }
+
+const holdField = (composition: Pick<SubComposition, 'templateHold'>) =>
+  composition.templateHold ? { templateHold: { ...composition.templateHold } } : {}
 
 export function buildTemplateInstance(params: {
   composition: SubComposition
@@ -248,6 +277,7 @@ export function buildTemplateInstance(params: {
     ...(params.linkedGroupId ? { linkedGroupId: params.linkedGroupId } : {}),
     transform: { x: 0, y: 0, ...size, rotation: 0, opacity: 1 },
     ...(params.overrides ? { compositionControlOverrides: params.overrides } : {}),
+    ...holdField(composition),
     ...wrapperSourceFields(composition),
   }
 }
@@ -268,6 +298,7 @@ export function buildTemplateAudioCompanion(params: {
     compositionId: params.composition.id,
     linkedGroupId: params.visual.linkedGroupId,
     src: '',
+    ...holdField(params.composition),
     ...wrapperSourceFields(params.composition),
   }
 }
@@ -371,18 +402,35 @@ function pruneUnreferenced(
   }
 }
 
+/** An instance retargeted at a new copy: its length (kept when the copy holds) and hold. */
+function retargetTiming(item: TimelineItem, root: SubComposition): Partial<TimelineItem> {
+  const durationInFrames = root.templateHold
+    ? item.durationInFrames
+    : Math.min(item.durationInFrames, root.durationInFrames)
+  return {
+    durationInFrames,
+    templateHold: root.templateHold ? { ...root.templateHold } : undefined,
+    ...wrapperSourceFields(root),
+  }
+}
+
 /**
- * Replace the project's copy of a template with the library version: every
- * instance (on the main timeline or nested) points at the new copy and keeps the
- * values of controls whose names still exist. Null when the copy is current.
+ * Replace the project's copy of a template variant with the library version:
+ * every instance (on the main timeline or nested) points at the new copy and
+ * keeps the values of controls whose names still exist. Null when the copy is
+ * current.
  */
 export function planTemplateUpdate(params: {
-  template: MotionTemplate
+  template: MotionTemplateVariantView
   compositions: readonly SubComposition[]
   rootItems: readonly TimelineItem[]
   newId?: NewId
 }): TemplateUpdatePlan | null {
-  const old = findTemplateComposition(params.compositions, params.template.id)
+  const old = findTemplateComposition(
+    params.compositions,
+    params.template.id,
+    params.template.aspect,
+  )
   if (!old) throw new Error(`This project has no copy of template "${params.template.name}"`)
   if (old.templateVersion === params.template.version) return null
   const copy = cloneTemplateCompositions(params.template, params.newId)
@@ -396,13 +444,12 @@ export function planTemplateUpdate(params: {
   let instances = 0
   const retarget = (item: TimelineItem): TimelineItem => {
     if (item.compositionId !== old.id) return item
-    const durationInFrames = Math.min(item.durationInFrames, copy.root.durationInFrames)
     const next = {
       ...item,
       compositionId: copy.root.id,
-      durationInFrames,
-      ...wrapperSourceFields(copy.root),
+      ...retargetTiming(item, copy.root),
     } as TimelineItem
+    if (!next.templateHold) delete next.templateHold
     if (next.type !== 'composition') return next
     instances += 1
     const overrides = remapOverrides(next.compositionControlOverrides, oldNames, newIds, dropped)

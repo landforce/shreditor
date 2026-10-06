@@ -13,7 +13,12 @@
 
 import React, { useCallback, useMemo, memo } from 'react'
 import { useClockFrameSelector } from '../clock'
-import { SequenceContext, type SequenceContextValue, useSequenceContext } from './sequence-context'
+import {
+  SequenceContext,
+  type SequenceContextValue,
+  useSequenceContext,
+  useSequenceFrameRemap,
+} from './sequence-context'
 
 // ============================================
 // Sequence Component
@@ -64,6 +69,8 @@ export const Sequence = memo<SequenceProps>(
     // Get parent sequence context (for nested sequences like sub-compositions)
     const parentContext = useSequenceContext()
     const parentFrom = parentContext?.from ?? 0
+    // Inside a held template instance the clock frame is remapped first.
+    const remap = useSequenceFrameRemap()
 
     // When nested inside another Sequence (e.g. sub-comp items inside a CompositionItem),
     // `from` is relative to the parent. Convert to absolute frame for clock comparison.
@@ -75,12 +82,13 @@ export const Sequence = memo<SequenceProps>(
     // premounted. Active sequences still receive every frame. This prevents
     // inactive timeline items from fanning every Clock tick into React work.
     const selectRelevantFrame = useCallback(
-      (frame: number): number | null => {
+      (clockFrame: number): number | null => {
+        const frame = remap ? remap(clockFrame) : clockFrame
         if (frame < premountStart || frame >= endFrame) return null
         if (frame < absoluteFrom) return absoluteFrom - 1
         return frame
       },
-      [absoluteFrom, endFrame, premountStart],
+      [absoluteFrom, endFrame, premountStart, remap],
     )
     const relevantFrame = useClockFrameSelector(selectRelevantFrame)
 

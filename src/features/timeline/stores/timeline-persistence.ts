@@ -38,7 +38,7 @@ import { useKeyframesStore } from './keyframes-store'
 import { useMarkersStore } from './markers-store'
 import { useProjectTextStylesStore } from '@/shared/state/text-styles'
 import { sanitizeTextStyles } from '@/shared/typography/text-styles/text-style-schema'
-import { aspectKey } from '@/shared/projects/aspect'
+import { aspectKey } from '@/shared/projects/aspect.mjs'
 import { useTimelineSettingsStore } from './timeline-settings-store'
 import { ROOT_HISTORY_CONTEXT, useTimelineCommandStore } from './timeline-command-store'
 import { useCompositionsStore, type SubComposition } from './compositions-store'
@@ -123,10 +123,19 @@ function projectTextStyles(project: Project): TextStyleDefinition[] {
 }
 
 /** The library motion template a composition was copied from (absent on most). */
-function templateTags(composition: { templateId?: string; templateVersion?: number }) {
-  return composition.templateId
-    ? { templateId: composition.templateId, templateVersion: composition.templateVersion }
-    : {}
+function templateTags(composition: {
+  templateId?: string
+  templateVersion?: number
+  templateAspect?: string
+  templateHold?: { start: number; end: number }
+}) {
+  if (!composition.templateId) return {}
+  return {
+    templateId: composition.templateId,
+    templateVersion: composition.templateVersion,
+    ...(composition.templateAspect ? { templateAspect: composition.templateAspect } : {}),
+    ...(composition.templateHold ? { templateHold: composition.templateHold } : {}),
+  }
 }
 
 function collectVideoMediaIds(project: Project): string[] {

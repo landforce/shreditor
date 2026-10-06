@@ -1,7 +1,9 @@
 // `shred templates`: the workspace's motion graphics template library
-// (<workspace>/app/templates/<id>/). list, show, save (from a project's
-// composition), export (a template pack: template.json, thumbnail and the media it
-// uses) and import (brings the media in through the normal import path).
+// (<workspace>/app/templates/<id>/). A template has one variant per aspect ratio
+// (9:16, 16:9, ...). list, show, save (a project's composition becomes the variant
+// for its aspect), clone (a new aspect's variant from an existing one), export (a
+// template pack: template.json, thumbnails and the media it uses) and import
+// (brings the media in through the normal import path).
 import { execFileSync } from 'node:child_process'
 import crypto from 'node:crypto'
 import fs from 'node:fs'
@@ -19,11 +21,19 @@ import {
 import { readMediaMetadata, resolveMediaFile } from '../../../headless/lib/workspace.mjs'
 import {
   findMotionTemplate,
+  formatTemplateHold,
   MOTION_TEMPLATE_CATEGORIES,
   MOTION_TEMPLATE_FILE,
-  MOTION_TEMPLATE_THUMBNAIL,
   parseMotionTemplate,
+  parseTemplateHold,
+  templateAspects,
+  templateVariant,
 } from '../../../src/shared/motion-templates/template-core.mjs'
+import {
+  cloneSourceAspect,
+  cloneTemplateVariant,
+} from '../../../src/shared/motion-templates/template-variants.mjs'
+import { canvasForAspect, parseAspect } from '../../../src/shared/projects/aspect.mjs'
 
 const THUMBNAIL_EDGE = 480
 const workspaceHas = (workspace) => (mediaId) => {
@@ -33,7 +43,11 @@ const workspaceHas = (workspace) => (mediaId) => {
     return false
   }
 }
-const seconds = (template) => (template.durationInFrames / template.fps).toFixed(2)
+const seconds = (variant) => (variant.durationInFrames / variant.fps).toFixed(2)
+const holdText = (variant) => (variant.hold ? `, hold ${formatTemplateHold(variant.hold)}` : '')
+const variantLine = (variant) =>
+  `${variant.aspect} ${variant.width}x${variant.height} @${variant.fps} ${variant.durationInFrames}f (${seconds(variant)}s${holdText(variant)}) v${variant.version}`
+const variantsOf = (template) => templateAspects(template).map((a) => template.variants[a])
 const slugOf = (name) =>
   name
     .toLowerCase()
@@ -57,7 +71,7 @@ function list(ctx) {
   if (ctx.opt.json)
     return ctx.say(
       JSON.stringify(
-        shown.map(({ template, dir, thumbnail }) => ({ ...summary(template), dir, thumbnail })),
+        shown.map(({ template, dir, thumbnails }) => ({ ...summary(template), dir, thumbnails })),
         null,
         2,
       ),
@@ -66,8 +80,9 @@ function list(ctx) {
     ctx.say(`No templates${category ? ` in ${category}` : ''} in ${templatesRoot(ctx.workspace)}.`)
   for (const { template } of shown) {
     ctx.say(
-      `${template.name}  [${template.category}${template.role ? `, role ${template.role}` : ''}]  ${template.width}x${template.height} @${template.fps}  ${template.durationInFrames} frames (${seconds(template)}s)  v${template.version}  ${template.id}`,
+      `${template.name}  [${template.category}${template.role ? `, role ${template.role}` : ''}]  v${template.version}  ${template.id}`,
     )
+    for (const variant of variantsOf(template)) ctx.say(`    ${variantLine(variant)}`)
     ctx.say(`    controls: ${describeControls(template)}`)
   }
   for (const problem of problems) ctx.say(`unreadable template: ${problem}`)
@@ -79,34 +94,41 @@ const summary = (template) => ({
   category: template.category,
   role: template.role ?? null,
   version: template.version,
-  width: template.width,
-  height: template.height,
-  fps: template.fps,
-  durationInFrames: template.durationInFrames,
-  controls: template.controls.map(({ name, kind, property, defaultValue }) => ({
-    name,
-    kind,
-    property,
-    defaultValue,
+  aspects: templateAspects(template),
+  variants: variantsOf(template).map((variant) => ({
+    aspect: variant.aspect,
+    version: variant.version,
+    width: variant.width,
+    height: variant.height,
+    fps: variant.fps,
+    durationInFrames: variant.durationInFrames,
+    hold: variant.hold ?? null,
   })),
+  controls: template.controls,
   media: template.media,
 })
 
 function show(ctx, ref) {
   if (!ref) throw new Error('Usage: shred templates show <name|id>')
-  const { template, dir, thumbnail } = resolveTemplate(ctx.workspace, ref)
+  const { template, dir, thumbnails } = resolveTemplate(ctx.workspace, ref)
   const missing = new Set(
     missingTemplateMedia(template, workspaceHas(ctx.workspace)).map((m) => m.mediaId),
   )
   if (ctx.opt.json)
     return ctx.say(
-      JSON.stringify({ ...summary(template), dir, thumbnail, missingMedia: [...missing] }, null, 2),
+      JSON.stringify(
+        { ...summary(template), dir, thumbnails, missingMedia: [...missing] },
+        null,
+        2,
+      ),
     )
   ctx.say(`${template.name}  v${template.version}  (${template.id})`)
   ctx.say(`category   ${template.category}${template.role ? `, fills role ${template.role}` : ''}`)
-  ctx.say(
-    `canvas     ${template.width}x${template.height} @${template.fps}, ${template.durationInFrames} frames (${seconds(template)}s)`,
-  )
+  ctx.say('versions (addTemplate uses the one matching the project aspect ratio):')
+  for (const variant of variantsOf(template))
+    ctx.say(
+      `  ${variantLine(variant)}${thumbnails[variant.aspect] ? `  ${thumbnails[variant.aspect]}` : ''}`,
+    )
   ctx.say(`updated    ${new Date(template.updatedAt).toISOString()}`)
   ctx.say('controls (addTemplate/setTemplateControls take these names):')
   for (const c of template.controls)
@@ -117,20 +139,24 @@ function show(ctx, ref) {
   ctx.say(
     `media      ${template.media.length ? template.media.map((m) => `${m.fileName}${missing.has(m.mediaId) ? ' (MISSING)' : ''}`).join(', ') : 'none'}`,
   )
-  ctx.say(`nested     ${template.subCompositions.length} sub-composition(s)`)
   ctx.say(`folder     ${dir}`)
-  if (thumbnail) ctx.say(`thumbnail  ${thumbnail}`)
 }
 
-async function renderThumbnail(ctx, template) {
-  const scale = THUMBNAIL_EDGE / Math.max(template.width, template.height)
+/** The hold frame when there is one (the template fully in), else the middle. */
+const thumbnailFrame = (variant) =>
+  variant.hold ? variant.hold.start : Math.floor(variant.durationInFrames / 2)
+
+/** A transparent WebP of one variant (shown on a checkerboard), or null when the service is down. */
+async function renderThumbnail(ctx, template, aspect) {
+  const variant = templateVariant(template, aspect)
+  const scale = THUMBNAIL_EDGE / Math.max(variant.width, variant.height)
   try {
     return await ctx.call('POST', '/frame', {
-      projectObject: templatePreviewProject(template),
-      frame: Math.floor(template.durationInFrames / 2),
-      width: Math.max(16, Math.round(template.width * scale)),
-      height: Math.max(16, Math.round(template.height * scale)),
-      format: 'jpeg',
+      projectObject: templatePreviewProject(variant),
+      frame: thumbnailFrame(variant),
+      width: Math.max(16, Math.round(variant.width * scale)),
+      height: Math.max(16, Math.round(variant.height * scale)),
+      format: 'webp',
     })
   } catch (error) {
     ctx.say(`warning: no thumbnail (${error.message}); is the service up? (shred start)`)
@@ -141,7 +167,7 @@ async function renderThumbnail(ctx, template) {
 async function save(ctx, projectId, ref) {
   if (!projectId || !ref)
     throw new Error(
-      'Usage: shred templates save <projectId> <compositionItemId|compositionId> --name "..." --category <c> [--role r]',
+      'Usage: shred templates save <projectId> <compositionItemId|compositionId> --name "..." --category <c> [--role r] [--hold <frame|start-end|none>]',
     )
   await ctx.warnUnsaved(projectId)
   const { project } = await ctx.getProject(projectId)
@@ -149,20 +175,77 @@ async function save(ctx, projectId, ref) {
     ctx.workspace,
     project,
     ref,
-    { name: ctx.opt.name, category: ctx.opt.category ?? 'other', role: ctx.opt.role },
+    {
+      name: ctx.opt.name,
+      category: ctx.opt.category,
+      role: ctx.opt.role,
+      hold: ctx.opt.hold === undefined ? undefined : parseTemplateHold(ctx.opt.hold),
+    },
     (mediaId) => readMediaMetadata(ctx.workspace, mediaId)?.fileName ?? mediaId,
   )
-  const thumbnail = await renderThumbnail(ctx, template)
-  const dir = writeTemplate(ctx.workspace, template, thumbnail)
+  const aspect = savedAspect(template)
+  const thumbnail = await renderThumbnail(ctx, template, aspect)
+  const dir = writeTemplate(ctx.workspace, template, { [aspect]: thumbnail })
   ctx.say(
     `${template.version > 1 ? 'new version' : 'saved'}  ${template.name}  v${template.version}  (${template.id})`,
   )
+  ctx.say(`variant   ${variantLine(template.variants[aspect])}`)
+  ctx.say(`versions  ${templateAspects(template).join(', ')}`)
   ctx.say(`controls  ${describeControls(template)}`)
   ctx.say(`folder    ${dir}`)
   if (!template.controls.length)
     ctx.say(
       'note: no controls, so every instance looks the same (setCompositionControls, then save again)',
     )
+}
+
+/** The variant a save wrote: the one saved in the template's newest version. */
+function savedAspect(template) {
+  return variantsOf(template).find((variant) => variant.version === template.version).aspect
+}
+
+function cloneCanvas(ctx, template, aspect, from) {
+  if (ctx.opt.size) {
+    const [width, height] = String(ctx.opt.size).split('x').map(Number)
+    if (!(width > 0) || !(height > 0)) throw new Error(`--size "${ctx.opt.size}" must be WxH`)
+    return { width, height }
+  }
+  const source = template.variants[from]
+  return canvasForAspect(aspect, Math.min(source.width, source.height))
+}
+
+/**
+ * A variant for another aspect ratio, copied from an existing one and re-laid
+ * for the new canvas (items keep their nearest edge, sizes follow the short
+ * side): a starting point to adjust in a project of that aspect, then save.
+ */
+async function clone(ctx, ref) {
+  if (!ref || !ctx.opt.aspect)
+    throw new Error(
+      'Usage: shred templates clone <name|id> --aspect <9:16|16:9|1:1|4:5|W:H> [--from <aspect>] [--size WxH]',
+    )
+  const { template } = resolveTemplate(ctx.workspace, ref)
+  const aspect = parseAspect(ctx.opt.aspect)
+  if (template.variants[aspect])
+    throw new Error(`"${template.name}" already has a ${aspect} version`)
+  const from = cloneSourceAspect(
+    template,
+    aspect,
+    ctx.opt.from ? parseAspect(ctx.opt.from) : undefined,
+  )
+  const result = cloneTemplateVariant(template, {
+    aspect,
+    from,
+    canvas: cloneCanvas(ctx, template, aspect, from),
+  })
+  const thumbnail = await renderThumbnail(ctx, result.template, aspect)
+  const dir = writeTemplate(ctx.workspace, result.template, { [aspect]: thumbnail })
+  ctx.say(`cloned   ${template.name} ${from} -> ${variantLine(result.template.variants[aspect])}`)
+  ctx.say(`versions ${templateAspects(result.template).join(', ')}`)
+  ctx.say(`folder   ${dir}`)
+  ctx.say(
+    `next     addTemplate "${template.name}" in a ${aspect} project, adjust its composition with the usual ops, then shred templates save <projectId> <instanceId>`,
+  )
 }
 
 function copyPreservingTime(from, to) {
@@ -173,13 +256,14 @@ function copyPreservingTime(from, to) {
 }
 
 function writePack(ctx, entry, packDir) {
-  const { template, thumbnail } = entry
+  const { template, thumbnails } = entry
   fs.mkdirSync(packDir, { recursive: true })
   fs.writeFileSync(
     path.join(packDir, MOTION_TEMPLATE_FILE),
     `${JSON.stringify(template, null, 2)}\n`,
   )
-  if (thumbnail) fs.copyFileSync(thumbnail, path.join(packDir, MOTION_TEMPLATE_THUMBNAIL))
+  for (const file of Object.values(thumbnails).filter(Boolean))
+    fs.copyFileSync(file, path.join(packDir, path.basename(file)))
   for (const ref of template.media) {
     const source = resolveMediaFile(ctx.workspace, ref.mediaId, { original: true })
     if (!source)
@@ -269,6 +353,16 @@ function uniqueName(ctx, template) {
   return clash && clash.id !== template.id ? `${template.name} (imported)` : template.name
 }
 
+/** The pack's thumbnail bytes by aspect (variants without one are left out). */
+function packThumbnails(packDir, template) {
+  const out = {}
+  for (const [aspect, variant] of Object.entries(template.variants)) {
+    const file = variant.thumbnail ? path.join(packDir, path.basename(variant.thumbnail)) : null
+    if (file && fs.existsSync(file)) out[aspect] = fs.readFileSync(file)
+  }
+  return out
+}
+
 async function importOne(ctx, packDir) {
   const parsed = parseMotionTemplate(
     JSON.parse(fs.readFileSync(path.join(packDir, MOTION_TEMPLATE_FILE), 'utf8')),
@@ -284,12 +378,7 @@ async function importOne(ctx, packDir) {
   }
   const { idMap, linked } = await importPackMedia(ctx, packDir, parsed)
   const template = { ...remapTemplateMedia(parsed, idMap), name: uniqueName(ctx, parsed) }
-  const thumbnailFile = path.join(packDir, MOTION_TEMPLATE_THUMBNAIL)
-  writeTemplate(
-    ctx.workspace,
-    template,
-    fs.existsSync(thumbnailFile) ? fs.readFileSync(thumbnailFile) : null,
-  )
+  writeTemplate(ctx.workspace, template, packThumbnails(packDir, template))
   ctx.say(`imported ${template.name} v${template.version} (${template.id})`)
   return linked
 }
@@ -327,12 +416,14 @@ const SUBCOMMANDS = {
   list: (ctx) => list(ctx),
   show: (ctx, [ref]) => show(ctx, ref),
   save: (ctx, [projectId, ref]) => save(ctx, projectId, ref),
+  clone: (ctx, [ref]) => clone(ctx, ref),
   export: (ctx, [ref]) => exportPack(ctx, ref),
   import: (ctx, [source]) => importPack(ctx, source),
 }
 
 export async function templatesCommand([sub = 'list', ...rest], ctx) {
   const run = Object.hasOwn(SUBCOMMANDS, sub) ? SUBCOMMANDS[sub] : null
-  if (!run) throw new Error(`Unknown templates command "${sub}" (list, show, save, export, import)`)
+  if (!run)
+    throw new Error(`Unknown templates command "${sub}" (list, show, save, clone, export, import)`)
   return run(ctx, rest)
 }

@@ -7,8 +7,11 @@ export {
   AbsoluteFill,
   Sequence,
   SequenceContext,
+  SequenceFrameRemapContext,
   interpolate,
   useSequenceContext,
+  useSequenceFrameRemap,
+  type SequenceFrameRemap,
 } from '@/runtime/player/composition'
 export { VideoConfigProvider } from '@/runtime/player/VideoConfigProvider'
 export { useVideoConfig } from '@/runtime/player/video-config-context'

@@ -54,29 +54,71 @@ yours. Nothing is merged silently.
 
 ## Setup
 
+### Install
+
+1. Install [Homebrew](https://brew.sh) and [Google Chrome](https://www.google.com/chrome/),
+   and Node.js 22 or newer ([nodejs.org](https://nodejs.org), or `brew install node`).
+2. In Terminal:
+
+   ```bash
+   git clone https://github.com/landforce/shreditor.git
+   cd shreditor
+   npm ci
+   npx shreditor install
+   ```
+
+`npx shreditor install` checks everything Shreditor needs and says what is
+missing and how to fix it. It offers to install ffmpeg and whisper.cpp with
+Homebrew, download the transcription model (1.6 GB), and build the editor;
+answer `y` (or pass `--yes`). It never installs Homebrew, Chrome or Node for
+you.
+
+Then it sets up two macOS login items, the editor and the agent service, and
+from then on Shreditor is always on at **http://localhost:5273**. They start
+when you log in and restart on their own if they stop. The agent service
+listens on `127.0.0.1:8787`, on this Mac only.
+
+### Update, check, remove
+
 ```bash
-git clone https://github.com/landforce/shreditor.git
-cd shreditor
-npm ci
+npx shreditor update      # pull, reinstall dependencies if they changed, rebuild, restart
+npx shreditor status      # login items, URLs, workspace, build vs checkout, log files
+npx shreditor restart     # restart both
+npx shreditor uninstall   # remove the login items (keeps your workspace, settings and logs)
 ```
 
-To use the editor on its own:
+`update` and `restart` wait while the editor has unsaved changes or the agent
+is in the middle of an edit or a render, and tell you what to save first
+(`--force` goes ahead anyway). `update` refuses when the checkout has local
+changes.
+
+Logs are in `~/Library/Logs/Shreditor/` (`editor.log`, `service.log`). The
+workspace, where projects and media live, is `~/Movies/Shreditor`; to use
+another folder, run `npx shreditor choose`, then `npx shreditor restart`.
+
+### Without the login items (development)
+
+To use the editor on its own with live reload:
 
 ```bash
 npm run dev        # editor at http://localhost:5173
 ```
 
-For agent editing, the skill's `shred` script starts everything:
+For agent editing without the login items, the skill's `shred` script starts
+everything:
 
 ```bash
 node skills/shreditor-edit/scripts/shred.mjs up       # editor on :5273, agent service on :8787
 node skills/shreditor-edit/scripts/shred.mjs status   # editor, service, workspace, writer lock
 ```
 
-`shred up` runs the editor dev server on port 5273 and starts the agent edit
-service (`headless/serve.mjs`) on `127.0.0.1:8787`. The service edits and
-renders through the built app, so the first start runs `npm run build`, which
-takes a while. Pass `--build` to `shred start` to rebuild after code changes.
+`shred up` serves a built copy of the editor on port 5273 (`--dev` for the dev
+server) and starts the agent edit service (`headless/serve.mjs`) on
+`127.0.0.1:8787`. It builds first when the build is missing or older than the
+checkout; pass `--build` to rebuild anyway. `shred` commands also start the
+service (and the editor) themselves when they need it, through the login item
+when one is installed; `SHRED_AUTOSTART=0` turns that off. When the login
+items are installed, `shred up` leaves them alone.
 
 An alias saves typing:
 

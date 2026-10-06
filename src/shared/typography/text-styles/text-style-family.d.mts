@@ -3,7 +3,6 @@ import type { TextStyleDefinition, TextStyleVariant } from '../../../types/text-
 
 export const LEGACY_TEXT_STYLE_ASPECT: string
 
-export function parseAspect(text: string): string
 export function referenceCanvasForAspect(aspect: string): { width: number; height: number }
 export function toTextStyleFamily<T = TextStyleDefinition>(entry: unknown, legacyAspect?: string): T
 export function textStyleVariantFor(

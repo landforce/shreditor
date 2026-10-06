@@ -13,10 +13,10 @@ import { z } from 'zod'
 import { TEXT_STYLE_ROLES, type TextStyleDefinition } from '@/types/text-style'
 import type { TextMotionSpec } from '@/types/text-motion'
 import { sanitizeTextMotion } from '@/shared/projects/migrations/sanitize-text-motion'
+import { parseAspect } from '@/shared/projects/aspect.mjs'
 import {
   LEGACY_TEXT_STYLE_ASPECT,
   mergeTextStyleFamilies,
-  parseAspect,
   toTextStyleFamily,
 } from './text-style-family.mjs'
 

@@ -4,7 +4,12 @@
  * The editor and the headless edit service share them.
  */
 import type { CompositionItem, TimelineItem } from '@/types/timeline'
-import type { MotionTemplate } from '@/shared/motion-templates/template-core.mjs'
+import {
+  chooseTemplateVariant,
+  templateVariant,
+  type MotionTemplate,
+  type MotionTemplateVariantView,
+} from '@/shared/motion-templates/template-core.mjs'
 import { createClassicTrack } from '../../utils/classic-tracks'
 import { compositionHasOwnedAudio } from '../../utils/dropped-composition'
 import { wouldCreateCompositionCycle } from '../../utils/composition-graph'
@@ -18,6 +23,7 @@ import {
   planTemplateUpdate,
   resolveInstanceDuration,
   resolveTemplateControlOverrides,
+  templateCompositionAspect,
   type TemplateControlValues,
 } from '../../utils/motion-template-instances'
 import { useItemsStore } from '../items-store'
@@ -28,8 +34,11 @@ import { execute } from './shared'
 
 export interface InsertMotionTemplateOptions {
   from: number
-  /** Project canvas: the instance is scaled to its width. */
-  canvas: { width: number }
+  /**
+   * Project canvas: picks the variant with its aspect ratio (none is an error)
+   * and the instance fills it.
+   */
+  canvas: { width: number; height: number }
   durationInFrames?: number
   /** A specific track (the caller checks it is free); otherwise one is chosen or made. */
   trackId?: string
@@ -57,12 +66,12 @@ function newTrack(kind: 'video' | 'audio'): string {
   return track.id
 }
 
-/** The project's copy of the template, or a fresh copy added to the project. */
+/** The project's copy of the variant, or a fresh copy added to the project. */
 function ensureTemplateComposition(
-  template: MotionTemplate,
+  template: MotionTemplateVariantView,
   existing: SubComposition | undefined,
 ): SubComposition {
-  return existing ?? ensureMotionTemplateComposition(template).composition
+  return existing ?? ensureVariantComposition(template).composition
 }
 
 function templateCompositionIds(): Set<string> {
@@ -83,7 +92,7 @@ interface InstancePlan {
 }
 
 function placeInstance(
-  template: MotionTemplate,
+  template: MotionTemplateVariantView,
   composition: SubComposition,
   plan: InstancePlan,
 ): { visual: CompositionItem; audio?: TimelineItem } {
@@ -130,13 +139,14 @@ function placeInstance(
 
 /** Check everything that can fail before the store changes (execute has no rollback). */
 function planInstance(
-  template: MotionTemplate,
+  template: MotionTemplateVariantView,
   existing: SubComposition | undefined,
   options: InsertMotionTemplateOptions,
 ): InstancePlan {
   const source = existing ?? {
     name: template.name,
     durationInFrames: template.durationInFrames,
+    templateHold: template.hold,
     items: template.composition.items as TimelineItem[],
     compositionControls: template.composition.compositionControls,
   }
@@ -161,14 +171,20 @@ function planInstance(
   }
 }
 
-/** Insert an instance of a library template (copying it into the project once per version). */
+/**
+ * Insert an instance of a library template: the variant matching the canvas's
+ * aspect ratio (throws naming the variants there are when none does), copied into
+ * the project once per version.
+ */
 export function insertMotionTemplate(
-  template: MotionTemplate,
+  family: MotionTemplate,
   options: InsertMotionTemplateOptions,
 ): InsertMotionTemplateResult {
+  const template = chooseTemplateVariant(family, options.canvas)
   const existing = findTemplateComposition(
     useCompositionsStore.getState().compositions,
     template.id,
+    template.aspect,
   )
   const plan = planInstance(template, existing, options)
   return execute(
@@ -200,14 +216,26 @@ export interface UpdateMotionTemplateResult {
   droppedControls: string[]
 }
 
+/** The library variant the project's copy of a template came from. */
+function projectVariant(family: MotionTemplate): MotionTemplateVariantView {
+  const copy = findTemplateComposition(useCompositionsStore.getState().compositions, family.id)
+  if (!copy) throw new Error(`This project has no copy of template "${family.name}"`)
+  const aspect = templateCompositionAspect(copy)
+  const template = templateVariant(family, aspect)
+  if (!template) throw new Error(`"${family.name}" no longer has a ${aspect} version`)
+  return template
+}
+
 /**
- * Replace the project's copy of a template with the library version (all
- * instances). Runs on the main timeline; null when the copy is already current.
+ * Replace the project's copy of a template with the library version of its
+ * variant (all instances). Runs on the main timeline; null when the copy is
+ * already current.
  */
-export function updateMotionTemplate(template: MotionTemplate): UpdateMotionTemplateResult | null {
+export function updateMotionTemplate(family: MotionTemplate): UpdateMotionTemplateResult | null {
   if (useCompositionNavigationStore.getState().activeCompositionId !== null) {
     throw new Error('Go back to the main timeline to update a template')
   }
+  const template = projectVariant(family)
   return execute(
     'UPDATE_MOTION_TEMPLATE',
     () => {
@@ -259,17 +287,25 @@ export function setMotionTemplateControlValues(
 }
 
 /**
- * Make sure the project has a copy of the template (for dragging it onto the
- * timeline as a composition). Returns the ids added, so an abandoned drag can
+ * Make sure the project has a copy of a template variant (for dragging it onto
+ * the timeline as a composition). Returns the ids added, so an abandoned drag can
  * take them out again with discardUnusedTemplateCompositions.
  */
-export function ensureMotionTemplateComposition(template: MotionTemplate): {
+export function ensureMotionTemplateComposition(
+  family: MotionTemplate,
+  canvas: { width: number; height: number },
+): { composition: SubComposition; addedIds: string[] } {
+  return ensureVariantComposition(chooseTemplateVariant(family, canvas))
+}
+
+function ensureVariantComposition(template: MotionTemplateVariantView): {
   composition: SubComposition
   addedIds: string[]
 } {
   const existing = findTemplateComposition(
     useCompositionsStore.getState().compositions,
     template.id,
+    template.aspect,
   )
   if (existing) return { composition: existing, addedIds: [] }
   const copy = cloneTemplateCompositions(template)
@@ -293,4 +329,42 @@ export function discardUnusedTemplateCompositions(addedIds: readonly string[]): 
   useCompositionsStore
     .getState()
     .setCompositions(compositions.filter((composition) => !added.has(composition.id)))
+}
+
+function withHold<T extends TimelineItem>(item: T, hold: SubComposition['templateHold']): T {
+  const next = { ...item, templateHold: hold ? { ...hold } : undefined }
+  if (!hold) delete next.templateHold
+  return next
+}
+
+/**
+ * After a project composition was saved to the library as a template variant:
+ * tag it as that variant's current version (so it is not shown as outdated) and
+ * give its instances on this level and nested ones the variant's hold.
+ */
+export function syncSavedTemplateComposition(
+  compositionId: string,
+  template: MotionTemplateVariantView,
+): void {
+  const hold = template.hold
+  const tags = {
+    templateId: template.id,
+    templateVersion: template.version,
+    templateAspect: template.aspect,
+    templateHold: hold ? { ...hold } : undefined,
+  }
+  const retag = <T extends TimelineItem>(item: T): T =>
+    item.compositionId === compositionId ? withHold(item, hold) : item
+  const { compositions, setCompositions } = useCompositionsStore.getState()
+  setCompositions(
+    compositions.map((composition) =>
+      composition.id === compositionId
+        ? { ...composition, ...tags }
+        : { ...composition, items: composition.items.map(retag) },
+    ),
+  )
+  const items = useItemsStore.getState().items
+  if (items.some((item) => item.compositionId === compositionId))
+    useItemsStore.getState().setItems(items.map(retag))
+  useTimelineSettingsStore.getState().markDirty()
 }

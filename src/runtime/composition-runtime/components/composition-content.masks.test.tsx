@@ -50,6 +50,8 @@ vi.mock('@/runtime/composition-runtime/deps/player', async () => {
   }
 
   return {
+    SequenceFrameRemapContext: React.createContext(null),
+    useSequenceFrameRemap: () => null,
     AbsoluteFill: ({
       children,
       style,

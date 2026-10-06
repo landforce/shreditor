@@ -16,8 +16,9 @@ import { createTemplateRoutes } from './template-bridge.mjs'
 import { createTranscriptionRoutes } from './transcription.mjs'
 
 const PREFIX = '/__shreditor/'
-const CONFIG_DIR = path.join(os.homedir(), '.shreditor')
-const CONFIG_FILE = path.join(CONFIG_DIR, 'config.json')
+// $SHREDITOR_CONFIG points elsewhere (as server/transcription.mjs allows), e.g. for test login items.
+const CONFIG_FILE = process.env.SHREDITOR_CONFIG || path.join(os.homedir(), '.shreditor', 'config.json')
+const CONFIG_DIR = path.dirname(CONFIG_FILE)
 export const DEFAULT_WORKSPACE = path.join(os.homedir(), 'Movies', 'Shreditor')
 const MAX_RECENT = 8
 
@@ -182,7 +183,7 @@ export function createWorkspaceBridge({ mode = 'dev' } = {}) {
       switch (route) {
         case 'GET info': {
           const config = readConfig()
-          return sendJson(res, 200, { version: 1, root, name: path.basename(root), recent: config.recent ?? [root], platform: process.platform, mode })
+          return sendJson(res, 200, { version: 1, root, name: path.basename(root), recent: config.recent ?? [root], platform: process.platform, mode, pid: process.pid })
         }
         case 'POST workspace': {
           const { path: dir } = JSON.parse((await readBody(req)).toString() || '{}')

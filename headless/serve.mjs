@@ -6,9 +6,10 @@
 //
 // Usage:
 //   node headless/serve.mjs --workspace <dir> [--host 127.0.0.1] [--port 8787] [--build] [--head] [--harness-url <url>]
+//                           [--break-lock]   (take over a writer lock whose process is confirmed dead)
 //
 // API:
-//   GET  /health                      -> { ok, harnessUrl }
+//   GET  /health                      -> { ok, harnessUrl, workspace, pid, inFlight }  (inFlight: requests not finished)
 //   GET  /projects                    -> [{ id, name, updatedAt }]
 //   POST /render  { project|projectObject, codec?, container?, resolution?, fps?, engine?,
 //                   quality?, in?, outSec?, duration?, audioOnly? }
@@ -59,6 +60,7 @@ import {
   readJsonBody,
   readJsonBodyWithBytes,
   setHttpTimeouts,
+  countInFlight,
 } from './lib/http-security.mjs'
 import {
   HEADLESS_API_VERSION,
@@ -91,7 +93,7 @@ import { withIdempotency } from './lib/idempotency.mjs'
 import { NativeExportRefused, exportsDir, runNativeExport } from './lib/native-export.mjs'
 import { projectFormatRecord } from '../formats/registry.mjs'
 
-const HELP = `Usage: node headless/serve.mjs --workspace <dir> [options]\n\nOptions:\n  --host <address>           Bind address (default: 127.0.0.1)\n  --port <n>                 HTTP port (default: 8787)\n  --render-timeout-ms <n>    Whole render deadline (default: 1800000)\n  --edit-timeout-ms <n>      Whole edit deadline (default: 120000)\n  --max-queue-depth <n>      Waiting operations allowed behind the active one (default: 8)\n  --shutdown-timeout-ms <n>  Graceful queue drain deadline (default: 30000)\n  --build  --head  --harness-url <url>\n`
+const HELP = `Usage: node headless/serve.mjs --workspace <dir> [options]\n\nOptions:\n  --host <address>           Bind address (default: 127.0.0.1)\n  --port <n>                 HTTP port (default: 8787)\n  --render-timeout-ms <n>    Whole render deadline (default: 1800000)\n  --edit-timeout-ms <n>      Whole edit deadline (default: 120000)\n  --max-queue-depth <n>      Waiting operations allowed behind the active one (default: 8)\n  --shutdown-timeout-ms <n>  Graceful queue drain deadline (default: 30000)\n  --break-lock               Take over a writer lock left by a process that is confirmed dead\n  --build  --head  --harness-url <url>\n`
 const SERVE_OPTIONS = new Set([
   'workspace',
   'host',
@@ -104,6 +106,7 @@ const SERVE_OPTIONS = new Set([
   'edit-timeout-ms',
   'max-queue-depth',
   'shutdown-timeout-ms',
+  'break-lock',
 ])
 
 /** Resolve the service bind address without exposing native runs by default. */
@@ -146,9 +149,10 @@ function isSoftwareGpu(gpu) {
   return /llvmpipe|lavapipe|swiftshader|software|mesa/.test(s)
 }
 
-async function main() {
+/** Run the service with these command-line arguments (server/install/run-service.mjs calls it too). */
+export async function main(argv = process.argv.slice(2)) {
   const { chromium } = await import('playwright')
-  const args = parseArgs(process.argv.slice(2), { allowed: SERVE_OPTIONS })
+  const args = parseArgs(argv, { allowed: SERVE_OPTIONS })
   if (args.help) {
     console.log(HELP)
     return
@@ -156,7 +160,9 @@ async function main() {
   const workspace = args.workspace
   if (!workspace) throw new Error('Missing --workspace <dir>')
   if (!fs.existsSync(workspace)) throw new Error(`Workspace not found: ${workspace}`)
-  const releaseWriterLock = await acquireWriterLock(workspace)
+  const releaseWriterLock = await acquireWriterLock(workspace, {
+    breakLock: Boolean(args['break-lock']),
+  })
   try {
     await assertAtomicReplace(workspace)
   } catch (error) {
@@ -666,6 +672,9 @@ async function main() {
               gpu,
               software: isSoftwareGpu(gpu),
               harnessUrl,
+              workspace,
+              pid: process.pid,
+              inFlight: inFlight(),
             })
           }
         : route === 'GET /capabilities'
@@ -789,6 +798,7 @@ async function main() {
     })
   })
   setHttpTimeouts(server)
+  const inFlight = countInFlight(server, { ignore: (req) => req.url === '/health' })
 
   // The default remains loopback-only because the render service has no auth.
   // Network exposure must be an explicit CLI/environment configuration choice.

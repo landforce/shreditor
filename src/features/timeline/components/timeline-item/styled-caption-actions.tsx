@@ -11,7 +11,7 @@ import type { AudioItem, TextItem, TimelineItem, VideoItem } from '@/types/timel
 import type { TextStyleDefinition } from '@/types/text-style'
 import { useLibraryTextStylesStore, useProjectTextStylesStore } from '@/shared/state/text-styles'
 import { DEFAULT_PROJECT_HEIGHT, DEFAULT_PROJECT_WIDTH } from '@/shared/projects/defaults'
-import { aspectKey } from '@/shared/projects/aspect'
+import { aspectKey } from '@/shared/projects/aspect.mjs'
 import {
   addClonedTextStyleVariant,
   textStyleVariantFor,
