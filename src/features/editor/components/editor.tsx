@@ -29,6 +29,8 @@ import { toast } from 'sonner'
 import { useEditorHotkeys } from '@/features/editor/hooks/use-editor-hotkeys'
 import { useAutoSave } from '../hooks/use-auto-save'
 import { ProjectSyncBanner } from '../agent-sync/sync-banner'
+import { AgentActivityBanner } from '../agent-sync/agent-activity-banner'
+import { isAgentEditLocked, refuseEditWhileAgentWorks } from '@/shared/state/agent-edit-lock'
 import { useProjectSyncStore } from '../agent-sync/sync-store'
 import { useProjectFileWatcher } from '../agent-sync/use-project-file-watcher'
 import { useProjectMediaWatcher } from '../agent-sync/use-project-media-watcher'
@@ -86,6 +88,14 @@ const LazyColorTimelineNavigator = lazy(() =>
   })),
 )
 const EDITOR_PROJECT_ROUTE_ID = '/editor/$projectId'
+
+/** In watch mode (an agent is mid-pass) a write would make the agent's publish fail: skip it. */
+function skipSaveForAgent(options?: SaveOptions): boolean {
+  if (!isAgentEditLocked()) return false
+  // Only edits from before the pass can be unsaved: say why they wait.
+  if (!options?.quiet && useTimelineStore.getState().isDirty) refuseEditWhileAgentWorks()
+  return true
+}
 
 function workspaceTimelineSizeStorageKey(workspace: EditorWorkspaceId): string {
   return `editor:workspaceTimelineSize:${workspace}`
@@ -609,7 +619,7 @@ export const LoadedEditor = memo(function LoadedEditor({
 
   // Save timeline to project (with guard against concurrent saves).
   // `quiet` skips the success toast (the frequent agent-native autosave).
-  const handleSave = useCallback(
+  const saveProject = useCallback(
     async (options?: SaveOptions) => {
       // Prevent concurrent saves (e.g., spamming Ctrl+S)
       if (isSavingRef.current) {
@@ -646,6 +656,11 @@ export const LoadedEditor = memo(function LoadedEditor({
       }
     },
     [projectId],
+  )
+  const handleSave = useCallback(
+    (options?: SaveOptions) =>
+      skipSaveForAgent(options) ? Promise.resolve() : saveProject(options),
+    [saveProject],
   )
 
   const handleExport = useCallback(() => {
@@ -717,6 +732,7 @@ export const LoadedEditor = memo(function LoadedEditor({
     >
       <AutoSaveController onSave={handleSave} projectId={projectId} />
       <FormatScorecardController />
+      <AgentActivityBanner projectId={projectId} />
       <ProjectSyncBanner projectId={projectId} />
       <TimelineShortcutsController />
 

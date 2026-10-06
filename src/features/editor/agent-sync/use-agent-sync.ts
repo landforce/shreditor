@@ -4,8 +4,10 @@ import { isBridgeHandle } from '@/infrastructure/storage/bridge-fs/bridge-handle
 import { requireWorkspaceRoot } from '@/infrastructure/storage/workspace-fs/root'
 import { useTimelineSettingsStore, useTimelineStore } from '@/features/editor/deps/timeline-store'
 import { useSelectionStore } from '@/shared/state/selection'
+import { isAgentEditLocked } from '@/shared/state/agent-edit-lock'
 import { AgentSyncController, type EditorStateReport } from './agent-sync-controller'
 import { useProjectSyncStore } from './sync-store'
+import { receiveAgentActivity } from './agent-activity-store'
 
 const ENDPOINT = '/__shreditor/editor-state'
 
@@ -26,7 +28,11 @@ async function send(report: EditorStateReport): Promise<{ saveRequest?: string |
     cache: 'no-store',
     keepalive: Boolean(report.closed),
   })
-  return res.ok ? ((await res.json()) as { saveRequest?: string | null }) : null
+  if (!res.ok) return null
+  const reply = (await res.json()) as { saveRequest?: string | null; agentActivity?: unknown }
+  // Whether an agent is mid-pass on this project (the banner and watch mode).
+  if (!report.closed) receiveAgentActivity(reply.agentActivity)
+  return reply
 }
 
 // Held pointer buttons count as a gesture: clip drags, trims, gizmo moves and
@@ -80,6 +86,7 @@ export function useAgentSync(
       isDirty: () => useTimelineStore.getState().isDirty,
       markDirty: () => useTimelineSettingsStore.getState().markDirty(),
       isBusy,
+      isPaused: isAgentEditLocked,
       status: () => useProjectSyncStore.getState().status,
       revision: () => getTrackedRevision(projectId),
       send,

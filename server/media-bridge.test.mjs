@@ -1,11 +1,10 @@
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
-import http from 'node:http'
 import os from 'node:os'
 import path from 'node:path'
 import test from 'node:test'
 import { importMediaByPath, projectMediaCategories, projectMediaVersion, setMediaCategories } from './media-bridge.mjs'
-import { createWorkspaceBridge } from './workspace-bridge.mjs'
+import { startBridge } from './bridge-test-server.mjs'
 
 function makeWorkspace(t) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'shreditor-media-bridge-'))
@@ -26,20 +25,6 @@ function makeWorkspace(t) {
       JSON.stringify({ version: '1.0', mediaIds: ids.map((id) => ({ id, addedAt: 1 })) }),
     )
   return { root, project, media, read, link }
-}
-
-/** Serve the workspace bridge for `root`; resolves to its http://127.0.0.1:<port> origin. */
-async function startBridge(t, root) {
-  const previous = process.env.SHREDITOR_WORKSPACE
-  process.env.SHREDITOR_WORKSPACE = root
-  const server = http.createServer(createWorkspaceBridge())
-  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve))
-  t.after(() => {
-    server.close()
-    if (previous === undefined) delete process.env.SHREDITOR_WORKSPACE
-    else process.env.SHREDITOR_WORKSPACE = previous
-  })
-  return `http://127.0.0.1:${server.address().port}`
 }
 
 test('setMediaCategories sets, clears and reports what changed', (t) => {

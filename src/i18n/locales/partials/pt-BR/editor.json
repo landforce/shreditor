@@ -874,6 +874,18 @@
     "colorPanel": {
       "emptyState": "Selecione um clipe para corrigir as cores",
       "adjustmentLayerLabel": "Correção de cor"
+    },
+    "agentActivity": {
+      "working": "O agente está trabalhando em uma passada: {{label}}",
+      "workingNoLabel": "O agente está trabalhando em uma passada",
+      "watchMode": "Você pode reproduzir, navegar e olhar. As edições esperam o agente.",
+      "editAnyway": "Editar mesmo assim",
+      "stop": "Parar o agente",
+      "stopping": "Parando… o agente verá isso no próximo passo",
+      "passReady": "Passada pronta: {{label}}",
+      "passReadyNoLabel": "Passada pronta",
+      "refused": "O agente está trabalhando. Aguarde ou escolha Editar mesmo assim.",
+      "actionFailed": "Não foi possível acessar a ponte do editor. Tente novamente."
     }
   }
 }
