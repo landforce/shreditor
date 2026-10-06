@@ -1,5 +1,6 @@
-import { memo, type CSSProperties, type ReactNode } from 'react'
+import { memo, useState, type CSSProperties, type ReactNode } from 'react'
 import { MINI_FILM_TILE_HEIGHT, MINI_FILM_TILE_WIDTH } from './constants'
+import { miniFilmTileThumbnailFit } from './thumbnail-fit'
 
 /**
  * Presentational film tile: numbered badge + timecode + track name header, a
@@ -35,6 +36,7 @@ export const MiniFilmTile = memo(function MiniFilmTile({
   overlay?: ReactNode
 }) {
   const clipNumber = String(index + 1).padStart(2, '0')
+  const [thumbnailFit, setThumbnailFit] = useState<'cover' | 'contain'>('cover')
 
   return (
     <button
@@ -79,8 +81,16 @@ export const MiniFilmTile = memo(function MiniFilmTile({
           <img
             src={thumbnailUrl}
             alt=""
-            className="h-full w-full object-cover"
-            style={imageStyle}
+            className="h-full w-full"
+            style={{ objectFit: thumbnailFit, ...imageStyle }}
+            onLoad={(event) =>
+              setThumbnailFit(
+                miniFilmTileThumbnailFit(
+                  event.currentTarget.naturalWidth,
+                  event.currentTarget.naturalHeight,
+                ),
+              )
+            }
             {...imageDataAttributes}
           />
         ) : (
