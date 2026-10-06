@@ -296,8 +296,9 @@ export const MediaLibrary = memo(function MediaLibrary({ onMediaSelect }: MediaL
   const showUnsupportedCodecDialog = useMediaLibraryStore((s) => s.showUnsupportedCodecDialog)
   const resolveUnsupportedCodecDialog = useMediaLibraryStore((s) => s.resolveUnsupportedCodecDialog)
 
-  // Background transcription + visual analysis for new video once media has
-  // loaded (gated by the autoAnalyzeMediaOnOpen setting).
+  // Background analysis once media has loaded (gated by the
+  // autoAnalyzeMediaOnOpen setting): transcripts (native first) and a visual
+  // pass, so uncategorized video gets a Speaker / B-roll suggestion.
   const isMediaLoading = useMediaLibraryStore((s) => s.isLoading)
   useEffect(() => {
     if (currentProjectId && !isMediaLoading) scheduleAutoMediaAnalysis(currentProjectId)
@@ -1154,7 +1155,7 @@ export const MediaLibrary = memo(function MediaLibrary({ onMediaSelect }: MediaL
           {/* Compositions section — collapsible, auto-hidden when empty */}
           <CompositionsSection />
 
-          {/* Media sections — grouped by category when any media has one, else by type */}
+          {/* Media sections — categories, then Analyzing, then the rest by file type */}
           {mediaGroups.map((group) => (
             <MediaTypeGroupView
               key={group.key}

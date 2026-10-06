@@ -1,21 +1,17 @@
 import { createLogger } from '@/shared/logging/logger'
-import type { MediaMetadata } from '@/types/storage'
-import { getTranscriptMediaIds } from '@/infrastructure/storage'
+import { getMedia, getTranscriptMediaIds } from '@/infrastructure/storage'
+import {
+  readNativeTranscriptionEngine,
+  requestNativeTranscription,
+} from '@/infrastructure/storage/bridge-fs/bridge-transcription'
 import { getMediaType } from '../utils/validation'
-import { hasAudioTrack } from '../utils/media-role'
+import { planBackgroundTranscription } from '../utils/background-transcription'
 import { useMediaLibraryStore } from '../stores/media-library-store'
 import { useSettingsStore } from '../deps/settings-contract'
 import { runMediaTranscriptionJob } from './media-transcription-runner'
 import { mediaAnalysisService } from './media-analysis-service'
 
 const log = createLogger('AutoMediaAnalysis')
-
-/** Native whisper.cpp states the bridge owns; failures fall back to the browser. */
-const NATIVE_HANDLED = new Set(['queued', 'running', 'done', 'none'])
-
-function isHandledByNativeTranscription(media: MediaMetadata): boolean {
-  return NATIVE_HANDLED.has(media.transcription?.status ?? '')
-}
 
 /** Let the editor finish loading before heavy model work starts. */
 const START_DELAY_MS = 2500
@@ -27,9 +23,12 @@ function isStillCurrent(projectId: string): boolean {
 }
 
 /**
- * Background pass run when a project opens: transcribe every video that has
- * no transcript yet, then run visual analysis on videos with no AI captions.
- * Together these let the media pane sort clips into speaker and b-roll.
+ * Background pass run when a project opens: make sure every video gets a
+ * transcript, then run visual analysis on videos with no AI captions.
+ * Together these let the media pane suggest Speaker / B-roll categories
+ * (use-auto-categories.ts). Transcripts come from the bridge's whisper.cpp
+ * when it can; the in-app model is only the fallback (see
+ * planBackgroundTranscription), so nothing is transcribed twice.
  *
  * One pass per project at a time; stops between items if the project changes.
  * Results persist in the workspace, so later opens only process new media.
@@ -53,35 +52,56 @@ async function runAutoMediaAnalysis(projectId: string): Promise<void> {
 
   const { mediaItems, brokenMediaIds } = useMediaLibraryStore.getState()
   const broken = new Set(brokenMediaIds)
-  const videos = mediaItems.filter(
-    (media) => getMediaType(media.mimeType) === 'video' && !broken.has(media.id),
-  )
+  const videoIds = mediaItems
+    .filter((media) => getMediaType(media.mimeType) === 'video' && !broken.has(media.id))
+    .map((media) => media.id)
 
+  if (!(await ensureTranscripts(projectId, videoIds))) return
+  if (!isStillCurrent(projectId)) return
+  await analyzeUncaptioned(videoIds)
+}
+
+/** Get each video a transcript (see planBackgroundTranscription). False when the project changed. */
+async function ensureTranscripts(projectId: string, mediaIds: string[]): Promise<boolean> {
   // Ask the workspace, not the store: the store's transcript map may still be
-  // loading, and re-transcribing would overwrite a user's transcript.
-  // Retries earlier failures too (e.g. a model download that failed last open).
-  // Skip media the local bridge is transcribing natively (or already settled)
-  const withAudio = videos.filter(
-    (media) => hasAudioTrack(media) && !isHandledByNativeTranscription(media),
-  )
-  const transcribed = await getTranscriptMediaIds(withAudio.map((media) => media.id))
-  const untranscribed = withAudio.filter((media) => !transcribed.has(media.id))
-  for (const media of untranscribed) {
-    if (!isStillCurrent(projectId)) return
+  // loading, and the bridge may have queued native transcription since.
+  // Retries earlier in-app failures too (e.g. a model download).
+  const transcribed = await getTranscriptMediaIds(mediaIds)
+  const nativeAvailable = (await readNativeTranscriptionEngine())?.available === true
+  for (const mediaId of mediaIds) {
+    if (!isStillCurrent(projectId)) return false
     try {
-      await runMediaTranscriptionJob(media.id, { origin: 'background' })
+      await transcribeInBackground(mediaId, transcribed.has(mediaId), nativeAvailable)
     } catch (error) {
-      // The clip stays under "Analyzing" and is retried on the next open.
-      log.warn('Auto transcription skipped', { mediaId: media.id, error })
+      // The clip is retried on the next open.
+      log.warn('Auto transcription skipped', { mediaId, error })
     }
   }
+  return true
+}
 
-  if (!isStillCurrent(projectId)) return
+async function transcribeInBackground(
+  mediaId: string,
+  stored: boolean,
+  nativeAvailable: boolean,
+): Promise<void> {
+  const inApp = useMediaLibraryStore.getState().transcriptStatus.get(mediaId)
+  // A transcription started from the media card owns this media.
+  if (inApp === 'queued' || inApp === 'transcribing') return
+  const media = await getMedia(mediaId)
+  if (!media) return
+  const plan = planBackgroundTranscription({
+    media,
+    hasTranscript: stored || inApp === 'ready',
+    nativeAvailable,
+  })
+  if (plan === 'native') await requestNativeTranscription(mediaId)
+  else if (plan === 'browser') await runMediaTranscriptionJob(mediaId, { origin: 'background' })
+}
+
+async function analyzeUncaptioned(mediaIds: string[]): Promise<void> {
   const latest = new Map(useMediaLibraryStore.getState().mediaItems.map((m) => [m.id, m]))
-  const uncaptioned = videos
-    .map((media) => latest.get(media.id))
-    .filter((media) => media && (media.aiCaptions?.length ?? 0) === 0)
-    .map((media) => media!.id)
+  const uncaptioned = mediaIds.filter((id) => (latest.get(id)?.aiCaptions?.length ?? 0) === 0)
   if (uncaptioned.length > 0) {
     await mediaAnalysisService.analyzeBatch({ mediaIds: uncaptioned, onlyMissing: true })
   }
