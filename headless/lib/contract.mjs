@@ -166,6 +166,8 @@ const opSchemas = [
       updates: z
         .record(z.string(), z.unknown())
         .refine((value) => Object.keys(value).length > 0, 'updates must not be empty'),
+      // Timing changes carry to linked companions (a video's own audio) unless false.
+      linked: z.boolean().optional(),
     })
     .strict(),
   z.object({ op: z.literal('moveItem'), id, from: frame, trackId: id.optional() }).strict(),

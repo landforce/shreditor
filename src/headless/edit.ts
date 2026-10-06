@@ -74,6 +74,7 @@ import {
   type OverlapContext,
 } from './track-overlap'
 import { buildLutEffect, type HeadlessLutFile } from './lut-op'
+import { linkedTimingFollowers } from './linked-timing'
 
 const log = createLogger('HeadlessEdit')
 
@@ -249,6 +250,22 @@ function validateEffectParams(gpuEffectType: string, params: unknown): void {
     const problem = EFFECT_PARAM_CHECKS[spec.type](value, spec)
     if (problem) throw new Error(`params.${key}: ${problem}`)
   }
+}
+
+/** Linked companions that follow a timing update, each checked for room on its track. */
+function linkedFollowersFor(
+  context: OverlapContext,
+  item: TimelineItem,
+  updates: Partial<TimelineItem>,
+): ReturnType<typeof linkedTimingFollowers> {
+  const followers = linkedTimingFollowers(useItemsStore.getState().items, item, updates)
+  for (const follower of followers) {
+    assertItemPlacement(context, follower.item, {
+      from: asNumber(follower.updates.from),
+      durationInFrames: asNumber(follower.updates.durationInFrames),
+    })
+  }
+  return followers
 }
 
 function requireItem(id: string, field = 'id'): TimelineItem {
@@ -472,8 +489,10 @@ function applyOp(op: EditOp): unknown {
       const problem = timelineItemProblem({ ...item, ...updates })
       if (problem) throw new Error(`updates.${problem}`)
       assertTemplateInstanceUpdate(item, updates)
+      const followers = op.linked === false ? [] : linkedFollowersFor(context, item, updates)
       updateItem(id, updates)
-      return { id }
+      for (const follower of followers) updateItem(follower.item.id, follower.updates)
+      return followers.length ? { id, linked: followers.map((f) => f.item.id) } : { id }
     }
     case 'moveItem': {
       const id = asString(op.id)

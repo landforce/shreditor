@@ -205,6 +205,55 @@ describe('editProject', () => {
     expect(audioTrack.kind).toBe('audio')
   })
 
+  describe('updateItem keeps linked companions in sync', () => {
+    const trimmed = (linked?: boolean) =>
+      editProject({
+        project: baseProject(),
+        media: [{ mediaId: 'm-vid', metadata: videoMedia }],
+        ops: [
+          { op: 'addClip', mediaId: 'm-vid', from: 5, callerId: 'clip' } as EditOp,
+          {
+            op: 'updateItem',
+            id: { $ref: 'clip#/detail/created/0/id' },
+            updates: { sourceStart: 30, sourceEnd: 60, durationInFrames: 25 },
+            ...(linked === undefined ? {} : { linked }),
+            callerId: 'trim',
+          } as EditOp,
+        ],
+      })
+
+    it('a trim on the video carries to its own audio', async () => {
+      const result = await trimmed()
+      const items = result.project.timeline!.items
+      const audio = items.find((i) => i.type === 'audio')!
+      expect(audio).toMatchObject({ sourceStart: 30, sourceEnd: 60, durationInFrames: 25, from: 5 })
+      expect(result.results.at(-1)!.detail).toMatchObject({ linked: [audio.id] })
+    })
+
+    it('linked: false trims only the item itself', async () => {
+      const result = await trimmed(false)
+      const audio = result.project.timeline!.items.find((i) => i.type === 'audio')!
+      expect(audio).toMatchObject({ sourceStart: 0, sourceEnd: 120, durationInFrames: 100 })
+    })
+
+    it('non-timing updates stay on the item', async () => {
+      const result = await editProject({
+        project: baseProject(),
+        media: [{ mediaId: 'm-vid', metadata: videoMedia }],
+        ops: [
+          { op: 'addClip', mediaId: 'm-vid', from: 5, callerId: 'clip' } as EditOp,
+          {
+            op: 'updateItem',
+            id: { $ref: 'clip#/detail/created/0/id' },
+            updates: { label: 'Swing' },
+          } as EditOp,
+        ],
+      })
+      const audio = result.project.timeline!.items.find((i) => i.type === 'audio')!
+      expect(audio.label).not.toBe('Swing')
+    })
+  })
+
   it('addClip image defaults to a 150-frame still', async () => {
     const result = await editProject({
       project: baseProject(),
