@@ -1,12 +1,14 @@
 /**
  * Media categories: what each file is for in the edit (speaker, B-roll, ...).
  *
- * The agent assigns them when it catalogs footage (`shred categorize`), the
- * user can change them from the media card. Uncategorized videos fall back to
- * the speaker / b-roll role inferred from analysis; the rest group by file type.
+ * `category` is the one source of truth, for the media pane and for the
+ * agent. The user (media card) and the agent (`shred categorize`) set it
+ * explicitly; the background analysis may only suggest one, marked
+ * `categorySource: 'auto'`, while nothing explicit is set. See
+ * {@link hasExplicitCategory} and {@link autoCategoryUpdate}.
  */
 
-import type { MediaCategory, MediaMetadata } from '@/types/storage'
+import type { MediaCategory, MediaCategorySource, MediaMetadata } from '@/types/storage'
 import { getMediaType } from './validation'
 
 /** Display order of the category groups. */
@@ -30,6 +32,48 @@ export function isMediaCategory(value: unknown): value is MediaCategory {
   return typeof value === 'string' && CATEGORY_SET.has(value)
 }
 
+const CATEGORY_SOURCES: ReadonlySet<string> = new Set<MediaCategorySource>([
+  'auto',
+  'user',
+  'agent',
+])
+
+export function isCategorySource(value: unknown): value is MediaCategorySource {
+  return typeof value === 'string' && CATEGORY_SOURCES.has(value)
+}
+
+type CategoryFields = Pick<MediaMetadata, 'category' | 'categorySource'>
+
+/**
+ * Whether the user or the agent decided this media's category, so automatic
+ * analysis must leave it alone. A category with no source (metadata written
+ * before sources existed) counts as explicit, and so does a 'user' / 'agent'
+ * source with no category (someone cleared it on purpose).
+ */
+export function hasExplicitCategory(media: CategoryFields): boolean {
+  if (media.categorySource === 'user' || media.categorySource === 'agent') return true
+  return media.categorySource !== 'auto' && isMediaCategory(media.category)
+}
+
+/** A category the background analysis suggested and nobody has confirmed yet. */
+export function isAutoCategory(media: CategoryFields): boolean {
+  return media.categorySource === 'auto' && isMediaCategory(media.category)
+}
+
+/**
+ * The write that records an automatic suggestion, or null when there is
+ * nothing to write: an explicit category always wins, an unchanged
+ * suggestion is skipped, and no suggestion never clears an earlier one.
+ */
+export function autoCategoryUpdate(
+  media: CategoryFields,
+  suggestion: MediaCategory | undefined,
+): { category: MediaCategory; categorySource: Extract<MediaCategorySource, 'auto'> } | null {
+  if (!suggestion || hasExplicitCategory(media)) return null
+  if (isAutoCategory(media) && media.category === suggestion) return null
+  return { category: suggestion, categorySource: 'auto' }
+}
+
 export type MediaTypeGroupKey = 'video' | 'audio' | 'image' | 'gif' | 'lottie'
 
 export function mediaTypeGroupOf(item: Pick<MediaMetadata, 'mimeType'>): MediaTypeGroupKey {
@@ -38,64 +82,66 @@ export function mediaTypeGroupOf(item: Pick<MediaMetadata, 'mimeType'>): MediaTy
   return type === 'video' || type === 'audio' || type === 'lottie' ? type : 'image'
 }
 
+/** What the background analysis says about an item right now (see media-role.ts). */
+export type CategoryVerdict = MediaCategory | 'pending' | undefined
+
 type MediaSection =
   | { kind: 'category'; key: MediaCategory; items: MediaMetadata[] }
+  | { kind: 'analyzing'; key: 'analyzing'; items: MediaMetadata[] }
   | { kind: 'type'; key: MediaTypeGroupKey; items: MediaMetadata[] }
 
-/**
- * Section order: picture media before audio. Categories and the
- * uncategorized type groups interleave so images and graphics sit above
- * every kind of audio.
- */
-const SECTION_ORDER: ReadonlyArray<
-  { kind: 'category'; key: MediaCategory } | { kind: 'type'; key: MediaTypeGroupKey }
-> = [
-  { kind: 'category', key: 'speaker' },
-  { kind: 'category', key: 'b-roll' },
-  { kind: 'type', key: 'video' },
-  { kind: 'category', key: 'graphics' },
-  { kind: 'category', key: 'overlay' },
-  { kind: 'type', key: 'image' },
-  { kind: 'type', key: 'gif' },
-  { kind: 'type', key: 'lottie' },
-  { kind: 'category', key: 'voiceover' },
-  { kind: 'category', key: 'music' },
-  { kind: 'category', key: 'sfx' },
-  { kind: 'type', key: 'audio' },
-  { kind: 'category', key: 'other' },
-]
+/** Type groups for media with no category, after every category and "Analyzing". */
+const TYPE_GROUP_ORDER: readonly MediaTypeGroupKey[] = ['video', 'image', 'gif', 'lottie', 'audio']
+
+type SectionKey = MediaCategory | 'analyzing' | { type: MediaTypeGroupKey }
+
+function sectionOf(item: MediaMetadata, verdictOf: (item: MediaMetadata) => CategoryVerdict) {
+  if (hasExplicitCategory(item)) {
+    return isMediaCategory(item.category) ? item.category : { type: mediaTypeGroupOf(item) }
+  }
+  const verdict = verdictOf(item)
+  // A fresh verdict shows at once; it is being written as the new suggestion.
+  if (isMediaCategory(verdict)) return verdict
+  if (isMediaCategory(item.category)) return item.category
+  return verdict === 'pending' ? 'analyzing' : { type: mediaTypeGroupOf(item) }
+}
 
 /**
- * Split items into media library sections. A saved category always wins;
- * otherwise `inferCategory` (speaker / b-roll from analysis) may supply one;
- * anything left is grouped by file type. Empty sections are left out and
- * item order within a section is kept, so search, filter and sort still apply.
+ * Split items into media library sections: Speaker, B-roll, Graphics,
+ * Overlays, Voiceover, Music, SFX, Other, then "Analyzing" (no category yet,
+ * analysis still to come), then the remaining items by file type (Videos,
+ * Images, GIFs, Lottie, Audio). An explicit category always decides; for the
+ * rest `verdictOf` (the current analysis verdict) wins over a standing
+ * automatic suggestion. Empty sections are left out and item order within a
+ * section is kept, so search, filter and sort still apply.
  */
 export function groupMediaSections(
   items: readonly MediaMetadata[],
-  inferCategory: (item: MediaMetadata) => MediaCategory | undefined = () => undefined,
+  verdictOf: (item: MediaMetadata) => CategoryVerdict = () => undefined,
 ): MediaSection[] {
   const byCategory = new Map<MediaCategory, MediaMetadata[]>()
   const byType = new Map<MediaTypeGroupKey, MediaMetadata[]>()
-  for (const item of items) {
-    const category = isMediaCategory(item.category) ? item.category : inferCategory(item)
-    if (category) {
-      const bucket = byCategory.get(category)
-      if (bucket) bucket.push(item)
-      else byCategory.set(category, [item])
-    } else {
-      const key = mediaTypeGroupOf(item)
-      const bucket = byType.get(key)
-      if (bucket) bucket.push(item)
-      else byType.set(key, [item])
-    }
+  const analyzing: MediaMetadata[] = []
+  const push = <K>(map: Map<K, MediaMetadata[]>, key: K, item: MediaMetadata) => {
+    const bucket = map.get(key)
+    if (bucket) bucket.push(item)
+    else map.set(key, [item])
   }
-  return SECTION_ORDER.flatMap((section): MediaSection[] => {
-    if (section.kind === 'category') {
-      const bucket = byCategory.get(section.key)
-      return bucket ? [{ kind: 'category', key: section.key, items: bucket }] : []
-    }
-    const bucket = byType.get(section.key)
-    return bucket ? [{ kind: 'type', key: section.key, items: bucket }] : []
-  })
+  for (const item of items) {
+    const section: SectionKey = sectionOf(item, verdictOf)
+    if (section === 'analyzing') analyzing.push(item)
+    else if (typeof section === 'object') push(byType, section.type, item)
+    else push(byCategory, section, item)
+  }
+  const sections: MediaSection[] = []
+  for (const key of MEDIA_CATEGORIES) {
+    const bucket = byCategory.get(key)
+    if (bucket) sections.push({ kind: 'category', key, items: bucket })
+  }
+  if (analyzing.length > 0) sections.push({ kind: 'analyzing', key: 'analyzing', items: analyzing })
+  for (const key of TYPE_GROUP_ORDER) {
+    const bucket = byType.get(key)
+    if (bucket) sections.push({ kind: 'type', key, items: bucket })
+  }
+  return sections
 }

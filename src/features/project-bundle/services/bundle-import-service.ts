@@ -27,7 +27,11 @@ import {
   saveAnimationPresets,
   sanitizeAnimationPresets,
 } from '@/infrastructure/storage'
-import { generateThumbnail, isMediaCategory } from '@/features/project-bundle/deps/media-library'
+import {
+  generateThumbnail,
+  isCategorySource,
+  isMediaCategory,
+} from '@/features/project-bundle/deps/media-library'
 import { createLogger } from '@/shared/logging/logger'
 import { fileSystemService } from './file-system-service'
 import { restoreTimelineFromBundle } from './bundle-timeline'
@@ -152,6 +156,7 @@ export async function importProjectBundle(
         thumbnailId,
         tags: [],
         ...(isMediaCategory(entry.category) ? { category: entry.category } : {}),
+        ...(isCategorySource(entry.categorySource) ? { categorySource: entry.categorySource } : {}),
         createdAt: Date.now(),
         updatedAt: Date.now(),
       }

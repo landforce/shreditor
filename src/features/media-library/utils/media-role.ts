@@ -2,12 +2,14 @@ import type { MediaMetadata, MediaTranscriptSegment } from '@/types/storage'
 import type { MediaTranscriptStatus } from '../types'
 
 /**
- * What a video clip is for in the edit, derived from transcript + visual analysis:
- * - `speaker`: someone talking for most of the clip (A-roll / talking head)
- * - `broll`: little or no speech, or speech over footage with no one in frame
- * - `pending`: not analyzed yet
+ * Automatic category suggestions for video, from transcript + visual analysis.
+ * Only these two categories are ever suggested; everything else (graphics,
+ * overlays, music vs SFX vs voiceover) needs a person or the agent to say so.
+ *
+ * Audio files are left alone on purpose: speech alone can't tell a voiceover
+ * from a song with vocals. Images are not guessed either (photo or graphic).
  */
-export type MediaRole = 'speaker' | 'broll' | 'pending'
+export type VideoCategoryVerdict = 'speaker' | 'b-roll' | 'pending'
 
 /** Share of the clip that must be speech before it counts as a speaker clip. */
 const SPEAKER_SPEECH_COVERAGE = 0.3
@@ -60,19 +62,40 @@ export function hasAudioTrack(media: Pick<MediaMetadata, 'audioCodec'>): boolean
   return Boolean(media.audioCodec)
 }
 
-export function classifyMediaRole(input: {
+/** Native (bridge) transcription is still to finish for this media. */
+function nativeInProgress(media: Pick<MediaMetadata, 'transcription'>): boolean {
+  const status = media.transcription?.status
+  return status === 'queued' || status === 'running'
+}
+
+/**
+ * - `speaker`: someone talking for most of the clip (A-roll / talking head)
+ * - `b-roll`: no audio, no speech, little speech, or speech over footage with
+ *   no one in frame (voiceover over b-roll; the clip itself is b-roll footage)
+ * - `pending`: a transcript is still coming (bridge or background pass)
+ * - undefined: nothing to go on and nothing coming (analysis off, or the
+ *   in-app transcription failed until the next project open)
+ */
+export function suggestVideoCategory(input: {
   media: Pick<MediaMetadata, 'aiCaptions' | 'audioCodec' | 'transcription'>
   transcriptStatus: MediaTranscriptStatus | undefined
   /** Undefined while the transcript is still being read. */
   speechCoverage: number | undefined
-}): MediaRole {
-  const { media, transcriptStatus, speechCoverage } = input
-  if (!hasAudioTrack(media)) return 'broll'
+  /** The background pass is on, so a missing transcript will be made. */
+  analysisEnabled: boolean
+}): VideoCategoryVerdict | undefined {
+  const { media, transcriptStatus, speechCoverage, analysisEnabled } = input
+  if (!hasAudioTrack(media)) return 'b-roll'
   // The bridge's native transcriber found no speech (silent, music, typing...)
-  if (media.transcription?.status === 'none') return 'broll'
-  // Not transcribed yet, or transcription failed (e.g. model download) - unknown
-  if (transcriptStatus !== 'ready' || speechCoverage === undefined) return 'pending'
-  if (speechCoverage < SPEAKER_SPEECH_COVERAGE) return 'broll'
-  // Speech over footage where no one is ever in frame reads as voiceover b-roll.
-  return captionsShowPerson(media) === false ? 'broll' : 'speaker'
+  if (media.transcription?.status === 'none') return 'b-roll'
+  if (transcriptStatus === 'ready') {
+    if (speechCoverage === undefined) return 'pending'
+    if (speechCoverage < SPEAKER_SPEECH_COVERAGE) return 'b-roll'
+    // Speech over footage where no one is ever in frame reads as voiceover b-roll.
+    return captionsShowPerson(media) === false ? 'b-roll' : 'speaker'
+  }
+  if (transcriptStatus === 'queued' || transcriptStatus === 'transcribing') return 'pending'
+  if (nativeInProgress(media)) return 'pending'
+  if (transcriptStatus === 'error') return undefined
+  return analysisEnabled ? 'pending' : undefined
 }

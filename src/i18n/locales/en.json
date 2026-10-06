@@ -90,7 +90,7 @@
     },
     "ai": {
       "autoAnalyzeOnOpen": "Analyze media when a project opens",
-      "autoAnalyzeOnOpenDescription": "Transcribe and visually analyze new video in the background so the media pane can sort clips into Speaker and B-roll.",
+      "autoAnalyzeOnOpenDescription": "Sort uncategorized video into Speaker and B-roll in the background, using the built-in transcripts (or transcribing in the app when they are unavailable) and a visual pass. Categories you or the agent set are never changed.",
       "captionSampleInterval": "Caption sample interval",
       "captionSampleIntervalDescription": "How often Analyze with AI samples a frame for captioning.",
       "seconds": "Seconds",
