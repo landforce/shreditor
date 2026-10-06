@@ -135,7 +135,7 @@ const EXPECTED = {
     lengthSec: [13, 15],
     shotCount: [12, 16],
     shotCountMin: [8, null],
-    cutsPerMin: [31, 38],
+    cutsPerMin: [null, null],
     titleWords: [5, 7],
     labelCount: [null, 2],
     graphicsCount: [null, 0],

@@ -9,10 +9,14 @@
 // up. `guide.reviewedHash` is the guide hash the targets were last checked
 // against; the sync script reports when a guide changes so they get reviewed.
 //
-// Target fields: min/max bound the accepted band (null = open), ideal is the
-// guide's point value, severity says what a miss is ('fail' for the guide's
-// Avoid list and Always/Never/No rules, 'warn' for Targets-table numbers, which
-// the guides call starting points), source is where the number comes from
+// The formats are specs and guidelines, not templates to fill: a numeric target
+// is the range successful videos sit in, so missing one is a warning to look at,
+// never a failure. Only the rules that make a video that format (title hook,
+// speech or voiceover, music, nobody talking in a 10 Shot...) can fail.
+//
+// Target fields: min/max bound the usual band (null = open), ideal is the
+// guide's point value, severity is 'warn' (a target can set another, but none
+// does), source is where the number comes from
 // ('measured' from the VDB sample, 'vdb' for VDB's stated rules, 'colin' for the
 // owner's rules), seen is the range observed in the sample. A target with
 // neither min nor max is informational.
@@ -152,19 +156,16 @@ const graphicYap = {
     }),
     t('firstImageSec', 'First image', 's', {
       max: 2,
-      severity: 'fail',
       source: 'vdb',
       seen: [0, 11],
     }),
     t('longestNoNewImageSec', 'Longest stretch with no new image', 's', {
       max: 5,
-      severity: 'fail',
       seen: [5, 35],
     }),
     t('speechWpm', 'Speech rate', 'wpm', { min: 160, max: 270 }),
     t('pauseMaxSec', 'Longest pause in speech', 's', {
       max: 1,
-      severity: 'fail',
       note: 'speech from 0 s; activity pauses (a golf swing) can run 2 to 4 s',
     }),
   ],
@@ -240,17 +241,15 @@ const greenscreen = {
     t('medianChangeGapSec', 'Median gap between changes', 's', { min: 2.6, max: 3 }),
     t('speechWpm', 'Speech rate', 'wpm', { min: 198, max: 265, ideal: 225 }),
     t('plateCoveragePct', 'Share of runtime on greenscreen', '%', { min: 100, seen: [31, 100] }),
-    t('firstPlateSec', 'First plate', 's', { max: 0, severity: 'fail', source: 'colin' }),
+    t('firstPlateSec', 'First plate', 's', { max: 0, source: 'colin' }),
     t('firstPlateChangeSec', 'Background change after the hook', 's', {
       max: 3,
-      severity: 'fail',
       source: 'colin',
       note: 'never hold the hook plate past about 3 s',
     }),
     t('longestNoChangeSec', 'Longest stretch with no visual change', 's', { source: 'colin' }),
     t('pauseMaxSec', 'Longest pause in speech', 's', {
       max: 0.5,
-      severity: 'fail',
       source: 'colin',
     }),
     t('labelCount', 'Text layers besides title and captions', 'count', {
@@ -361,7 +360,7 @@ const vlog = {
     t('voStartSec', 'VO starts', 's', { max: 0.25, source: 'colin' }),
     t('voCoveragePct', 'VO coverage of runtime', '%', { min: 98, note: 'wall to wall' }),
     t('speechWpm', 'VO rate', 'wpm', { min: 152, max: 244, ideal: 213 }),
-    t('pauseMaxSec', 'Longest pause in VO', 's', { max: 0.5, severity: 'fail', source: 'colin' }),
+    t('pauseMaxSec', 'Longest pause in VO', 's', { max: 0.5, source: 'colin' }),
     t('labelCount', 'Text besides title and captions', 'count', {
       source: 'colin',
       note: 'rare: an occasional label on a reveal shot at most',
@@ -449,14 +448,13 @@ const tenShot = {
     t('shotCountMin', 'At least 8 shots', 'count', {
       metric: 'shotCount',
       min: 8,
-      severity: 'fail',
     }),
     t('medianShotSec', 'Median shot', 's', { ideal: 1, seen: [0.2, 3.7] }),
+    // Pace is the edit's call: about 31 to 38 a minute for a slower 10 Shot, about
+    // 70 for a fast one or after a premise pivot. Reported, not scored.
     t('cutsPerMin', 'Cuts per minute', 'per min', {
-      min: 31,
-      max: 38,
       seen: [25, 137],
-      note: 'or about 70 after a premise pivot',
+      note: 'slower about 31 to 38, fast about 70',
     }),
     t('openerRatio', 'Opener vs median shot', 'x', {
       ideal: 1.5,
