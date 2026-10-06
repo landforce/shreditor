@@ -50,6 +50,7 @@ import {
   getAudioEqSettings,
   isAudioEqStageActive,
 } from '@/shared/utils/audio-eq'
+import { decodedRangeFrameCount, sliceDecodedSampleIntoRange } from './decoded-audio-range'
 import {
   getAudioPitchRatioFromSemitones,
   getAudioPitchShiftSemitones,
@@ -630,7 +631,12 @@ function resolveCompositionWrapper(
     wrapperSourceEnd:
       compositionItem.sourceEnd ??
       sourceOffset +
-        timelineToSourceFrames(compositionItem.durationInFrames, wrapperSpeed, fps, wrapperSourceFps),
+        timelineToSourceFrames(
+          compositionItem.durationInFrames,
+          wrapperSpeed,
+          fps,
+          wrapperSourceFps,
+        ),
   }
 }
 
@@ -665,9 +671,11 @@ function mapNestedItemWindow(
   if (overlapEnd <= overlapStart) return null
 
   const effectiveStart =
-    compFrom + sourceToTimelineFrames(overlapStart - sourceOffset, wrapperSpeed, wrapperSourceFps, fps)
+    compFrom +
+    sourceToTimelineFrames(overlapStart - sourceOffset, wrapperSpeed, wrapperSourceFps, fps)
   const effectiveEnd =
-    compFrom + sourceToTimelineFrames(overlapEnd - sourceOffset, wrapperSpeed, wrapperSourceFps, fps)
+    compFrom +
+    sourceToTimelineFrames(overlapEnd - sourceOffset, wrapperSpeed, wrapperSourceFps, fps)
   const effectiveDuration = Math.max(1, effectiveEnd - effectiveStart)
 
   const baseSourceStart = subItem.sourceStart ?? subItem.trimStart ?? 0
@@ -1109,6 +1117,8 @@ interface AudioDecodeAccumulator {
   totalFrames: number
   sampleRate: number
   channels: number
+  /** Set once a decoded sample has been placed in the requested range. */
+  anchored: boolean
 }
 
 function createAudioChannelBackfill(totalFrames: number): Float32Array[] {
@@ -1116,15 +1126,11 @@ function createAudioChannelBackfill(totalFrames: number): Float32Array[] {
   return [new Float32Array(totalFrames)]
 }
 
-function appendDecodedAudioSample(
+function ensureAccumulatorChannels(
   state: AudioDecodeAccumulator,
-  sample: MediabunnyAudioSample,
+  sampleChannels: number,
   itemId: string,
 ): void {
-  const frameCount = Math.max(0, sample.numberOfFrames)
-  const sampleChannels = Math.max(1, sample.numberOfChannels)
-  if (frameCount === 0) return
-
   if (state.channels === 0) {
     state.channels = sampleChannels
     for (let channel = 0; channel < state.channels; channel++) state.channelChunks.push([])
@@ -1140,17 +1146,53 @@ function appendDecodedAudioSample(
       actualChannels: sampleChannels,
     })
   }
+}
+
+/**
+ * Append the part of a decoded sample that falls in `startTime..endTime`
+ * (see decoded-audio-range.ts). Returns true once the range is full.
+ */
+function appendDecodedAudioSample(
+  state: AudioDecodeAccumulator,
+  sample: MediabunnyAudioSample,
+  itemId: string,
+  startTime: number,
+  endTime: number,
+): boolean {
+  const frameCount = Math.max(0, sample.numberOfFrames)
+  const sampleChannels = Math.max(1, sample.numberOfChannels)
+  if (sample.sampleRate > 0) state.sampleRate = sample.sampleRate
+  const wanted = decodedRangeFrameCount(startTime, endTime, state.sampleRate)
+  if (frameCount === 0) return state.totalFrames >= wanted
+
+  const { padFrames, skipFrames, takeFrames } = sliceDecodedSampleIntoRange({
+    sampleTimestamp: sample.timestamp,
+    sampleFrames: frameCount,
+    sampleRate: state.sampleRate,
+    startTime,
+    endTime,
+    writtenFrames: state.totalFrames,
+    anchored: state.anchored,
+  })
+  if (padFrames === 0 && takeFrames === 0) return state.totalFrames >= wanted
+  state.anchored = true
+  ensureAccumulatorChannels(state, sampleChannels, itemId)
 
   for (let channel = 0; channel < state.channels; channel++) {
-    const channelData = new Float32Array(frameCount)
+    const chunks = state.channelChunks[channel]!
+    if (padFrames > 0) chunks.push(new Float32Array(padFrames))
+    if (takeFrames === 0) continue
+    const channelData = new Float32Array(takeFrames)
     sample.copyTo(channelData, {
       planeIndex: Math.min(channel, sampleChannels - 1),
       format: 'f32-planar',
+      frameOffset: skipFrames,
+      frameCount: takeFrames,
     })
-    state.channelChunks[channel]!.push(channelData)
+    chunks.push(channelData)
   }
-  state.totalFrames += frameCount
-  if (sample.sampleRate > 0) state.sampleRate = sample.sampleRate
+  state.totalFrames += padFrames + takeFrames
+  return state.totalFrames >= wanted
 }
 
 function mergeDecodedAudioChannels(state: AudioDecodeAccumulator): Float32Array[] {
@@ -1171,19 +1213,29 @@ async function decodeAudioRangeFromSink(
   startTime: number,
   endTime: number,
 ): Promise<DecodedAudio> {
+  if (endTime <= startTime) {
+    // A window past the end of the source: silence, not a decode failure.
+    return { itemId, sampleRate: 48_000, channels: 1, samples: [new Float32Array(0)], duration: 0 }
+  }
   const state: AudioDecodeAccumulator = {
     channelChunks: [],
     totalFrames: 0,
     sampleRate: 48_000,
     channels: 0,
+    anchored: false,
   }
 
+  // The sink yields whole decoded packets, the first one usually starting
+  // before `startTime`; each is cut to the range by its timestamp, so the
+  // result starts exactly at `startTime`.
   for await (const sample of sink.samples(startTime, endTime)) {
+    let full = false
     try {
-      appendDecodedAudioSample(state, sample, itemId)
+      full = appendDecodedAudioSample(state, sample, itemId, startTime, endTime)
     } finally {
       sample.close()
     }
+    if (full) break
   }
 
   if (state.channels === 0 || state.totalFrames === 0) {
@@ -2754,8 +2806,8 @@ export async function processAudio(
         segment.audioCodec,
       )
 
-      // Process audio channels.
-      // Note: decoded audio is already trimmed to the range we requested.
+      // Process audio channels. The decode is cut to exactly the requested
+      // range (decodeAudioRangeFromSink), so sample 0 is `sourceStartTime`.
 
       // Apply speed across ALL channels at once to maintain phase coherence
       // between L/R (the WSOLA pipeline finds shared overlap windows).
