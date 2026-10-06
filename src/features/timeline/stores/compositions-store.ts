@@ -28,6 +28,9 @@ export interface SubComposition {
   backgroundColor?: string
   /** Authored parameters shown on every CompositionItem instance. */
   compositionControls?: CompositionControlSchema
+  /** The library motion template (and its version) this composition was copied from. */
+  templateId?: string
+  templateVersion?: number
   busAudioEq?: AudioEqSettings
   /** Per-sequence timeline markers (independent of Main's). */
   markers?: ProjectMarker[]

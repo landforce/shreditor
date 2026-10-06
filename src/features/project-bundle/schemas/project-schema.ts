@@ -711,6 +711,8 @@ const compositionSchema = z
     durationInFrames: z.number().int().min(1),
     backgroundColor: z.string().optional(),
     compositionControls: compositionControlSchema.optional(),
+    templateId: z.string().min(1).optional(),
+    templateVersion: z.number().int().min(1).optional(),
     markers: z.array(markerSchema).optional(),
     inPoint: z.number().int().min(0).optional(),
     outPoint: z.number().int().min(0).optional(),
