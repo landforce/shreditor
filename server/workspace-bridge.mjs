@@ -165,7 +165,7 @@ export function createWorkspaceBridge() {
     try {
       const root = currentWorkspace()
       fs.mkdirSync(root, { recursive: true })
-      if (await mediaRoutes(req, res, { route, rel, root })) return
+      if (await mediaRoutes(req, res, { route, rel, root, query: url.searchParams })) return
       switch (route) {
         case 'GET info': {
           const config = readConfig()
