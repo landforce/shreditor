@@ -83,6 +83,7 @@ export type CaptionTextItemTemplate = Pick<
   | 'color'
   | 'backgroundColor'
   | 'backgroundRadius'
+  | 'backgroundMode'
   | 'textPadding'
   | 'textAlign'
   | 'verticalAlign'
@@ -535,6 +536,7 @@ export function getCaptionTextItemTemplate(
     color: item.color,
     backgroundColor: item.backgroundColor,
     backgroundRadius: item.backgroundRadius,
+    backgroundMode: item.backgroundMode,
     textPadding: item.textPadding,
     textAlign: item.textAlign,
     verticalAlign: item.verticalAlign,
@@ -976,8 +978,7 @@ export function appendVirtualTranscriptCaptionTrack(
     unfilteredBaseTracks.flatMap((track) =>
       (track.items ?? [])
         .filter(
-          (item) =>
-            (item.type === 'video' || item.type === 'audio') && item.isReversed === true,
+          (item) => (item.type === 'video' || item.type === 'audio') && item.isReversed === true,
         )
         .map((item) => item.id),
     ),
@@ -1173,6 +1174,7 @@ export function consolidateCaptionTextItemsToSegments(
       color: first.color,
       backgroundColor: first.backgroundColor,
       backgroundRadius: first.backgroundRadius,
+      backgroundMode: first.backgroundMode,
       textAlign: first.textAlign,
       verticalAlign: first.verticalAlign,
       lineHeight: first.lineHeight,

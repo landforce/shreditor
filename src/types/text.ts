@@ -32,14 +32,30 @@ export type TextShadow = {
   color: string
 }
 
+export type TextStrokeJoin = 'round' | 'miter' | 'bevel'
+
 export type TextStroke = {
   width: number
   color: string
+  /**
+   * Corner style of the outline. Default 'round'. 'miter' keeps square,
+   * die-cut corners (sharp glyph points past the miter limit fall back to a
+   * bevel so they don't spike).
+   */
+  join?: TextStrokeJoin
 }
+
+/**
+ * How `backgroundColor` is painted. 'text' (default) hugs the laid-out lines
+ * (plus `textPadding`); 'box' fills the item's whole transform box, so the
+ * text sits inside a fixed-size rounded panel (e.g. a chat pill).
+ */
+export type TextBackgroundMode = 'text' | 'box'
 
 export type TextVisualStyleFields = {
   backgroundColor?: string
   backgroundRadius?: number
+  backgroundMode?: TextBackgroundMode
   textAlign?: TextHorizontalAlign
   verticalAlign?: TextVerticalAlign
   lineHeight?: number
