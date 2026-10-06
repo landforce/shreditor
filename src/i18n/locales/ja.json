@@ -5,8 +5,8 @@
     "reloadWithoutSaving": "保存せずに再読み込み",
     "dockPanel": "パネルをドック",
     "installPrompt": {
-      "label": "FreeCut をインストール",
-      "title": "FreeCut をインストール",
+      "label": "Shreditor をインストール",
+      "title": "Shreditor をインストール",
       "description": "デスクトップまたはホーム画面から起動できます。",
       "install": "インストール",
       "notNow": "今はしない",

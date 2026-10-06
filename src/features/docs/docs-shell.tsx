@@ -10,7 +10,7 @@ import {
   Lightbulb,
   Search,
 } from 'lucide-react'
-import { FreeCutLogo } from '@/components/brand/freecut-logo'
+import { ShreditorLogo } from '@/components/brand/shreditor-logo'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/shared/ui/cn'
 import {
@@ -53,12 +53,12 @@ export function DocsShell({ children, currentSlug }: DocsShellProps) {
       <header className="sticky top-0 z-20 border-b border-border bg-background/95 backdrop-blur">
         <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-4 sm:px-6">
           <Link to="/" className="flex items-center gap-3">
-            <FreeCutLogo size="md" />
+            <ShreditorLogo size="md" />
             <span className="hidden text-sm text-muted-foreground sm:inline">Docs</span>
           </Link>
           <nav className="flex items-center gap-2">
             <Button asChild variant="ghost" size="sm">
-              <Link to="/projects">Open FreeCut</Link>
+              <Link to="/projects">Open Shreditor</Link>
             </Button>
             <Button asChild variant="outline" size="sm">
               <Link to="/">Home</Link>
@@ -154,10 +154,10 @@ export function DocsHome() {
       <section className="rounded-lg border border-border bg-card p-6 sm:p-8">
         <div className="mb-4 flex items-center gap-2 text-primary">
           <BookOpen className="h-5 w-5" />
-          <span className="text-sm font-medium">FreeCut documentation</span>
+          <span className="text-sm font-medium">Shreditor documentation</span>
         </div>
         <h1 className="max-w-3xl text-3xl font-semibold tracking-tight sm:text-4xl">
-          FreeCut User Guide
+          Shreditor User Guide
         </h1>
         <p className="mt-4 max-w-3xl text-muted-foreground">
           Start with setup, workspaces, media import, timeline editing, and export. Use the

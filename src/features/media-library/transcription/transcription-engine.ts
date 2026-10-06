@@ -8,7 +8,7 @@ export const PARAKEET_MODEL: MediaTranscriptModel = 'parakeet-tdt-v3'
 export const PARAKEET_FALLBACK_WHISPER_MODEL: MediaTranscriptModel = 'whisper-base'
 
 // Parakeet TDT 0.6B v3 covers 25 European languages (auto-detected). Anything outside this
-// set — notably ja/ko/zh, which FreeCut supports — must fall back to Whisper.
+// set — notably ja/ko/zh, which Shreditor supports — must fall back to Whisper.
 export const PARAKEET_SUPPORTED_LANGUAGES: ReadonlySet<string> = new Set([
   'en',
   'es',

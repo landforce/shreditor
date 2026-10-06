@@ -47,8 +47,7 @@ export type PathVertexAnimatableComponent =
   | 'outX'
   | 'outY'
 
-export type PathVertexAnimatableProperty =
-  `pathVertex:${number}:${PathVertexAnimatableComponent}`
+export type PathVertexAnimatableProperty = `pathVertex:${number}:${PathVertexAnimatableComponent}`
 
 export type AnimatableProperty =
   | BuiltInAnimatableProperty
@@ -206,7 +205,7 @@ export interface DirectPropertyLink {
   timeOffsetFrames: number
 }
 
-/** Deterministic expression source evaluated by FreeCut's sandboxed DSL. */
+/** Deterministic expression source evaluated by Shreditor's sandboxed DSL. */
 export interface PropertyExpression {
   type: 'expression'
   targetProperty: DirectLinkableProperty

@@ -1,7 +1,7 @@
 /**
  * Local LLM adapter contract.
  *
- * FreeCut runs language models fully on-device (WebGPU/WASM) to stay
+ * Shreditor runs language models fully on-device (WebGPU/WASM) to stay
  * privacy-first and offline-capable. The {@link LlmAdapter} interface is the
  * single seam every consumer (the editing agent, future features) talks to, so
  * the concrete model — today Gemma via transformers.js — can be swapped for a

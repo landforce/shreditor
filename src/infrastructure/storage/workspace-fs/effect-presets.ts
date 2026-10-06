@@ -3,7 +3,7 @@
  *
  * Stored at `app/effect-presets.json` in the workspace — presets are
  * app-level (shared across projects) and travel with the user's workspace
- * folder like every other piece of FreeCut state.
+ * folder like every other piece of Shreditor state.
  */
 
 import type { VisualEffect } from '@/types/effects'

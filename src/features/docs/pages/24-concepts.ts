@@ -4,7 +4,7 @@ import type { DocPageContent } from '../docs-content'
 const page = {
   order: 1.5,
   slug: 'concepts',
-  title: 'How FreeCut Works',
+  title: 'How Shreditor Works',
   description:
     'The mental model: local-first storage, projects and linked media, frames and timecode, and the GPU pipeline.',
   category: 'Start',
@@ -16,8 +16,8 @@ const page = {
         {
           kind: 'list',
           items: [
-            'FreeCut runs in your browser and stores everything in a **workspace folder** on your disk.',
-            'Your original video and audio are **linked**, not copied or uploaded — FreeCut points to the files where they already live.',
+            'Shreditor runs in your browser and stores everything in a **workspace folder** on your disk.',
+            'Your original video and audio are **linked**, not copied or uploaded — Shreditor points to the files where they already live.',
             'Projects, caches, generated assets, and exports are written into the workspace, so you can back it up or move it like any folder.',
           ],
         },
@@ -47,7 +47,7 @@ const page = {
       blocks: [
         {
           kind: 'paragraph',
-          text: 'FreeCut has one primitive for **a timeline inside your project** — a composition. It shows up in two ways depending on how you use it.',
+          text: 'Shreditor has one primitive for **a timeline inside your project** — a composition. It shows up in two ways depending on how you use it.',
         },
         {
           kind: 'list',
@@ -61,7 +61,7 @@ const page = {
         {
           kind: 'note',
           tone: 'info',
-          text: 'A composition can contain other compositions, but never itself — FreeCut blocks circular references, so a compound clip can never end up nested inside its own contents.',
+          text: 'A composition can contain other compositions, but never itself — Shreditor blocks circular references, so a compound clip can never end up nested inside its own contents.',
         },
       ],
     },
@@ -73,7 +73,7 @@ const page = {
           items: [
             'Timing is measured in **frames**. A clip has a start frame and a length in frames at the project frame rate.',
             'The preview shows **timecode**; click the readout in some views to switch to frame numbers.',
-            'Source media can have a different frame rate than the project, so FreeCut converts source frames to project frames when you edit.',
+            'Source media can have a different frame rate than the project, so Shreditor converts source frames to project frames when you edit.',
           ],
         },
         {

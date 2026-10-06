@@ -48,7 +48,7 @@ const page = {
         {
           kind: 'note',
           tone: 'info',
-          text: 'Which codecs are available depends on your browser; FreeCut warns or falls back when one is not.',
+          text: 'Which codecs are available depends on your browser; Shreditor warns or falls back when one is not.',
         },
       ],
     },

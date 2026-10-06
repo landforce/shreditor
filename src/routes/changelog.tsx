@@ -2,7 +2,7 @@ import { createFileRoute, Link } from '@tanstack/react-router'
 import { ArrowLeft, ArrowRight, CalendarDays, Plus, Sparkles, Wrench } from 'lucide-react'
 import type { TFunction } from 'i18next'
 import { useTranslation } from 'react-i18next'
-import { FreeCutLogo } from '@/components/brand/freecut-logo'
+import { ShreditorLogo } from '@/components/brand/shreditor-logo'
 import { Button } from '@/components/ui/button'
 import changelogData from '@/data/changelog.json'
 import type { ChangelogEntry, ChangelogFile, ChangelogGroup } from '@/data/changelog-types'
@@ -165,7 +165,7 @@ function ChangelogPage() {
       <header className="relative border-b border-border/70 px-6 py-5">
         <div className="mx-auto flex max-w-5xl items-center justify-between gap-4">
           <Link to="/" aria-label={t('changelog.homeAria')}>
-            <FreeCutLogo size="md" />
+            <ShreditorLogo size="md" />
           </Link>
           <Button asChild variant="ghost" size="sm" className="gap-2">
             <Link to="/">
@@ -200,13 +200,11 @@ function ChangelogPage() {
           <div className="mt-16 flex flex-col items-start justify-between gap-5 rounded-xl border border-border bg-card px-6 py-7 sm:flex-row sm:items-center sm:px-8">
             <div>
               <h2 className="text-xl font-semibold">{t('changelog.ctaTitle')}</h2>
-              <p className="mt-1 text-sm text-muted-foreground">
-                {t('changelog.ctaDescription')}
-              </p>
+              <p className="mt-1 text-sm text-muted-foreground">{t('changelog.ctaDescription')}</p>
             </div>
             <Button asChild className="gap-2">
               <Link to="/projects">
-                {t('changelog.openFreeCut')}
+                {t('changelog.openShreditor')}
                 <ArrowRight className="h-4 w-4" />
               </Link>
             </Button>

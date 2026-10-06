@@ -5,8 +5,8 @@
     "reloadWithoutSaving": "Recargar sin guardar",
     "dockPanel": "Acoplar panel",
     "installPrompt": {
-      "label": "Instalar FreeCut",
-      "title": "Instalar FreeCut",
+      "label": "Instalar Shreditor",
+      "title": "Instalar Shreditor",
       "description": "Ábrelo desde tu escritorio o pantalla de inicio.",
       "install": "Instalar",
       "notNow": "Ahora no",

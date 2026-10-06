@@ -5,8 +5,8 @@
     "reloadWithoutSaving": "不保存直接重新加载",
     "dockPanel": "停靠面板",
     "installPrompt": {
-      "label": "安装 FreeCut",
-      "title": "安装 FreeCut",
+      "label": "安装 Shreditor",
+      "title": "安装 Shreditor",
       "description": "从桌面或主屏幕启动。",
       "install": "安装",
       "notNow": "暂不",

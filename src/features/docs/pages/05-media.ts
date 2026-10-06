@@ -16,7 +16,7 @@ const page = {
           kind: 'list',
           items: [
             'Open the **Media** tab and use **Import** to pick files, or drag files straight into the library.',
-            'FreeCut handles video, audio, images, GIFs, SVGs, Lottie animations (`.json` and `.lottie`), and generated assets. GIFs import as image items.',
+            'Shreditor handles video, audio, images, GIFs, SVGs, Lottie animations (`.json` and `.lottie`), and generated assets. GIFs import as image items.',
             'Use **Import Media From URL** for a direct link to a media file — the URL must point at the file itself, not a page that embeds it.',
           ],
         },

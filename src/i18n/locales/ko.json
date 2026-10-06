@@ -5,8 +5,8 @@
     "reloadWithoutSaving": "저장하지 않고 다시 로드",
     "dockPanel": "패널 도킹",
     "installPrompt": {
-      "label": "FreeCut 설치",
-      "title": "FreeCut 설치",
+      "label": "Shreditor 설치",
+      "title": "Shreditor 설치",
       "description": "데스크톱이나 홈 화면에서 실행하세요.",
       "install": "설치",
       "notNow": "나중에",

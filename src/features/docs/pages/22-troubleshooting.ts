@@ -17,7 +17,7 @@ const page = {
           rows: [
             [
               'Unsupported browser, or no workspace picker',
-              'Use Chrome or Edge 113+, which support the APIs FreeCut needs.',
+              'Use Chrome or Edge 113+, which support the APIs Shreditor needs.',
             ],
             [
               'Brave cannot pick a folder',

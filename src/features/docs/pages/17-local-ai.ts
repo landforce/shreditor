@@ -70,7 +70,7 @@ const page = {
           items: [
             'Transcription lives in the Media library and Transcript workflow, separate from the AI tab.',
             '**Parakeet** is the fast default engine and covers many European languages.',
-            'Whisper models (Tiny, Base, Small, Large v3 Turbo) are also available, and FreeCut falls back to Whisper when needed.',
+            'Whisper models (Tiny, Base, Small, Large v3 Turbo) are also available, and Shreditor falls back to Whisper when needed.',
           ],
         },
         {

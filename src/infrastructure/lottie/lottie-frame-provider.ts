@@ -3,7 +3,7 @@
  *
  * dotlottie-web's WASM core renders a specific frame synchronously with
  * `setFrame()` (verified frame-accurate + deterministic), which is exactly what
- * FreeCut's frame-by-frame compositor needs. Unlike the GIF path we do NOT
+ * Shreditor's frame-by-frame compositor needs. Unlike the GIF path we do NOT
  * pre-extract every frame — dotlottie renders on demand into a canvas, so this
  * module just owns:
  *   - one-time WASM URL wiring (bundled asset, works offline / in the export worker)

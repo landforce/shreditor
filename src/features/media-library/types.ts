@@ -136,7 +136,7 @@ export interface MediaLibraryActions {
   loadMediaItems: () => Promise<void>
   /**
    * Import media using file picker.
-   * Defaults to copying into FreeCut's workspace-backed media store. Use
+   * Defaults to copying into Shreditor's workspace-backed media store. Use
    * storageMode='link' to reference files directly on the user's disk.
    */
   importMedia: (options?: { storageMode?: 'copy' | 'link' }) => Promise<MediaMetadata[]>

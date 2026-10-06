@@ -5,21 +5,21 @@ const page = {
   slug: 'getting-started',
   title: 'Getting Started',
   description:
-    'What FreeCut is, what your browser needs, and your first edit from launch to export.',
+    'What Shreditor is, what your browser needs, and your first edit from launch to export.',
   category: 'Start',
   related: ['concepts', 'workspaces', 'export'],
   sections: [
     {
-      title: 'What FreeCut is',
+      title: 'What Shreditor is',
       blocks: [
         {
           kind: 'paragraph',
-          text: 'FreeCut is a **local-first** video editor that runs entirely in your browser — there is no account, upload, or server render. Editing, effects, color, AI tools, and export all run on your own machine using your GPU and CPU.',
+          text: 'Shreditor is a **local-first** video editor that runs entirely in your browser — there is no account, upload, or server render. Editing, effects, color, AI tools, and export all run on your own machine using your GPU and CPU.',
         },
         {
           kind: 'note',
           tone: 'tip',
-          text: 'Your media stays on your device. FreeCut links to the original files and writes projects, caches, and exports to a **workspace folder** you choose — nothing is sent to the cloud.',
+          text: 'Your media stays on your device. Shreditor links to the original files and writes projects, caches, and exports to a **workspace folder** you choose — nothing is sent to the cloud.',
         },
       ],
     },
@@ -28,7 +28,7 @@ const page = {
       blocks: [
         {
           kind: 'paragraph',
-          text: 'FreeCut relies on modern web APIs, so a recent Chromium browser is the supported path.',
+          text: 'Shreditor relies on modern web APIs, so a recent Chromium browser is the supported path.',
         },
         {
           kind: 'table',
@@ -42,7 +42,7 @@ const page = {
         {
           kind: 'note',
           tone: 'info',
-          text: 'FreeCut uses the File System Access API (workspace folders), WebCodecs (decode and export), WebGPU (effects, color, AI), and OPFS (caches). Keep hardware acceleration on and GPU drivers current.',
+          text: 'Shreditor uses the File System Access API (workspace folders), WebCodecs (decode and export), WebGPU (effects, color, AI), and OPFS (caches). Keep hardware acceleration on and GPU drivers current.',
         },
         {
           kind: 'note',
@@ -57,7 +57,7 @@ const page = {
         {
           kind: 'steps',
           items: [
-            'Open FreeCut in a supported browser and, when prompted, pick a **workspace folder** you can read and write.',
+            'Open Shreditor in a supported browser and, when prompted, pick a **workspace folder** you can read and write.',
             'On the Projects page, choose **New Project** and set the resolution and frame rate for the edit.',
             'Open the **Media** tab and use **Import** to add files, or drag media straight into the library.',
             'Drag a clip from the Media panel onto a timeline track.',

@@ -181,7 +181,7 @@ export async function bootstrapWorkspace(root: FileSystemDirectoryHandle): Promi
   }
 
   // Marker: write on first bootstrap so we can detect "this is a real
-  // FreeCut workspace" and attach a schema version for future migrations.
+  // Shreditor workspace" and attach a schema version for future migrations.
   if (!(await exists(root, [MARKER_FILENAME]))) {
     const marker: WorkspaceMarker = {
       schemaVersion: WORKSPACE_SCHEMA_VERSION,

@@ -1,6 +1,6 @@
-# FreeCut Workspace
+# Shreditor Workspace
 
-This folder is your FreeCut project workspace - the app's source of truth
+This folder is your Shreditor project workspace - the app's source of truth
 for everything: projects, media metadata, thumbnails, waveforms, caches.
 
 Everything here is **plain files** you can `cat`, `grep`, and diff with
@@ -43,7 +43,7 @@ normal tools. AI coding agents can read them directly without a browser.
 ## Safe to edit?
 
 Everything except media source bytes is safe to inspect. Editing
-`project.json` externally works; FreeCut picks up changes on next load.
+`project.json` externally works; Shreditor picks up changes on next load.
 
 Binary caches (waveforms, decoded audio, filmstrips) are regeneratable -
 delete them and the app will rebuild them on demand.

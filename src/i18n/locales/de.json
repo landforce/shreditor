@@ -5,8 +5,8 @@
     "reloadWithoutSaving": "Ohne Speichern neu laden",
     "dockPanel": "Panel andocken",
     "installPrompt": {
-      "label": "FreeCut installieren",
-      "title": "FreeCut installieren",
+      "label": "Shreditor installieren",
+      "title": "Shreditor installieren",
       "description": "Starte es vom Desktop oder Startbildschirm.",
       "install": "Installieren",
       "notNow": "Jetzt nicht",

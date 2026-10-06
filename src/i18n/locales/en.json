@@ -5,8 +5,8 @@
     "reloadWithoutSaving": "Reload without saving",
     "dockPanel": "Dock panel",
     "installPrompt": {
-      "label": "Install FreeCut",
-      "title": "Install FreeCut",
+      "label": "Install Shreditor",
+      "title": "Install Shreditor",
       "description": "Launch it from your desktop or home screen.",
       "install": "Install",
       "notNow": "Not now",

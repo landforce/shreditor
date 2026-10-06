@@ -1,5 +1,5 @@
 /**
- * Fired synchronously after FreeCut's RAF-driven timeline scroller changes
+ * Fired synchronously after Shreditor's RAF-driven timeline scroller changes
  * scrollLeft. Native `scroll` can arrive a paint later, which is too late for
  * overlays in a separate panel that must visually share the same axis.
  */
