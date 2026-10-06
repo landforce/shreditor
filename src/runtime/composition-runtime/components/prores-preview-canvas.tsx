@@ -15,7 +15,8 @@ const log = createLogger('ProResPreviewCanvas')
  * per-frame draw/composite cost for high-res ProRes. Export and thumbnails decode at full
  * resolution through their own paths — this only caps the on-screen preview.
  */
-const MAX_PREVIEW_WIDTH = 1920
+// Long edge, so a vertical 4K source is capped like a landscape one (1080x1920).
+const MAX_PREVIEW_LONG_EDGE = 1920
 
 interface ProResPreviewState {
   session: ProResPreviewSession | null
@@ -104,7 +105,10 @@ const ProResPreviewCanvasInner = memo<ProResPreviewInnerProps>(
           // with no visible loss at preview size (a single 2x downscale, well clear of the
           // moire territory that only bites tiny thumbnail jumps). CSS `objectFit: fill`
           // still stretches the canvas to the container.
-          const scale = Math.min(1, MAX_PREVIEW_WIDTH / sample.displayWidth)
+          const scale = Math.min(
+            1,
+            MAX_PREVIEW_LONG_EDGE / Math.max(sample.displayWidth, sample.displayHeight),
+          )
           const drawWidth = Math.max(1, Math.round(sample.displayWidth * scale))
           const drawHeight = Math.max(1, Math.round(sample.displayHeight * scale))
           if (canvas.width !== drawWidth) canvas.width = drawWidth
