@@ -28,6 +28,9 @@ const testState = vi.hoisted(() => ({
   timelineState: {
     keyframes: [] as unknown[],
   },
+  mediaLibraryState: {
+    mediaById: {} as Record<string, { codec: string }>,
+  },
 }))
 
 testState.pool = {
@@ -45,6 +48,7 @@ const {
   playbackState,
   gizmoState,
   timelineState,
+  mediaLibraryState,
 } = testState
 
 function createStoreHook<TState extends object>(state: TState) {
@@ -111,6 +115,7 @@ vi.mock('@/runtime/composition-runtime/deps/stores', () => ({
   usePlaybackStore: createStoreHook(testState.playbackState),
   useGizmoStore: createStoreHook(testState.gizmoState),
   useTimelineStore: createStoreHook(testState.timelineState),
+  useMediaLibraryStore: createStoreHook(testState.mediaLibraryState),
 }))
 
 vi.mock('../hooks/use-player-compat', () => ({
@@ -155,6 +160,7 @@ describe('VideoContent pooled handoff', () => {
     gizmoState.activeGizmo = null
     gizmoState.preview = null
     timelineState.keyframes = []
+    mediaLibraryState.mediaById = {}
   })
 
   it('keeps the acquired pool element when only itemId changes on the same pool lane', async () => {
@@ -280,9 +286,7 @@ describe('VideoContent pooled handoff', () => {
     vi.useFakeTimers()
     playbackState.isPlaying = false
     const pooledElement = createMockVideoElement()
-    pooledElement.getClientRects = vi.fn(
-      () => ({ length: 1 }) as unknown as DOMRectList,
-    )
+    pooledElement.getClientRects = vi.fn(() => ({ length: 1 }) as unknown as DOMRectList)
     acquireForClipMock.mockReturnValue(pooledElement)
 
     const rendered = render(
@@ -313,6 +317,52 @@ describe('VideoContent pooled handoff', () => {
     expect(pooledElement.play).not.toHaveBeenCalled()
     rendered.unmount()
     vi.useRealTimers()
+  })
+
+  it.each([
+    ['vp9', true],
+    ['avc', false],
+  ])('presents a %s source through a canvas mirror: %s', async (codec, mirrored) => {
+    playbackState.isPlaying = false
+    mediaLibraryState.mediaById = { 'media-1': { codec } }
+    const getContextSpy = vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null)
+    const pooledElement = createMockVideoElement()
+    acquireForClipMock.mockReturnValue(pooledElement)
+
+    const rendered = render(
+      <VideoContent
+        item={{
+          id: 'clip-alpha',
+          type: 'video',
+          trackId: 'track-1',
+          from: 0,
+          durationInFrames: 90,
+          label: 'Alpha clip',
+          src: 'blob:test',
+          mediaId: 'media-1',
+          _poolClipId: 'group-origin-alpha',
+        }}
+        muted={false}
+        safeTrimBefore={0}
+        playbackRate={1}
+        sourceFps={30}
+        audioEqStages={[]}
+      />,
+    )
+
+    await waitFor(() => {
+      expect(registerDomVideoElementMock).toHaveBeenCalledWith('clip-alpha', pooledElement)
+    })
+    const container = pooledElement.parentElement!
+    await waitFor(() => {
+      expect(container.querySelector('canvas') !== null).toBe(mirrored)
+      expect(pooledElement.style.opacity).toBe(mirrored ? '0' : '')
+    })
+
+    rendered.unmount()
+    expect(container.querySelector('canvas')).toBeNull()
+    expect(pooledElement.style.opacity).toBe('')
+    getContextSpy.mockRestore()
   })
 })
 
