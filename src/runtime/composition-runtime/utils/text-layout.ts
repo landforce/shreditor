@@ -15,6 +15,8 @@ export interface TextLayoutPreviewProperties {
   letterSpacing?: number
   lineHeight?: number
   textPadding?: number
+  textPaddingX?: number
+  textPaddingY?: number
   backgroundRadius?: number
   textShadow?: TextItem['textShadow']
   stroke?: TextItem['stroke']
@@ -85,6 +87,8 @@ function applyPreviewProperties(
     letterSpacing: previewProperties.letterSpacing ?? item.letterSpacing,
     lineHeight: previewProperties.lineHeight ?? item.lineHeight,
     textPadding: previewProperties.textPadding ?? item.textPadding,
+    textPaddingX: previewProperties.textPaddingX ?? item.textPaddingX,
+    textPaddingY: previewProperties.textPaddingY ?? item.textPaddingY,
     backgroundRadius: previewProperties.backgroundRadius ?? item.backgroundRadius,
     stroke: hasStroke ? previewProperties.stroke : item.stroke,
     textShadow: hasShadow ? previewProperties.textShadow : item.textShadow,
@@ -107,7 +111,7 @@ function getTextRequiredHeight(
     ? Math.abs(style.textShadow.offsetY) + style.textShadow.blur
     : 0
 
-  return layout.totalHeight + style.textPadding * 2 + strokePad + shadowPad * 2
+  return layout.totalHeight + style.paddingY * 2 + strokePad + shadowPad * 2
 }
 
 /**

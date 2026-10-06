@@ -19,7 +19,8 @@ import {
 } from '../../src/shared/typography/text-styles/text-style-family.mjs'
 
 const TEXT_STYLE_ROLES = ['title', 'caption', 'label', 'lower-third', 'other']
-const styleId = z.string().regex(/^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/)
+// Letters, digits, '_', '-' and ':' (a namespace, as in `kit:title`).
+const styleId = z.string().regex(/^[A-Za-z0-9][A-Za-z0-9_:-]{0,63}$/)
 const finite = z.number().finite()
 
 const look = z
@@ -35,9 +36,11 @@ const look = z
     textAlign: z.enum(['left', 'center', 'right']).optional(),
     verticalAlign: z.enum(['top', 'middle', 'bottom']).optional(),
     backgroundColor: z.string().min(1).optional(),
-    backgroundMode: z.enum(['text', 'box']).optional(),
+    backgroundMode: z.enum(['text', 'lines', 'box']).optional(),
     backgroundRadius: finite.min(0).optional(),
     textPadding: finite.min(0).optional(),
+    textPaddingX: finite.min(0).optional(),
+    textPaddingY: finite.min(0).optional(),
     textShadow: z
       .object({ offsetX: finite, offsetY: finite, blur: finite.min(0), color: z.string().min(1) })
       .strict()

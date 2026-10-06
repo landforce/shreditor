@@ -84,6 +84,8 @@ function scaleTextStyleForCanvas<TItem extends TextItem | SubtitleSegmentItem>(
     letterSpacing: scaleOptional(item.letterSpacing, scale.uniform),
     backgroundRadius: scaleOptional(item.backgroundRadius, scale.uniform),
     textPadding: scaleOptional(item.textPadding, scale.uniform),
+    textPaddingX: scaleOptional(item.textPaddingX, scale.uniform),
+    textPaddingY: scaleOptional(item.textPaddingY, scale.uniform),
     ...('textSpans' in item
       ? {
           textSpans: item.textSpans?.map((span) => ({

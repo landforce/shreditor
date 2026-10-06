@@ -159,6 +159,8 @@ export function mergeLiveItemPresentation(
     verticalAlign: liveItem.verticalAlign,
     lineHeight: liveItem.lineHeight,
     textPadding: liveItem.textPadding,
+    textPaddingX: liveItem.textPaddingX,
+    textPaddingY: liveItem.textPaddingY,
     textShadow: liveItem.textShadow,
     stroke: liveItem.stroke,
   } as TimelineItem

@@ -85,6 +85,8 @@ export type CaptionTextItemTemplate = Pick<
   | 'backgroundRadius'
   | 'backgroundMode'
   | 'textPadding'
+  | 'textPaddingX'
+  | 'textPaddingY'
   | 'textAlign'
   | 'verticalAlign'
   | 'lineHeight'
@@ -538,6 +540,8 @@ export function getCaptionTextItemTemplate(
     backgroundRadius: item.backgroundRadius,
     backgroundMode: item.backgroundMode,
     textPadding: item.textPadding,
+    textPaddingX: item.textPaddingX,
+    textPaddingY: item.textPaddingY,
     textAlign: item.textAlign,
     verticalAlign: item.verticalAlign,
     lineHeight: item.lineHeight,
@@ -1180,6 +1184,8 @@ export function consolidateCaptionTextItemsToSegments(
       lineHeight: first.lineHeight,
       letterSpacing: first.letterSpacing,
       textPadding: first.textPadding,
+      textPaddingX: first.textPaddingX,
+      textPaddingY: first.textPaddingY,
       textShadow: first.textShadow,
       stroke: first.stroke,
       transform: first.transform,

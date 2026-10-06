@@ -30,6 +30,8 @@ export type CaptionStylePatch = Pick<
   | 'lineHeight'
   | 'letterSpacing'
   | 'textPadding'
+  | 'textPaddingX'
+  | 'textPaddingY'
   | 'textShadow'
   | 'stroke'
 > & { transform?: TransformProperties }
@@ -193,7 +195,12 @@ export function resolveCaptionStylePatch(
   baseTransform?: TransformProperties,
 ): CaptionStylePatch {
   const layout = preset.layout
-  const patch: CaptionStylePatch = { ...preset.patch }
+  // A preset's padding is one value: clear any horizontal/vertical split.
+  const patch: CaptionStylePatch = {
+    ...preset.patch,
+    textPaddingX: undefined,
+    textPaddingY: undefined,
+  }
 
   if (layout?.fontSizeRatio !== undefined) {
     patch.fontSize = Math.max(8, Math.round(canvasHeight * layout.fontSizeRatio))

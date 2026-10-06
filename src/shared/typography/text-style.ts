@@ -39,6 +39,10 @@ export interface ResolvedTextStyle {
   textAlign: TextHorizontalAlign
   verticalAlign: TextVerticalAlign
   textPadding: number
+  /** Left/right padding: `textPaddingX`, else `textPadding`. */
+  paddingX: number
+  /** Top/bottom padding: `textPaddingY`, else `textPadding`. */
+  paddingY: number
   color: string
   backgroundColor?: string
   backgroundRadius: number
@@ -81,6 +85,8 @@ export type TextStyleInput = Pick<
   | 'lineHeight'
   | 'letterSpacing'
   | 'textPadding'
+  | 'textPaddingX'
+  | 'textPaddingY'
   | 'textShadow'
   | 'stroke'
 >
@@ -100,12 +106,15 @@ function buildCssFont(
 }
 
 export function resolveTextStyle(item: TextStyleInput): ResolvedTextStyle {
+  const textPadding = Math.max(0, item.textPadding ?? TEXT_DEFAULTS.textPadding)
   return {
     lineHeight: item.lineHeight ?? TEXT_DEFAULTS.lineHeight,
     letterSpacing: item.letterSpacing ?? TEXT_DEFAULTS.letterSpacing,
     textAlign: item.textAlign ?? TEXT_DEFAULTS.textAlign,
     verticalAlign: item.verticalAlign ?? TEXT_DEFAULTS.verticalAlign,
-    textPadding: Math.max(0, item.textPadding ?? TEXT_DEFAULTS.textPadding),
+    textPadding,
+    paddingX: Math.max(0, item.textPaddingX ?? textPadding),
+    paddingY: Math.max(0, item.textPaddingY ?? textPadding),
     color: item.color ?? TEXT_DEFAULTS.color,
     backgroundColor: item.backgroundColor,
     backgroundRadius: Math.max(0, item.backgroundRadius ?? 0),

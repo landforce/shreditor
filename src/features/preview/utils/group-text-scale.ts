@@ -23,6 +23,9 @@ export interface GroupScaledTextProperties {
   fontSize: number
   letterSpacing: number
   textPadding: number
+  /** Only when the item has its own horizontal/vertical padding (not keyframable). */
+  textPaddingX?: number
+  textPaddingY?: number
   backgroundRadius: number
   textShadow?: TextItem['textShadow']
   stroke?: TextItem['stroke']
@@ -35,11 +38,16 @@ export interface GroupTextScaleCommit {
   itemUpdates: Partial<TextItem>
 }
 
+const scaledOptional = (value: number | undefined, factor: number) =>
+  value === undefined ? undefined : value * factor
+
 function scaleTextProperties(item: TextItem, factor: number): GroupScaledTextProperties {
   return {
     fontSize: (item.fontSize ?? TEXT_DEFAULTS.fontSize) * factor,
     letterSpacing: (item.letterSpacing ?? TEXT_DEFAULTS.letterSpacing) * factor,
     textPadding: (item.textPadding ?? TEXT_DEFAULTS.textPadding) * factor,
+    textPaddingX: scaledOptional(item.textPaddingX, factor),
+    textPaddingY: scaledOptional(item.textPaddingY, factor),
     backgroundRadius: (item.backgroundRadius ?? 0) * factor,
     textShadow: item.textShadow
       ? {
@@ -98,13 +106,7 @@ function getGroupTextKeyframeOperation(
   currentFrame: number,
   forceFrameScoped: boolean,
 ): AutoKeyframeOperation | null {
-  const automatic = getAutoKeyframeOperation(
-    item,
-    itemKeyframes,
-    property,
-    value,
-    currentFrame,
-  )
+  const automatic = getAutoKeyframeOperation(item, itemKeyframes, property, value, currentFrame)
   if (automatic || !forceFrameScoped) return automatic
 
   const relativeFrame = currentFrame - item.from
@@ -147,6 +149,8 @@ export function buildGroupTextScaleCommit(
   const itemUpdates: Partial<TextItem> = {
     letterSpacing: updates.letterSpacing,
     textSpans: updates.textSpans,
+    ...(updates.textPaddingX === undefined ? {} : { textPaddingX: updates.textPaddingX }),
+    ...(updates.textPaddingY === undefined ? {} : { textPaddingY: updates.textPaddingY }),
   }
 
   const commitScalar = (

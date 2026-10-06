@@ -14,7 +14,9 @@ import { parseSubtitleCueText } from '@/shared/utils/subtitle-cue-format'
 import {
   layoutTextBlock,
   lineInkWidth,
+  textBlockBackgrounds,
   type LaidOutLine,
+  type TextBlockLayout,
 } from '@/shared/typography/text-block-layout'
 import {
   applyCanvasLetterSpacing,
@@ -76,6 +78,8 @@ export function getTextRasterCacheKey(item: TextItem, boxWidth: number, boxHeigh
     lineHeight: item.lineHeight,
     letterSpacing: item.letterSpacing,
     textPadding: item.textPadding,
+    textPaddingX: item.textPaddingX,
+    textPaddingY: item.textPaddingY,
     textShadow: item.textShadow,
     stroke: item.stroke,
     textStyleScale: item.textStyleScale,
@@ -91,6 +95,27 @@ function pruneTextRasterCache(cache: Map<string, TextRasterCacheEntry>): void {
     if (total <= TEXT_RASTER_CACHE_MAX_BYTES || cache.size <= 1) break
     cache.delete(key)
     total -= entry.bytes
+  }
+}
+
+/** Fill the block's background box, or one box per line in 'lines' mode. */
+function paintTextBackgrounds(
+  ctx: OffscreenCanvasRenderingContext2D,
+  item: TextItem,
+  layout: TextBlockLayout,
+  originX: number,
+  originY: number,
+): void {
+  if (!item.backgroundColor) return
+  ctx.fillStyle = item.backgroundColor
+  for (const bg of textBlockBackgrounds(layout)) {
+    if (bg.radius > 0) {
+      ctx.beginPath()
+      ctx.roundRect(originX + bg.x, originY + bg.y, bg.width, bg.height, bg.radius)
+      ctx.fill()
+    } else {
+      ctx.fillRect(originX + bg.x, originY + bg.y, bg.width, bg.height)
+    }
   }
 }
 
@@ -114,17 +139,7 @@ function paintTextBlock(
   )
   const layout = layoutTextBlock(item, boxWidth, boxHeight, measurer)
 
-  if (item.backgroundColor && layout.background) {
-    const bg = layout.background
-    ctx.fillStyle = item.backgroundColor
-    if (bg.radius > 0) {
-      ctx.beginPath()
-      ctx.roundRect(originX + bg.x, originY + bg.y, bg.width, bg.height, bg.radius)
-      ctx.fill()
-    } else {
-      ctx.fillRect(originX + bg.x, originY + bg.y, bg.width, bg.height)
-    }
-  }
+  paintTextBackgrounds(ctx, item, layout, originX, originY)
 
   if (item.textShadow) {
     ctx.shadowColor = item.textShadow.color
@@ -291,17 +306,7 @@ function paintTextBlockWithMotion(
         })
 
   // Background box is whole-clip (never per-unit) — same as paintTextBlock.
-  if (item.backgroundColor && layout.background) {
-    const bg = layout.background
-    ctx.fillStyle = item.backgroundColor
-    if (bg.radius > 0) {
-      ctx.beginPath()
-      ctx.roundRect(originX + bg.x, originY + bg.y, bg.width, bg.height, bg.radius)
-      ctx.fill()
-    } else {
-      ctx.fillRect(originX + bg.x, originY + bg.y, bg.width, bg.height)
-    }
-  }
+  paintTextBackgrounds(ctx, item, layout, originX, originY)
 
   if (item.textShadow) {
     ctx.shadowColor = item.textShadow.color
@@ -537,6 +542,8 @@ export function renderSubtitleSegmentItem(
     lineHeight: item.lineHeight,
     letterSpacing: item.letterSpacing,
     textPadding: item.textPadding,
+    textPaddingX: item.textPaddingX,
+    textPaddingY: item.textPaddingY,
     textShadow: item.textShadow,
     stroke: item.stroke,
     transform: item.transform,

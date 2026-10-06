@@ -1,6 +1,10 @@
 import type { TextItem } from '@/types/timeline'
 import type { TextMotionSpec } from '@/types/text-motion'
-import { layoutTextBlock, lineInkWidth } from '@/shared/typography/text-block-layout'
+import {
+  layoutTextBlock,
+  lineInkWidth,
+  textBlockBackgrounds,
+} from '@/shared/typography/text-block-layout'
 import { parseFontSizePx, type TextMeasurer } from '@/shared/typography/text-measurer'
 import {
   evaluateGlyphMotion,
@@ -372,20 +376,22 @@ export class GlyphAtlasTextPipeline {
     }
 
     const glyphs: PackedGlyph[] = []
-    if (item.backgroundColor && layout.background) {
-      const backgroundColor = parseGpuTextColor(item.backgroundColor)
+    const backgrounds = item.backgroundColor ? textBlockBackgrounds(layout) : []
+    if (backgrounds.length > 0) {
+      const backgroundColor = parseGpuTextColor(item.backgroundColor!)
       const backgroundGlyph = this.ensureSolidGlyph()
       if (!backgroundColor || !backgroundGlyph) return null
-      const bg = layout.background
-      glyphs.push({
-        metrics: backgroundGlyph,
-        x: bg.x,
-        y: bg.y,
-        width: bg.width,
-        height: bg.height,
-        color: backgroundColor,
-        solidRadius: bg.radius,
-      })
+      for (const bg of backgrounds) {
+        glyphs.push({
+          metrics: backgroundGlyph,
+          x: bg.x,
+          y: bg.y,
+          width: bg.width,
+          height: bg.height,
+          color: backgroundColor,
+          solidRadius: bg.radius,
+        })
+      }
     }
 
     const shadow = item.textShadow

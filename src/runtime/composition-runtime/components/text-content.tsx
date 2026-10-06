@@ -16,19 +16,42 @@ const VERTICAL_ALIGN_TO_FLEX: Record<string, string> = {
   bottom: 'flex-end',
 }
 
+interface BackgroundBoxStyles {
+  outer: React.CSSProperties
+  inner: React.CSSProperties
+  /** 'lines' mode: the inline box behind each line (CSS `box-decoration-break: clone`). */
+  line?: React.CSSProperties
+}
+
 /**
  * Where the background and padding go. Default ('text' mode) the inner wrapper
  * hugs the text block and carries both; 'box' mode paints the whole item box
- * (a fixed-size panel) on the outer wrapper, which then holds the padding.
+ * (a fixed-size panel) on the outer wrapper, which then holds the padding;
+ * 'lines' mode gives every line its own inline box, which carries the
+ * horizontal padding (so the outer wrapper keeps only the vertical one).
  */
 function getBackgroundBoxStyles(
   style: ReturnType<typeof resolveTextStyle>,
   scale: number,
-): { outer: React.CSSProperties; inner: React.CSSProperties } {
-  const padding = `${style.textPadding * scale}px`
+): BackgroundBoxStyles {
+  const padX = style.paddingX * scale
+  const padY = style.paddingY * scale
+  const padding = `${padY}px ${padX}px`
   const borderRadius = `${style.backgroundRadius * scale}px`
   if (!style.backgroundColor) return { outer: { padding }, inner: { padding: 0 } }
   const fill = { backgroundColor: style.backgroundColor, borderRadius }
+  if (style.backgroundMode === 'lines') {
+    return {
+      outer: { padding: `${padY}px 0` },
+      inner: { padding: 0 },
+      line: {
+        ...fill,
+        padding,
+        boxDecorationBreak: 'clone',
+        WebkitBoxDecorationBreak: 'clone',
+      },
+    }
+  }
   return style.backgroundMode === 'box'
     ? { outer: { padding, ...fill }, inner: { padding: 0 } }
     : { outer: { padding: 0 }, inner: { padding, ...fill } }
@@ -103,6 +126,8 @@ export const TextContent: React.FC<{ item: TextItem & { _sequenceFrameOffset?: n
       backgroundColor: preview?.backgroundColor ?? resolvedItem.backgroundColor,
       backgroundRadius: preview?.backgroundRadius ?? resolvedItem.backgroundRadius,
       textPadding: preview?.textPadding ?? resolvedItem.textPadding,
+      textPaddingX: preview?.textPaddingX ?? resolvedItem.textPaddingX,
+      textPaddingY: preview?.textPaddingY ?? resolvedItem.textPaddingY,
       textShadow: hasTextShadowPreview ? preview?.textShadow : resolvedItem.textShadow,
       stroke: hasStrokePreview ? preview?.stroke : resolvedItem.stroke,
     }),
@@ -159,6 +184,7 @@ export const TextContent: React.FC<{ item: TextItem & { _sequenceFrameOffset?: n
           lineHeight={style.lineHeight}
           scale={scale}
           scaleX={scaleX}
+          lineBox={background.line}
         />
       </div>
     </div>
@@ -170,6 +196,28 @@ interface SpanBlockProps {
   lineHeight: number
   scale: number
   scaleX: number
+  /** 'lines' background mode: the inline box every line of text sits in. */
+  lineBox?: React.CSSProperties
+}
+
+/**
+ * Spaces are kept as typed ('pre-wrap'), except with per-line boxes: there a
+ * space where a line wraps would widen that line's box on the right, which
+ * the canvas renderers (which drop it) don't, so they collapse ('pre-line').
+ */
+function lineWhiteSpace(lineBox: React.CSSProperties | undefined): 'pre-wrap' | 'pre-line' {
+  return lineBox ? 'pre-line' : 'pre-wrap'
+}
+
+/** Text inside the per-line inline box, when the item has one. */
+function InLineBox({
+  lineBox,
+  children,
+}: {
+  lineBox?: React.CSSProperties
+  children: React.ReactNode
+}) {
+  return lineBox ? <span style={lineBox}>{children}</span> : <>{children}</>
 }
 
 /** Picks the span flow: 'inline' (one wrapped stream) vs default stacked lines. */
@@ -186,7 +234,7 @@ function SpanBlocks({
  * inside a line. Font/size come from the FIRST span — same base-style rule as
  * the shared layoutTextBlock inline path.
  */
-function InlineSpanFlow({ spanStyles, lineHeight, scale, scaleX }: SpanBlockProps) {
+function InlineSpanFlow({ spanStyles, lineHeight, scale, scaleX, lineBox }: SpanBlockProps) {
   const base = spanStyles[0]!
   return (
     <div
@@ -198,28 +246,30 @@ function InlineSpanFlow({ spanStyles, lineHeight, scale, scaleX }: SpanBlockProp
         lineHeight,
         letterSpacing: base.letterSpacing * scaleX,
         display: 'block',
-        whiteSpace: 'pre-wrap',
+        whiteSpace: lineWhiteSpace(lineBox),
         wordBreak: 'break-word',
         width: '100%',
       }}
     >
-      {spanStyles.map((span, index) => (
-        <span
-          key={`${index}:${span.text}`}
-          style={{
-            color: span.color,
-            textDecoration: span.underline ? 'underline' : 'none',
-          }}
-        >
-          {span.text}
-        </span>
-      ))}
+      <InLineBox lineBox={lineBox}>
+        {spanStyles.map((span, index) => (
+          <span
+            key={`${index}:${span.text}`}
+            style={{
+              color: span.color,
+              textDecoration: span.underline ? 'underline' : 'none',
+            }}
+          >
+            {span.text}
+          </span>
+        ))}
+      </InLineBox>
     </div>
   )
 }
 
 /** Default flow: every span is its own block line-group. */
-function StackedSpans({ spanStyles, lineHeight, scale, scaleX }: SpanBlockProps) {
+function StackedSpans({ spanStyles, lineHeight, scale, scaleX, lineBox }: SpanBlockProps) {
   return (
     <>
       {spanStyles.map((span, index) => (
@@ -235,12 +285,12 @@ function StackedSpans({ spanStyles, lineHeight, scale, scaleX }: SpanBlockProps)
             lineHeight,
             letterSpacing: span.letterSpacing * scaleX,
             display: 'block',
-            whiteSpace: 'pre-wrap',
+            whiteSpace: lineWhiteSpace(lineBox),
             wordBreak: 'break-word',
             width: '100%',
           }}
         >
-          {span.text}
+          <InLineBox lineBox={lineBox}>{span.text}</InLineBox>
         </div>
       ))}
     </>

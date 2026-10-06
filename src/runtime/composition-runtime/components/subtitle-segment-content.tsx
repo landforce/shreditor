@@ -69,6 +69,8 @@ export const SubtitleSegmentContent: React.FC<{
       lineHeight: item.lineHeight,
       letterSpacing: item.letterSpacing,
       textPadding: item.textPadding,
+      textPaddingX: item.textPaddingX,
+      textPaddingY: item.textPaddingY,
       textShadow: item.textShadow,
       stroke: item.stroke,
       _sequenceFrameOffset: item._sequenceFrameOffset,

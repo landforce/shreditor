@@ -64,7 +64,10 @@ export interface TextBlockBackground {
 export interface TextBlockLayout {
   lines: LaidOutLine[]
   totalHeight: number
+  /** The background box ('text' and 'box' modes). */
   background?: TextBlockBackground
+  /** One background box per line with text ('lines' mode). */
+  lineBackgrounds?: TextBlockBackground[]
 }
 
 function breakWord(
@@ -308,6 +311,163 @@ function layoutInlineSpanLines(
   return lines
 }
 
+/** Lines of the stacked flow: each span wraps on its own, one after another. */
+function layoutStackedSpanLines(
+  spans: ReturnType<typeof resolveSpanStyles>,
+  lineHeightFactor: number,
+  availableWidth: number,
+  measurer: TextMeasurer,
+): LaidOutLine[] {
+  const lines: LaidOutLine[] = []
+  for (const span of spans) {
+    const metrics = measurer.fontMetrics(span.cssFont)
+    const lineHeightPx = span.fontSize * lineHeightFactor
+    const halfLeading = (lineHeightPx - (metrics.ascent + metrics.descent)) / 2
+    const baselineOffset = halfLeading + metrics.ascent
+    for (const text of wrapText(
+      span.text,
+      span.cssFont,
+      span.letterSpacing,
+      availableWidth,
+      measurer,
+    )) {
+      lines.push({
+        text,
+        cssFont: span.cssFont,
+        fontSize: span.fontSize,
+        color: span.color,
+        letterSpacing: span.letterSpacing,
+        underline: span.underline,
+        width: measurer.measure(text, span.cssFont, span.letterSpacing),
+        top: 0,
+        baselineY: baselineOffset, // refined by the caller once block top is known
+        startX: 0,
+        lineHeightPx,
+      })
+    }
+  }
+  return lines
+}
+
+type ResolvedBlockStyle = ReturnType<typeof resolveTextStyle>
+
+function blockTopFor(style: ResolvedBlockStyle, boxHeight: number, totalHeight: number): number {
+  const padY = style.paddingY
+  if (style.verticalAlign === 'top') return padY
+  if (style.verticalAlign === 'bottom') return boxHeight - padY - totalHeight
+  return padY + (boxHeight - padY * 2 - totalHeight) / 2
+}
+
+/** Set each line's top, baseline and left edge inside the box. */
+function positionLines(
+  lines: LaidOutLine[],
+  style: ResolvedBlockStyle,
+  boxWidth: number,
+  blockTop: number,
+): void {
+  const padX = style.paddingX
+  let cursorTop = blockTop
+  for (const line of lines) {
+    line.top = cursorTop
+    line.baselineY = cursorTop + line.baselineY
+    // Center ignores padding (centers in the full box); left/right respect it.
+    line.startX =
+      style.textAlign === 'left'
+        ? padX
+        : style.textAlign === 'right'
+          ? boxWidth - padX - line.width
+          : (boxWidth - line.width) / 2
+    cursorTop += line.lineHeightPx
+  }
+}
+
+const backgroundRect = (
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  radius: number,
+): TextBlockBackground => ({
+  x,
+  y,
+  width,
+  height,
+  // Clamp to the background rect (not the box) so the rounded corners can't
+  // exceed half the rect — both canvas roundRect and the GPU SDF re-clamp,
+  // so the rendered result is identical either way.
+  radius: Math.max(0, Math.min(radius, width / 2, height / 2)),
+})
+
+/** 'text' mode: one box around the whole block of lines, plus the padding. */
+function blockBackground(
+  lines: LaidOutLine[],
+  style: ResolvedBlockStyle,
+  boxWidth: number,
+  blockTop: number,
+  totalHeight: number,
+): TextBlockBackground {
+  const { paddingX: padX, paddingY: padY } = style
+  const maxLineWidth = Math.max(...lines.map((line) => line.width))
+  const centerX =
+    style.textAlign === 'left'
+      ? padX + maxLineWidth / 2
+      : style.textAlign === 'right'
+        ? boxWidth - padX - maxLineWidth / 2
+        : boxWidth / 2
+  const width = Math.min(boxWidth, maxLineWidth + padX * 2)
+  const height = totalHeight + padY * 2
+  return backgroundRect(centerX - width / 2, blockTop - padY, width, height, style.backgroundRadius)
+}
+
+/**
+ * 'lines' mode: one box behind each line with text, like a CSS inline
+ * background with `box-decoration-break: clone` (what the DOM preview draws):
+ * the line's advance plus the horizontal padding, and the font's content area
+ * (ascent + descent around the baseline) plus the vertical padding.
+ */
+function perLineBackgrounds(
+  lines: LaidOutLine[],
+  style: ResolvedBlockStyle,
+  boxWidth: number,
+  measurer: TextMeasurer,
+): TextBlockBackground[] {
+  const { paddingX: padX, paddingY: padY } = style
+  return lines
+    .filter((line) => line.text.trim() !== '')
+    .map((line) => {
+      const metrics = measurer.fontMetrics(line.cssFont)
+      const width = Math.min(boxWidth, line.width + padX * 2)
+      return backgroundRect(
+        line.startX + line.width / 2 - width / 2,
+        line.baselineY - metrics.ascent - padY,
+        width,
+        metrics.ascent + metrics.descent + padY * 2,
+        style.backgroundRadius,
+      )
+    })
+}
+
+function layoutBackgrounds(
+  lines: LaidOutLine[],
+  style: ResolvedBlockStyle,
+  box: { width: number; height: number; blockTop: number; totalHeight: number },
+  measurer: TextMeasurer,
+): Pick<TextBlockLayout, 'background' | 'lineBackgrounds'> {
+  if (!style.backgroundColor) return {}
+  if (style.backgroundMode === 'box') {
+    // Box mode: the panel is the item's transform box itself; text is laid out
+    // inside it as usual (padding insets, align/verticalAlign position).
+    const width = Math.max(0, box.width)
+    const height = Math.max(0, box.height)
+    return { background: backgroundRect(0, 0, width, height, style.backgroundRadius) }
+  }
+  if (lines.length === 0) return {}
+  if (style.backgroundMode === 'lines') {
+    return { lineBackgrounds: perLineBackgrounds(lines, style, box.width, measurer) }
+  }
+  return { background: blockBackground(lines, style, box.width, box.blockTop, box.totalHeight) }
+}
+
 export function layoutTextBlock(
   item: TextStyleInput,
   boxWidth: number,
@@ -316,104 +476,29 @@ export function layoutTextBlock(
 ): TextBlockLayout {
   const style = resolveTextStyle(item)
   const spans = resolveSpanStyles(item)
-  const padding = style.textPadding
-  const availableWidth = Math.max(1, boxWidth - padding * 2)
-  const availableHeight = boxHeight - padding * 2
+  const availableWidth = Math.max(1, boxWidth - style.paddingX * 2)
 
   const inlineFlow =
     (item as { spanLayout?: 'stack' | 'inline' }).spanLayout === 'inline' && spans.length > 0
-
-  const lines: LaidOutLine[] = inlineFlow
+  const lines = inlineFlow
     ? layoutInlineSpanLines(spans, style.lineHeight, availableWidth, measurer)
-    : []
-  if (!inlineFlow) {
-    for (const span of spans) {
-      const metrics = measurer.fontMetrics(span.cssFont)
-      const lineHeightPx = span.fontSize * style.lineHeight
-      const halfLeading = (lineHeightPx - (metrics.ascent + metrics.descent)) / 2
-      const baselineOffset = halfLeading + metrics.ascent
-      for (const text of wrapText(
-        span.text,
-        span.cssFont,
-        span.letterSpacing,
-        availableWidth,
-        measurer,
-      )) {
-        lines.push({
-          text,
-          cssFont: span.cssFont,
-          fontSize: span.fontSize,
-          color: span.color,
-          letterSpacing: span.letterSpacing,
-          underline: span.underline,
-          width: measurer.measure(text, span.cssFont, span.letterSpacing),
-          top: 0,
-          baselineY: baselineOffset, // refined below once block top is known
-          startX: 0,
-          lineHeightPx,
-        })
-      }
-    }
-  }
+    : layoutStackedSpanLines(spans, style.lineHeight, availableWidth, measurer)
 
   const totalHeight = lines.reduce((sum, line) => sum + line.lineHeightPx, 0)
-  const blockTop =
-    style.verticalAlign === 'top'
-      ? padding
-      : style.verticalAlign === 'bottom'
-        ? boxHeight - padding - totalHeight
-        : padding + (availableHeight - totalHeight) / 2
+  const blockTop = blockTopFor(style, boxHeight, totalHeight)
+  positionLines(lines, style, boxWidth, blockTop)
+  const backgrounds = layoutBackgrounds(
+    lines,
+    style,
+    { width: boxWidth, height: boxHeight, blockTop, totalHeight },
+    measurer,
+  )
+  return { lines, totalHeight, ...backgrounds }
+}
 
-  let cursorTop = blockTop
-  for (const line of lines) {
-    line.top = cursorTop
-    line.baselineY = cursorTop + line.baselineY
-    // Center ignores padding (centers in the full box); left/right respect it.
-    line.startX =
-      style.textAlign === 'left'
-        ? padding
-        : style.textAlign === 'right'
-          ? boxWidth - padding - line.width
-          : (boxWidth - line.width) / 2
-    cursorTop += line.lineHeightPx
-  }
-
-  let background: TextBlockBackground | undefined
-  if (style.backgroundColor && style.backgroundMode === 'box') {
-    // Box mode: the panel is the item's transform box itself; text is laid out
-    // inside it as usual (textPadding insets, align/verticalAlign position).
-    const width = Math.max(0, boxWidth)
-    const height = Math.max(0, boxHeight)
-    background = {
-      x: 0,
-      y: 0,
-      width,
-      height,
-      radius: Math.max(0, Math.min(style.backgroundRadius, width / 2, height / 2)),
-    }
-  } else if (style.backgroundColor && lines.length > 0) {
-    const maxLineWidth = Math.max(...lines.map((line) => line.width))
-    const backgroundCenterX =
-      style.textAlign === 'left'
-        ? padding + maxLineWidth / 2
-        : style.textAlign === 'right'
-          ? boxWidth - padding - maxLineWidth / 2
-          : boxWidth / 2
-    const width = Math.min(boxWidth, maxLineWidth + padding * 2)
-    const height = totalHeight + padding * 2
-    background = {
-      x: backgroundCenterX - width / 2,
-      y: blockTop - padding,
-      width,
-      height,
-      // Clamp to the background rect (not the box) so the rounded corners can't
-      // exceed half the rect — both canvas roundRect and the GPU SDF re-clamp,
-      // so the rendered result is identical either way.
-      radius: Math.max(0, Math.min(style.backgroundRadius, width / 2, height / 2)),
-    }
-  }
-
-  return { lines, totalHeight, background }
+/** Every background rect of a laid-out block: the block's box, or one per line. */
+export function textBlockBackgrounds(layout: TextBlockLayout): TextBlockBackground[] {
+  return layout.lineBackgrounds ?? (layout.background ? [layout.background] : [])
 }
 
 /** Width of the visible ink (excludes the trailing letter-spacing). */

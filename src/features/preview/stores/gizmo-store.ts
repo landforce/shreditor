@@ -133,6 +133,8 @@ export interface ItemPropertiesPreview extends Partial<Pick<ShapeItem, ShapePrev
   backgroundColor?: string
   backgroundRadius?: number
   textPadding?: number
+  textPaddingX?: number
+  textPaddingY?: number
   textShadow?: {
     offsetX: number
     offsetY: number

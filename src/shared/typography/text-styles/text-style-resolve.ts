@@ -46,6 +46,8 @@ const TEXT_STYLE_LOOK_KEYS = [
   'backgroundMode',
   'backgroundRadius',
   'textPadding',
+  'textPaddingX',
+  'textPaddingY',
   'textShadow',
   'stroke',
 ] as const satisfies ReadonlyArray<keyof TextStyleFields>
@@ -131,6 +133,8 @@ function scaleLook(look: TextStyleLook, scale: number): TextStyleLook {
   if (look.fontSize !== undefined) scaled.fontSize = len(look.fontSize)
   if (look.letterSpacing !== undefined) scaled.letterSpacing = len(look.letterSpacing)
   if (look.textPadding !== undefined) scaled.textPadding = len(look.textPadding)
+  if (look.textPaddingX !== undefined) scaled.textPaddingX = len(look.textPaddingX)
+  if (look.textPaddingY !== undefined) scaled.textPaddingY = len(look.textPaddingY)
   if (look.backgroundRadius !== undefined) scaled.backgroundRadius = len(look.backgroundRadius)
   if (look.textShadow) {
     scaled.textShadow = {

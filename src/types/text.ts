@@ -46,11 +46,13 @@ export type TextStroke = {
 }
 
 /**
- * How `backgroundColor` is painted. 'text' (default) hugs the laid-out lines
- * (plus `textPadding`); 'box' fills the item's whole transform box, so the
- * text sits inside a fixed-size rounded panel (e.g. a chat pill).
+ * How `backgroundColor` is painted. 'text' (default) is one box around the
+ * laid-out lines (plus the padding); 'lines' is one box behind each line,
+ * hugging that line's text (plus the padding), like CSS inline backgrounds;
+ * 'box' fills the item's whole transform box, so the text sits inside a
+ * fixed-size rounded panel (e.g. a chat pill).
  */
-export type TextBackgroundMode = 'text' | 'box'
+export type TextBackgroundMode = 'text' | 'lines' | 'box'
 
 export type TextVisualStyleFields = {
   backgroundColor?: string
@@ -60,6 +62,10 @@ export type TextVisualStyleFields = {
   verticalAlign?: TextVerticalAlign
   lineHeight?: number
   textPadding?: number
+  /** Horizontal padding (left and right); falls back to `textPadding`. */
+  textPaddingX?: number
+  /** Vertical padding (top and bottom); falls back to `textPadding`. */
+  textPaddingY?: number
   textShadow?: TextShadow
   stroke?: TextStroke
 }

@@ -20,7 +20,8 @@ import {
   toTextStyleFamily,
 } from './text-style-family.mjs'
 
-const TEXT_STYLE_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/
+// Letters, digits, '_', '-' and ':' (a namespace, as in `kit:title`).
+const TEXT_STYLE_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_:-]{0,63}$/
 
 const fontWeight = z.enum(['normal', 'medium', 'semibold', 'bold'])
 const fontStyle = z.enum(['normal', 'italic'])
@@ -39,9 +40,11 @@ const lookSchema = z
     textAlign: z.enum(['left', 'center', 'right']).optional(),
     verticalAlign: z.enum(['top', 'middle', 'bottom']).optional(),
     backgroundColor: z.string().min(1).max(64).optional(),
-    backgroundMode: z.enum(['text', 'box']).optional(),
+    backgroundMode: z.enum(['text', 'lines', 'box']).optional(),
     backgroundRadius: finite.min(0).max(2000).optional(),
     textPadding: finite.min(0).max(1000).optional(),
+    textPaddingX: finite.min(0).max(1000).optional(),
+    textPaddingY: finite.min(0).max(1000).optional(),
     textShadow: z
       .object({ offsetX: finite, offsetY: finite, blur: finite.min(0), color: z.string().min(1) })
       .strict()

@@ -1495,6 +1495,8 @@ function getGpuTextTextureCacheKey(item: TextItem, width: number, height: number
     lineHeight: item.lineHeight,
     letterSpacing: item.letterSpacing,
     textPadding: item.textPadding,
+    textPaddingX: item.textPaddingX,
+    textPaddingY: item.textPaddingY,
     textShadow: item.textShadow,
     stroke: item.stroke,
   })

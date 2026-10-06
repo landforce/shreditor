@@ -579,6 +579,9 @@ function buildResolvedPresetStyle(
     lineHeight: preset.style.lineHeight,
     letterSpacing: resolveTracking(scale, preset.style.letterSpacing) * styleScale,
     textPadding: Math.round(scale.spacing[preset.style.textPadding] * styleScale),
+    // A preset's padding is one value: clear any horizontal/vertical split.
+    textPaddingX: undefined,
+    textPaddingY: undefined,
     textShadow: shadowScale
       ? {
           offsetX: shadowScale.offsetX * styleScale,

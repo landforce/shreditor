@@ -79,7 +79,11 @@ import {
   resolveTrackRenderState,
 } from '@/runtime/composition-runtime/utils/scene-assembly'
 import { expandTextTransformToFitContent } from '@/runtime/composition-runtime/utils/text-layout'
-import { layoutTextBlock, lineInkWidth } from '@/shared/typography/text-block-layout'
+import {
+  layoutTextBlock,
+  lineInkWidth,
+  type TextBlockBackground,
+} from '@/shared/typography/text-block-layout'
 import { createCanvasTextMeasurer } from '@/shared/typography/text-measurer'
 import { resolveAnimatedTextItem } from '@/features/keyframes/utils/animated-text-item'
 
@@ -821,11 +825,22 @@ interface TextLayoutLine {
  * canvas coordinates. Lets callers position companion graphics (underlines,
  * plates) pixel-exactly instead of estimating glyph widths.
  */
+interface TextBackgroundRect {
+  x: number
+  y: number
+  width: number
+  height: number
+  radius: number
+}
+
 interface TextLayoutInfo {
   /** The auto-expanded text box (canvas-space). */
   box: { x: number; y: number; width: number; height: number }
   lines: TextLayoutLine[]
-  background?: { x: number; y: number; width: number; height: number; radius: number }
+  /** The background box (backgroundMode 'text' or 'box'). */
+  background?: TextBackgroundRect
+  /** One background box per line with text (backgroundMode 'lines'). */
+  lineBackgrounds?: TextBackgroundRect[]
 }
 
 interface LayoutBox {
@@ -1012,6 +1027,17 @@ function getLayoutMeasureCtx(): OffscreenCanvasRenderingContext2D | null {
   return layoutMeasureCtx
 }
 
+/** A box-local background rect in canvas coordinates. */
+function toCanvasRect(rect: TextBlockBackground, left: number, top: number): TextBackgroundRect {
+  return {
+    x: left + rect.x,
+    y: top + rect.y,
+    width: rect.width,
+    height: rect.height,
+    radius: rect.radius,
+  }
+}
+
 /**
  * Dry-run the exact text layout the renderers draw from, mapped to canvas
  * coordinates. Mirrors the render path: resolve animated text properties,
@@ -1063,16 +1089,9 @@ function computeTextLayout(
             }
           : {}),
       })),
-      ...(block.background
-        ? {
-            background: {
-              x: left + block.background.x,
-              y: top + block.background.y,
-              width: block.background.width,
-              height: block.background.height,
-              radius: block.background.radius,
-            },
-          }
+      ...(block.background ? { background: toCanvasRect(block.background, left, top) } : {}),
+      ...(block.lineBackgrounds
+        ? { lineBackgrounds: block.lineBackgrounds.map((bg) => toCanvasRect(bg, left, top)) }
         : {}),
     },
   }
