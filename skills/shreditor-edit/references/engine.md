@@ -32,7 +32,7 @@ What `shred apply` accepts and how the project behaves. Verified against the Shr
 
 | Op | Fields | Notes |
 |---|---|---|
-| `addTrack` | `kind` video/audio, `order?` | Returns `trackId`. Only for extra layers; V1/A1 exist already. |
+| `addTrack` | `kind` video/audio, `order?`, `name?`, `formatRole?` | Returns `trackId`. Only for extra layers; V1/A1 exist already. `name` and `formatRole` (a format role: `shots`, `title`, ...) make it a format track. |
 | `removeTrack` | `trackId`, `removeItems?` | Fails if the track has items unless `removeItems: true` (linked companions on other tracks go too; `detail/removedItems` lists them). The last track can't be removed. |
 | `addClip` | `mediaId`, `trackId?`, `from?`, `durationInFrames?` | Images default to 150 frames. Video adds a linked audio clip only if the file has audio; it goes on the first audio track free for that range (a new one if none is), so it stays in sync. `detail/created/<n>/trackId` says where. Set the source window after with `updateItem`. |
 | `addText` | `text`, `from`, `durationInFrames?`, `trackId?`, `label?`, `color?`, `fontSize?`, `fontFamily?`, `fontWeight?` medium/semibold/bold, `textAlign?`, `verticalAlign?`, `styleId?` | With `styleId` (a project or library style, by id or name) the text takes the style's look, position, motion and default length; the other fields given win and are recorded as overrides. Without one, stroke, shadow, letter spacing, line height and position go in a following `updateItem` / `setTransform`. See Text styles and captions. |
@@ -41,7 +41,10 @@ What `shred apply` accepts and how the project behaves. Verified against the Shr
 | `moveItem` | `id`, `from`, `trackId?` | |
 | `trimStart` / `trimEnd` | `id`, `amount` (positive frames) | `trimStart` cuts `amount` off the head; `trimEnd` **extends** the tail by `amount` (to shorten a clip, `updateItem` its `durationInFrames` and `sourceEnd`). The source window moves with it. |
 | `split` | `id`, `frame` | |
-| `removeItems` | `ids` | |
+| `removeItems` | `ids`, `linked?` | By default linked companions go too (as in the editor: removing a video's own audio removes the video), and `detail.linkedRemoved` names them. `linked: false` removes only the listed items: they are unlinked first, as the editor's Unlink does, so a video whose audio you remove keeps playing silently (`embeddedAudioMuted`). |
+| `unlinkItems` | `ids` | Makes each listed item's link group separate items (a video and its own audio move, trim and go on their own afterwards); a video that had an audio companion gets its embedded audio muted. Returns `detail.unlinked`. |
+| `addMarker` | `frame`, `id?`, `label?`, `color?` | A marker on the ruler, like the user's. `id` lets you find it again (plan beats are `plan-<beat id>`); an id in use fails. Colour defaults to amber. Returns `detail.id`. |
+| `removeMarkers` | `ids` | Unknown ids fail. |
 | `addTransition` / `updateTransition` / `removeTransition` | | Crossfade between adjacent clips. Many styles forbid transitions; check the style skill. |
 | `addKeyframe` / `removeKeyframes` | `itemId`, `property`, `frame`, `value`, `easing?` | Keyframe frames count from the clip's start. |
 | `addEffect` | `itemId`, `gpuEffectType`, `params?` | Returns `detail.effectId`. Params are checked against the effect's ranges (`shred effects <id>`); omitted params take their defaults. |
@@ -79,8 +82,12 @@ A project's `format` (`{ id, variant, reviewedHash }`, set by `shred new --forma
 
 - **Roles.** Each item plays a role in the format: `speaker`, `images`, `plates`, `broll`, `shots`, `title`, `captions`, `labels`, `voice`, `music`, `sfx`. The scorecard resolves it in this order: the item's `formatRole`, caption markers (`textRole: "caption"`, subtitle items), the media's category (mapped per format: `graphics` is `images` in a Graphic Yap, `plates` in a Greenscreen), the track's role (`formatRole` on the track, which format tracks carry, or a track named like the layout), then the item type (text from frame 0, at least 2 s, top or middle is the title; other text is a label).
 - **Set a role** when placement and category don't say it: `{ "op": "updateItem", "id": "<id>", "updates": { "formatRole": "title" } }`. A PNG title lockup on the Title track is already `title`; text on a picture track is never a picture.
-- **Sync sound.** Linked audio from b-roll counts as sync sound, not speech (category `b-roll`); a 10 Shot fails on it, so remove it (`removeItems`) or mute it (`volume: -60`).
+- **Sync sound.** Linked audio from b-roll counts as sync sound, not speech (category `b-roll`); a 10 Shot fails on it, so remove the audio alone with `{ "op": "removeItems", "ids": ["<audio id>"], "linked": false }` (the video stays, silent). Without `linked: false` the video goes too. `shred build` does this for every clip when the format has no sync sound.
 - **`shred check <id> [--json]`** scores the saved timeline: rules (title hook from frame 0 and its hold, captions, speech, voiceover, music, SFX, sync sound, transitions) and numeric targets (length, change rates, first image or cut, longest stretch, shot lengths, speech rate, pauses). Each check is `pass`, `warn`, `fail`, `info` (measured, no band) or `n/a` (can't measure), with frame ranges to look at. Pauses and speech rate come from the built-in transcripts mapped through each clip's source window; without one they are `n/a`. Numeric targets are guidelines and only ever warn; the rules that define the format (and kit musts) can fail. Exit code 1 means one did.
+
+## Plans and markers
+
+The first edit of a project is built from its plan (`agent/plan.json`, `references/brief-and-plan.md`): `shred plan <id>` validates it and records its hash, `shred draft` refuses a first pass until it validated clean, and `shred build <draftId>` applies it as one batch: per beat `addClip` at `edit[0]` for the beat's length on the format track for its role (an `addTrack` with `name`/`formatRole` first when the project lacks it), `updateItem` for the source window (`in` converted to source frames), `removeItems { linked: false }` on the camera audio when the format's `syncSound` is `none`, `addText` for planned text (`styleId` `kit:title` / `kit:overlay`, else a project style of that role), and `addMarker { id: "plan-<beat id>", label: "<role>: <takeaway>" }`. It refuses a draft with items unless `--replace` (which removes them in the same batch), and always replaces the old `plan-*` markers. `--markers-only` sends only the marker ops, on any project (the user's, for plan review: refused while the editor has unsaved edits or a pass is working). Markers are ordinary timeline markers: the editor shows them on the ruler, `shred changes` reports the user moving or relabelling them, and they ride along in drafts and passes.
 
 ## Media categories
 
