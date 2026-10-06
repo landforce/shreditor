@@ -19,55 +19,55 @@ interface TimelineCanvasClipPalette {
 const LABEL_ROW_HEIGHT = 18
 const LABEL_HORIZONTAL_PADDING = 5
 
-// Paper theme: mid-deep inks matching the DOM clip colours in timeline/theme.css.
+// Light CapCut: mid-tone inks matching the DOM clip colours in timeline/theme.css.
 const DEFAULT_PALETTE: TimelineCanvasClipPalette = {
-  fill: 'rgba(107, 122, 143, 0.95)',
-  stroke: 'rgba(78, 92, 112, 0.8)',
-  labelFill: 'rgba(11, 31, 51, 0.28)',
+  fill: 'rgba(134, 144, 156, 0.95)',
+  stroke: 'rgba(107, 119, 133, 0.8)',
+  labelFill: 'rgba(29, 33, 41, 0.22)',
   text: 'rgba(255, 255, 255, 0.95)',
 }
 
 const PALETTE_BY_TYPE: Partial<Record<TimelineItem['type'], TimelineCanvasClipPalette>> = {
   video: {
-    fill: 'rgba(37, 81, 163, 0.96)',
-    stroke: 'rgba(24, 58, 122, 0.85)',
-    labelFill: 'rgba(11, 31, 51, 0.28)',
+    fill: 'rgba(42, 127, 140, 0.96)',
+    stroke: 'rgba(31, 102, 113, 0.85)',
+    labelFill: 'rgba(29, 33, 41, 0.22)',
     text: 'rgba(255, 255, 255, 0.96)',
   },
   audio: {
-    fill: 'rgba(30, 104, 54, 0.96)',
-    stroke: 'rgba(20, 74, 38, 0.85)',
-    labelFill: 'rgba(11, 31, 51, 0.28)',
+    fill: 'rgba(26, 154, 132, 0.96)',
+    stroke: 'rgba(19, 122, 104, 0.85)',
+    labelFill: 'rgba(29, 33, 41, 0.22)',
     text: 'rgba(255, 255, 255, 0.96)',
   },
   image: {
-    fill: 'rgba(63, 120, 184, 0.94)',
-    stroke: 'rgba(40, 90, 150, 0.85)',
-    labelFill: 'rgba(11, 31, 51, 0.28)',
+    fill: 'rgba(58, 134, 209, 0.94)',
+    stroke: 'rgba(42, 108, 176, 0.85)',
+    labelFill: 'rgba(29, 33, 41, 0.22)',
     text: 'rgba(255, 255, 255, 0.96)',
   },
   text: {
-    fill: 'rgba(107, 79, 168, 0.94)',
-    stroke: 'rgba(80, 56, 135, 0.85)',
-    labelFill: 'rgba(11, 31, 51, 0.28)',
+    fill: 'rgba(224, 138, 44, 0.94)',
+    stroke: 'rgba(190, 112, 28, 0.85)',
+    labelFill: 'rgba(29, 33, 41, 0.22)',
     text: 'rgba(255, 255, 255, 0.96)',
   },
   shape: {
-    fill: 'rgba(216, 86, 0, 0.92)',
-    stroke: 'rgba(170, 66, 0, 0.85)',
-    labelFill: 'rgba(11, 31, 51, 0.28)',
+    fill: 'rgba(214, 95, 160, 0.92)',
+    stroke: 'rgba(180, 70, 132, 0.85)',
+    labelFill: 'rgba(29, 33, 41, 0.22)',
     text: 'rgba(255, 255, 255, 0.96)',
   },
   adjustment: {
     fill: 'rgba(140, 92, 200, 0.9)',
     stroke: 'rgba(108, 66, 168, 0.85)',
-    labelFill: 'rgba(11, 31, 51, 0.28)',
+    labelFill: 'rgba(29, 33, 41, 0.22)',
     text: 'rgba(255, 255, 255, 0.96)',
   },
   composition: {
     fill: 'rgba(98, 70, 190, 0.92)',
     stroke: 'rgba(72, 48, 156, 0.85)',
-    labelFill: 'rgba(11, 31, 51, 0.28)',
+    labelFill: 'rgba(29, 33, 41, 0.22)',
     text: 'rgba(255, 255, 255, 0.96)',
   },
 }

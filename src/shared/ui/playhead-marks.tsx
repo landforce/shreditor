@@ -54,7 +54,7 @@ export function PlayheadMarks({
       <span
         data-playhead-mark="line"
         className={cn(
-          'pointer-events-none absolute w-px -translate-x-1/2 bg-timeline-playhead shadow-[0_0_4px_rgba(218,55,48,0.35)]',
+          'pointer-events-none absolute w-px -translate-x-1/2 bg-timeline-playhead shadow-[0_0_3px_rgba(29,33,41,0.25)]',
           bleedBottom ? '-bottom-px' : 'bottom-0',
           className,
         )}
@@ -64,7 +64,7 @@ export function PlayheadMarks({
         <span
           data-playhead-mark="handle"
           className={cn(
-            'pointer-events-none absolute left-0 block h-3 w-2 -translate-x-1/2 rounded-b-[2px] border border-timeline-playhead/60 bg-timeline-playhead shadow-[0_0_6px_rgba(218,55,48,0.3)]',
+            'pointer-events-none absolute left-0 block h-3 w-2 -translate-x-1/2 rounded-b-[2px] border border-timeline-playhead/60 bg-timeline-playhead shadow-[0_1px_3px_rgba(29,33,41,0.3)]',
             handleClassName,
           )}
           style={{ top: topOffsetPx }}

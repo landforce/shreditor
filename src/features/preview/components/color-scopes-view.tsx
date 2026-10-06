@@ -350,7 +350,7 @@ function ScopeModeBar({
     { value: 'rgb', label: 'RGB' },
     { value: 'r', label: 'R', activeColor: '#c62828' },
     { value: 'g', label: 'G', activeColor: '#1e8a3a' },
-    { value: 'b', label: 'B', activeColor: '#2551a3' },
+    { value: 'b', label: 'B', activeColor: '#00b5c9' },
     { value: 'luma', label: 'Y', activeColor: '#7a6f2e' },
   ]
   return (
@@ -365,8 +365,8 @@ function ScopeModeBar({
           style={
             mode === m.value
               ? {
-                  backgroundColor: `${m.activeColor ?? '#5b6b7f'}33`,
-                  borderBottom: `1.5px solid ${m.activeColor ?? '#5b6b7f'}`,
+                  backgroundColor: `${m.activeColor ?? '#6b7785'}33`,
+                  borderBottom: `1.5px solid ${m.activeColor ?? '#6b7785'}`,
                 }
               : undefined
           }

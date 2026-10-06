@@ -75,7 +75,7 @@ export function drawTimelineRulerViewportCanvas({
     minorSpacing >= MIN_MINOR_TICK_SPACING_PX
 
   context.lineWidth = 1 / devicePixelRatio
-  context.strokeStyle = 'rgba(11, 31, 51, 0.34)'
+  context.strokeStyle = 'rgba(29, 33, 41, 0.34)'
   context.beginPath()
   for (let index = firstIndex; index <= lastIndex; index++) {
     const x = alignToDevicePixel(index * markerWidth - scrollLeft, devicePixelRatio)
@@ -86,7 +86,7 @@ export function drawTimelineRulerViewportCanvas({
   context.stroke()
 
   if (showMinorTicks) {
-    context.strokeStyle = 'rgba(11, 31, 51, 0.16)'
+    context.strokeStyle = 'rgba(29, 33, 41, 0.16)'
     context.beginPath()
     for (let index = firstIndex; index <= lastIndex; index++) {
       const majorX = index * markerWidth - scrollLeft
@@ -100,7 +100,7 @@ export function drawTimelineRulerViewportCanvas({
     context.stroke()
   }
 
-  context.fillStyle = 'rgba(11, 31, 51, 0.62)'
+  context.fillStyle = 'rgba(29, 33, 41, 0.62)'
   const styles = getComputedStyle(canvas)
   context.font = `${styles.fontWeight} ${styles.fontSize} ${styles.fontFamily}`
   context.textBaseline = 'top'

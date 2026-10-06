@@ -79,8 +79,8 @@ export const GraphTransitionRegions = memo(function GraphTransitionRegions({
           patternTransform="rotate(-45)"
         >
           {/* Alternating stripes - using direct colors */}
-          <rect width="10" height="10" fill="rgba(218, 55, 48, 0.1)" />
-          <rect width="4" height="10" fill="rgba(218, 55, 48, 0.22)" />
+          <rect width="10" height="10" fill="rgba(245, 63, 63, 0.1)" />
+          <rect width="4" height="10" fill="rgba(245, 63, 63, 0.22)" />
         </pattern>
       </defs>
 
@@ -99,7 +99,7 @@ export const GraphTransitionRegions = memo(function GraphTransitionRegions({
               y={graphTop}
               width={region.width}
               height={graphHeight}
-              fill="rgba(218, 55, 48, 0.06)"
+              fill="rgba(245, 63, 63, 0.06)"
             />
             {/* Striped overlay */}
             <rect
@@ -115,7 +115,7 @@ export const GraphTransitionRegions = memo(function GraphTransitionRegions({
               y1={graphTop}
               x2={region.x}
               y2={graphTop + graphHeight}
-              stroke="rgba(218, 55, 48, 0.7)"
+              stroke="rgba(245, 63, 63, 0.7)"
               strokeWidth={2}
             />
             <line
@@ -123,7 +123,7 @@ export const GraphTransitionRegions = memo(function GraphTransitionRegions({
               y1={graphTop}
               x2={region.x + region.width}
               y2={graphTop + graphHeight}
-              stroke="rgba(218, 55, 48, 0.7)"
+              stroke="rgba(245, 63, 63, 0.7)"
               strokeWidth={2}
             />
             {/* Label if region is wide enough */}
@@ -132,7 +132,7 @@ export const GraphTransitionRegions = memo(function GraphTransitionRegions({
                 x={labelX}
                 y={labelY}
                 textAnchor="middle"
-                fill="#da3730"
+                fill="#f53f3f"
                 fontSize={10}
                 fontWeight={600}
               >

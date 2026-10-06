@@ -287,7 +287,7 @@ const KEY_ACTIVE_CLASSES =
   'border-primary/55 bg-primary/18 text-primary shadow-[0_0_0_1px_rgba(37,81,163,0.12),0_2px_8px_rgba(37,81,163,0.14)]'
 
 const KEY_IDLE_CLASSES =
-  'border-border bg-[linear-gradient(180deg,#ffffff,#f3f6fb)] text-foreground/78'
+  'border-border bg-[linear-gradient(180deg,#ffffff,#fafbfc)] text-foreground/78'
 
 function KeyCap({
   keySpec,

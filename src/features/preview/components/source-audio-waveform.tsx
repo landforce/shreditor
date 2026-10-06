@@ -107,7 +107,7 @@ function drawWaveformRegion(
     )
   }
 
-  context.strokeStyle = 'rgba(11, 31, 51, 0.16)'
+  context.strokeStyle = 'rgba(29, 33, 41, 0.16)'
   context.lineWidth = 1
   context.beginPath()
   context.moveTo(region.x, Math.round(centerY) + 0.5)
@@ -120,7 +120,7 @@ function drawPlayhead(
   x: number,
   y: number,
   height: number,
-  color = '#da3730',
+  color = '#1d2129',
 ) {
   context.strokeStyle = color
   context.lineWidth = 1
@@ -142,20 +142,20 @@ function drawOverviewWindow(
   const left = Math.round(startX) + 0.5
   const width = Math.max(1, Math.round(endX - startX))
 
-  context.fillStyle = 'rgba(11, 31, 51, 0.06)'
+  context.fillStyle = 'rgba(29, 33, 41, 0.06)'
   context.fillRect(regionX, y, Math.max(0, left - regionX), height)
   context.fillRect(left + width, y, Math.max(0, regionX + regionWidth - left - width), height)
 
-  context.fillStyle = 'rgba(37, 81, 163, 0.1)'
+  context.fillStyle = 'rgba(0, 181, 201, 0.1)'
   context.fillRect(left, y + 1.5, width, height - 3)
 
-  context.strokeStyle = 'rgba(37, 81, 163, 0.7)'
+  context.strokeStyle = 'rgba(0, 181, 201, 0.7)'
   context.lineWidth = 1
   context.strokeRect(left, y + 1.5, width, height - 3)
 }
 
 function drawDetailGrid(context: CanvasRenderingContext2D, region: WaveformRegion) {
-  context.strokeStyle = 'rgba(11, 31, 51, 0.07)'
+  context.strokeStyle = 'rgba(29, 33, 41, 0.07)'
   context.lineWidth = 1
   for (let i = 1; i < 4; i += 1) {
     const x = Math.round(region.x + (region.width * i) / 4) + 0.5
@@ -290,7 +290,7 @@ export function SourceAudioWaveform({
     const scaleY = (size.visualHeight / size.layoutHeight) * dpr
     context.setTransform(scaleX, 0, 0, scaleY, 0, 0)
     context.clearRect(0, 0, size.layoutWidth, size.layoutHeight)
-    context.fillStyle = '#f1f4fa'
+    context.fillStyle = '#f7f8fa'
     context.fillRect(0, 0, size.layoutWidth, size.layoutHeight)
 
     const waveformX = SOURCE_WAVEFORM_INSET_X
@@ -319,11 +319,11 @@ export function SourceAudioWaveform({
       endTimeSeconds: detailWindow.end,
     }
 
-    context.fillStyle = '#eef1f8'
+    context.fillStyle = '#f2f3f5'
     context.fillRect(0, 0, size.layoutWidth, SOURCE_WAVEFORM_OVERVIEW_HEIGHT)
-    context.fillStyle = '#fbfcff'
+    context.fillStyle = '#ffffff'
     context.fillRect(0, detailRegion.y, size.layoutWidth, detailRegion.height)
-    context.fillStyle = '#d5dce8'
+    context.fillStyle = '#e5e6eb'
     context.fillRect(
       0,
       SOURCE_WAVEFORM_OVERVIEW_HEIGHT,
@@ -334,12 +334,12 @@ export function SourceAudioWaveform({
 
     const overviewGradient = context.createLinearGradient(0, 0, 0, overviewRegion.height)
     overviewGradient.addColorStop(0, 'rgba(91, 107, 127, 0.62)')
-    overviewGradient.addColorStop(0.5, 'rgba(11, 31, 51, 0.72)')
+    overviewGradient.addColorStop(0.5, 'rgba(29, 33, 41, 0.72)')
     overviewGradient.addColorStop(1, 'rgba(91, 107, 127, 0.62)')
 
     const detailGradient = context.createLinearGradient(0, detailRegion.y, 0, size.layoutHeight)
     detailGradient.addColorStop(0, 'rgba(91, 107, 127, 0.78)')
-    detailGradient.addColorStop(0.5, 'rgba(11, 31, 51, 0.86)')
+    detailGradient.addColorStop(0.5, 'rgba(29, 33, 41, 0.86)')
     detailGradient.addColorStop(1, 'rgba(91, 107, 127, 0.78)')
 
     drawWaveformRegion(context, overviewAmplitudes, overviewRegion, overviewGradient)

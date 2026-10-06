@@ -65,7 +65,7 @@ const GraphCurve = memo(function GraphCurve({
         <path
           d={path}
           fill="none"
-          stroke="#2551a3"
+          stroke="#00b5c9"
           strokeWidth={5}
           strokeLinecap="round"
           strokeLinejoin="round"
@@ -393,7 +393,7 @@ export const GraphPlayhead = memo(function GraphPlayhead({
             strokeWidth={1}
             onPointerDown={isInteractive ? handlePointerDown : undefined}
             style={{
-              filter: 'drop-shadow(0 0 4px rgba(218, 55, 48, 0.35))',
+              filter: 'drop-shadow(0 0 3px rgba(29, 33, 41, 0.25))',
               cursor: isInteractive ? 'ew-resize' : 'default',
             }}
           />

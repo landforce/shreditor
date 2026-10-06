@@ -173,7 +173,7 @@ const BezierHandle = memo(function BezierHandle({
         y1={handle.anchorY}
         x2={handle.x}
         y2={handle.y}
-        stroke="#0b1f33"
+        stroke="#1d2129"
         strokeWidth={1}
         strokeOpacity={0.45}
         style={{ pointerEvents: 'none' }}
@@ -195,12 +195,12 @@ const BezierHandle = memo(function BezierHandle({
         cx={handle.x}
         cy={handle.y}
         r={5}
-        fill={isDragging ? '#5e96ff' : '#ffffff'}
-        stroke="#0b1f33"
+        fill={isDragging ? '#00c8dc' : '#ffffff'}
+        stroke="#1d2129"
         strokeWidth={1.25}
         className={cn(
           'transition-colors',
-          !disabled && 'hover:fill-[#e2e8f3]',
+          !disabled && 'hover:fill-[#e8eaed]',
           isDragging && 'r-[6]',
         )}
         style={{ pointerEvents: 'none' }}

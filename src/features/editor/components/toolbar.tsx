@@ -161,7 +161,7 @@ export const Toolbar = memo(function Toolbar({
 
   return (
     <div
-      className="bg-panel-header flex flex-shrink-0 items-center gap-2.5 border-b border-border px-3"
+      className="bg-background flex flex-shrink-0 items-center gap-2.5 px-3"
       style={{ height: EDITOR_LAYOUT_CSS_VALUES.toolbarHeight }}
       role="toolbar"
       aria-label={t('toolbar.ariaLabel')}
@@ -319,7 +319,7 @@ export const Toolbar = memo(function Toolbar({
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button size="sm" className="gap-1.5 glow-primary-sm">
+            <Button size="sm" className="gap-1.5 px-4">
               <Download className="h-4 w-4" />
               {t('toolbar.export')}
               <ChevronDown className="h-3 w-3" />

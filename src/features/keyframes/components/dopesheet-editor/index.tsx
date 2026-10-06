@@ -3519,7 +3519,7 @@ export const DopesheetEditor = memo(function DopesheetEditor({
                   left: Math.round(firstX),
                   width: Math.ceil(frameToX(lastTick) - firstX + majorSpacing),
                   backgroundImage:
-                    'linear-gradient(to right, rgba(11, 31, 51, 0.14) 1px, transparent 1px)',
+                    'linear-gradient(to right, rgba(29, 33, 41, 0.14) 1px, transparent 1px)',
                   backgroundSize: `${minorSpacing}px 100%`,
                 }}
               />

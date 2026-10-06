@@ -168,19 +168,19 @@ export function TimelinePreviewScrubberVisual({
       const isRateStretch = tool === 'rate-stretch'
       const isTrimEdit = tool === 'trim-edit'
       const lineColor = isRazor
-        ? 'rgba(218, 55, 48, 0.75)'
+        ? 'rgba(245, 63, 63, 0.75)'
         : isRateStretch
           ? 'rgba(124, 58, 237, 0.7)'
           : isTrimEdit
             ? 'rgba(217, 119, 6, 0.75)'
-            : 'rgba(11, 31, 51, 0.35)'
+            : 'rgba(29, 33, 41, 0.35)'
       const handleColor = isRazor
-        ? 'rgba(218, 55, 48, 0.85)'
+        ? 'rgba(245, 63, 63, 0.85)'
         : isRateStretch
           ? 'rgba(124, 58, 237, 0.8)'
           : isTrimEdit
             ? 'rgba(217, 119, 6, 0.85)'
-            : 'rgba(11, 31, 51, 0.45)'
+            : 'rgba(29, 33, 41, 0.45)'
 
       if (lineRef.current) lineRef.current.style.backgroundColor = lineColor
       if (handleRef.current) handleRef.current.style.backgroundColor = handleColor

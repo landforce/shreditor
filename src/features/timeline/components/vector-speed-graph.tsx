@@ -235,7 +235,7 @@ export function VectorSpeedGraph({
                 x2={GRAPH_WIDTH - GRAPH_PADDING_X}
                 y1={y}
                 y2={y}
-                stroke="rgba(11, 31, 51, 0.1)"
+                stroke="rgba(29, 33, 41, 0.1)"
                 vectorEffect="non-scaling-stroke"
               />
             )
@@ -247,18 +247,18 @@ export function VectorSpeedGraph({
               x2={xForFrame(keyframe.frame)}
               y1={GRAPH_PADDING_Y}
               y2={GRAPH_HEIGHT - GRAPH_PADDING_Y}
-              stroke="rgba(11, 31, 51, 0.1)"
+              stroke="rgba(29, 33, 41, 0.1)"
               vectorEffect="non-scaling-stroke"
             />
           ))}
           <path
             d={`${speedPath} L ${xForFrame(lastFrame)} ${GRAPH_HEIGHT - GRAPH_PADDING_Y} L ${xForFrame(firstFrame)} ${GRAPH_HEIGHT - GRAPH_PADDING_Y} Z`}
-            fill="rgba(37, 81, 163, 0.08)"
+            fill="rgba(0, 181, 201, 0.08)"
           />
           <path
             d={speedPath}
             fill="none"
-            stroke="#2551a3"
+            stroke="#00b5c9"
             strokeWidth={2}
             vectorEffect="non-scaling-stroke"
           />
@@ -311,7 +311,7 @@ export function VectorSpeedGraph({
                 cy={yForSpeed(nearest.speed)}
                 r={selected ? 5 : 4}
                 fill={selected ? '#d97706' : '#ffffff'}
-                stroke="#0b1f33"
+                stroke="#1d2129"
                 strokeWidth={2}
                 className="cursor-pointer"
                 onClick={() => onSelectKeyframe?.(keyframe)}

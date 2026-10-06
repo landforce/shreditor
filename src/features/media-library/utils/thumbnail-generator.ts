@@ -118,7 +118,7 @@ async function generateAudioThumbnail(file: File, options: ThumbnailOptions = {}
     // Navy-ink tile: treated like footage, since card scrims and badges sit on it
     const gradient = ctx.createLinearGradient(0, 0, width, height)
     gradient.addColorStop(0, '#163452')
-    gradient.addColorStop(1, '#0b1f33')
+    gradient.addColorStop(1, '#1d2129')
     ctx.fillStyle = gradient
     ctx.fillRect(0, 0, width, height)
 

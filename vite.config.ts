@@ -39,12 +39,23 @@ const crossOriginIsolationHeaders = {
 // full-reloads the editor whenever that session edits a file. Top-level dirs
 // are anchored to the repo root so same-named folders under src/ still reload.
 const fromRoot = (dir: string) => `${fileURLToPath(new URL(`./${dir}`, import.meta.url))}/**`
+// `.claude` / `.worktrees` are anchored too: a glob like '**/.claude/**' also
+// matches every path when the app itself runs from a worktree under
+// .claude/worktrees, which silently disables HMR there.
 const watchIgnored = [
-  '**/.claude/**',
-  '**/.worktrees/**',
-  ...['worktrees', 'dist', 'coverage', 'tmp', 'output', 'agent', 'skills', 'headless', 'docs'].map(
-    fromRoot,
-  ),
+  ...[
+    '.claude',
+    '.worktrees',
+    'worktrees',
+    'dist',
+    'coverage',
+    'tmp',
+    'output',
+    'agent',
+    'skills',
+    'headless',
+    'docs',
+  ].map(fromRoot),
 ]
 
 function serviceWorkerVersionPlugin(): Plugin {

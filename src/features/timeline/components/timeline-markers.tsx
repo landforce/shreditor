@@ -244,7 +244,7 @@ function drawTile(
     // Major tick mark - bottom-anchored, only draw if within tile bounds
     if (x >= 0 && x <= actualTileWidth) {
       const lineX = Math.round(x) + 0.5
-      ctx.strokeStyle = 'rgba(11, 31, 51, 0.34)'
+      ctx.strokeStyle = 'rgba(29, 33, 41, 0.34)'
       ctx.lineWidth = 1
       ctx.beginPath()
       ctx.moveTo(lineX, majorTickTop)
@@ -258,7 +258,7 @@ function drawTile(
       const lastTickX = x + tickSpacing * (markerConfig.minorTicks - 1)
       if (lastTickX < 0 || x > actualTileWidth) continue
 
-      ctx.strokeStyle = 'rgba(11, 31, 51, 0.16)'
+      ctx.strokeStyle = 'rgba(29, 33, 41, 0.16)'
       ctx.lineWidth = 1
 
       for (let j = 1; j < markerConfig.minorTicks; j++) {

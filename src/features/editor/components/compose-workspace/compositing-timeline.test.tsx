@@ -2957,7 +2957,7 @@ describe('CompositingTimeline', { timeout: 15_000 }, () => {
       expect(rejectedRow).toHaveAttribute('data-transform-parent-link-rejected', 'true')
     })
     const overlay = screen.getByTestId('transform-parent-pick-whip')
-    expect(overlay.querySelector('path')).toHaveAttribute('stroke', '#da3730')
+    expect(overlay.querySelector('path')).toHaveAttribute('stroke', '#f53f3f')
 
     fireEvent.pointerUp(window, { pointerId: 43, clientX: 32, clientY: 24 })
 

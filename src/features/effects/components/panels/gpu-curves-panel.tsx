@@ -42,7 +42,7 @@ interface DragState {
 const CURVE_SIZE = 230
 const CURVE_SAMPLE_STEPS = 64
 const CHANNELS: Array<{ key: GpuCurvesChannelKey; labelKey: string; color: string }> = [
-  { key: 'master', labelKey: 'effects.curves.channelMaster', color: '#0b1f33' },
+  { key: 'master', labelKey: 'effects.curves.channelMaster', color: '#1d2129' },
   { key: 'red', labelKey: 'effects.curves.channelRed', color: '#dc2626' },
   { key: 'green', labelKey: 'effects.curves.channelGreen', color: '#16a34a' },
   { key: 'blue', labelKey: 'effects.curves.channelBlue', color: '#2563eb' },

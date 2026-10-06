@@ -7,7 +7,7 @@ import type {
 function getOverlayGeometry(drag: MotionPickWhipOverlaySnapshot) {
   const controlDistance = Math.max(48, Math.abs(drag.currentX - drag.startX) * 0.45)
   return {
-    color: drag.valid ? '#ea580c' : drag.rejectionMessage ? '#da3730' : '#5b6b7f',
+    color: drag.valid ? '#ea580c' : drag.rejectionMessage ? '#f53f3f' : '#6b7785',
     clipWidth: Math.max(0, drag.clipBounds.right - drag.clipBounds.left),
     clipHeight: Math.max(0, drag.clipBounds.bottom - drag.clipBounds.top),
     path: `M ${drag.startX} ${drag.startY} C ${drag.startX + controlDistance} ${drag.startY}, ${drag.currentX - controlDistance} ${drag.currentY}, ${drag.currentX} ${drag.currentY}`,

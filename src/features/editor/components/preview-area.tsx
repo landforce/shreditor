@@ -556,14 +556,15 @@ export const PreviewArea = memo(function PreviewArea({
         role="region"
         aria-label="Program monitor"
       >
-        {hasSidePanels && (
-          <div
-            className="border-b border-border flex items-center px-3 flex-shrink-0"
-            style={{ height: EDITOR_LAYOUT_CSS_VALUES.previewSplitHeaderHeight }}
-          >
-            <span className="text-xs text-muted-foreground">Program</span>
-          </div>
-        )}
+        {/* CapCut-style panel title */}
+        <div
+          className="flex items-center px-3 flex-shrink-0"
+          style={{ height: EDITOR_LAYOUT_CSS_VALUES.previewSplitHeaderHeight }}
+        >
+          <span className="text-[13px] font-semibold text-foreground">
+            {hasSidePanels ? 'Program' : 'Player'}
+          </span>
+        </div>
 
         <div className="flex-1 flex flex-col min-w-0 min-h-0">
           <div
