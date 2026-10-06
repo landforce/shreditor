@@ -21,11 +21,16 @@ import {
   replaceActivePreviewSourceTargets,
   settleActivePreviewRenderTarget,
   subscribeActivePreviewReady,
+  isActivePreviewFallbackAllowed,
   isActivePreviewFrameDecodeReady,
 } from '../utils/decoder-prewarm'
 import { getDirectionalPrewarmOffsets } from '../utils/fast-scrub-prewarm'
 import { resolveProxyUrl } from '../utils/media-resolver'
-import { scheduleScrubProxyFallback } from '../utils/scrub-proxy-fallback'
+import {
+  measureScrubProxyFallbackDisplay,
+  scheduleScrubProxyFallback,
+} from '../utils/scrub-proxy-fallback'
+import { createSettledExactWatchdog } from '../utils/settled-exact-watchdog'
 import { shouldShowFastScrubOverlay } from '../utils/fast-scrub-overlay-guard'
 import { shouldPreferDomPlayerForGizmo } from '../utils/gizmo-preview-presentation'
 import { hasPendingPreviewInput, yieldToPendingPreviewInput } from '../utils/preview-input-yield'
@@ -377,12 +382,44 @@ export function usePreviewRenderPump({
       committedPreviewSnapshot.guardUntilMs = 0
     }
 
+    // A settled target must end up exact even when its worker decode is slow,
+    // hung or cancelled: past the deadline, render it through the ordinary
+    // exact path instead of waiting on the active lane (see the watchdog).
+    const settledExactWatchdog = createSettledExactWatchdog({
+      getTarget: () => {
+        const playbackState = usePlaybackStore.getState()
+        return playbackState.isPlaying
+          ? null
+          : (playbackState.previewFrame ?? playbackState.currentFrame)
+      },
+      isMoving: isActivePreviewFallbackAllowed,
+      isExactOnScreen: (frame) =>
+        !showFastScrubOverlayRef.current ||
+        (lastPresentation?.frame === frame &&
+          !lastPresentation.usedFallback &&
+          usePreviewBridgeStore.getState().displayedFrame === frame),
+      escalate: (frame) => {
+        if (effectDisposed || !scrubMountedRef.current) return
+        forceExactRender(frame)
+      },
+    })
+
+    // What the scrub canvas last presented: a scrub fallback is never a
+    // committed frame, and the settled-exact watchdog needs to know whether
+    // the exact frame for its target reached the screen.
+    let lastPresentation: { frame: number; usedFallback: boolean } | null = null
+    const notePresentation = (frame: number, usedFallback: boolean) => {
+      lastPresentation = { frame, usedFallback }
+      settledExactWatchdog.notePresented(frame, usedFallback)
+    }
+
     const captureCommittedPreviewSnapshot = (frame: number) => {
       const displayCanvas = scrubCanvasRef.current
       if (
         !displayCanvas ||
         !showFastScrubOverlayRef.current ||
-        usePreviewBridgeStore.getState().displayedFrame !== frame
+        usePreviewBridgeStore.getState().displayedFrame !== frame ||
+        (lastPresentation?.frame === frame && lastPresentation.usedFallback)
       ) {
         // A hidden scrub canvas is not the visible committed presentation.
         // It may contain an old partial render even though its frame tag still
@@ -485,6 +522,7 @@ export function usePreviewRenderPump({
         // instead of merely declining the blank replacement.
         drawSourceToPreviewDisplayCanvas(displayCtx, displayCanvas, committedPreviewSnapshot.canvas)
         setDisplayedFrame(renderedFrame)
+        notePresentation(renderedFrame, false)
         return
       }
       const shouldReleaseScrubSnapshotGuardAfterDraw =
@@ -523,6 +561,7 @@ export function usePreviewRenderPump({
       }
       drawSourceToPreviewDisplayCanvas(displayCtx, displayCanvas, source)
       setDisplayedFrame(renderedFrame)
+      notePresentation(renderedFrame, usedFallback)
       recordPreviewScrubPresentationQuality(renderedFrame, usedFallback)
       recordPreviewScrubPresented(renderedFrame)
       if (
@@ -1624,10 +1663,17 @@ export function usePreviewRenderPump({
       }
 
       if (useProxy) {
+        const display = measureScrubProxyFallbackDisplay(
+          scrubCanvasRef.current,
+          window.devicePixelRatio,
+        )
         for (const [src, timestamps] of bySource) {
           const currentTimestamp = timestamps[0]
           if (currentTimestamp !== undefined) {
-            scheduleScrubProxyFallback(src, currentTimestamp)
+            scheduleScrubProxyFallback(src, currentTimestamp, {
+              display,
+              requireActiveTarget: false,
+            })
           }
         }
       }
@@ -1703,6 +1749,20 @@ export function usePreviewRenderPump({
       runBatchPreseek(bySource)
     }
 
+    // Leave the worker-only active lane for `frame` and render it through the
+    // normal DOM/MediaBunny path, which never draws a scrub fallback. The
+    // visible front buffer stays until that exact render presents.
+    function forceExactRender(frame: number) {
+      setActivePreviewRenderTarget(null)
+      if (scrubOffscreenRenderedFrameRef.current === frame) {
+        scrubOffscreenRenderedFrameRef.current = null
+      }
+      scrubRequestedFrameRef.current = frame
+      if (!scrubRenderInFlightRef.current) {
+        void pumpRenderLoop()
+      }
+    }
+
     const scheduleActiveScrubPreseek = (
       targetFrame: number,
       direction: -1 | 0 | 1,
@@ -1729,6 +1789,13 @@ export function usePreviewRenderPump({
       }
 
       recordPreviewPreseekPlan(targetFrame, bySource)
+      settledExactWatchdog.arm(targetFrame)
+      // Only a target the pointer is moving through can show a fallback, and
+      // only one legible at the preview's on-screen size.
+      const fallbackDisplay =
+        useProxy && isActivePreviewFallbackAllowed(targetFrame)
+          ? measureScrubProxyFallbackDisplay(scrubCanvasRef.current, window.devicePixelRatio)
+          : null
       const elapsedMs =
         lastActivePreviewTargetAtMs === 0
           ? Number.POSITIVE_INFINITY
@@ -1762,14 +1829,13 @@ export function usePreviewRenderPump({
         // abort forever until the pointer requested a different frame. Unpin
         // this exact schedule and retry through the normal DOM/MediaBunny
         // renderer while preserving the visible front buffer.
+        if (retryFailedTarget) {
+          forceExactRender(targetFrame)
+          return
+        }
         setActivePreviewRenderTarget(null)
         if (scrubOffscreenRenderedFrameRef.current === targetFrame) {
           scrubOffscreenRenderedFrameRef.current = null
-        }
-        if (!retryFailedTarget) return
-        scrubRequestedFrameRef.current = targetFrame
-        if (!scrubRenderInFlightRef.current) {
-          void pumpRenderLoop()
         }
       }
       const observeRequiredPreseek = (promise: Promise<ImageBitmap | null>) => {
@@ -1783,8 +1849,11 @@ export function usePreviewRenderPump({
         const exactTimestamp = timestamps[0]
         if (exactTimestamp === undefined) continue
         nextSourceTimes.set(src, exactTimestamp)
-        if (useProxy) {
-          scheduleScrubProxyFallback(src, exactTimestamp)
+        if (fallbackDisplay) {
+          scheduleScrubProxyFallback(src, exactTimestamp, {
+            display: fallbackDisplay,
+            requireActiveTarget: true,
+          })
         }
 
         if (!usedDedicatedLane) {
@@ -2411,7 +2480,11 @@ export function usePreviewRenderPump({
         forceFastScrubOverlay:
           forceFastScrubOverlay || renderedPlaybackActive || renderedPlaybackWasActive,
       })
-      setActivePreviewRenderTarget(activePreviewPresentationTarget)
+      setActivePreviewRenderTarget(activePreviewPresentationTarget, {
+        // Hover/drag updates move the pointer; release, pause and playback
+        // handoffs settle on a frame that must be exact.
+        moving: state.previewFrame !== null && state.previewFrame !== prev.previewFrame,
+      })
       if (!renderedPlaybackActive && shouldPreferPlayerForPreview(state.previewFrame)) {
         resetScrubLoopState()
         hideAllOverlays()
@@ -3094,6 +3167,7 @@ export function usePreviewRenderPump({
       initialLookaheadTimeoutIdRef.current = null
       renderPumpRestartTimeoutId = null
       resumeScrubLoopRef.current = () => {}
+      settledExactWatchdog.dispose()
       unsubscribe()
       unsubscribeActivePreviewReady()
       unsubscribeGizmo()

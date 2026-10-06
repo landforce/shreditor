@@ -337,6 +337,7 @@ describe('renderVideoItem', () => {
       getResolvedVideoSource: vi.fn(() => 'blob:resolved-proxy'),
       waitForInflightPredecodedBitmap,
       isActivePreviewFrameCurrent: vi.fn(() => true),
+      isActivePreviewFallbackAllowed: vi.fn(() => true),
       isActivePreviewFrameSuperseded: vi.fn(() => false),
     })
 
@@ -360,6 +361,34 @@ describe('renderVideoItem', () => {
       expect.any(Number),
       expect.any(Number),
     )
+  })
+
+  it('never draws a scrub fallback for a held or released target', async () => {
+    const fallbackBitmap = { width: 480, height: 270 } as ImageBitmap
+    const markActivePreviewFramePending = vi.fn()
+    const ctx = createCanvasContext()
+    const renderContext = createRenderContext({
+      getCachedPredecodedBitmap: vi.fn(() => null),
+      getCachedActivePreviewFallbackBitmap: vi.fn(() => fallbackBitmap),
+      getResolvedVideoSource: vi.fn(() => 'blob:resolved-proxy'),
+      waitForInflightPredecodedBitmap: vi.fn(async () => null),
+      isActivePreviewFrameCurrent: vi.fn(() => true),
+      isActivePreviewFallbackAllowed: vi.fn(() => false),
+      isActivePreviewFrameSuperseded: vi.fn(() => false),
+      markActivePreviewFramePending,
+    })
+
+    const drewVideoFrame = await renderVideoItem(ctx, item, transform, 12, renderContext)
+
+    expect(drewVideoFrame).toBe(false)
+    expect(ctx.drawImage).not.toHaveBeenCalledWith(
+      fallbackBitmap,
+      expect.any(Number),
+      expect.any(Number),
+      expect.any(Number),
+      expect.any(Number),
+    )
+    expect(markActivePreviewFramePending).toHaveBeenCalled()
   })
 
   it('holds the previous frame while a scheduled compound proxy target is pending', async () => {

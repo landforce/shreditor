@@ -37,6 +37,13 @@ const MAX_INFLIGHT_PER_WORKER = 1
 const MAX_ACTIVE_PREVIEW_INFLIGHT = 2
 const MAX_QUEUED_ACTIVE_PREVIEW_SOURCES = 2
 const PRESEEK_REQUEST_REUSE_TOLERANCE_SECONDS = 1 / 240
+/**
+ * A scrub fallback (filmstrip thumbnail) may stand in for the exact frame only
+ * while the pointer is still moving. Once no new target arrived for this long
+ * the target counts as held: renders wait for the exact decode and keep the
+ * previous presentation instead of drawing a thumbnail.
+ */
+const ACTIVE_PREVIEW_FALLBACK_MOTION_WINDOW_MS = 150
 /** Min 3 (transition pair + spare), max 6 (memory cap ~12MB WASM) */
 const WORKER_POOL_SIZE = Math.max(
   3,
@@ -79,6 +86,7 @@ export interface DecoderPrewarmMetricsSnapshot {
   fallbackSourceEvictions: number
   fallbackReadyNotifications: number
   exactFallbackReplacements: number
+  lateFallbackDiscards: number
 }
 
 interface PoolWorker {
@@ -181,6 +189,7 @@ const decoderPrewarmMetrics: DecoderPrewarmMetricsSnapshot = {
   fallbackSourceEvictions: 0,
   fallbackReadyNotifications: 0,
   exactFallbackReplacements: 0,
+  lateFallbackDiscards: 0,
 }
 
 /** In-flight preseek promises keyed by source URL — lets the render engine await
@@ -194,6 +203,7 @@ const activePreviewInflightById = new Map<string, ActivePreviewInflightState>()
 const queuedActivePreviewRequestsBySrc = new Map<string, ActivePreviewRequestState>()
 let activePreviewScrubSession = false
 let latestActivePreviewTimelineFrame: number | null = null
+let activePreviewFallbackAllowedUntilMs = 0
 let activePreviewRequestVersion = 0
 let activePreviewSettleTimer: ReturnType<typeof setTimeout> | null = null
 const latestActivePreviewTimestampsBySrc = new Map<string, number[]>()
@@ -502,47 +512,75 @@ function cachePredecodedBitmap(
   }
 }
 
+function countFallbackBitmaps(): number {
+  return [...fallbackBitmapCache.values()].reduce(
+    (sum, sourceEntries) => sum + sourceEntries.length,
+    0,
+  )
+}
+
+function evictOldestFallbackSourceFor(src: string): void {
+  if (fallbackBitmapCache.has(src) || fallbackBitmapCache.size < MAX_FALLBACK_BITMAP_SOURCES) return
+  const oldestSrc = fallbackBitmapCache.keys().next().value as string | undefined
+  if (!oldestSrc) return
+  const oldestEntries = fallbackBitmapCache.get(oldestSrc)
+  fallbackBitmapCache.delete(oldestSrc)
+  for (const entry of oldestEntries ?? []) entry.bitmap.close()
+  decoderPrewarmMetrics.fallbackSourceEvictions += 1
+}
+
+function insertFallbackEntry(src: string, entry: CachedFallbackBitmapEntry): void {
+  const entries = fallbackBitmapCache.get(src) ?? []
+  const duplicateIndex = entries.findIndex(
+    (candidate) =>
+      Math.abs(candidate.timestamp - entry.timestamp) <= PRESEEK_REQUEST_REUSE_TOLERANCE_SECONDS,
+  )
+  if (duplicateIndex >= 0) entries.splice(duplicateIndex, 1)[0]?.bitmap.close()
+  entries.push(entry)
+  while (entries.length > MAX_FALLBACK_BITMAPS_PER_SOURCE) entries.shift()?.bitmap.close()
+  // Re-insert to keep Map order as the source-level LRU.
+  fallbackBitmapCache.delete(src)
+  fallbackBitmapCache.set(src, entries)
+}
+
+/**
+ * Only a target the pointer is still moving through can present a fallback,
+ * so only then is a wake-up render useful.
+ */
+function notifyFallbackReady(src: string, timestamp: number): void {
+  if (
+    latestActivePreviewTimelineFrame === null ||
+    !isActivePreviewFallbackAllowed(latestActivePreviewTimelineFrame) ||
+    !isActivePreviewSourceTarget(src, timestamp)
+  ) {
+    return
+  }
+  decoderPrewarmMetrics.fallbackReadyNotifications += 1
+  for (const listener of activePreviewReadyListeners) listener(src, timestamp)
+}
+
+/**
+ * Cache a scrub fallback for an active target. Returns false (and closes the
+ * bitmap) when the exact frame for that target is already decoded: a fallback
+ * that loses the race must never replace or shadow the exact frame.
+ */
 export function cacheActivePreviewFallbackBitmap(
   src: string,
   timestamp: number,
   proxyTimestamp: number,
   bitmap: ImageBitmap,
-): void {
+): boolean {
   decoderPrewarmMetrics.fallbackRequests += 1
-  if (!fallbackBitmapCache.has(src) && fallbackBitmapCache.size >= MAX_FALLBACK_BITMAP_SOURCES) {
-    const oldestSrc = fallbackBitmapCache.keys().next().value as string | undefined
-    if (oldestSrc) {
-      const oldestEntries = fallbackBitmapCache.get(oldestSrc)
-      fallbackBitmapCache.delete(oldestSrc)
-      for (const entry of oldestEntries ?? []) entry.bitmap.close()
-      decoderPrewarmMetrics.fallbackSourceEvictions += 1
-    }
+  if (getCachedPredecodedBitmap(src, timestamp, PRESEEK_REQUEST_REUSE_TOLERANCE_SECONDS)) {
+    decoderPrewarmMetrics.lateFallbackDiscards += 1
+    closeUnclaimedBitmap(bitmap)
+    return false
   }
-
-  const entries = fallbackBitmapCache.get(src) ?? []
-  const duplicateIndex = entries.findIndex(
-    (entry) => Math.abs(entry.timestamp - timestamp) <= PRESEEK_REQUEST_REUSE_TOLERANCE_SECONDS,
-  )
-  if (duplicateIndex >= 0) entries.splice(duplicateIndex, 1)[0]?.bitmap.close()
-  entries.push({ bitmap, timestamp, proxyTimestamp })
-  while (entries.length > MAX_FALLBACK_BITMAPS_PER_SOURCE) entries.shift()?.bitmap.close()
-  fallbackBitmapCache.delete(src)
-  fallbackBitmapCache.set(src, entries)
-  decoderPrewarmMetrics.fallbackBitmaps = [...fallbackBitmapCache.values()].reduce(
-    (sum, sourceEntries) => sum + sourceEntries.length,
-    0,
-  )
-
-  const activeTargets = latestActivePreviewTimestampsBySrc.get(src)
-  if (
-    activePreviewScrubSession &&
-    activeTargets?.some(
-      (target) => Math.abs(target - timestamp) <= PRESEEK_REQUEST_REUSE_TOLERANCE_SECONDS,
-    )
-  ) {
-    decoderPrewarmMetrics.fallbackReadyNotifications += 1
-    for (const listener of activePreviewReadyListeners) listener(src, timestamp)
-  }
+  evictOldestFallbackSourceFor(src)
+  insertFallbackEntry(src, { bitmap, timestamp, proxyTimestamp })
+  decoderPrewarmMetrics.fallbackBitmaps = countFallbackBitmaps()
+  notifyFallbackReady(src, timestamp)
+  return true
 }
 
 export function getCachedActivePreviewFallbackBitmap(
@@ -987,10 +1025,30 @@ export function activePreviewPreseek(
   return next.promise
 }
 
-export function setActivePreviewRenderTarget(frame: number | null): void {
+/**
+ * Pin (or clear) the timeline frame the active preview lane serves. `moving`
+ * marks a target the pointer has just moved to (a hover or drag update); only
+ * such a target may show a scrub fallback, and only for a short motion window.
+ * Release, pause and other settled targets always wait for the exact frame.
+ */
+export function setActivePreviewRenderTarget(
+  frame: number | null,
+  options: { moving?: boolean } = {},
+): void {
   latestActivePreviewTimelineFrame = frame
   activePreviewScrubSession = frame !== null
+  activePreviewFallbackAllowedUntilMs =
+    frame !== null && options.moving === true
+      ? performance.now() + ACTIVE_PREVIEW_FALLBACK_MOTION_WINDOW_MS
+      : 0
   if (frame === null) latestActivePreviewTimestampsBySrc.clear()
+}
+
+/** True while `frame` is the active target and the pointer is still moving through it. */
+export function isActivePreviewFallbackAllowed(frame: number): boolean {
+  return (
+    isActivePreviewFrameCurrent(frame) && performance.now() < activePreviewFallbackAllowedUntilMs
+  )
 }
 
 export function settleActivePreviewRenderTarget(frame: number): void {
@@ -1039,18 +1097,22 @@ export function isActivePreviewFrameCurrent(frame: number): boolean {
 export function isActivePreviewFrameDecodeReady(frame: number): boolean {
   if (!isActivePreviewFrameCurrent(frame)) return true
   if (latestActivePreviewTimestampsBySrc.size === 0) return true
+  const fallbackAllowed = isActivePreviewFallbackAllowed(frame)
   for (const [src, timestamps] of latestActivePreviewTimestampsBySrc) {
     for (const timestamp of timestamps) {
+      if (getCachedPredecodedBitmap(src, timestamp, PRESEEK_REQUEST_REUSE_TOLERANCE_SECONDS))
+        continue
       if (
-        !getCachedPredecodedBitmap(src, timestamp, PRESEEK_REQUEST_REUSE_TOLERANCE_SECONDS) &&
-        !getCachedActivePreviewFallbackBitmap(
+        fallbackAllowed &&
+        getCachedActivePreviewFallbackBitmap(
           src,
           timestamp,
           PRESEEK_REQUEST_REUSE_TOLERANCE_SECONDS,
         )
       ) {
-        return false
+        continue
       }
+      return false
     }
   }
   return true
@@ -1529,6 +1591,7 @@ export function disposePrewarmWorker(): void {
   activePreviewSettleTimer = null
   activePreviewScrubSession = false
   latestActivePreviewTimelineFrame = null
+  activePreviewFallbackAllowedUntilMs = 0
   latestActivePreviewTimestampsBySrc.clear()
   activePreviewReadyListeners.clear()
   decoderPrewarmMetrics.activeWorkerReady = false

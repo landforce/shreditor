@@ -9,6 +9,7 @@ export { getCachedActivePreviewFallbackBitmap } from '@/features/preview/utils/d
 export { isActivePreviewTargetSuperseded } from '@/features/preview/utils/decoder-prewarm'
 export { isActivePreviewFrameSuperseded } from '@/features/preview/utils/decoder-prewarm'
 export { isActivePreviewFrameCurrent } from '@/features/preview/utils/decoder-prewarm'
+export { isActivePreviewFallbackAllowed } from '@/features/preview/utils/decoder-prewarm'
 export { isActivePreviewFrameDecodeReady } from '@/features/preview/utils/decoder-prewarm'
 export { isActivePreviewSourceTarget } from '@/features/preview/utils/decoder-prewarm'
 export { waitForInflightPredecodedBitmap } from '@/features/preview/utils/decoder-prewarm'
