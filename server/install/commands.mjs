@@ -193,7 +193,9 @@ async function assertSafe(plan, kinds, opt) {
   const urls = Object.fromEntries(kinds.map((kind) => [kind, plan[kind].url]))
   const { blockers } = await checkRestartSafe(urls, { force: opt.force, say })
   if (blockers.length)
-    throw new Error(`Not restarting now:\n  ${blockers.join('\n  ')}\n(--force restarts anyway.)`)
+    throw new Error(
+      `Not safe to stop ${kinds.map((kind) => NAMES[kind]).join(' and ')} now:\n  ${blockers.join('\n  ')}\n(--force does it anyway.)`,
+    )
 }
 
 async function waitUntilAnswering(job, { oldPid } = {}) {
@@ -342,9 +344,9 @@ async function restartProcess(kind, job) {
   await stopPid(pid)
   if (kind === 'editor') spawnEditor({ repo: REPO, port: job.port, workspace })
   else spawnService({ repo: REPO, port: job.port, workspace })
-  if (!(await waitFor(() => answering[kind](job.url), { timeoutMs: 240_000 })))
-    throw new Error(`${NAMES[kind]} did not come back; run shred up`)
-  say(`restarted ${NAMES[kind]} (started by hand before, pid ${pid} -> new)`)
+  const now = await waitFor(() => answering[kind](job.url), { timeoutMs: 240_000 })
+  if (!now) throw new Error(`${NAMES[kind]} did not come back; run shred up`)
+  say(`restarted ${NAMES[kind]} (not a login item; pid ${pid} -> ${now.pid ?? '?'})`)
 }
 
 /** Pull, install dependencies if the lockfile moved, build: { from, to, commits } or null when current. */
