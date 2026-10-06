@@ -52,6 +52,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { prepareCompatibleMedia } from './media-compatibility.mjs'
 import { resolveMediaFile } from '../headless/lib/workspace.mjs'
+import { autoTranscribe } from './transcription.mjs'
 
 const SOURCE_LINK_FILENAME = 'source.link.json'
 
@@ -469,6 +470,7 @@ export async function importMediaByPath(root, paths, { projectId, mode = 'auto',
         writeJsonAtomic(path.join(dir, 'metadata.json'), metadata)
         if (projectId) associateWithProject(root, projectId, placed.id, inside)
         existing.push(metadata)
+        autoTranscribe(root, placed.id)
         results.push({
           id: placed.id,
           fileName: placed.fileName,

@@ -24,6 +24,7 @@ import {
   getMediaTranscriptionModelLabel,
 } from '../transcription/registry'
 import { importMediaLibraryService } from './media-library-service-loader'
+import { onExternalTranscriptChange } from './transcript-change-events'
 import {
   buildSubtitleSegmentForClip,
   getCaptionStyleTemplateFromPreset,
@@ -347,6 +348,11 @@ class MediaTranscriptionService {
   private queue: QueuedTranscriptionJob[] = []
   private readonly transcriptChangeListeners = new Set<(mediaId: string) => void>()
 
+  constructor() {
+    // Transcripts the bridge wrote in the background (see transcript-change-events).
+    onExternalTranscriptChange((mediaId) => this.emitTranscriptChanged(mediaId))
+  }
+
   getTranscript = getTranscript
   getTranscriptMediaIds = getTranscriptMediaIds
 
@@ -627,12 +633,7 @@ class MediaTranscriptionService {
     // an older transcript snapshot.
     const compositionsState = useCompositionsStore.getState()
     for (const composition of compositionsState.compositions) {
-      const synced = syncTranscriptCaptionItems(
-        composition.items,
-        mediaId,
-        transcript,
-        sourceCues,
-      )
+      const synced = syncTranscriptCaptionItems(composition.items, mediaId, transcript, sourceCues)
       if (synced.updatedClipCount === 0) continue
       compositionsState.updateComposition(composition.id, { items: synced.items })
       updatedClipCount += synced.updatedClipCount
@@ -649,9 +650,7 @@ class MediaTranscriptionService {
       return synced.updatedClipCount > 0 ? { ...stash, items: synced.items } : stash
     }
     const nextStashStack = navigationState.stashStack.map(syncStash)
-    const nextMainHolder = navigationState.mainHolder
-      ? syncStash(navigationState.mainHolder)
-      : null
+    const nextMainHolder = navigationState.mainHolder ? syncStash(navigationState.mainHolder) : null
     if (updatedStashedClipCount > 0) {
       useCompositionNavigationStore.setState({
         stashStack: nextStashStack,

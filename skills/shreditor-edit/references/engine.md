@@ -53,6 +53,10 @@ What `shred apply` accepts and how the project behaves. Verified against the Shr
 
 Each media's `category` (in `media/<id>/metadata.json`) says what it is for: `speaker`, `b-roll`, `graphics`, `overlay`, `voiceover`, `music`, `sfx`, `other`. Absent means uncategorized. Set it with `shred import ... --category <c>` or `shred categorize <mediaId>=<c> ...` (`none` clears). When any media in a project has one, the editor's media pane groups by category (that order, uncategorized last) instead of by file type. Categories don't affect ops or rendering.
 
+## Transcripts
+
+Imported audio/video is transcribed in the background by whisper.cpp (`ggml-large-v3-turbo`, local) into `media/<id>/cache/ai/transcript.json`, the editor's own transcript store. Status is `transcription` in `media/<id>/metadata.json`: `queued`, `running`, `done`, `none` (`reason`: `no-audio`, `silent`, `no-speech`), `failed`, `unavailable` (whisper.cpp or the model missing; `hint` says what to run). Words are in source seconds (`start`, `end`, `confidence`); `sourceStart` for a word is `round(word.start * sourceFps)` (the project fps for audio with no fps). Times come from whisper's DTW alignment, typically within about 0.1 s of the spoken onset; check a tight cut with `shred frames` or by ear. Phantom lines Whisper invents on music, typing or silence ("Thank you.", "See you next time") are dropped. A transcript made or edited in the app is never replaced unless `shred transcribe <id> --force`.
+
 ## Same-track overlaps are errors
 
 Two items on one track can't overlap. Any op that would make them (`addText`, `addClip`, `addItem`, `moveItem`, `updateItem` changing `from`/`durationInFrames`/`trackId`, `trimEnd` growth) fails the whole batch, nothing applied, naming the op, the track, the item in the way and both frame ranges (`[from, end)`, end exclusive):

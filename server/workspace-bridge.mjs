@@ -12,6 +12,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { createEditorStateRoutes } from './editor-state.mjs'
 import { createMediaRoutes } from './media-bridge.mjs'
+import { createTranscriptionRoutes } from './transcription.mjs'
 
 const PREFIX = '/__shreditor/'
 const CONFIG_DIR = path.join(os.homedir(), '.shreditor')
@@ -161,6 +162,8 @@ export function createWorkspaceBridge({ mode = 'dev' } = {}) {
   const mediaRoutes = createMediaRoutes({ resolveInside, sendJson, readBody, serveFile })
   // Unsaved-edit heartbeat and save requests (see editor-state.mjs).
   const editorStateRoutes = createEditorStateRoutes({ resolveInside, sendJson, readBody })
+  // Native background transcription after imports (see transcription.mjs).
+  const transcriptionRoutes = createTranscriptionRoutes({ sendJson, readBody })
   return async function workspaceBridge(req, res, next) {
     const url = new URL(req.url ?? '/', 'http://localhost')
     if (!url.pathname.startsWith(PREFIX)) return next?.()
@@ -169,6 +172,7 @@ export function createWorkspaceBridge({ mode = 'dev' } = {}) {
     try {
       const root = currentWorkspace()
       fs.mkdirSync(root, { recursive: true })
+      if (await transcriptionRoutes(req, res, { route, rel, root, query: url.searchParams })) return
       if (await mediaRoutes(req, res, { route, rel, root, query: url.searchParams })) return
       if (await editorStateRoutes(req, res, { route, root, url })) return
       switch (route) {

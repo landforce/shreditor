@@ -51,6 +51,22 @@ export type MediaCategory =
   | 'sfx'
   | 'other'
 
+/** Written by the local bridge into `metadata.json`; absent until an import queues it. */
+export interface NativeTranscriptionStatus {
+  status: 'queued' | 'running' | 'done' | 'none' | 'failed' | 'unavailable'
+  engine: 'whisper.cpp'
+  /** Model file name, e.g. `ggml-large-v3-turbo`. */
+  model?: string
+  /** Detected (or configured) spoken language. */
+  language?: string
+  updatedAt: number
+  /** For `none`: `no-audio`, `silent` or `no-speech`. */
+  reason?: 'no-audio' | 'silent' | 'no-speech'
+  words?: number
+  error?: string
+  hint?: string
+}
+
 export interface MediaMetadata {
   id: string
   /**
@@ -135,6 +151,12 @@ export interface MediaMetadata {
    * required attribution/license for assets that carry usage terms.
    */
   attribution?: MediaAttribution
+  /**
+   * Native background transcription (whisper.cpp in the local bridge,
+   * `server/transcription.mjs`). The transcript itself is the regular
+   * transcript store entry; this only reports progress and outcome.
+   */
+  transcription?: NativeTranscriptionStatus
   /**
    * AI-generated timestamped captions from LFM vision-language model.
    * Mirrors the canonical `cache/ai/captions.json` payload for in-memory
