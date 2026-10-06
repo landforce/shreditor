@@ -47,6 +47,7 @@ What `shred apply` accepts and how the project behaves. Verified against the Shr
 | `addEffect` | `itemId`, `gpuEffectType`, `params?` | Returns `detail.effectId`. Params are checked against the effect's ranges (`shred effects <id>`); omitted params take their defaults. |
 | `updateEffect` | `itemId`, `effectId`, `params?`, `enabled?` | Merges `params` into the effect; `enabled: false` bypasses it (handy for a before/after frame). |
 | `removeEffect` | `itemId`, `effectId` | |
+| `addLut` | `itemId`, `lut`, `intensity?` (0..1, default 1) | Adds a `gpu-lut` effect from `<workspace>/luts/<lut>` (a file name there, e.g. `"Warm.cube"`; `shred lut list`). The LUT is embedded in the effect as the editor's LUT panel does (resampled to 33³), so later changes to the file don't touch the clip. Returns `detail.effectId`. An unknown name fails and lists what `luts/` has. |
 | `setTransformParent` | | Parent one item's transform to another. |
 
 `GET /v1/capabilities` (on the service) lists the exact ops and limits for the running version.
@@ -140,7 +141,9 @@ Correction is a judgement, not a pipeline step: a clip gets it when you (or the 
 
 **Picture.** Colour is a GPU effect on the clip (`addEffect`), drawn in preview and export alike. `shred effects --category color` lists them with params, ranges and defaults.
 - `gpu-color-wheels` is the primary corrector and what the editor's Color panel edits: `exposure` (-3..3 stops), `contrast` (0..2, 1 = none) around `pivot`, `temperature` / `tint` (-100..100: negative is cooler / greener), `saturation` (-100..100), `lift` / `gamma` / `gain` / `offset`, and hue wheels (`shadowsHue`/`shadowsAmount`, `midtonesHue`/..., `highlightsHue`/...). One per clip is usually enough.
-- `gpu-curves`, `gpu-levels`, `gpu-vibrance`, `gpu-exposure`, `gpu-temperature` are there for specific jobs. `gpu-lut` takes a LUT the user loads in the editor; you can't load `.cube` files.
+- `gpu-curves`, `gpu-levels`, `gpu-vibrance`, `gpu-exposure`, `gpu-temperature` are there for specific jobs.
+- LUTs: the workspace LUT library is `<workspace>/luts/*.cube`, shared with the user (the editor's LUT panel lists it under Library, and every `.cube` the user imports there is saved into it). `shred lut add <file.cube...> [--name x.cube]` copies 3D LUTs in (1D and malformed files are refused; an existing name with other content needs `--force` or another `--name`); `shred lut list` shows name, size and TITLE. Apply one with `{"op":"addLut","itemId":…,"lut":"Warm.cube","intensity":0.8}`. A LUT is a look, not a fix: correct first (`gpu-color-wheels`), then the LUT, and pull `intensity` down before reaching for a different LUT.
+- Saved grades: `shred grade list` prints the user's grade presets (saved in the editor's Color panel; name, id, effects). `shred grade apply <id> <itemId...> --preset <name|id>` gives clips that grade the way the editor does: each clip's colour effects (`shred effects --category color`, LUTs included) are removed and the preset's added, other effects kept, all in one atomic batch. Re-running it replaces the grade again rather than stacking it.
 - Work: `shred frames` before, `addEffect` with small moves, `shred frames` after (or `updateEffect … enabled:false` for the before) and open both. Fix the reason the qc prompt fired (a yellow cast → `temperature` negative, `tint` to taste; flat/log → contrast and saturation up), then stop. Highlights at white are gone: darken, don't expect detail.
 - Native export draws a clip with an effect in the browser (`shred export` prints the route).
 
