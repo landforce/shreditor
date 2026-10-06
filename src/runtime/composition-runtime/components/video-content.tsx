@@ -525,13 +525,10 @@ const NativePreviewVideo: React.FC<{
     // Mount element into container
     const container = containerRef.current
     if (container && element.parentElement !== container) {
-      element.style.width = '100%'
-      element.style.height = '100%'
       element.style.objectFit = fitMode
       element.style.display = 'block'
       element.style.position = 'absolute'
-      element.style.top = '0'
-      element.style.left = '0'
+      applyVideoEdgeCrop(element.style)
       if (forceCssCompositeRef.current) {
         element.style.transform = 'translateZ(0)'
         element.style.backfaceVisibility = 'hidden'
@@ -1212,6 +1209,23 @@ const NativePreviewVideo: React.FC<{
  *
  * Uses native HTML5 video for both preview and export (via Canvas + WebCodecs).
  */
+/**
+ * Chrome blends a video's coded padding (e.g. 1920x1080 stored as 1088 rows,
+ * rotated on playback for iPhone footage) into one edge when it scales the
+ * frame, leaving a dark hairline down the side of the preview. Exports decode
+ * the visible rect and don't have it. Draw the video 1px larger on every side
+ * and clip it back to its box, so the bleed falls outside what's shown.
+ */
+function applyVideoEdgeCrop(
+  style: Pick<CSSStyleDeclaration, 'top' | 'left' | 'width' | 'height' | 'clipPath'>,
+): void {
+  style.top = '-1px'
+  style.left = '-1px'
+  style.width = 'calc(100% + 2px)'
+  style.height = 'calc(100% + 2px)'
+  style.clipPath = 'inset(1px)'
+}
+
 export const VideoContent: React.FC<{
   item: VideoItem & {
     _sequenceFrameOffset?: number

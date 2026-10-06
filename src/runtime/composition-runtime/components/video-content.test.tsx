@@ -163,6 +163,40 @@ describe('VideoContent pooled handoff', () => {
     mediaLibraryState.mediaById = {}
   })
 
+  it("draws the video a pixel past its box and clips it back, hiding Chrome's edge bleed", async () => {
+    const pooledElement = createMockVideoElement()
+    acquireForClipMock.mockReturnValue(pooledElement)
+
+    render(
+      <VideoContent
+        item={{
+          id: 'clip-edge',
+          type: 'video',
+          trackId: 'track-1',
+          from: 0,
+          durationInFrames: 90,
+          label: 'Clip',
+          src: 'blob:test',
+          _poolClipId: 'edge-1',
+        }}
+        muted={false}
+        safeTrimBefore={0}
+        playbackRate={1}
+        sourceFps={30}
+        audioEqStages={[]}
+      />,
+    )
+
+    await waitFor(() => expect(acquireForClipMock).toHaveBeenCalledTimes(1))
+    expect(pooledElement.style).toMatchObject({
+      top: '-1px',
+      left: '-1px',
+      width: 'calc(100% + 2px)',
+      height: 'calc(100% + 2px)',
+      clipPath: 'inset(1px)',
+    })
+  })
+
   it('keeps the acquired pool element when only itemId changes on the same pool lane', async () => {
     const pooledElement = createMockVideoElement()
     acquireForClipMock.mockReturnValue(pooledElement)
