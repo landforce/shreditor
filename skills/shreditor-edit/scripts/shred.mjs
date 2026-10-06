@@ -17,10 +17,13 @@
 //   shred publish <draftId> <targetId> --label "..." --summary <file.md>
 //                                        hand the finished draft to the user's project as one pass
 //   shred changes <id>                   what the user changed since the last published pass
+//   shred master <audio|video> [--lufs -14] [--tp -1.5] [--out file.wav]
+//                                        loudness-master to a new WAV (two-pass loudnorm)
 //
-// Service: 127.0.0.1:8787 (SHRED_SERVICE to override). Times are frames at the
+// Service: 127.0.0.1:8787 (SHRED_SERVICE to override). Workspace: SHRED_WORKSPACE,
+// else ~/.shreditor/config.json, else ~/Movies/Shreditor. Times are frames at the
 // project fps. Ops reference earlier results with {"$ref":"<callerId>#/detail/..."}.
-import { execFileSync, spawn } from 'node:child_process'
+import { execFileSync, spawn, spawnSync } from 'node:child_process'
 import crypto from 'node:crypto'
 import fs from 'node:fs'
 import os from 'node:os'
@@ -35,7 +38,15 @@ process.stdout.on('error', (e) => e.code === 'EPIPE' && process.exit(0))
 
 const { values: opt, positionals } = parseArgs({
   allowPositionals: true,
+  // `--lufs -14` reads as a flag to parseArgs; glue negative numbers to their option.
+  args: process.argv.slice(2).reduce((out, arg) => {
+    if (/^-\d/.test(arg) && /^--(lufs|tp)$/.test(out.at(-1) ?? '')) out.push(`${out.pop()}=${arg}`)
+    else out.push(arg)
+    return out
+  }, []),
   options: {
+    lufs: { type: 'string', default: '-14' },
+    tp: { type: 'string', default: '-1.5' },
     project: { type: 'string' },
     at: { type: 'string' },
     out: { type: 'string' },
@@ -54,6 +65,7 @@ const { values: opt, positionals } = parseArgs({
 const [command, ...args] = positionals
 
 function workspace() {
+  if (process.env.SHRED_WORKSPACE) return path.resolve(process.env.SHRED_WORKSPACE)
   try {
     const config = JSON.parse(fs.readFileSync(path.join(os.homedir(), '.shreditor/config.json'), 'utf8'))
     if (config.workspace) return config.workspace
@@ -190,6 +202,9 @@ const commands = {
     fs.mkdirSync(path.join(workspace(), 'projects', created.id, 'agent', 'passes'), { recursive: true })
     say(created.id)
     say(`${EDITOR}/editor/${created.id}`)
+    // New projects already have V1 and A1: build on these, add tracks only for extra layers.
+    const tracks = [...(created.project?.timeline?.tracks ?? [])].sort((a, b) => a.order - b.order)
+    for (const t of tracks) say(`${t.name.padEnd(3)} ${t.id}  (${t.kind ?? 'video'}, default track: reuse it)`)
   },
 
   async catalog(inputs) {
@@ -343,7 +358,7 @@ const commands = {
       say(`\n${t.name} (${t.kind ?? 'track'} ${t.id})`)
       for (const i of s.items.filter((x) => x.trackId === t.id).sort((x, y) => x.from - y.from)) {
         const src = i.sourceStart !== undefined ? `  src ${i.sourceStart}-${i.sourceEnd}` : ''
-        say(`  ${String(i.from).padStart(5)}-${String(i.from + i.durationInFrames).padEnd(5)} ${i.type.padEnd(6)} ${i.label ?? i.text ?? ''}${src}  [${i.id}]`)
+        say(`  ${String(i.from).padStart(5)}-${String(i.from + i.durationInFrames).padEnd(5)} ${i.type.padEnd(6)} ${(i.type === 'text' ? JSON.stringify(i.text) : i.label) ?? ''}${src}  [${i.id}]`)
       }
     }
   },
@@ -351,7 +366,7 @@ const commands = {
   async import(files) {
     if (!files.length) throw new Error('Pass one or more file paths')
     const cli = path.join(REPO, 'bin/shreditor.mjs')
-    const out = execFileSync(process.execPath, [cli, 'import', ...files, ...(opt.project ? ['--project', opt.project] : []), ...(opt.link ? ['--link'] : [])], { encoding: 'utf8' })
+    const out = execFileSync(process.execPath, [cli, 'import', ...files, ...(opt.project ? ['--project', opt.project] : []), ...(opt.link ? ['--link'] : [])], { encoding: 'utf8', env: { ...process.env, SHREDITOR_WORKSPACE: workspace() } })
     say(out.trim())
   },
 
@@ -417,12 +432,79 @@ const commands = {
     say(`Pass #${Number(n)} "${opt.label}" published to ${targetId}: ${changes.length} changes, revision ${saved.revision}`)
     say(`Editor: ${EDITOR}/editor/${targetId}  (an open editor reloads it within a second; open this link if it isn't showing)`)
   },
+
+  // Clip volume is plain gain with no limiter, so loudness targets are met here,
+  // before import: ffmpeg loudnorm, measure pass then linear pass with the measured
+  // values (it limits true peak itself when linear gain alone would clip).
+  async master([input]) {
+    if (!input) throw new Error('Pass an audio or video file')
+    const src = path.resolve(input)
+    if (!fs.existsSync(src)) throw new Error(`${src} does not exist`)
+    const lufs = Number(opt.lufs)
+    const tp = Number(opt.tp)
+    if (!(lufs >= -70 && lufs <= -5)) throw new Error('--lufs must be between -70 and -5')
+    if (!(tp >= -9 && tp <= 0)) throw new Error('--tp must be between -9 and 0')
+    const out = path.resolve(opt.out ?? path.join(path.dirname(src), `${path.parse(src).name}.mastered.wav`))
+    if (out === src) throw new Error('--out must differ from the input; the original is never overwritten')
+    const before = measureLoudness(src)
+    if (!Number.isFinite(before.i)) throw new Error(`No measurable audio in ${src}`)
+    const runLoudnorm = (filter, outArgs) => {
+      const log = ffmpegLog(['-i', src, '-vn', '-af', `${filter}:print_format=json`, ...outArgs])
+      return JSON.parse(log.slice(log.lastIndexOf('{'), log.lastIndexOf('}') + 1))
+    }
+    const m = runLoudnorm(`loudnorm=I=${lufs}:TP=${tp}:LRA=11`, ['-f', 'null', '-'])
+    // Linear mode needs a target range at least as wide as the source's.
+    const lra = Math.min(50, Math.max(11, Math.ceil(Number(m.input_lra)) + 1))
+    const rate = Number(execFileSync('ffprobe', ['-v', 'error', '-select_streams', 'a:0', '-show_entries', 'stream=sample_rate', '-of', 'csv=p=0', src], { encoding: 'utf8' }).trim()) || 48000
+    // loudnorm limits at 192 kHz and its limiter costs a little loudness, so the file
+    // can land a hair over the ceiling or under the target. Measure the result and
+    // render again with the target and ceiling nudged by the miss (max 4 tries).
+    let aimI = lufs
+    let ceiling = tp
+    let pass2
+    let after
+    for (let attempt = 0; attempt < 4; attempt++) {
+      pass2 = runLoudnorm(
+        `loudnorm=I=${aimI}:TP=${ceiling}:LRA=${lra}:measured_I=${m.input_i}:measured_TP=${m.input_tp}:measured_LRA=${m.input_lra}:measured_thresh=${m.input_thresh}:offset=${m.target_offset}:linear=true`,
+        ['-ar', String(rate), '-c:a', 'pcm_s16le', '-y', out],
+      )
+      after = measureLoudness(out)
+      const iMiss = lufs - after.i
+      const tpOver = after.tp - tp
+      if (Math.abs(iMiss) <= 0.3 && !(tpOver > 0)) break
+      const tenth = (x) => Math.round(x * 10) / 10
+      aimI = tenth(Math.min(-5, Math.max(-70, aimI + iMiss)))
+      if (tpOver > 0) ceiling = tenth(Math.max(-9, ceiling - tpOver - 0.1))
+    }
+    const row = (name, x) => `${name.padEnd(7)} ${x.i.toFixed(1).padStart(6)} LUFS integrated   ${x.tp.toFixed(1).padStart(5)} dBTP true peak   ${x.lra.toFixed(1)} LU range`
+    say(row('before', before))
+    say(row('after', after))
+    say(`target  ${lufs} LUFS, true peak <= ${tp} dBTP (loudnorm ${pass2.normalization_type ?? 'two-pass'}${aimI === lufs && ceiling === tp ? '' : `, aimed ${aimI} LUFS / ceiling ${ceiling}`}; measured with ebur128)`)
+    if (Math.abs(after.i - lufs) > 0.5) say(`warning: integrated is ${(after.i - lufs).toFixed(1)} LU off target (very short or very dynamic source?)`)
+    if (after.tp > tp) say(`warning: true peak ${after.tp.toFixed(1)} dBTP is above ${tp}`)
+    say(`${out}  (original untouched; import this file)`)
+  },
+}
+
+function ffmpegLog(args) {
+  const r = spawnSync('ffmpeg', ['-hide_banner', '-nostats', ...args], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 })
+  if (r.status !== 0) throw new Error(`ffmpeg failed: ${r.stderr.trim().split('\n').slice(-3).join(' ')}`)
+  return r.stderr
+}
+
+/** Integrated loudness, true peak and loudness range from ffmpeg's ebur128 summary. */
+function measureLoudness(file) {
+  const log = ffmpegLog(['-i', file, '-vn', '-filter_complex', 'ebur128=peak=true', '-f', 'null', '-'])
+  const summary = log.slice(log.lastIndexOf('Summary:'))
+  const num = (re) => Number(re.exec(summary)?.[1] ?? Number.NaN)
+  return { i: num(/I:\s+(-?[\d.]+|-inf) LUFS/), tp: num(/Peak:\s+(-?[\d.]+|-inf) dBFS/), lra: num(/LRA:\s+(-?[\d.]+) LU/) }
 }
 
 try {
   const fn = commands[command]
   if (!fn) {
-    say(fs.readFileSync(fileURLToPath(import.meta.url), 'utf8').split('\n').slice(1, 25).map((l) => l.replace(/^\/\/ ?/, '')).join('\n'))
+    const lines = fs.readFileSync(fileURLToPath(import.meta.url), 'utf8').split('\n').slice(1)
+    say(lines.slice(0, lines.findIndex((l) => !l.startsWith('//'))).map((l) => l.replace(/^\/\/ ?/, '')).join('\n'))
     process.exit(command ? 1 : 0)
   }
   await fn(args)
