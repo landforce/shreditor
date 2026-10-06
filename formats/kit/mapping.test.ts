@@ -109,16 +109,38 @@ test('kit:caption and kit:caption-low: outline as padding, chunking rules, both 
   assert.equal(caption.style.backgroundColor, undefined)
   assert.deepEqual(caption.caption, {
     maxWordsPerChunk: 3,
+    minWordsPerChunk: 2,
     maxCharsPerLine: 23,
     maxLines: 1,
     minChunkFrames: 9,
     case: 'as-is',
     punctuation: 'keep',
+    breakOn: 'phrase',
   })
   assert.equal(layoutToAnchorBox(caption.layout!, 'top', VERTICAL).y, 720)
   assert.equal(layoutToAnchorBox(variant(v3(), 'kit:caption-low').layout!, 'top', VERTICAL).y, 1250)
   // One line at 64 x 1.1 plus 10 padding and 10 outline each side: the renderer won't grow it.
   assert.equal(Math.round(caption.layout!.heightRatio! * 1920), 110)
+})
+
+test('caption chunking: word range and where to break', () => {
+  const rules = (chunking: Record<string, unknown>) => {
+    const kit = v3()
+    ;(kit.captions as { chunking?: unknown }).chunking = chunking
+    return variant(kit, 'kit:caption').caption!
+  }
+  assert.deepEqual(
+    [rules({ wordsPerChunk: 4 })].map((r) => [r.minWordsPerChunk, r.maxWordsPerChunk, r.breakOn]),
+    [[undefined, 4, 'phrase']],
+  )
+  const ranged = rules({ wordsPerChunk: [5, 3], breakOn: 'pause' })
+  assert.deepEqual(
+    [ranged.minWordsPerChunk, ranged.maxWordsPerChunk, ranged.breakOn],
+    [3, 3, 'words'],
+  )
+  assert.equal(rules({ breakOn: 'words' }).breakOn, 'words')
+  assert.equal(rules({ breakOn: 'clause' }).breakOn, 'phrase')
+  assert.equal(rules({}).maxWordsPerChunk, 3)
 })
 
 test('overlays, the listicle headline and the emphasis label', () => {

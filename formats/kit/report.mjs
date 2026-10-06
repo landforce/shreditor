@@ -170,12 +170,15 @@ function motionNotes(kit) {
   )
 }
 
+/** `breakOn` values the caption rules map (phrase -> phrase, pause and words -> words). */
+const KNOWN_BREAK_ON = new Set(['phrase', 'pause', 'words'])
+
 function captionNotes(kit) {
   const chunking = kit.captions.chunking ?? {}
   const notes = []
-  if (chunking.breakOn && chunking.breakOn !== 'pause')
+  if (chunking.breakOn && !KNOWN_BREAK_ON.has(chunking.breakOn))
     notes.push(
-      `captions.chunking.breakOn "${chunking.breakOn}": captions break at pauses and sentence ends, and at the word limit; check phrase breaks by reading them.`,
+      `captions.chunking.breakOn "${chunking.breakOn}": unknown; captions break by phrase (the kit can say "phrase", "pause" or "words").`,
     )
   if (chunking.highlightWords || kit.captions.style.highlightColor)
     notes.push('captions highlight words: not supported by caption styles; colour words by hand.')

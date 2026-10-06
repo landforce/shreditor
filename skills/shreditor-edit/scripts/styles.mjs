@@ -40,6 +40,17 @@ function sameStyle(a, b) {
   return strip(a) === strip(b)
 }
 
+/** Caption rules in a few words: "2-3 words, 1x23 chars" (", by words" when not by phrase). */
+function captionSummary(caption) {
+  const min = caption.minWordsPerChunk
+  const words =
+    min && min < caption.maxWordsPerChunk
+      ? `${min}-${caption.maxWordsPerChunk}`
+      : caption.maxWordsPerChunk
+  const by = caption.breakOn === 'words' ? ', by words' : ''
+  return `${words} words, ${caption.maxLines}x${caption.maxCharsPerLine} chars${by}`
+}
+
 /** One variant in a line: font, size on its reference canvas, colours, position, rules. */
 function variantSummary(variant) {
   const s = variant.style ?? {}
@@ -52,9 +63,7 @@ function variantSummary(variant) {
     s.stroke ? `stroke ${s.stroke.width} ${s.stroke.color}` : null,
     variant.layout?.yRatio !== undefined ? `y ${variant.layout.yRatio}` : null,
     variant.textMotion ? `motion ${Object.keys(variant.textMotion).join('/')}` : null,
-    variant.caption
-      ? `${variant.caption.maxWordsPerChunk} words, ${variant.caption.maxLines}x${variant.caption.maxCharsPerLine} chars`
-      : null,
+    variant.caption ? captionSummary(variant.caption) : null,
   ]
   return `${variant.aspect}: ${parts.filter(Boolean).join(', ')}`
 }
@@ -249,7 +258,9 @@ export function stylesCommands({ say, opt, workspace, getProject, applyBatch }) 
     },
 
     async export(names) {
-      const source = opt.project ? projectStyles((await getProject(opt.project)).project) : library()
+      const source = opt.project
+        ? projectStyles((await getProject(opt.project)).project)
+        : library()
       const styles = names.length
         ? names.map((name) => {
             const style = findStyle(source, name)

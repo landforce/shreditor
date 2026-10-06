@@ -156,24 +156,38 @@ function overlayMaxLines(section) {
   return counts.length ? Math.max(...counts) : 2
 }
 
-const wordsMax = (words) => (Array.isArray(words) ? words[words.length - 1] : words)
+const wordCount = (value) => (isNumber(value) ? Math.max(1, Math.round(value)) : undefined)
+
+/** `wordsPerChunk` as `[min, max]` (a number is the max alone); max 3 when the kit has none. */
+function wordRange(words) {
+  const range = Array.isArray(words) ? words : [undefined, words]
+  const max = wordCount(range.at(-1)) ?? 3
+  const min = range.length > 1 ? wordCount(range[0]) : undefined
+  return { min: min === undefined ? undefined : Math.min(min, max), max }
+}
+
+/** `breakOn`: "phrase" (and anything unknown) breaks by phrase; "pause" or "words" by word count. */
+const breakOnRule = (breakOn) => (breakOn === 'pause' || breakOn === 'words' ? 'words' : 'phrase')
 
 /**
- * Caption chunking: the kit's most words per chunk and lines, characters per
- * line from the text width at the caption size (a bold sans averages about
- * 0.55 of the size per character), held at least 0.3 s at 30 fps.
+ * Caption chunking: the kit's word range per chunk, lines and where to break,
+ * characters per line from the text width at the caption size (a bold sans
+ * averages about 0.55 of the size per character), held at least 0.3 s at 30 fps.
  */
 function kitCaptionRules(section, look) {
   const chunking = section.chunking ?? {}
   const pad = paddingOf(section.style)
   const textWidth = section.placement.width - pad.x * 2
+  const words = wordRange(chunking.wordsPerChunk)
   return {
-    maxWordsPerChunk: Math.max(1, Math.round(wordsMax(chunking.wordsPerChunk) ?? 3)),
+    maxWordsPerChunk: words.max,
+    ...(words.min === undefined ? {} : { minWordsPerChunk: words.min }),
     maxCharsPerLine: Math.max(4, Math.floor(textWidth / (look.fontSize * 0.55))),
     maxLines: Math.max(1, Math.round(chunking.lines ?? 2)),
     minChunkFrames: 9,
     case: 'as-is',
     punctuation: 'keep',
+    breakOn: breakOnRule(chunking.breakOn),
   }
 }
 

@@ -348,7 +348,9 @@ export function collectTextStyleInput(workspace, project, ops) {
     const transcript = readTranscript(workspace, mediaId)
     if (!transcript) return []
     const { segments, language } = transcript
-    return [{ mediaId, segments, ...(typeof language === 'string' && language ? { language } : {}) }]
+    return [
+      { mediaId, segments, ...(typeof language === 'string' && language ? { language } : {}) },
+    ]
   })
   return {
     ...(textStyleLibrary.length ? { textStyleLibrary } : {}),

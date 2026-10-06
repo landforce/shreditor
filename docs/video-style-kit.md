@@ -32,7 +32,7 @@ The code is in `formats/kit/` (plain ESM shared by the agent tools and the edito
 | `placement.anchor` | `verticalAlign`: top / middle / bottom (free: middle) |
 | `x`, `width`, `y` + anchor | layout ratios: box centre from the canvas centre, box size. The box is as tall as the section's most lines (title `maxLines`, caption `chunking.lines`, overlay `oneShot`/`tenShot` lines) plus padding and outline; a top or bottom anchor with a `zone` reaches to the zone's far edge, so extra lines grow away from the anchor |
 | `variants["16:9"]` | the style's 16:9 look, pixels at 1920x1080; without it, the 9:16 look cloned the way the editor's "Make a 16:9 version" does |
-| `chunking.wordsPerChunk` (max), `lines` | caption rules `maxWordsPerChunk`, `maxLines`; `maxCharsPerLine` = text width / (size x 0.55); `minChunkFrames` 9 |
+| `chunking.wordsPerChunk` (`[min, max]` or a max), `lines`, `breakOn` | caption rules `minWordsPerChunk`, `maxWordsPerChunk`, `maxLines`; `breakOn` `phrase` -> `phrase` (break where an editor would: sentence and clause ends, pauses, before "and" or "to"; never after "a", "the", "to", inside "$5 million" or a name), `pause` or `words` -> `words` (fill to the word limit, break at pauses and punctuation), anything else -> `phrase` with a note; `maxCharsPerLine` = text width / (size x 0.55); `minChunkFrames` 9 |
 | `motion` cut in / cut out | no text motion |
 | `preferences.tightCuts` | the scorecard's pause target (`maxPauseMs`, or `offMaxPauseMs` when off) |
 | `preferences.brandColors` (on) | `project.kit.brandColors`: swatches in the text and background colour pickers |
@@ -43,7 +43,7 @@ The project records `project.kit = { path, creator, kitVersion, hash, appliedAt,
 
 Re-applying is a three-way merge per style: the kit's look now, the look last applied, and the project's copy. Same kit: nothing changes. The kit changed a style: the project's copy and every item using it update. Only the project changed a style: it is kept (save-back can put it in the kit; `--force` takes the kit's).
 
-**Not mapped, and why:** `sizeSmall` is a choice per title (it is in `kit:title`'s description and the max-lines check hint); `tiltDeg` is item rotation, not a style; `breakOn: phrase` (captions break at pauses, sentence ends and the word limit); highlighted caption words; `nudgeToClearSubject` and the speaker's side are per-shot decisions; images, greenscreen and objects are placed per shot (the checks measure them); objects are generated outside Shreditor; reference frames are for looking at.
+**Not mapped, and why:** `sizeSmall` is a choice per title (it is in `kit:title`'s description and the max-lines check hint); `tiltDeg` is item rotation, not a style; highlighted caption words; `nudgeToClearSubject` and the speaker's side are per-shot decisions; images, greenscreen and objects are placed per shot (the checks measure them); objects are generated outside Shreditor; reference frames are for looking at.
 
 ## Check coverage
 

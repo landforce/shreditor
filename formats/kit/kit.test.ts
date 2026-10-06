@@ -10,6 +10,7 @@ import { kitHash, readKitFile, resolveKitPath, writeKitFile } from './node.mjs'
 import { describeKitDiff, diffKits } from './diff.mjs'
 import { describeKitFonts, resolveKitFonts } from './fonts.mjs'
 import {
+  describeMapping,
   describePreferences,
   describeReferenceFrames,
   kitBrandColors,
@@ -181,4 +182,15 @@ test('reference frames read both forms; placeholders are never to compare agains
     "graphic-yap: /kits/me/frames/real.jpg (the creator's frame: compare your frames against it)",
   ])
   assert.match(describeReferenceFrames(v3())[0]!, /placeholder: don't compare/)
+})
+
+test('caption breakOn: phrase, pause and words map; anything else is noted', () => {
+  const kit = JSON.parse(fs.readFileSync(path.join(FIXTURES, 'stock-kit.v3.json'), 'utf8')) as Kit
+  const breakOnNotes = (breakOn: string) => {
+    const copy = structuredClone(kit)
+    ;(copy.captions as { chunking?: Record<string, unknown> }).chunking = { breakOn }
+    return describeMapping(copy).unmapped.filter((note) => note.includes('breakOn'))
+  }
+  for (const known of ['phrase', 'pause', 'words']) assert.deepEqual(breakOnNotes(known), [])
+  assert.match(breakOnNotes('clause')[0]!, /unknown; captions break by phrase/)
 })
