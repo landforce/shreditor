@@ -874,6 +874,18 @@
     "colorPanel": {
       "emptyState": "Sélectionnez un clip à étalonner",
       "adjustmentLayerLabel": "Étalonnage"
+    },
+    "agentActivity": {
+      "working": "L’agent travaille sur une passe : {{label}}",
+      "workingNoLabel": "L’agent travaille sur une passe",
+      "watchMode": "Vous pouvez lire, parcourir et regarder. Les modifications attendent l’agent.",
+      "editAnyway": "Modifier quand même",
+      "stop": "Arrêter l’agent",
+      "stopping": "Arrêt en cours… l’agent le verra à sa prochaine étape",
+      "passReady": "Passe prête : {{label}}",
+      "passReadyNoLabel": "Passe prête",
+      "refused": "L’agent travaille. Attendez-le ou choisissez Modifier quand même.",
+      "actionFailed": "Impossible de joindre le pont de l’éditeur. Réessayez."
     }
   }
 }

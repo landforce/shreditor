@@ -61,7 +61,13 @@ function tryDrawActivePreviewFallback(options: {
   allowOutsideActivePreview?: boolean
 }): boolean {
   const { rctx, previewRootFrame, workerSource, sourceTime, toleranceSeconds, drawBitmap } = options
-  if (!options.allowOutsideActivePreview && !rctx.isActivePreviewFrameCurrent?.(previewRootFrame))
+  // A held target, a released scrub or a paused frame never shows a fallback:
+  // only a target the pointer is still moving through may (see
+  // isActivePreviewFallbackAllowed). Reverse playback opts in explicitly.
+  if (
+    !options.allowOutsideActivePreview &&
+    !rctx.isActivePreviewFallbackAllowed?.(previewRootFrame)
+  )
     return false
   const bitmap = rctx.getCachedActivePreviewFallbackBitmap?.(
     workerSource,

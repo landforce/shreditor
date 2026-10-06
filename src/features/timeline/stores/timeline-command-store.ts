@@ -10,6 +10,8 @@ import { useSettingsStore } from '@/features/timeline/deps/settings'
 import { useTimelineSettingsStore } from './timeline-settings-store'
 import { formatTimelineCommandLabel } from './commands/labels'
 import { emitUiSound } from '@/shared/ui/ui-sound'
+import { refuseEditWhileAgentWorks } from '@/shared/state/agent-edit-lock'
+import { mustWaitForAgent, refuseRanEdit } from './agent-edit-gate'
 
 /**
  * Sentinel context key for the Main timeline (activeCompositionId === null).
@@ -168,6 +170,7 @@ export const useTimelineCommandStore = create<CommandStoreState & CommandStoreAc
       // A command run inside another is part of it: one gesture, one undo step.
       if (executeDepth > 0) return action()
       const beforeSnapshot = captureSnapshot()
+      const waitForAgent = mustWaitForAgent(command.type)
 
       // Execute the action
       let result: T
@@ -181,8 +184,16 @@ export const useTimelineCommandStore = create<CommandStoreState & CommandStoreAc
       // Capture after state to check if anything changed
       const afterSnapshot = captureSnapshot()
 
+      const changed = !snapshotsEqual(beforeSnapshot, afterSnapshot)
+
+      // An agent is mid-pass (watch mode): put it back, no history.
+      if (changed && waitForAgent) {
+        refuseRanEdit(beforeSnapshot)
+        return result
+      }
+
       // Only add to history if state actually changed
-      if (!snapshotsEqual(beforeSnapshot, afterSnapshot)) {
+      if (changed) {
         set((state) =>
           pushUndoEntry(state.undoStack, { command, beforeSnapshot, timestamp: Date.now() }),
         )
@@ -195,6 +206,7 @@ export const useTimelineCommandStore = create<CommandStoreState & CommandStoreAc
     undo: () => {
       const { undoStack } = get()
       if (undoStack.length === 0) return
+      if (refuseEditWhileAgentWorks()) return // watch mode: the agent is mid-pass
 
       // Capture current state for redo
       const currentSnapshot = captureSnapshot()
@@ -218,6 +230,7 @@ export const useTimelineCommandStore = create<CommandStoreState & CommandStoreAc
     redo: () => {
       const { redoStack } = get()
       if (redoStack.length === 0) return
+      if (refuseEditWhileAgentWorks()) return // watch mode: the agent is mid-pass
 
       // Capture current state for undo
       const currentSnapshot = captureSnapshot()
@@ -278,6 +291,8 @@ export const useTimelineCommandStore = create<CommandStoreState & CommandStoreAc
 
       // Only add to history if state actually changed
       if (!snapshotsEqual(beforeSnapshot, afterSnapshot)) {
+        // A live drag or slider changed the stores directly: in watch mode, undo it.
+        if (mustWaitForAgent(command.type)) return refuseRanEdit(beforeSnapshot)
         set((state) =>
           pushUndoEntry(state.undoStack, { command, beforeSnapshot, timestamp: Date.now() }),
         )

@@ -10,11 +10,13 @@
  *   from `shred sync`, which is honoured at once.
  *
  * Only runs when the workspace is served by the bridge (agent-native mode).
+ * Autosave waits while `isPaused` (an agent is mid-pass: watch mode).
  */
 
 export const AUTOSAVE_DELAY_MS = 1500
 const HEARTBEAT_MS = 1000
 const BUSY_RETRY_MS = 300
+const PAUSED_RETRY_MS = 1000
 
 export type AgentSyncStatus = 'synced' | 'reloading' | 'conflict'
 
@@ -44,6 +46,8 @@ export interface AgentSyncDeps {
   send: (report: EditorStateReport) => Promise<{ saveRequest?: string | null } | null>
   /** False keeps the heartbeat but leaves saving to the user (and `shred sync`). */
   autosave?: boolean
+  /** Autosave holds off while true (an agent is mid-pass on this project). */
+  isPaused?: () => boolean
   now?: () => number
 }
 
@@ -99,6 +103,7 @@ export class AgentSyncController {
 
   private async autosave(): Promise<void> {
     if (!this.deps.isDirty() || this.deps.status() === 'conflict') return
+    if (this.deps.isPaused?.()) return this.schedule(PAUSED_RETRY_MS)
     if (this.saving || this.deps.isBusy()) return this.schedule(BUSY_RETRY_MS)
     const quietFor = this.now() - (this.lastEditAt ?? 0)
     if (quietFor < AUTOSAVE_DELAY_MS) return this.schedule(AUTOSAVE_DELAY_MS - quietFor)
