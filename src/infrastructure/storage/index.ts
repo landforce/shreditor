@@ -22,6 +22,7 @@ export {
   setTrackedRevision,
   type ProjectFileStamp,
 } from '@/infrastructure/storage/workspace-fs/project-revisions'
+export { readAgentPassLabel } from '@/infrastructure/storage/workspace-fs/agent-passes'
 
 // Media
 export {

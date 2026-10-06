@@ -45,6 +45,11 @@ export interface BatchTransformCommandOptions extends TransformCommandOptions {
 
 export interface LoadTimelineOptions {
   allowProjectUpgrade?: boolean
+  /**
+   * Keep the undo/redo history (a reload of the open project, which records
+   * itself as one undo step) instead of clearing it as a fresh open does.
+   */
+  keepHistory?: boolean
 }
 
 export interface TimelineState {

@@ -49,57 +49,56 @@ function formatTransformLabel(command: TimelineCommand): string {
   }
 }
 
+function formatProjectMetadataLabel(command: TimelineCommand): string {
+  const fields = Array.isArray(command.payload?.fields)
+    ? command.payload.fields.filter((field): field is string => typeof field === 'string')
+    : []
+  const resized = fields.includes('width') || fields.includes('height')
+
+  if (fields.includes('fps') && resized) return 'Resize canvas and change frame rate'
+  if (resized) return 'Resize canvas'
+  if (fields.includes('fps')) return 'Change frame rate'
+  if (fields.includes('backgroundColor')) return 'Change canvas background'
+  return 'Update project settings'
+}
+
+/** A reload of the project from disk: an agent pass carries its own label. */
+function formatExternalChangeLabel(command: TimelineCommand): string {
+  const label = command.payload?.label
+  return typeof label === 'string' && label.trim() ? label.trim() : 'Changes from the agent'
+}
+
+const LABEL_FORMATTERS: Record<string, (command: TimelineCommand) => string> = {
+  UPDATE_TRANSFORM: formatTransformLabel,
+  UPDATE_TRANSFORMS: formatTransformLabel,
+  UPDATE_PROJECT_METADATA: formatProjectMetadataLabel,
+  APPLY_AUTO_KEYFRAME_OPERATIONS: (command) => {
+    const count = readCount(command.payload)
+    if (count === null) return 'Auto-keyframe properties'
+    return `Auto-keyframe ${count} ${count === 1 ? 'property' : 'properties'}`
+  },
+  APPLY_BENTO_LAYOUT: (command) => {
+    const count = readCount(command.payload)
+    if (count === null) return 'Apply bento layout'
+    return `Apply bento layout (${count} ${count === 1 ? 'item' : 'items'})`
+  },
+  EXTERNAL_CHANGE: formatExternalChangeLabel,
+}
+
+const FIXED_LABELS: Record<string, string> = {
+  SET_IN_POINT: 'Set In point',
+  SET_OUT_POINT: 'Set Out point',
+  CLEAR_IN_OUT_POINTS: 'Clear In/Out points',
+  CLEAR_MARKERS: 'Clear markers',
+  CLEAR_TIMELINE: 'Clear timeline',
+  REMOVE_FILLER_WORDS: 'Remove filler words',
+}
+
 export function formatTimelineCommandLabel(command: TimelineCommand): string {
-  if (command.type === 'UPDATE_TRANSFORM' || command.type === 'UPDATE_TRANSFORMS') {
-    return formatTransformLabel(command)
-  }
-
-  if (command.type === 'UPDATE_PROJECT_METADATA') {
-    const fields = Array.isArray(command.payload?.fields)
-      ? command.payload.fields.filter((field): field is string => typeof field === 'string')
-      : []
-
-    if (fields.includes('fps') && (fields.includes('width') || fields.includes('height'))) {
-      return 'Resize canvas and change frame rate'
-    }
-
-    if (fields.includes('width') || fields.includes('height')) {
-      return 'Resize canvas'
-    }
-
-    if (fields.includes('fps')) {
-      return 'Change frame rate'
-    }
-
-    if (fields.includes('backgroundColor')) {
-      return 'Change canvas background'
-    }
-
-    return 'Update project settings'
-  }
-
-  if (command.type === 'APPLY_AUTO_KEYFRAME_OPERATIONS') {
-    const count = readCount(command.payload)
-    if (count !== null) {
-      return `Auto-keyframe ${count} ${count === 1 ? 'property' : 'properties'}`
-    }
-    return 'Auto-keyframe properties'
-  }
-
-  if (command.type === 'APPLY_BENTO_LAYOUT') {
-    const count = readCount(command.payload)
-    if (count !== null) {
-      return `Apply bento layout (${count} ${count === 1 ? 'item' : 'items'})`
-    }
-    return 'Apply bento layout'
-  }
-
-  if (command.type === 'SET_IN_POINT') return 'Set In point'
-  if (command.type === 'SET_OUT_POINT') return 'Set Out point'
-  if (command.type === 'CLEAR_IN_OUT_POINTS') return 'Clear In/Out points'
-  if (command.type === 'CLEAR_MARKERS') return 'Clear markers'
-  if (command.type === 'CLEAR_TIMELINE') return 'Clear timeline'
-  if (command.type === 'REMOVE_FILLER_WORDS') return 'Remove filler words'
+  const formatter = LABEL_FORMATTERS[command.type]
+  if (formatter) return formatter(command)
+  const fixed = FIXED_LABELS[command.type]
+  if (fixed) return fixed
 
   const count = readCount(command.payload)
   const base = toTitleCaseWords(command.type)

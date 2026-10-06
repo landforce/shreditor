@@ -80,4 +80,16 @@ describe('formatTimelineCommandLabel', () => {
 
     expect(label).toBe('Move Items (4)')
   })
+
+  it('names a reload from disk after the agent pass, or generically', () => {
+    expect(
+      formatTimelineCommandLabel({ type: 'EXTERNAL_CHANGE', payload: { label: ' Pass 2: hook ' } }),
+    ).toBe('Pass 2: hook')
+    expect(formatTimelineCommandLabel({ type: 'EXTERNAL_CHANGE' })).toBe('Changes from the agent')
+  })
+
+  it('formats the fixed labels', () => {
+    expect(formatTimelineCommandLabel({ type: 'SET_IN_POINT' })).toBe('Set In point')
+    expect(formatTimelineCommandLabel({ type: 'CLEAR_TIMELINE' })).toBe('Clear timeline')
+  })
 })

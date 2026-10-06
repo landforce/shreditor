@@ -1,7 +1,13 @@
 import { create } from 'zustand'
 import type { TimelineCommand, CommandEntry, TimelineSnapshot } from './commands/types'
-import { captureSnapshot, restoreSnapshot, snapshotsEqual } from './commands/snapshot'
+import {
+  captureSnapshot,
+  restoreSnapshot,
+  snapshotsEqual,
+  timelineContentEqual,
+} from './commands/snapshot'
 import { useSettingsStore } from '@/features/timeline/deps/settings'
+import { useTimelineSettingsStore } from './timeline-settings-store'
 import { formatTimelineCommandLabel } from './commands/labels'
 import { emitUiSound } from '@/shared/ui/ui-sound'
 
@@ -20,6 +26,24 @@ function historyContextKey(compositionId: string | null): string {
 interface HistoryStacks {
   undoStack: CommandEntry[]
   redoStack: CommandEntry[]
+}
+
+/** A new undo entry on top of the active stack, within the history limit; redo is dropped. */
+function pushUndoEntry(undoStack: CommandEntry[], entry: CommandEntry) {
+  const maxHistory = useSettingsStore.getState().maxUndoHistory
+  return {
+    undoStack: [...undoStack.slice(-(maxHistory - 1)), entry],
+    redoStack: [],
+    canUndo: true,
+    canRedo: false,
+  }
+}
+
+/** Undo and redo change the timeline, so the result needs saving like any edit. */
+function restoreAsEdit(snapshot: TimelineSnapshot): void {
+  restoreSnapshot(snapshot)
+  useTimelineSettingsStore.getState().markDirty()
+  emitUiSound('select')
 }
 
 /**
@@ -97,6 +121,19 @@ interface CommandStoreActions {
   addUndoEntry: (command: TimelineCommand, beforeSnapshot: TimelineSnapshot) => void
 
   /**
+   * Record a reload of the open project from disk (an agent pass, or any
+   * write made outside this tab) as one undo step on the Main timeline.
+   * `beforeSnapshot` is the Main timeline captured just before the reload.
+   *
+   * Only timeline content is undone: project settings that came with the
+   * reload (canvas size, frame rate, format, kit) stay as loaded, so an undo
+   * never leaves the project half on one version and half on the other.
+   * Parked composition histories are dropped, since their snapshots predate
+   * the reloaded content. Returns false when the reload changed nothing.
+   */
+  recordExternalChange: (command: TimelineCommand, beforeSnapshot: TimelineSnapshot) => boolean
+
+  /**
    * Switch the active undo/redo context to the given composition (null = Main
    * timeline). Parks the current stacks and swaps in the target context's
    * stacks (empty if none). Called by composition navigation whenever the live
@@ -135,16 +172,9 @@ export const useTimelineCommandStore = create<CommandStoreState & CommandStoreAc
 
       // Only add to history if state actually changed
       if (!snapshotsEqual(beforeSnapshot, afterSnapshot)) {
-        const maxHistory = useSettingsStore.getState().maxUndoHistory
-        set((state) => ({
-          undoStack: [
-            ...state.undoStack.slice(-(maxHistory - 1)),
-            { command, beforeSnapshot, timestamp: Date.now() },
-          ],
-          redoStack: [], // Clear redo on new action
-          canUndo: true,
-          canRedo: false,
-        }))
+        set((state) =>
+          pushUndoEntry(state.undoStack, { command, beforeSnapshot, timestamp: Date.now() }),
+        )
       }
 
       return result
@@ -160,8 +190,7 @@ export const useTimelineCommandStore = create<CommandStoreState & CommandStoreAc
       const entry = undoStack[undoStack.length - 1]!
 
       // Restore previous state
-      restoreSnapshot(entry.beforeSnapshot)
-      emitUiSound('select')
+      restoreAsEdit(entry.beforeSnapshot)
 
       set((state) => ({
         undoStack: state.undoStack.slice(0, -1),
@@ -184,8 +213,7 @@ export const useTimelineCommandStore = create<CommandStoreState & CommandStoreAc
       const entry = redoStack[redoStack.length - 1]!
 
       // Restore the "after" state (which is stored in beforeSnapshot after undo swapped it)
-      restoreSnapshot(entry.beforeSnapshot)
-      emitUiSound('select')
+      restoreAsEdit(entry.beforeSnapshot)
 
       set((state) => ({
         redoStack: state.redoStack.slice(0, -1),
@@ -237,17 +265,36 @@ export const useTimelineCommandStore = create<CommandStoreState & CommandStoreAc
 
       // Only add to history if state actually changed
       if (!snapshotsEqual(beforeSnapshot, afterSnapshot)) {
-        const maxHistory = useSettingsStore.getState().maxUndoHistory
-        set((state) => ({
-          undoStack: [
-            ...state.undoStack.slice(-(maxHistory - 1)),
-            { command, beforeSnapshot, timestamp: Date.now() },
-          ],
-          redoStack: [], // Clear redo on new action
-          canUndo: true,
-          canRedo: false,
-        }))
+        set((state) =>
+          pushUndoEntry(state.undoStack, { command, beforeSnapshot, timestamp: Date.now() }),
+        )
       }
+    },
+
+    recordExternalChange: (command, beforeSnapshot) => {
+      const after = captureSnapshot()
+      // Keep what the reload brought outside the timeline, and the view.
+      const before: TimelineSnapshot = {
+        ...beforeSnapshot,
+        fps: after.fps,
+        projectId: after.projectId,
+        projectMetadata: after.projectMetadata,
+        currentFrame: after.currentFrame,
+        scrollPosition: after.scrollPosition,
+        snapEnabled: after.snapEnabled,
+      }
+      const changed = !timelineContentEqual(before, after)
+      set((state) => ({
+        stacksByContext: {},
+        ...(changed
+          ? pushUndoEntry(state.undoStack, {
+              command,
+              beforeSnapshot: before,
+              timestamp: Date.now(),
+            })
+          : {}),
+      }))
+      return changed
     },
 
     setActiveContext: (compositionId) => {

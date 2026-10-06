@@ -1123,7 +1123,10 @@ export async function saveTimeline(
  * dialog side effects. {@link loadTimeline} calls this after reading +
  * migrating from storage; it then runs media validation on top.
  */
-export async function hydrateTimelineStoresFromProject(project: Project): Promise<void> {
+export async function hydrateTimelineStoresFromProject(
+  project: Project,
+  { keepHistory = false }: { keepHistory?: boolean } = {},
+): Promise<void> {
   // Unwind the outgoing runtime context before replacing any live domain
   // stores. If a Motion composition is active and root items are loaded first,
   // resetToRoot() mistakes those freshly loaded root items for composition
@@ -1262,15 +1265,20 @@ export async function hydrateTimelineStoresFromProject(project: Project): Promis
   useTimelineSettingsStore.getState().setSnapEnabled(useSettingsStore.getState().snapEnabled)
   useTimelineSettingsStore.getState().markClean()
 
-  // Clear undo history when loading
-  useTimelineCommandStore.getState().clearHistory()
+  // A fresh open starts with no history. A reload of the open project keeps
+  // it: the caller records the reload as one undo step on top.
+  if (!keepHistory) useTimelineCommandStore.getState().clearHistory()
 }
 
 const inFlightTimelineLoads = new Map<string, Promise<void>>()
 let timelineLoadQueueTail: Promise<void> | null = null
 
 function getTimelineLoadKey(projectId: string, options: LoadTimelineOptions): string {
-  return JSON.stringify([projectId, options.allowProjectUpgrade === true])
+  return JSON.stringify([
+    projectId,
+    options.allowProjectUpgrade === true,
+    options.keepHistory === true,
+  ])
 }
 
 export function loadTimeline(projectId: string, options: LoadTimelineOptions = {}): Promise<void> {
@@ -1374,7 +1382,7 @@ async function loadTimelineOnce(
       logger.debug('Saved migrated project to storage')
     }
 
-    await hydrateTimelineStoresFromProject(project)
+    await hydrateTimelineStoresFromProject(project, { keepHistory: options.keepHistory })
 
     // Validate media references after loading timeline
     const loadedItems = useItemsStore.getState().items

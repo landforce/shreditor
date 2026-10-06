@@ -194,3 +194,38 @@ export function snapshotsEqual(a: TimelineSnapshot, b: TimelineSnapshot): boolea
     projectMetadataEqual(a.projectMetadata, b.projectMetadata)
   )
 }
+
+/** The fields of a snapshot that are timeline content (what a project file holds). */
+function timelineContent(snapshot: TimelineSnapshot) {
+  return {
+    items: snapshot.items,
+    tracks: snapshot.tracks,
+    transitions: snapshot.transitions,
+    keyframes: snapshot.keyframes,
+    markers: snapshot.markers,
+    compositions: snapshot.compositions,
+    textStyles: snapshot.textStyles ?? [],
+    topLevelSequenceIds: snapshot.topLevelSequenceIds,
+    inPoint: snapshot.inPoint,
+    outPoint: snapshot.outPoint,
+    busAudioEq: snapshot.busAudioEq ?? null,
+    masterBusDb: snapshot.masterBusDb ?? 0,
+  }
+}
+
+/** JSON with object keys sorted, so key order (file vs memory) doesn't matter. */
+function stableJson(value: unknown): string {
+  return JSON.stringify(value, (_key, v: unknown) =>
+    v && typeof v === 'object' && !Array.isArray(v)
+      ? Object.fromEntries(Object.entries(v).sort(([x], [y]) => (x < y ? -1 : x > y ? 1 : 0)))
+      : v,
+  )
+}
+
+/**
+ * Deep comparison of timeline content. A reload from disk builds new arrays
+ * even when nothing changed, so reference equality can't tell.
+ */
+export function timelineContentEqual(a: TimelineSnapshot, b: TimelineSnapshot): boolean {
+  return stableJson(timelineContent(a)) === stableJson(timelineContent(b))
+}

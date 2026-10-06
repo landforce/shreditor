@@ -34,16 +34,22 @@ export function useResolvedProjectFormat(): ResolvedFormat | null {
 }
 
 /**
- * Re-read the project's format from project.json (after an agent pass or
- * `shred format set` reloaded the timeline).
+ * Re-read the project's settings outside the timeline from project.json: the
+ * format, the style kit and the canvas (after an agent pass, `shred format set`
+ * or `shred kit apply` reloaded the timeline).
  */
-export async function refreshProjectFormatFromDisk(projectId: string): Promise<void> {
+export async function refreshProjectSettingsFromDisk(projectId: string): Promise<void> {
   const fresh = await getProject(projectId)
   const { currentProject } = useProjectStore.getState()
   if (!fresh || currentProject?.id !== projectId) return
-  const { format: _previous, ...rest } = currentProject
+  const { format: _format, kit: _kit, ...rest } = currentProject
   useProjectStore.setState({
-    currentProject: fresh.format ? { ...rest, format: fresh.format } : rest,
+    currentProject: {
+      ...rest,
+      metadata: { ...rest.metadata, ...fresh.metadata },
+      ...(fresh.format ? { format: fresh.format } : {}),
+      ...(fresh.kit ? { kit: fresh.kit } : {}),
+    },
   })
 }
 
