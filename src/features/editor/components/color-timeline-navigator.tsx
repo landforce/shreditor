@@ -366,14 +366,14 @@ export const ColorTimelineNavigator = memo(function ColorTimelineNavigator() {
 
   return (
     <section
-      className="panel-bg shrink-0 overflow-hidden border-y border-border bg-[#24252b]"
+      className="bg-panel-bg shrink-0 overflow-hidden border-y border-border"
       aria-label={t('editor.colorTimeline.label')}
       data-testid="color-timeline-navigator"
       style={{ height: STRIP_HEIGHT }}
     >
       <div className="flex h-full flex-col">
         <div
-          className="flex shrink-0 gap-1 overflow-x-auto overflow-y-hidden border-b border-black/40 px-1 pt-1"
+          className="flex shrink-0 gap-1 overflow-x-auto overflow-y-hidden border-b border-border px-1 pt-1"
           data-testid="color-timeline-filmstrip-scroll"
           style={{
             height: MINI_FILM_TILE_STRIP_HEIGHT,
@@ -393,19 +393,19 @@ export const ColorTimelineNavigator = memo(function ColorTimelineNavigator() {
               />
             ))
           ) : (
-            <div className="flex h-full items-center px-2 text-[10px] font-medium text-zinc-500">
+            <div className="flex h-full items-center px-2 text-[10px] font-medium text-muted-foreground">
               {t('editor.colorTimeline.noClip')}
             </div>
           )}
         </div>
 
         <div
-          className="relative flex min-h-0 flex-1 cursor-ew-resize flex-col bg-[#1d1e23]"
+          className="relative flex min-h-0 flex-1 cursor-ew-resize flex-col bg-timeline-bg"
           data-testid="color-timeline-scrub-surface"
           {...scrubHandlers}
         >
           <div
-            className="relative shrink-0 border-b border-black/40 bg-[#202127]"
+            className="relative shrink-0 border-b border-border bg-panel-header"
             style={{ height: MINI_TIMELINE_IO_LANE_HEIGHT }}
           >
             <MiniTimelineIoLane

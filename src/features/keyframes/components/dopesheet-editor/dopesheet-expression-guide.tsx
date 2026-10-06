@@ -68,7 +68,7 @@ export function DopesheetExpressionGuide({
               <button
                 key={`${preset.group}-${preset.label}`}
                 type="button"
-                className="min-w-0 rounded border border-border/60 bg-background/70 px-1.5 py-1 text-left hover:border-sky-500/50 hover:bg-sky-500/5"
+                className="min-w-0 rounded border border-border/60 bg-background/70 px-1.5 py-1 text-left hover:border-sky-600/50 hover:bg-sky-500/5"
                 title={`${preset.description}\n${preset.source}`}
                 onClick={() => onApplyPreset(preset.source)}
               >
@@ -91,7 +91,7 @@ export function DopesheetExpressionGuide({
                   <span className="shrink-0 text-[8px] font-medium text-foreground">
                     {item.title}
                   </span>
-                  <code className="truncate text-[8px] text-sky-300">{item.syntax}</code>
+                  <code className="truncate text-[8px] text-sky-700">{item.syntax}</code>
                 </div>
                 <div className="truncate text-[8px] text-muted-foreground">{item.description}</div>
               </div>

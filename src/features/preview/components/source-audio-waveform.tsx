@@ -107,7 +107,7 @@ function drawWaveformRegion(
     )
   }
 
-  context.strokeStyle = 'rgba(255, 255, 255, 0.13)'
+  context.strokeStyle = 'rgba(11, 31, 51, 0.16)'
   context.lineWidth = 1
   context.beginPath()
   context.moveTo(region.x, Math.round(centerY) + 0.5)
@@ -120,7 +120,7 @@ function drawPlayhead(
   x: number,
   y: number,
   height: number,
-  color = 'rgba(239, 68, 68, 0.98)',
+  color = '#da3730',
 ) {
   context.strokeStyle = color
   context.lineWidth = 1
@@ -142,20 +142,20 @@ function drawOverviewWindow(
   const left = Math.round(startX) + 0.5
   const width = Math.max(1, Math.round(endX - startX))
 
-  context.fillStyle = 'rgba(0, 0, 0, 0.22)'
+  context.fillStyle = 'rgba(11, 31, 51, 0.06)'
   context.fillRect(regionX, y, Math.max(0, left - regionX), height)
   context.fillRect(left + width, y, Math.max(0, regionX + regionWidth - left - width), height)
 
-  context.fillStyle = 'rgba(255, 255, 255, 0.11)'
+  context.fillStyle = 'rgba(37, 81, 163, 0.1)'
   context.fillRect(left, y + 1.5, width, height - 3)
 
-  context.strokeStyle = 'rgba(238, 238, 238, 0.7)'
+  context.strokeStyle = 'rgba(37, 81, 163, 0.7)'
   context.lineWidth = 1
   context.strokeRect(left, y + 1.5, width, height - 3)
 }
 
 function drawDetailGrid(context: CanvasRenderingContext2D, region: WaveformRegion) {
-  context.strokeStyle = 'rgba(255, 255, 255, 0.065)'
+  context.strokeStyle = 'rgba(11, 31, 51, 0.07)'
   context.lineWidth = 1
   for (let i = 1; i < 4; i += 1) {
     const x = Math.round(region.x + (region.width * i) / 4) + 0.5
@@ -290,7 +290,7 @@ export function SourceAudioWaveform({
     const scaleY = (size.visualHeight / size.layoutHeight) * dpr
     context.setTransform(scaleX, 0, 0, scaleY, 0, 0)
     context.clearRect(0, 0, size.layoutWidth, size.layoutHeight)
-    context.fillStyle = '#121316'
+    context.fillStyle = '#f1f4fa'
     context.fillRect(0, 0, size.layoutWidth, size.layoutHeight)
 
     const waveformX = SOURCE_WAVEFORM_INSET_X
@@ -319,11 +319,11 @@ export function SourceAudioWaveform({
       endTimeSeconds: detailWindow.end,
     }
 
-    context.fillStyle = '#202127'
+    context.fillStyle = '#eef1f8'
     context.fillRect(0, 0, size.layoutWidth, SOURCE_WAVEFORM_OVERVIEW_HEIGHT)
-    context.fillStyle = '#18191f'
+    context.fillStyle = '#fbfcff'
     context.fillRect(0, detailRegion.y, size.layoutWidth, detailRegion.height)
-    context.fillStyle = 'rgba(255, 255, 255, 0.08)'
+    context.fillStyle = '#d5dce8'
     context.fillRect(
       0,
       SOURCE_WAVEFORM_OVERVIEW_HEIGHT,
@@ -333,14 +333,14 @@ export function SourceAudioWaveform({
     drawDetailGrid(context, detailRegion)
 
     const overviewGradient = context.createLinearGradient(0, 0, 0, overviewRegion.height)
-    overviewGradient.addColorStop(0, 'rgba(180, 182, 186, 0.74)')
-    overviewGradient.addColorStop(0.5, 'rgba(132, 134, 139, 0.92)')
-    overviewGradient.addColorStop(1, 'rgba(180, 182, 186, 0.74)')
+    overviewGradient.addColorStop(0, 'rgba(91, 107, 127, 0.62)')
+    overviewGradient.addColorStop(0.5, 'rgba(11, 31, 51, 0.72)')
+    overviewGradient.addColorStop(1, 'rgba(91, 107, 127, 0.62)')
 
     const detailGradient = context.createLinearGradient(0, detailRegion.y, 0, size.layoutHeight)
-    detailGradient.addColorStop(0, 'rgba(198, 199, 201, 0.94)')
-    detailGradient.addColorStop(0.5, 'rgba(139, 140, 142, 0.98)')
-    detailGradient.addColorStop(1, 'rgba(198, 199, 201, 0.94)')
+    detailGradient.addColorStop(0, 'rgba(91, 107, 127, 0.78)')
+    detailGradient.addColorStop(0.5, 'rgba(11, 31, 51, 0.86)')
+    detailGradient.addColorStop(1, 'rgba(91, 107, 127, 0.78)')
 
     drawWaveformRegion(context, overviewAmplitudes, overviewRegion, overviewGradient)
     drawWaveformRegion(context, detailAmplitudes, detailRegion, detailGradient)
@@ -455,7 +455,7 @@ export function SourceAudioWaveform({
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onKeyDown={handleKeyDown}
-      className="relative h-full w-full touch-none cursor-crosshair select-none overflow-hidden bg-[#121316]"
+      className="relative h-full w-full touch-none cursor-crosshair select-none overflow-hidden bg-timeline-bg"
     >
       <div
         data-testid="source-audio-waveform-overview"
@@ -472,7 +472,7 @@ export function SourceAudioWaveform({
             {Array.from({ length: 64 }, (_, index) => (
               <div
                 key={index}
-                className="w-0.5 bg-zinc-400/40"
+                className="w-0.5 bg-muted-foreground/40"
                 style={{ height: `${22 + ((index * 11) % 54)}%` }}
               />
             ))}
@@ -481,7 +481,7 @@ export function SourceAudioWaveform({
             {Array.from({ length: 96 }, (_, index) => (
               <div
                 key={index}
-                className="w-1 bg-zinc-400/35"
+                className="w-1 bg-muted-foreground/35"
                 style={{ height: `${24 + ((index * 17) % 68)}%` }}
               />
             ))}
@@ -490,8 +490,8 @@ export function SourceAudioWaveform({
       ) : null}
       {showUnavailable ? (
         <>
-          <div className="absolute inset-x-4 top-5 h-px bg-zinc-400/30" />
-          <div className="absolute inset-x-4 top-1/2 h-px bg-zinc-400/25" />
+          <div className="absolute inset-x-4 top-5 h-px bg-muted-foreground/30" />
+          <div className="absolute inset-x-4 top-1/2 h-px bg-muted-foreground/25" />
         </>
       ) : null}
     </div>

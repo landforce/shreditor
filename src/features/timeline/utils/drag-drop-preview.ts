@@ -44,13 +44,13 @@ export function getGhostHighlightClasses(ghostPreviews: TimelineGhostPreviewLike
     return 'border-timeline-shape/60 bg-timeline-shape/10'
   }
   if (ghostPreviews.some((ghost) => ghost.type === 'adjustment')) {
-    return 'border-slate-400/60 bg-slate-400/10'
+    return 'border-slate-500/60 bg-slate-500/10'
   }
   if (ghostPreviews.some((ghost) => ghost.type === 'image' || ghost.type === 'lottie')) {
     return 'border-timeline-image/60 bg-timeline-image/10'
   }
   if (ghostPreviews.some((ghost) => ghost.type === 'composition')) {
-    return 'border-violet-400/60 bg-violet-600/10'
+    return 'border-violet-600/60 bg-violet-600/10'
   }
   if (ghostPreviews.some((ghost) => ghost.type === 'external-file')) {
     return 'border-orange-500/60 bg-orange-500/10'
@@ -60,7 +60,7 @@ export function getGhostHighlightClasses(ghostPreviews: TimelineGhostPreviewLike
 
 export function getGhostPreviewItemClasses(type: TimelineGhostPreviewType): string {
   if (type === 'composition') {
-    return 'border-violet-400 bg-violet-600/20'
+    return 'border-violet-600 bg-violet-600/20'
   }
   if (type === 'external-file') {
     return 'border-orange-500 bg-orange-500/15'
@@ -78,7 +78,7 @@ export function getGhostPreviewItemClasses(type: TimelineGhostPreviewType): stri
     return 'border-timeline-shape bg-timeline-shape/20'
   }
   if (type === 'adjustment') {
-    return 'border-slate-400 bg-slate-400/15'
+    return 'border-slate-500 bg-slate-500/15'
   }
   return 'border-timeline-image bg-timeline-image/20'
 }

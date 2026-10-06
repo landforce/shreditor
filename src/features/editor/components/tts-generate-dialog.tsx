@@ -511,7 +511,7 @@ export const TtsGenerateDialog = memo(function TtsGenerateDialog() {
 
         <div className="space-y-4">
           {!isTtsSupported && (
-            <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-100">
+            <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-800">
               {engine === 'kokoro'
                 ? t('editor.tts.kokoroUnsupported')
                 : engine === 'moss'
@@ -734,7 +734,7 @@ export const TtsGenerateDialog = memo(function TtsGenerateDialog() {
               <MiniAudioPlayer src={result.objectUrl} />
 
               {inserted && (
-                <span className="flex items-center gap-1 text-[11px] text-emerald-400">
+                <span className="flex items-center gap-1 text-[11px] text-emerald-700">
                   <CheckCircle2 className="h-3 w-3" />
                   {t('editor.tts.insertedAndLinked')}
                 </span>

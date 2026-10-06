@@ -99,7 +99,7 @@ export function SaveAnimationPresetDialog({
             }}
           />
           {isDuplicate && (
-            <p className="text-xs text-amber-500">
+            <p className="text-xs text-amber-700">
               {t('editor.animatePresets.dialog.duplicateWarning')}
             </p>
           )}

@@ -73,7 +73,7 @@ function LottieCardComponent({
         )}
 
         {isFailed && !isImporting && (
-          <div className="absolute inset-0 flex items-center justify-center bg-destructive/30">
+          <div className="absolute inset-0 flex items-center justify-center bg-destructive/60">
             <RotateCcw className="h-5 w-5 text-white" />
           </div>
         )}

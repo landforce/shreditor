@@ -324,7 +324,7 @@ export function PlaybackControls({ totalFrames, fps }: PlaybackControlsProps) {
           style={btnSize}
           className={`flex-shrink-0 ${
             useProxy
-              ? 'text-green-500 hover:text-green-400 hover:bg-green-500/10'
+              ? 'text-green-700 hover:text-green-800 hover:bg-green-600/10'
               : 'text-muted-foreground hover:text-foreground'
           }`}
           onClick={toggleUseProxy}

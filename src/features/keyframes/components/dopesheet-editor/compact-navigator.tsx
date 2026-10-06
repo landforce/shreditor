@@ -277,7 +277,7 @@ export function CompactNavigator({
         onClick={handleTrackClick}
       >
         <div
-          className="pointer-events-none absolute inset-y-0 w-px bg-primary/70"
+          className="pointer-events-none absolute inset-y-0 w-px bg-timeline-playhead/80"
           style={{ left: playheadLeft }}
         />
         <div

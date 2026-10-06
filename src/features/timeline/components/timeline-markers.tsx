@@ -244,7 +244,7 @@ function drawTile(
     // Major tick mark - bottom-anchored, only draw if within tile bounds
     if (x >= 0 && x <= actualTileWidth) {
       const lineX = Math.round(x) + 0.5
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.30)'
+      ctx.strokeStyle = 'rgba(11, 31, 51, 0.34)'
       ctx.lineWidth = 1
       ctx.beginPath()
       ctx.moveTo(lineX, majorTickTop)
@@ -258,7 +258,7 @@ function drawTile(
       const lastTickX = x + tickSpacing * (markerConfig.minorTicks - 1)
       if (lastTickX < 0 || x > actualTileWidth) continue
 
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.14)'
+      ctx.strokeStyle = 'rgba(11, 31, 51, 0.16)'
       ctx.lineWidth = 1
 
       for (let j = 1; j < markerConfig.minorTicks; j++) {
@@ -340,11 +340,11 @@ function syncLabels(
     const isNew = !span
     if (!span) {
       span = document.createElement('span')
-      span.className = 'absolute text-xs text-white/60 select-none whitespace-nowrap'
+      span.className = 'absolute text-xs text-foreground/60 select-none whitespace-nowrap'
       span.style.top = '2px'
       span.style.fontFamily = 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace'
       span.style.fontFeatureSettings = '"tnum"'
-      span.style.textShadow = '0 1px 2px rgba(0, 0, 0, 0.45)'
+      span.style.textShadow = '0 1px 0 rgba(255, 255, 255, 0.6)'
       span.style.zIndex = '24'
       container.appendChild(span)
       pool.set(i, span)
@@ -1118,7 +1118,7 @@ export const TimelineMarkers = memo(function TimelineMarkers({
       onMouseMove={handleRulerMouseMove}
       onMouseLeave={handleRulerMouseLeave}
       style={{
-        background: 'oklch(0.22 0 0 / 0.22)',
+        background: 'var(--panel-header)',
         userSelect: 'none',
         cursor: 'ew-resize',
         height: EDITOR_LAYOUT_CSS_VALUES.timelineRulerHeight,
@@ -1148,7 +1148,7 @@ export const TimelineMarkers = memo(function TimelineMarkers({
       {/* IO lane backdrop + divider so the in/out bar reads as its own track
           rather than floating over the ruler ticks. */}
       <div
-        className="absolute left-0 right-0 top-0 border-b border-border/70 bg-black/25 pointer-events-none"
+        className="absolute left-0 right-0 top-0 border-b border-border/70 bg-foreground/[0.04] pointer-events-none"
         style={{ height: IO_LANE_HEIGHT, zIndex: 8 }}
       />
 

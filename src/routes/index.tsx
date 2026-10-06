@@ -229,9 +229,7 @@ function LandingPage() {
             {t('projects.landing.heroSubtitle')}
           </p>
 
-          <p className="mb-6 max-w-lg text-sm text-amber-600 dark:text-amber-500">
-            {t('projects.landing.disclaimer')}
-          </p>
+          <p className="mb-6 max-w-lg text-sm text-amber-700">{t('projects.landing.disclaimer')}</p>
 
           <div className="flex flex-col items-center gap-4 sm:flex-row sm:flex-wrap sm:justify-center">
             <Button asChild size="lg" className="gap-2 px-8">
@@ -295,7 +293,7 @@ function LandingPage() {
                 key={item.id}
                 className="group relative overflow-hidden rounded-xl border border-border bg-card transition-[border-color,box-shadow] duration-150 hover:border-primary/50 hover:shadow-lg hover:shadow-primary/5"
               >
-                <div className="relative aspect-[16/10] w-full overflow-hidden bg-black">
+                <div className="relative aspect-[16/10] w-full overflow-hidden bg-video-preview-background">
                   <img
                     src={item.media}
                     alt={t(item.titleKey)}

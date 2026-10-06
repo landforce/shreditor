@@ -431,8 +431,7 @@ export const MediaSidebar = memo(function MediaSidebar() {
     const { tracks, fps, addItemOnNewTrack } = useTimelineStore.getState()
     const { activeTrackId, selectItems, setActiveTrack } = useSelectionStore.getState()
     const currentProject = useProjectStore.getState().currentProject
-    const activeCompositionId =
-      useCompositionNavigationStore.getState().activeCompositionId
+    const activeCompositionId = useCompositionNavigationStore.getState().activeCompositionId
     const activeComposition = activeCompositionId
       ? useCompositionsStore.getState().getComposition(activeCompositionId)
       : undefined
@@ -588,7 +587,7 @@ export const MediaSidebar = memo(function MediaSidebar() {
     <div className="flex h-full flex-shrink-0">
       {/* Vertical Category Bar */}
       <div
-        className="panel-header border-r border-border flex flex-col items-center flex-shrink-0"
+        className="bg-panel-header border-r border-border flex flex-col items-center flex-shrink-0"
         style={{ width: EDITOR_LAYOUT_CSS_VALUES.sidebarRailWidth }}
       >
         {/* Header row - aligned with content panel header */}
@@ -658,7 +657,7 @@ export const MediaSidebar = memo(function MediaSidebar() {
           a touch faster than open (exit < entrance). During a resize-drag we snap
           (duration 0) so width tracks the pointer instead of easing behind it. */}
       <motion.div
-        className="panel-bg border-r border-border overflow-hidden relative"
+        className="bg-panel-bg border-r border-border overflow-hidden relative"
         initial={false}
         animate={{ width: leftSidebarOpen ? sidebarWidth : 0 }}
         transition={

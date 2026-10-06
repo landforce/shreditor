@@ -234,7 +234,7 @@ const TranscriptSegmentRow = memo(function TranscriptSegmentRow({
                   isSelected
                     ? 'bg-primary text-primary-foreground'
                     : isActive
-                      ? 'bg-yellow-300 text-neutral-900 shadow-sm'
+                      ? 'bg-yellow-300 text-foreground shadow-sm'
                       : isMatch
                         ? matchesApproximate
                           ? 'text-foreground ring-1 ring-inset ring-amber-500/40'
@@ -712,61 +712,64 @@ export function TranscriptEditorPanel({ active }: TranscriptEditorPanelProps) {
     return status === 'loading' || status === 'transcribing'
   })
 
-  const handleTranscribe = useCallback((values: TranscribeDialogValues) => {
-    const targets = uniqueMediaIds.filter((id) => {
-      const status = mediaState[id]?.status
-      return status === 'needs' || status === 'error'
-    })
-    if (targets.length === 0) return
+  const handleTranscribe = useCallback(
+    (values: TranscribeDialogValues) => {
+      const targets = uniqueMediaIds.filter((id) => {
+        const status = mediaState[id]?.status
+        return status === 'needs' || status === 'error'
+      })
+      if (targets.length === 0) return
 
-    setTranscribeDialogOpen(false)
+      setTranscribeDialogOpen(false)
 
-    for (const id of targets) requestedRef.current.add(id)
-    setMediaState((prev) => {
-      const next = { ...prev }
-      for (const id of targets) next[id] = { status: 'transcribing' }
-      return next
-    })
+      for (const id of targets) requestedRef.current.add(id)
+      setMediaState((prev) => {
+        const next = { ...prev }
+        for (const id of targets) next[id] = { status: 'transcribing' }
+        return next
+      })
 
-    void Promise.all(
-      targets.map(async (mediaId) => {
-        try {
-          const result = await runMediaTranscriptionJob(mediaId, {
-            ...values,
-            onModelFallback: () => {
-              toast.info(t('transcript.largeTurboFallback'))
-            },
-          })
-          if (!mountedRef.current) return
-          if (result.status === 'cancelled') {
-            setMediaState((prev) => ({ ...prev, [mediaId]: { status: 'needs' } }))
-            return
-          }
-          const { transcript } = result
-          setMediaState((prev) => ({
-            ...prev,
-            [mediaId]: hasWordTimings(transcript)
-              ? { status: 'ready', transcript }
-              : { status: 'needs' },
-          }))
-        } catch (error) {
-          logger.warn('Transcription failed', { mediaId, error })
-          const errorMessage = isTranscriptionOutOfMemoryError(error)
-            ? TRANSCRIPTION_OOM_HINT
-            : error instanceof Error && error.message.trim().length > 0
-              ? error.message
-              : t('transcript.toastTranscribeFailed')
-          if (mountedRef.current) {
+      void Promise.all(
+        targets.map(async (mediaId) => {
+          try {
+            const result = await runMediaTranscriptionJob(mediaId, {
+              ...values,
+              onModelFallback: () => {
+                toast.info(t('transcript.largeTurboFallback'))
+              },
+            })
+            if (!mountedRef.current) return
+            if (result.status === 'cancelled') {
+              setMediaState((prev) => ({ ...prev, [mediaId]: { status: 'needs' } }))
+              return
+            }
+            const { transcript } = result
             setMediaState((prev) => ({
               ...prev,
-              [mediaId]: { status: 'error', errorMessage },
+              [mediaId]: hasWordTimings(transcript)
+                ? { status: 'ready', transcript }
+                : { status: 'needs' },
             }))
+          } catch (error) {
+            logger.warn('Transcription failed', { mediaId, error })
+            const errorMessage = isTranscriptionOutOfMemoryError(error)
+              ? TRANSCRIPTION_OOM_HINT
+              : error instanceof Error && error.message.trim().length > 0
+                ? error.message
+                : t('transcript.toastTranscribeFailed')
+            if (mountedRef.current) {
+              setMediaState((prev) => ({
+                ...prev,
+                [mediaId]: { status: 'error', errorMessage },
+              }))
+            }
+            toast.error(errorMessage)
           }
-          toast.error(errorMessage)
-        }
-      }),
-    )
-  }, [uniqueMediaIds, mediaState, t])
+        }),
+      )
+    },
+    [uniqueMediaIds, mediaState, t],
+  )
 
   const transcriptionError = useMemo(
     () =>
@@ -936,7 +939,7 @@ export function TranscriptEditorPanel({ active }: TranscriptEditorPanelProps) {
           <div className="mx-auto max-w-[62ch] select-none">
             {sourceCoverage && (
               <div className="mb-2 flex items-start gap-2 rounded-md border border-border/70 bg-secondary/30 px-2.5 py-2">
-                <CircleCheck className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-500" />
+                <CircleCheck className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-600" />
                 <div className="min-w-0">
                   <p className="text-xs font-medium text-foreground">
                     {t('transcript.sourceAnalyzed', {

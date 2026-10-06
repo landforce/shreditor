@@ -9,7 +9,7 @@ export const ColorGradingDock = memo(function ColorGradingDock() {
 
   return (
     <section
-      className="panel-bg flex h-full min-h-0 flex-col border-t border-border"
+      className="bg-panel-bg flex h-full min-h-0 flex-col border-t border-border"
       aria-label={t('editor.colorPanel.dockLabel')}
       data-testid="color-grading-dock"
     >

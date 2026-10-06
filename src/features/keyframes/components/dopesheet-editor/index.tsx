@@ -1583,13 +1583,7 @@ export const DopesheetEditor = memo(function DopesheetEditor({
     linkedTimelineViewportWidth !== undefined &&
     linkedTimelineViewportWidth > 0
   const timelineCellBorderWidth =
-    presentation === 'classic'
-      ? hasLinkedTimelineAxis
-        ? 0
-        : 1
-      : presentation === 'lanes'
-        ? 1
-        : 0
+    presentation === 'classic' ? (hasLinkedTimelineAxis ? 0 : 1) : presentation === 'lanes' ? 1 : 0
   const effectiveTimelineWidth = Math.max(
     hasLinkedTimelineAxis
       ? linkedTimelineViewportWidth
@@ -1692,12 +1686,8 @@ export const DopesheetEditor = memo(function DopesheetEditor({
   }, [affectedFrameRange, effectiveTimelineWidth, frameToX])
   const sharedGridFrameToX = useCallback(
     (frame: number) =>
-      getFrameAxisX(
-        frame,
-        viewport,
-        effectiveTimelineWidth + timelineCellBorderWidth,
-        0,
-      ) - timelineCellBorderWidth,
+      getFrameAxisX(frame, viewport, effectiveTimelineWidth + timelineCellBorderWidth, 0) -
+      timelineCellBorderWidth,
     [effectiveTimelineWidth, timelineCellBorderWidth, viewport],
   )
   const getRenderedKeyframeX = useCallback(
@@ -1947,8 +1937,7 @@ export const DopesheetEditor = memo(function DopesheetEditor({
     if (timelineGridDivisions && timelineGridDivisions > 0) {
       return Array.from(
         { length: timelineGridDivisions + 1 },
-        (_, index) =>
-          viewport.startFrame + (index / timelineGridDivisions) * frameRange,
+        (_, index) => viewport.startFrame + (index / timelineGridDivisions) * frameRange,
       )
     }
     const step = getNiceTickStep(frameRange)
@@ -3530,7 +3519,7 @@ export const DopesheetEditor = memo(function DopesheetEditor({
                   left: Math.round(firstX),
                   width: Math.ceil(frameToX(lastTick) - firstX + majorSpacing),
                   backgroundImage:
-                    'linear-gradient(to right, rgba(255, 255, 255, 0.14) 1px, transparent 1px)',
+                    'linear-gradient(to right, rgba(11, 31, 51, 0.14) 1px, transparent 1px)',
                   backgroundSize: `${minorSpacing}px 100%`,
                 }}
               />
@@ -3545,7 +3534,7 @@ export const DopesheetEditor = memo(function DopesheetEditor({
           <div
             key={frame}
             data-dopesheet-ruler-major-tick
-            className="pointer-events-none absolute bottom-0 h-2 border-l border-white/30"
+            className="pointer-events-none absolute bottom-0 h-2 border-l border-foreground/30"
             style={{ left: Math.round(frameToX(frame)) }}
           >
             <span className="absolute bottom-[7px] left-1 whitespace-nowrap text-[10px] text-muted-foreground">
@@ -3660,8 +3649,8 @@ export const DopesheetEditor = memo(function DopesheetEditor({
             rowLocked && 'opacity-70',
             'data-[expression-link-eligible=true]:bg-primary/[0.06] data-[expression-link-eligible=true]:ring-1 data-[expression-link-eligible=true]:ring-inset data-[expression-link-eligible=true]:ring-primary/20',
             'data-[expression-link-hover=true]:!bg-primary/20 data-[expression-link-hover=true]:ring-1 data-[expression-link-hover=true]:ring-inset data-[expression-link-hover=true]:!ring-primary/70',
-            'data-[expression-reference-hover=true]:bg-sky-500/15 data-[expression-reference-hover=true]:ring-1 data-[expression-reference-hover=true]:ring-inset data-[expression-reference-hover=true]:ring-sky-400/70',
-            'data-[expression-reference-pickable=true]:cursor-crosshair data-[expression-reference-pickable=true]:bg-sky-500/15 data-[expression-reference-pickable=true]:ring-1 data-[expression-reference-pickable=true]:ring-inset data-[expression-reference-pickable=true]:ring-sky-400/70',
+            'data-[expression-reference-hover=true]:bg-sky-500/15 data-[expression-reference-hover=true]:ring-1 data-[expression-reference-hover=true]:ring-inset data-[expression-reference-hover=true]:ring-sky-600/60',
+            'data-[expression-reference-pickable=true]:cursor-crosshair data-[expression-reference-pickable=true]:bg-sky-500/15 data-[expression-reference-pickable=true]:ring-1 data-[expression-reference-pickable=true]:ring-inset data-[expression-reference-pickable=true]:ring-sky-600/60',
             'data-[expression-reference-unavailable=true]:opacity-45',
           )}
           data-expression-item-id={linkableProperty ? itemId : undefined}
@@ -3680,7 +3669,7 @@ export const DopesheetEditor = memo(function DopesheetEditor({
                   MINI_ICON_BUTTON_CLASS,
                   'self-center text-muted-foreground hover:text-foreground',
                   curveVisible
-                    ? 'text-orange-500 hover:text-orange-400'
+                    ? 'text-orange-600 hover:text-orange-700'
                     : 'opacity-30 hover:opacity-60',
                 )}
                 onClick={(event) => {
@@ -3716,7 +3705,7 @@ export const DopesheetEditor = memo(function DopesheetEditor({
                 className={cn(
                   MINI_ICON_BUTTON_CLASS,
                   'self-center text-muted-foreground hover:text-foreground',
-                  rowLocked ? 'text-red-400 hover:text-red-300' : 'opacity-30 hover:opacity-60',
+                  rowLocked ? 'text-red-600 hover:text-red-700' : 'opacity-30 hover:opacity-60',
                 )}
                 onClick={(event) => {
                   event.stopPropagation()
@@ -3803,7 +3792,7 @@ export const DopesheetEditor = memo(function DopesheetEditor({
                       size="sm"
                       className={cn(
                         MINI_ICON_BUTTON_CLASS,
-                        'self-center text-orange-400 hover:bg-orange-500/10 hover:text-orange-300',
+                        'self-center text-orange-600 hover:bg-orange-500/10 hover:text-orange-700',
                       )}
                       onPointerDown={(event) => {
                         event.stopPropagation()
@@ -3883,11 +3872,11 @@ export const DopesheetEditor = memo(function DopesheetEditor({
                 disabled={disabled || rowLocked}
                 className={cn(
                   MINI_ICON_BUTTON_CLASS,
-                  'self-center hover:bg-sky-500/10 hover:text-sky-300',
+                  'self-center hover:bg-sky-500/10 hover:text-sky-700',
                   expressionError
-                    ? 'text-red-400'
+                    ? 'text-red-600'
                     : propertyExpression?.enabled
-                      ? 'text-sky-400'
+                      ? 'text-sky-600'
                       : 'text-muted-foreground opacity-30 hover:opacity-70',
                 )}
                 title={
@@ -3926,7 +3915,7 @@ export const DopesheetEditor = memo(function DopesheetEditor({
                 className={cn(
                   MINI_ICON_BUTTON_CLASS,
                   'ml-0.5 self-center text-muted-foreground hover:text-foreground',
-                  axisConstraint.constrained && 'text-orange-400 hover:text-orange-300',
+                  axisConstraint.constrained && 'text-orange-600 hover:text-orange-700',
                 )}
                 onClick={(event) => {
                   event.stopPropagation()
@@ -4083,7 +4072,7 @@ export const DopesheetEditor = memo(function DopesheetEditor({
                       ? 'w-[80px]'
                       : 'w-[44px]',
                   !isColorAnimatableProperty(row.property) && 'cursor-ew-resize select-none',
-                  propertyLink && 'text-orange-400',
+                  propertyLink && 'text-orange-600',
                 )}
                 disabled={
                   disabled ||
@@ -4128,7 +4117,7 @@ export const DopesheetEditor = memo(function DopesheetEditor({
                 className={cn(
                   'h-5 w-5 p-0 hover:bg-transparent',
                   row.controls.hasKeyframeAtCurrentFrame
-                    ? 'text-neutral-200 hover:text-neutral-200'
+                    ? 'text-foreground hover:text-foreground'
                     : 'text-muted-foreground hover:text-foreground',
                   isCurrentFrameBlocked &&
                     !row.controls.hasKeyframeAtCurrentFrame &&
@@ -4172,7 +4161,7 @@ export const DopesheetEditor = memo(function DopesheetEditor({
                   className={cn(
                     'block h-[7px] w-[7px] rotate-45 border transition-colors',
                     row.controls.hasKeyframeAtCurrentFrame
-                      ? 'border-neutral-200 bg-neutral-200'
+                      ? 'border-foreground bg-foreground'
                       : 'border-current bg-transparent',
                   )}
                 />
@@ -4329,7 +4318,7 @@ export const DopesheetEditor = memo(function DopesheetEditor({
                 MINI_ICON_BUTTON_CLASS,
                 'self-center text-muted-foreground hover:text-foreground',
                 curveVisible
-                  ? 'text-orange-500 hover:text-orange-400'
+                  ? 'text-orange-600 hover:text-orange-700'
                   : 'opacity-30 hover:opacity-60',
               )}
               onClick={(event) => {
@@ -4356,7 +4345,7 @@ export const DopesheetEditor = memo(function DopesheetEditor({
               className={cn(
                 MINI_ICON_BUTTON_CLASS,
                 'self-center text-muted-foreground hover:text-foreground',
-                allRowsLocked ? 'text-red-400 hover:text-red-300' : 'opacity-30 hover:opacity-60',
+                allRowsLocked ? 'text-red-600 hover:text-red-700' : 'opacity-30 hover:opacity-60',
               )}
               onClick={(event) => {
                 event.stopPropagation()
@@ -4441,7 +4430,7 @@ export const DopesheetEditor = memo(function DopesheetEditor({
               {groupLabel}
             </span>
           </button>
-          <div className="ml-auto flex items-center gap-0 rounded-sm border border-border/70 bg-background/90 px-px shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+          <div className="ml-auto flex items-center gap-0 rounded-sm border border-border/70 bg-card px-px shadow-[inset_0_1px_0_rgba(255,255,255,0.6)]">
             <DopesheetGroupOptionsMenu
               groupLabel={groupLabel}
               dimensionSeparation={dimensionSeparation}
@@ -5128,7 +5117,7 @@ export const DopesheetEditor = memo(function DopesheetEditor({
                 type="button"
                 variant="ghost"
                 size="sm"
-                className="h-6 gap-1 px-1.5 text-[10px] text-amber-300 hover:text-amber-200"
+                className="h-6 gap-1 px-1.5 text-[10px] text-amber-700 hover:text-amber-800"
                 onClick={onTrimAnimation}
                 title={t('timeline.keyframeEditor.trimAnimationHint', {
                   count: trimmedKeyframeCount,
@@ -5269,7 +5258,7 @@ export const DopesheetEditor = memo(function DopesheetEditor({
 
           {isCurrentFrameBlocked && (
             <span
-              className="rounded border border-amber-500/40 bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-medium text-amber-300"
+              className="rounded border border-amber-500/40 bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-medium text-amber-700"
               title={t('timeline.keyframeEditor.transitionBlocked')}
             >
               {t('timeline.keyframeEditor.transitionBlockedPill')}
@@ -5281,7 +5270,7 @@ export const DopesheetEditor = memo(function DopesheetEditor({
               type="button"
               variant="ghost"
               size="sm"
-              className="h-6 gap-1 px-1.5 text-[11px] text-sky-300 hover:text-sky-200"
+              className="h-6 gap-1 px-1.5 text-[11px] text-sky-700 hover:text-sky-800"
               onClick={onBakeMotion}
               title={t('timeline.keyframeEditor.bakeMotionHint')}
             >

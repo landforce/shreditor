@@ -102,7 +102,9 @@ function KeyframeConnectors({
       data-dopesheet-to-frame={segment.toFrame}
       className={cn(
         'pointer-events-none absolute z-0 -translate-y-1/2',
-        segment.held ? 'border-t border-dashed border-neutral-500/50' : 'h-px bg-neutral-400/50',
+        segment.held
+          ? 'border-t border-dashed border-muted-foreground/50'
+          : 'h-px bg-muted-foreground/40',
       )}
       style={{ left: segment.left, width: segment.width, top: '50%' }}
     />
@@ -112,7 +114,7 @@ function KeyframeConnectors({
 // Hatched fill marks a span as generated/procedural (distinct from solid
 // connector lines and diamonds).
 const PROCEDURAL_HATCH =
-  'repeating-linear-gradient(45deg, rgba(56,189,248,0.25) 0 2px, transparent 2px 5px)'
+  'repeating-linear-gradient(45deg, rgba(2,132,199,0.25) 0 2px, transparent 2px 5px)'
 
 /**
  * A non-keyframe band marking that a property is driven by a procedural motion
@@ -137,7 +139,7 @@ function ProceduralBandView({
       data-dopesheet-from-frame={band.fromFrame}
       data-dopesheet-to-frame={band.toFrame}
       data-dopesheet-min-width={3}
-      className="pointer-events-none absolute top-1/2 z-0 h-2 -translate-y-1/2 overflow-hidden rounded-sm border border-sky-400/40 bg-sky-400/10"
+      className="pointer-events-none absolute top-1/2 z-0 h-2 -translate-y-1/2 overflow-hidden rounded-sm border border-sky-600/40 bg-sky-500/10"
       style={{ left, width, backgroundImage: PROCEDURAL_HATCH }}
       title={title}
     />
@@ -257,8 +259,8 @@ export const GroupTimelineCell = memo(function GroupTimelineCell({
                     className={cn(
                       'pointer-events-none block rotate-45 border transition-colors',
                       isSelected
-                        ? 'border-blue-100 bg-blue-500 shadow-[0_0_0_1px_rgba(59,130,246,0.45)]'
-                        : 'border-transparent bg-neutral-200 group-hover:bg-white',
+                        ? 'border-blue-100 bg-primary shadow-[0_0_0_1px_rgba(37,81,163,0.45)]'
+                        : 'border-transparent bg-muted-foreground group-hover:bg-foreground',
                     )}
                     style={{
                       width: KEYFRAME_DIAMOND_SIDE_PX,
@@ -284,7 +286,7 @@ export const GroupTimelineCell = memo(function GroupTimelineCell({
                   }}
                 >
                   <span
-                    className="block rotate-45 border border-primary/70 bg-primary/70 shadow-[0_0_0_1px_rgba(59,130,246,0.35)]"
+                    className="block rotate-45 border border-primary/70 bg-primary/70 shadow-[0_0_0_1px_rgba(37,81,163,0.35)]"
                     style={{
                       width: KEYFRAME_DIAMOND_SIDE_PX,
                       height: KEYFRAME_DIAMOND_SIDE_PX,
@@ -505,10 +507,10 @@ export const PropertyTimelineCell = memo(function PropertyTimelineCell({
               >
                 <span
                   className={cn(
-                    'pointer-events-none block rotate-45 border transition-colors group-data-[marquee-selected=true]:!border-blue-100 group-data-[marquee-selected=true]:!bg-blue-500 group-data-[marquee-selected=true]:!shadow-[0_0_0_1px_rgba(59,130,246,0.45)] group-data-[marquee-selected=false]:!border-transparent group-data-[marquee-selected=false]:!bg-neutral-200 group-data-[marquee-selected=false]:!shadow-none',
+                    'pointer-events-none block rotate-45 border transition-colors group-data-[marquee-selected=true]:!border-blue-100 group-data-[marquee-selected=true]:!bg-primary group-data-[marquee-selected=true]:!shadow-[0_0_0_1px_rgba(37,81,163,0.45)] group-data-[marquee-selected=false]:!border-transparent group-data-[marquee-selected=false]:!bg-muted-foreground group-data-[marquee-selected=false]:!shadow-none',
                     selected
-                      ? 'border-blue-100 bg-blue-500 shadow-[0_0_0_1px_rgba(59,130,246,0.45)]'
-                      : 'border-transparent bg-neutral-200 group-hover:bg-white',
+                      ? 'border-blue-100 bg-primary shadow-[0_0_0_1px_rgba(37,81,163,0.45)]'
+                      : 'border-transparent bg-muted-foreground group-hover:bg-foreground',
                   )}
                   style={{
                     width: KEYFRAME_DIAMOND_SIDE_PX,
@@ -542,7 +544,7 @@ export const PropertyTimelineCell = memo(function PropertyTimelineCell({
                 }}
               >
                 <span
-                  className="block rotate-45 border border-primary/70 bg-primary/70 shadow-[0_0_0_1px_rgba(59,130,246,0.35)]"
+                  className="block rotate-45 border border-primary/70 bg-primary/70 shadow-[0_0_0_1px_rgba(37,81,163,0.35)]"
                   style={{
                     width: KEYFRAME_DIAMOND_SIDE_PX,
                     height: KEYFRAME_DIAMOND_SIDE_PX,

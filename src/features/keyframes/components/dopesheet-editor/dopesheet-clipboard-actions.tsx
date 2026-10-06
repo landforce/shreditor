@@ -67,7 +67,7 @@ export function DopesheetClipboardActions({
         <ClipboardPaste className="h-3 w-3" />
       </Button>
       {isKeyframeClipboardCut && hasKeyframeClipboard && (
-        <span className="pl-0.5 text-[10px] font-medium text-amber-500">
+        <span className="pl-0.5 text-[10px] font-medium text-amber-700">
           {t('timeline.keyframeEditor.cut')}
         </span>
       )}

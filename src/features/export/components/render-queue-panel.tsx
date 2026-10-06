@@ -38,7 +38,7 @@ function StatusIcon({ status }: { status: RenderJobStatus }) {
     case 'rendering':
       return <Loader2 className="h-4 w-4 animate-spin text-primary" />
     case 'completed':
-      return <CheckCircle2 className="h-4 w-4 text-green-500" />
+      return <CheckCircle2 className="h-4 w-4 text-green-600" />
     case 'failed':
       return <AlertCircle className="h-4 w-4 text-destructive" />
     case 'cancelled':
@@ -103,7 +103,7 @@ function JobRow({ job }: { job: RenderJob }) {
           )}
 
           {job.status === 'completed' && job.savedPath && (
-            <div className="mt-1 flex items-center gap-1.5 text-xs text-green-500">
+            <div className="mt-1 flex items-center gap-1.5 text-xs text-green-700">
               <FolderCheck className="h-3.5 w-3.5 flex-shrink-0" />
               <span className="truncate">
                 {t('export.renderQueue.savedTo', { path: job.savedPath })}
@@ -236,7 +236,7 @@ export function RenderQueueList() {
       </div>
 
       {isPaused && jobs.some((j) => j.status === 'queued') && (
-        <p className="text-xs text-amber-500">{t('export.renderQueue.paused')}</p>
+        <p className="text-xs text-amber-700">{t('export.renderQueue.paused')}</p>
       )}
 
       <div className="max-h-[55vh] overflow-y-auto pr-1">

@@ -35,13 +35,13 @@ function getBucketColorClasses(item: TimelineItem): string {
     case 'audio':
       return 'bg-timeline-audio border-timeline-audio'
     case 'image':
-      return 'bg-timeline-image/40 border-timeline-image'
+      return 'bg-timeline-image border-timeline-image'
     case 'text':
-      return 'bg-timeline-text/40 border-timeline-text'
+      return 'bg-timeline-text border-timeline-text'
     case 'shape':
-      return 'bg-timeline-shape/40 border-timeline-shape'
+      return 'bg-timeline-shape border-timeline-shape'
     case 'adjustment':
-      return 'bg-violet-950/80 border-violet-500/70'
+      return 'bg-purple-600/90 border-purple-700'
     default:
       return 'bg-muted border-border'
   }
@@ -80,10 +80,7 @@ export const TimelineDensityOverview = memo(function TimelineDensityOverview({
   const itemIds = useMemo(() => items.map((item) => item.id), [items])
   const previewUpdates = useLinkedEditPreviewStore(
     useShallow(
-      useCallback(
-        (state) => itemIds.map((itemId) => state.updatesById[itemId] ?? null),
-        [itemIds],
-      ),
+      useCallback((state) => itemIds.map((itemId) => state.updatesById[itemId] ?? null), [itemIds]),
     ),
   )
   const previewItems = useMemo(
@@ -97,11 +94,7 @@ export const TimelineDensityOverview = memo(function TimelineDensityOverview({
     [items, previewUpdates],
   )
   const buckets = useMemo(
-    () =>
-      buildTimelineDensityBuckets(
-        previewItems,
-        DENSE_TIMELINE_MAX_OVERVIEW_BUCKETS_PER_TRACK,
-      ),
+    () => buildTimelineDensityBuckets(previewItems, DENSE_TIMELINE_MAX_OVERVIEW_BUCKETS_PER_TRACK),
     [previewItems],
   )
 
@@ -171,7 +164,9 @@ export const TimelineDensityOverview = memo(function TimelineDensityOverview({
                 : [item.id]
               if (event.metaKey || event.ctrlKey) {
                 const targetSet = new Set(targetIds)
-                const alreadySelected = targetIds.some((id) => selection.selectedItemIds.includes(id))
+                const alreadySelected = targetIds.some((id) =>
+                  selection.selectedItemIds.includes(id),
+                )
                 flushSync(() =>
                   selection.selectItems(
                     alreadySelected

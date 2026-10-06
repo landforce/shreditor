@@ -66,7 +66,7 @@ export function SubtitleScanProgressDialog() {
                     <Loader2 className="w-3 h-3 shrink-0 animate-spin text-muted-foreground" />
                   )}
                   {entry.status === 'done' && (
-                    <CheckCircle2 className="w-3 h-3 shrink-0 text-emerald-500" />
+                    <CheckCircle2 className="w-3 h-3 shrink-0 text-emerald-600" />
                   )}
                   {entry.status === 'error' && (
                     <XCircle className="w-3 h-3 shrink-0 text-destructive" />

@@ -339,14 +339,14 @@ export function KeyframeTimingStrip({
               type="button"
               data-testid={`keyframe-timing-strip-marker-${marker.id}`}
               className={cn(
-                'absolute -translate-x-1/2 -translate-y-1/2 shadow-[0_0_0_1px_rgba(0,0,0,0.35)]',
+                'absolute -translate-x-1/2 -translate-y-1/2 shadow-[0_0_0_1px_rgba(11,31,51,0.18)]',
                 disabled
                   ? 'cursor-default'
                   : marker.draggable
                     ? 'cursor-ew-resize'
                     : 'cursor-pointer',
                 marker.selected
-                  ? 'h-3 w-3 rounded-[2px] border border-blue-200/70 bg-blue-500 rotate-45'
+                  ? 'h-3 w-3 rounded-[2px] border border-blue-100 bg-primary rotate-45'
                   : 'h-2 w-2 rounded-full border border-muted-foreground/60 bg-muted-foreground/70',
               )}
               style={markerStyle}

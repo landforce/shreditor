@@ -232,7 +232,7 @@ export function MissingMediaDialog() {
           <div className="flex gap-2 text-xs">
             {permissionDenied.length > 0 && (
               <div className="flex items-center gap-1 px-2 py-1 bg-yellow-500/10 border border-yellow-500/30 rounded">
-                <AlertTriangle className="w-3 h-3 text-yellow-500" />
+                <AlertTriangle className="w-3 h-3 text-yellow-600" />
                 <span>
                   {t('media.missingMedia.needPermission', { count: permissionDenied.length })}
                 </span>
@@ -295,7 +295,7 @@ export function MissingMediaDialog() {
                   }`}
                 >
                   {item.errorType === 'permission_denied' ? (
-                    <AlertTriangle className="w-4 h-4 text-yellow-500" />
+                    <AlertTriangle className="w-4 h-4 text-yellow-600" />
                   ) : (
                     <X className="w-4 h-4 text-destructive" />
                   )}

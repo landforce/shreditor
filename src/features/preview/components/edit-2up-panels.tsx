@@ -154,7 +154,7 @@ export function EditTwoUpPanels({ leftPanel, rightPanel }: EditTwoUpPanelsProps)
   return (
     <div
       ref={containerRef}
-      className="absolute inset-0 z-30 bg-black flex items-center"
+      className="absolute inset-0 z-30 bg-video-preview-background flex items-center"
       style={{ gap: GAP }}
     >
       <FramePanel
@@ -207,15 +207,15 @@ function FramePanel({
 
   return (
     <div className="flex-1 min-w-0 flex flex-col items-center justify-center">
-      <span className="text-base font-semibold tracking-widest text-white/80 uppercase pb-1">
+      <span className="text-base font-semibold tracking-widest text-muted-foreground uppercase pb-1">
         {label}
       </span>
       <div
-        className="flex items-center justify-center shrink-0 bg-black"
+        className="flex items-center justify-center shrink-0 bg-video-preview-background"
         style={{ width: panelWidth, height: areaHeight }}
       >
         <div
-          className="overflow-hidden border border-white/10"
+          className="overflow-hidden border border-border bg-black"
           style={{ width: mediaWidth, height: mediaHeight }}
         >
           {renderPanelMedia(
@@ -240,7 +240,7 @@ function FramePanel({
           )}
         </div>
       </div>
-      <span className="text-lg font-mono text-white/90 tabular-nums pt-1">{timecode}</span>
+      <span className="text-lg font-mono text-foreground tabular-nums pt-1">{timecode}</span>
     </div>
   )
 }

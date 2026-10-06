@@ -147,7 +147,7 @@ export function RotaryKnob({
         <path
           d={arcPath(cx, cy, r, ARC_START_DEG, ARC_START_DEG + ARC_SWEEP_DEG)}
           fill="none"
-          stroke="#2e2e31"
+          className="stroke-border"
           strokeWidth={2.5}
           strokeLinecap="round"
         />
@@ -155,12 +155,12 @@ export function RotaryKnob({
           <path
             d={arcPath(cx, cy, r, ARC_START_DEG, deg)}
             fill="none"
-            stroke="#ff7b63"
+            className="stroke-primary"
             strokeWidth={2.5}
             strokeLinecap="round"
           />
         )}
-        <circle cx={tip.x} cy={tip.y} r={2} fill="white" />
+        <circle cx={tip.x} cy={tip.y} r={2} className="fill-foreground" />
       </svg>
     </div>
   )

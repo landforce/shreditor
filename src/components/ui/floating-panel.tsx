@@ -272,7 +272,7 @@ export const FloatingPanel = memo(function FloatingPanel({
   const panel = (
     <div
       ref={panelRef}
-      className={`fixed z-40 flex flex-col rounded-lg border border-border bg-background shadow-2xl shadow-black/50 overflow-hidden ${className}`}
+      className={`fixed z-40 flex flex-col rounded-lg border border-border bg-card shadow-float overflow-hidden ${className}`}
       style={{
         left: bounds.x,
         top: bounds.y,
@@ -316,7 +316,7 @@ export const FloatingPanel = memo(function FloatingPanel({
       ) : null}
 
       <div
-        className="flex items-center justify-between gap-2 border-b border-border bg-secondary/30 px-2 py-1.5 cursor-grab active:cursor-grabbing select-none shrink-0"
+        className="flex items-center justify-between gap-2 border-b border-border bg-panel-header px-2 py-1.5 cursor-grab active:cursor-grabbing select-none shrink-0"
         onPointerDown={handleTitlePointerDown}
       >
         <span className="text-xs font-mono uppercase tracking-[0.12em] text-muted-foreground">

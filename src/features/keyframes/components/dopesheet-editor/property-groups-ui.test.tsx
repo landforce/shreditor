@@ -207,7 +207,7 @@ describe('DopesheetEditor property groups', () => {
     const minorTickLayers = ruler.querySelectorAll('[data-dopesheet-ruler-minor-ticks]')
 
     expect(majorTicks.length).toBeGreaterThan(1)
-    expect(majorTicks[0]).toHaveClass('bottom-0', 'h-2', 'border-white/30')
+    expect(majorTicks[0]).toHaveClass('bottom-0', 'h-2', 'border-foreground/30')
     expect(minorTickLayers).toHaveLength(1)
     expect(minorTickLayers[0]).toHaveClass('bottom-0', 'h-1')
   })
@@ -565,7 +565,7 @@ describe('DopesheetEditor property groups', () => {
       name: /edit x position expression: division by zero/i,
     })
     expect(indicator).toHaveAttribute('title', 'X Position expression error: Division by zero')
-    expect(indicator).toHaveClass('text-red-400')
+    expect(indicator).toHaveClass('text-red-600')
   })
 
   it('inserts an Expression pick-whip reference at the editor cursor', async () => {

@@ -108,5 +108,5 @@ export const SLIP_SLIDE_TOOLS_ENABLED = false
 // =============================================================================
 
 // Waveform colors (canvas doesn't support CSS vars)
-export const WAVEFORM_FILL_COLOR = 'rgba(158, 107, 214, 0.5)'
-export const WAVEFORM_STROKE_COLOR = 'rgba(158, 107, 214, 0.8)'
+export const WAVEFORM_FILL_COLOR = 'rgba(214, 240, 218, 0.55)'
+export const WAVEFORM_STROKE_COLOR = 'rgba(232, 248, 234, 0.85)'

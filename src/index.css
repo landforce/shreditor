@@ -23,61 +23,108 @@ body.canvas-translate-cursor-not-allowed * {
   --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1); /* iOS-like drawer/panel slide */
 }
 
+/* UI type. Named apart from "Inter" so composition/caption fonts that load
+   Inter by name are never shadowed by the editor chrome's copy. */
+@font-face {
+  font-display: swap;
+  font-family: 'Shreditor UI';
+  font-style: normal;
+  font-weight: 100 900;
+  src: url('/fonts/InterVariable.woff2') format('woff2');
+}
+
+@font-face {
+  font-display: swap;
+  font-family: 'Shreditor Display';
+  font-style: normal;
+  font-weight: 400;
+  src: url('/fonts/NeueHaasDisplayRoman.ttf') format('truetype');
+}
+
+@font-face {
+  font-display: swap;
+  font-family: 'Shreditor Display';
+  font-style: normal;
+  font-weight: 500 600;
+  src: url('/fonts/NeueHaasDisplayMedium.ttf') format('truetype');
+}
+
+@font-face {
+  font-display: swap;
+  font-family: 'Shreditor Display';
+  font-style: normal;
+  font-weight: 700 900;
+  src: url('/fonts/NeueHaasDisplayBold.ttf') format('truetype');
+}
+
 @layer base {
   :root {
-    /* Professional Video Editor Dark Theme - OKLCH Colors */
-    /* Inspired by Premiere Pro & DaVinci Resolve */
+    /* Paper theme - inspired by the Cut30 design system: cool paper surfaces,
+       navy ink, one blue accent, soft layered shadows. Kept dense and quiet
+       for a desktop editor: small radii, hairline borders, no decoration. */
 
-    /* Base - Very dark, reduced eye strain */
-    --background: oklch(0.15 0 0); /* #262626 - Main canvas */
-    --foreground: oklch(0.95 0 0); /* #f2f2f2 - Primary text */
+    /* Ground - the cool paper the panels sit on */
+    --background: #e8edf5;
+    --foreground: #0b1f33; /* Navy ink - primary text */
 
-    /* Panels - Layered depth */
-    --card: oklch(0.18 0 0); /* #2e2e2e - Panel backgrounds */
-    --card-foreground: oklch(0.92 0 0); /* #ebebeb - Panel text */
+    /* Panels - near-white paper */
+    --card: #fbfcff;
+    --card-foreground: #0b1f33;
 
-    --popover: oklch(0.16 0 0); /* #292929 - Dropdowns */
-    --popover-foreground: oklch(0.92 0 0);
+    --popover: #ffffff;
+    --popover-foreground: #0b1f33;
 
-    /* Primary - Orange accent (playback, active states) */
-    --primary: oklch(0.68 0.19 45); /* #FF8C3A - Vibrant orange */
-    --primary-foreground: oklch(0.12 0 0); /* Dark text on primary */
+    /* Primary - Cut30 blue (active tools, selection, primary actions) */
+    --primary: #2551a3;
+    --primary-foreground: #ffffff;
 
-    /* Secondary - Subtle panel variation */
-    --secondary: oklch(0.22 0 0); /* #383838 - Secondary surfaces */
-    --secondary-foreground: oklch(0.88 0 0);
+    /* Secondary - tinted paper */
+    --secondary: #eef1f8;
+    --secondary-foreground: #1b2d42;
 
-    /* Muted - Backgrounds and disabled states */
-    --muted: oklch(0.2 0 0); /* #333333 - Muted backgrounds */
-    --muted-foreground: oklch(0.6 0 0); /* #999999 - Muted text */
+    /* Muted - quiet fills and secondary text */
+    --muted: #eef1f8;
+    --muted-foreground: #5b6b7f;
 
-    /* Accent - Hover states and highlights */
-    --accent: oklch(0.24 0 0); /* #3d3d3d - Hover backgrounds */
-    --accent-foreground: oklch(0.95 0 0);
+    /* Accent - hover fills */
+    --accent: #e2e8f3;
+    --accent-foreground: #0b1f33;
 
-    /* Destructive - Red for delete/errors */
-    --destructive: oklch(0.58 0.22 25); /* #E53E3E - Error red */
-    --destructive-foreground: oklch(0.98 0 0);
+    --destructive: #da3730;
+    --destructive-foreground: #ffffff;
 
-    /* Borders - Subtle separators */
-    --border: oklch(0.25 0 0); /* #404040 - Borders */
-    --input: oklch(0.24 0 0); /* #3d3d3d - Input borders */
-    --ring: oklch(0.68 0.19 45); /* Orange focus ring */
+    /* Hairlines */
+    --border: #d5dce8;
+    --input: #cdd5e3;
+    --ring: #5e96ff;
 
-    /* Panel system - Layered depth */
-    --panel-bg: oklch(0.18 0 0); /* #2e2e2e - Panels */
-    --panel-header: oklch(0.14 0 0); /* #242424 - Panel headers */
-    --timeline-bg: oklch(0.12 0 0); /* #1f1f1f - Timeline darker */
+    /* Panel system */
+    --panel-bg: #fbfcff;
+    --panel-header: #f3f6fb;
+    --timeline-bg: #f1f4fa;
 
-    /* Sidebar */
-    --sidebar: oklch(0.18 0 0);
-    --sidebar-foreground: oklch(0.92 0 0);
-    --sidebar-primary: oklch(0.68 0.19 45);
-    --sidebar-primary-foreground: oklch(0.12 0 0);
-    --sidebar-accent: oklch(0.22 0 0);
-    --sidebar-accent-foreground: oklch(0.92 0 0);
-    --sidebar-border: oklch(0.25 0 0);
-    --sidebar-ring: oklch(0.68 0.19 45);
+    --sidebar: #fbfcff;
+    --sidebar-foreground: #0b1f33;
+    --sidebar-primary: #2551a3;
+    --sidebar-primary-foreground: #ffffff;
+    --sidebar-accent: #e2e8f3;
+    --sidebar-accent-foreground: #0b1f33;
+    --sidebar-border: #d5dce8;
+    --sidebar-ring: #5e96ff;
+
+    /* Charcoal ink for the strongest controls (Cut30's charcoal CTA) */
+    --ink: #0b1f33;
+    --ink-foreground: #ffffff;
+
+    /* Soft layered elevation, after Cut30's card shadows */
+    --shadow-panel: 0 1px 2px rgb(11 31 51 / 0.05), 0 4px 14px rgb(11 31 51 / 0.05);
+    --shadow-float: 0 2px 6px rgb(11 31 51 / 0.06), 0 12px 32px rgb(11 31 51 / 0.12);
+
+    /* Faint paper fibre, tiled. Inline SVG noise so it costs no request. */
+    --paper-grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.04 0 0 0 0 0.12 0 0 0 0 0.2 0 0 0 0.1 0'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");
+
+    --font-ui: 'Shreditor UI', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    --font-display: 'Shreditor Display', 'Shreditor UI', -apple-system, sans-serif;
 
     --radius: 0.5rem;
   }
@@ -96,12 +143,10 @@ body.canvas-translate-cursor-not-allowed * {
 
   body {
     @apply bg-background text-foreground;
-    font-family:
-      'IBM Plex Sans',
-      -apple-system,
-      BlinkMacSystemFont,
-      'Segoe UI',
-      sans-serif;
+    background-image: var(--paper-grain);
+    background-size: 160px 160px;
+    font-family: var(--font-ui);
+    font-feature-settings: 'cv11', 'ss01';
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     user-select: none;
@@ -110,9 +155,17 @@ body.canvas-translate-cursor-not-allowed * {
     -ms-user-select: none;
   }
 
-  /* Force dark mode always */
   html {
-    color-scheme: dark;
+    color-scheme: light;
+  }
+
+  /* Display face for headings, after Cut30's Neue Haas */
+  h1,
+  h2,
+  h3,
+  .font-display {
+    font-family: var(--font-display);
+    letter-spacing: -0.005em;
   }
 
   /* Monospace for technical data */
@@ -135,21 +188,23 @@ body.canvas-translate-cursor-not-allowed * {
   }
 
   ::-webkit-scrollbar-track {
-    background: oklch(0.15 0 0);
+    background: transparent;
   }
 
   ::-webkit-scrollbar-thumb {
-    background: oklch(0.3 0 0);
+    background: rgb(11 31 51 / 0.16);
     border-radius: 6px;
-    border: 2px solid oklch(0.15 0 0);
+    border: 3px solid transparent;
+    background-clip: padding-box;
   }
 
   ::-webkit-scrollbar-thumb:hover {
-    background: oklch(0.35 0 0);
+    background: rgb(11 31 51 / 0.28);
+    background-clip: padding-box;
   }
 
   ::-webkit-scrollbar-corner {
-    background: oklch(0.15 0 0);
+    background: transparent;
   }
 
   /* Timeline keyframe sheets reserve a custom overlay rail matching the main
@@ -200,32 +255,39 @@ body.canvas-translate-cursor-not-allowed * {
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
+
+  /* Paper theme extras */
+  --color-ink: var(--ink);
+  --color-ink-foreground: var(--ink-foreground);
+  --shadow-panel: var(--shadow-panel);
+  --shadow-float: var(--shadow-float);
+  --font-display: var(--font-display);
 }
 
 /* Professional video editor utility classes */
 @layer utilities {
   .panel-bg {
-    background-color: oklch(var(--panel-bg));
+    background-color: var(--panel-bg);
   }
 
   .panel-header {
-    background-color: oklch(var(--panel-header));
+    background-color: var(--panel-header);
   }
 
   .timeline-bg {
-    background-color: oklch(var(--timeline-bg));
+    background-color: var(--timeline-bg);
   }
 
   /* Subtle glow for active elements */
   .glow-primary {
-    box-shadow: 0 0 12px oklch(var(--primary) / 0.3);
+    box-shadow: 0 0 12px color-mix(in oklab, var(--primary) 30%, transparent);
   }
 
   .glow-primary-sm {
-    box-shadow: 0 0 6px oklch(var(--primary) / 0.25);
+    box-shadow: 0 0 6px color-mix(in oklab, var(--primary) 25%, transparent);
   }
 
-  /* Text shadows for better readability on dark */
+  /* Text shadow for labels drawn over footage */
   .text-shadow {
     text-shadow: 0 1px 2px oklch(0 0 0 / 0.8);
   }
@@ -296,8 +358,8 @@ body.canvas-translate-cursor-not-allowed * {
 }
 
 [data-media-id].media-marquee-preview > * {
-  border-color: oklch(var(--primary));
-  box-shadow: 0 0 0 1px oklch(var(--primary) / 0.2);
+  border-color: var(--primary);
+  box-shadow: 0 0 0 1px color-mix(in oklab, var(--primary) 20%, transparent);
 }
 
 [data-composition-id].composition-marquee-preview {

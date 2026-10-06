@@ -281,7 +281,7 @@ export function CompositionsSection() {
               open && 'rotate-90',
             )}
           />
-          <Layers className="w-3 h-3 text-violet-400" />
+          <Layers className="w-3 h-3 text-violet-600" />
           <span className="text-xs font-semibold tracking-wide uppercase text-muted-foreground">
             {t('media.compositions.sectionTitle')}
           </span>
@@ -359,10 +359,10 @@ export function CompositionsSection() {
                 </p>
                 {deleteImpact.totalReferenceCount > 0 && (
                   <div className="flex items-start gap-2 p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-md">
-                    <Trash2 className="w-4 h-4 text-yellow-500 flex-shrink-0 mt-0.5" />
-                    <div className="text-sm text-yellow-600 dark:text-yellow-400">
+                    <Trash2 className="w-4 h-4 text-yellow-600 flex-shrink-0 mt-0.5" />
+                    <div className="text-sm text-yellow-700">
                       <p className="font-medium">{t('media.compositions.deleteInstancesTitle')}</p>
-                      <p className="text-xs mt-1 text-yellow-600/80 dark:text-yellow-400/80">
+                      <p className="text-xs mt-1 text-yellow-700/80">
                         {t(
                           isSequenceTarget
                             ? 'media.compositions.deleteSequenceInstancesDetail'
@@ -651,7 +651,7 @@ const CompositionCardInternal = memo(function CompositionCardInternal({
           >
             <div
               ref={thumbnailContainerRef}
-              className="flex-1 bg-secondary relative overflow-hidden min-h-0 flex items-center justify-center bg-gradient-to-br from-violet-600/20 to-violet-900/30"
+              className="flex-1 bg-secondary relative overflow-hidden min-h-0 flex items-center justify-center bg-gradient-to-br from-violet-500/10 to-violet-600/20"
               onPointerEnter={handleThumbnailPointerEnter}
               onPointerMove={handleThumbnailPointerMove}
               onPointerLeave={handleThumbnailPointerLeave}
@@ -663,7 +663,7 @@ const CompositionCardInternal = memo(function CompositionCardInternal({
                   className="w-full h-full object-contain transition-transform duration-500 group-hover:scale-105"
                 />
               ) : (
-                <Layers className="w-8 h-8 text-violet-400/70" />
+                <Layers className="w-8 h-8 text-violet-600/70" />
               )}
 
               <div className="absolute inset-x-0 bottom-0 px-1.5 py-1 bg-gradient-to-t from-black/60 to-transparent flex items-center justify-between gap-1 pointer-events-none">
@@ -695,7 +695,7 @@ const CompositionCardInternal = memo(function CompositionCardInternal({
                       className="w-full bg-transparent border border-primary rounded px-1 py-0.5 text-[10px] text-foreground outline-none"
                     />
                   ) : (
-                    <h3 className="text-[10px] font-medium text-foreground truncate group-hover:text-violet-400 transition-colors">
+                    <h3 className="text-[10px] font-medium text-foreground truncate group-hover:text-violet-700 transition-colors">
                       {composition.name}
                     </h3>
                   )}
@@ -751,7 +751,7 @@ const CompositionCardInternal = memo(function CompositionCardInternal({
         >
           <div
             ref={thumbnailContainerRef}
-            className="w-16 h-12 bg-secondary rounded overflow-hidden flex-shrink-0 flex items-center justify-center bg-gradient-to-br from-violet-600/20 to-violet-900/30 relative"
+            className="w-16 h-12 bg-secondary rounded overflow-hidden flex-shrink-0 flex items-center justify-center bg-gradient-to-br from-violet-500/10 to-violet-600/20 relative"
             onPointerEnter={handleThumbnailPointerEnter}
             onPointerMove={handleThumbnailPointerMove}
             onPointerLeave={handleThumbnailPointerLeave}
@@ -763,7 +763,7 @@ const CompositionCardInternal = memo(function CompositionCardInternal({
                 className="w-full h-full object-contain"
               />
             ) : (
-              <Layers className="w-5 h-5 text-violet-400" />
+              <Layers className="w-5 h-5 text-violet-600" />
             )}
             {skimProgress !== null && (
               <div

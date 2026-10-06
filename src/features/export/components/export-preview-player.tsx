@@ -150,9 +150,7 @@ export function ExportPreviewPlayer({ src, isVideo }: ExportPreviewPlayerProps) 
       {/* Controls bar */}
       <div
         className={`flex items-center gap-2 px-3 py-2 ${
-          isFullscreen
-            ? 'bg-black/80 border-t border-white/10'
-            : 'bg-secondary/50 border-t border-border'
+          isFullscreen ? 'bg-card border-t border-border' : 'bg-secondary/50 border-t border-border'
         }`}
       >
         {/* Play/Pause */}

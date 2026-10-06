@@ -44,7 +44,7 @@ const SAVE_ANIMATION_MIN_MS = 1800
 const SaveDirtyIndicator = memo(function SaveDirtyIndicator() {
   const isDirty = useTimelineStore((state) => state.isDirty)
   return isDirty ? (
-    <span className="absolute -right-1 -top-1 h-2 w-2 animate-pulse rounded-full bg-orange-500" />
+    <span className="absolute -right-1 -top-1 h-2 w-2 animate-pulse rounded-full bg-orange-600" />
   ) : null
 })
 
@@ -161,7 +161,7 @@ export const Toolbar = memo(function Toolbar({
 
   return (
     <div
-      className="panel-header flex flex-shrink-0 items-center gap-2.5 border-b border-border px-3"
+      className="bg-panel-header flex flex-shrink-0 items-center gap-2.5 border-b border-border px-3"
       style={{ height: EDITOR_LAYOUT_CSS_VALUES.toolbarHeight }}
       role="toolbar"
       aria-label={t('toolbar.ariaLabel')}
@@ -396,7 +396,7 @@ function DebugPopover({ projectId }: { projectId: string }) {
           size="icon"
           className={cn(
             'h-7 w-7',
-            debugPanelOpen && 'bg-amber-500/20 border-amber-500/50 text-amber-400',
+            debugPanelOpen && 'bg-amber-500/15 border-amber-500/50 text-amber-700',
           )}
           data-tooltip={debugPanelOpen ? undefined : t('toolbar.debugPanel')}
           data-tooltip-side="bottom"
@@ -408,7 +408,7 @@ function DebugPopover({ projectId }: { projectId: string }) {
       <PopoverContent
         align="end"
         sideOffset={8}
-        className="w-64 p-0 bg-zinc-900 border-zinc-700 text-zinc-100"
+        className="w-64 p-0 bg-popover border-border text-popover-foreground"
       >
         <ProjectDebugPanel projectId={projectId} />
       </PopoverContent>

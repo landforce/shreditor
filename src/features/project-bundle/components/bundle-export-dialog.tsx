@@ -180,7 +180,7 @@ export function BundleExportDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             {isExporting && <Loader2 className="h-5 w-5 animate-spin text-primary" />}
-            {isCompleted && <CheckCircle2 className="h-5 w-5 text-green-500" />}
+            {isCompleted && <CheckCircle2 className="h-5 w-5 text-green-600" />}
             {isFailed && <AlertCircle className="h-5 w-5 text-destructive" />}
             {status === 'idle' && <FolderArchive className="h-5 w-5" />}
             {status === 'saving' && t('projects.bundleExport.savingProject')}
@@ -248,9 +248,9 @@ export function BundleExportDialog({
           {/* Success state */}
           {isCompleted && result && (
             <div className="space-y-4">
-              <Alert className="border-green-200 bg-green-50 dark:border-green-900 dark:bg-green-950">
+              <Alert className="border-green-200 bg-green-50">
                 <CheckCircle2 className="h-4 w-4 text-green-600" />
-                <AlertDescription className="text-green-700 dark:text-green-400">
+                <AlertDescription className="text-green-700">
                   {usedStreaming
                     ? t('projects.bundleExport.savedSuccess')
                     : t('projects.bundleExport.createdSuccess')}

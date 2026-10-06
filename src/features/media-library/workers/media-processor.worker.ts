@@ -669,15 +669,15 @@ async function generateAudioThumbnail(file: File, maxSize: number, quality: numb
     throw new Error('Failed to get canvas context')
   }
 
-  // Gradient background
+  // Navy-ink tile: treated like footage, since card scrims and badges sit on it
   const gradient = ctx.createLinearGradient(0, 0, width, height)
-  gradient.addColorStop(0, '#1a1a1a')
-  gradient.addColorStop(1, '#0a0a0a')
+  gradient.addColorStop(0, '#163452')
+  gradient.addColorStop(1, '#0b1f33')
   ctx.fillStyle = gradient
   ctx.fillRect(0, 0, width, height)
 
   // Waveform visualization
-  ctx.strokeStyle = '#00ff88'
+  ctx.strokeStyle = '#7cc596'
   ctx.lineWidth = 2
   ctx.beginPath()
   const amplitude = height * 0.3

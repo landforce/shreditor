@@ -46,22 +46,22 @@ const DOCK_WHEEL_GRID_GAP_PX = 28
 // header (20) + column gaps (2x8) + value chips with accents (24) + thumb wheel (16)
 const DOCK_WHEEL_EXTRAS_PX = 76
 const PUCK_RADIUS_PX = 4
-// Outer master ring (dock): a fill gauge like Resolve's. A bright metallic
-// ring sits under a pure-black cover that is revealed clockwise from 12
-// o'clock proportionally to the master value — fully black at the range
-// minimum, the full ring at the maximum.
+// Outer master ring (dock): a fill gauge like Resolve's. An ink ring sits
+// under a pale track cover that is revealed clockwise from 12 o'clock
+// proportionally to the master value — bare track at the range minimum, the
+// full ring at the maximum.
 const DOCK_RING_THICKNESS = 5
 const DOCK_RING_GAP = 3
 const DOCK_RING_INSET = DOCK_RING_THICKNESS + DOCK_RING_GAP
-const DOCK_RING_COVER_COLOR = '#060607'
-const DOCK_RING_METAL_GRADIENT = 'linear-gradient(180deg, #8b8b92 0%, #e4e4e9 55%, #f8f8fa 100%)'
+const DOCK_RING_COVER_COLOR = '#dfe5ef'
+const DOCK_RING_METAL_GRADIENT = 'linear-gradient(180deg, #0b1f33 0%, #2a3d55 55%, #5b6b7f 100%)'
 
 // Hue 0 sits on the +x axis to match getHueAmountFromClient's atan2 mapping.
 const WHEEL_HUE_CONIC =
   'conic-gradient(from 90deg, #ff3b30, #ff9500, #ffcc00, #34c759, #00c7be, #007aff, #5856d6, #ff2d55, #ff3b30)'
-// Resolve-style disc: heavily dimmed hue field inside, saturated rim band.
-const DOCK_DISC_BACKGROUND = `radial-gradient(circle closest-side, rgba(19,19,22,0.94) 0%, rgba(19,19,22,0.9) 62%, rgba(19,19,22,0.72) 80%, rgba(19,19,22,0.25) 88%, transparent 94%), ${WHEEL_HUE_CONIC}`
-const SIDEBAR_DISC_BACKGROUND = `radial-gradient(circle at center, hsl(0 0% 18%) 0%, hsl(0 0% 10%) 26%, transparent 28%), ${WHEEL_HUE_CONIC}`
+// Resolve-style disc: heavily washed-out hue field inside, saturated rim band.
+const DOCK_DISC_BACKGROUND = `radial-gradient(circle closest-side, rgba(251,252,255,0.94) 0%, rgba(251,252,255,0.9) 62%, rgba(251,252,255,0.72) 80%, rgba(251,252,255,0.25) 88%, transparent 94%), ${WHEEL_HUE_CONIC}`
+const SIDEBAR_DISC_BACKGROUND = `radial-gradient(circle at center, #fbfcff 0%, #eef1f8 26%, transparent 28%), ${WHEEL_HUE_CONIC}`
 
 function getHueAmountFromClient(clientX: number, clientY: number, element: HTMLButtonElement) {
   const rect = element.getBoundingClientRect()
@@ -166,8 +166,8 @@ function DockWheelCrosshair({ dock }: { dock: boolean }) {
   if (!dock) return null
   return (
     <>
-      <span className="absolute left-1/2 top-[3%] h-[94%] w-px -translate-x-1/2 bg-white/15" />
-      <span className="absolute left-[3%] top-1/2 h-px w-[94%] -translate-y-1/2 bg-white/15" />
+      <span className="absolute left-1/2 top-[3%] h-[94%] w-px -translate-x-1/2 bg-foreground/15" />
+      <span className="absolute left-[3%] top-1/2 h-px w-[94%] -translate-y-1/2 bg-foreground/15" />
     </>
   )
 }
@@ -350,7 +350,7 @@ const WheelControl = memo(function WheelControl({
         width: `${discSize}px`,
         height: `${discSize}px`,
         touchAction: 'none',
-        boxShadow: dock ? 'inset 0 0 0 1px rgba(255,255,255,0.07)' : undefined,
+        boxShadow: dock ? 'inset 0 0 0 1px rgba(11,31,51,0.08)' : undefined,
         backgroundImage: dock ? DOCK_DISC_BACKGROUND : SIDEBAR_DISC_BACKGROUND,
       }}
       onPointerDown={handlePointerDown}
@@ -361,7 +361,7 @@ const WheelControl = memo(function WheelControl({
     >
       <DockWheelCrosshair dock={dock} />
       <div
-        className="absolute rounded-full border border-black/60 shadow-sm"
+        className="absolute rounded-full border border-foreground/70 shadow-sm"
         style={{
           width: `${PUCK_RADIUS_PX * 2}px`,
           height: `${PUCK_RADIUS_PX * 2}px`,
@@ -374,8 +374,8 @@ const WheelControl = memo(function WheelControl({
     </button>
   )
 
-  // Donut mask leaves only the outer ring band visible. The black cover
-  // (top conic layer) shrinks as the fill grows, revealing the metallic
+  // Donut mask leaves only the outer ring band visible. The track cover
+  // (top conic layer) shrinks as the fill grows, revealing the ink
   // ring clockwise from 12 o'clock.
   const ringMask = `radial-gradient(closest-side, transparent calc(100% - ${DOCK_RING_THICKNESS}px), #000 calc(100% - ${DOCK_RING_THICKNESS - 1}px))`
   const revealDeg = clamp(masterRingFill, 0, 1) * 360
@@ -557,7 +557,7 @@ function formatParamValue(value: number, step: unknown): string {
 
 function getDockParamAccent(key: string): string {
   if (key === 'temperature' || key === 'contrast' || key === 'pivot' || key === 'lumMix') {
-    return 'from-zinc-200 via-zinc-500 to-zinc-900'
+    return 'from-zinc-300 via-zinc-500 to-zinc-900'
   }
   if (key === 'tint' || key === 'hue') return 'from-cyan-400 via-fuchsia-500 to-amber-300'
   if (key === 'saturation' || key === 'colorBoost') {
@@ -572,7 +572,7 @@ const WHEEL_CHANNEL_LABELS = ['Red', 'Green', 'Blue'] as const
 const WHEEL_CHANNEL_ACCENTS = ['bg-red-500', 'bg-green-500', 'bg-blue-500'] as const
 
 const THUMB_WHEEL_CLASS =
-  'mt-1 h-3 w-full cursor-ew-resize appearance-none rounded-full border border-black/80 bg-[repeating-linear-gradient(90deg,rgba(255,255,255,0.22)_0_1px,rgba(0,0,0,0.65)_1px_5px)] shadow-inner disabled:cursor-not-allowed disabled:opacity-60 [&::-moz-range-thumb]:h-3 [&::-moz-range-thumb]:w-3 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border [&::-moz-range-thumb]:border-black/80 [&::-moz-range-thumb]:bg-zinc-200 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:border [&::-webkit-slider-thumb]:border-black/80 [&::-webkit-slider-thumb]:bg-zinc-200'
+  'mt-1 h-3 w-full cursor-ew-resize appearance-none rounded-full border border-input bg-secondary bg-[repeating-linear-gradient(90deg,rgba(11,31,51,0.22)_0_1px,transparent_1px_5px)] shadow-inner disabled:cursor-not-allowed disabled:opacity-60 [&::-moz-range-thumb]:h-3 [&::-moz-range-thumb]:w-3 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border [&::-moz-range-thumb]:border-foreground/60 [&::-moz-range-thumb]:bg-card [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:border [&::-webkit-slider-thumb]:border-foreground/60 [&::-webkit-slider-thumb]:bg-card'
 
 /**
  * Range slider that previews live while dragging and commits once on release.
@@ -1007,7 +1007,7 @@ export const GpuWheelsPanel = memo(function GpuWheelsPanel({
             disabled={!effect.enabled}
             onLive={(raw) => updateParamFromDisplay(key, display, raw, 'live')}
             onCommit={(raw) => updateParamFromDisplay(key, display, raw, 'commit')}
-            className="h-6 w-full rounded-[2px] border border-black/80 bg-black/75 px-1 text-center font-mono text-[11px] tabular-nums text-foreground shadow-inner focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            className="h-6 w-full rounded-[2px] border border-input bg-card px-1 text-center font-mono text-[11px] tabular-nums text-foreground shadow-inner focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
           />
           <span
             aria-hidden="true"
@@ -1052,7 +1052,7 @@ export const GpuWheelsPanel = memo(function GpuWheelsPanel({
     const chipMin = displayMin - display.scale
     const chipMax = displayMax + display.scale
     const chipClass =
-      'h-5 w-full rounded-[2px] border border-black/80 bg-black/75 px-1 text-center font-mono text-[10px] leading-5 tabular-nums text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring'
+      'h-5 w-full rounded-[2px] border border-input bg-card px-1 text-center font-mono text-[10px] leading-5 tabular-nums text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring'
 
     const updateLevelFromDisplay = (rawValue: string, mode: 'live' | 'commit') => {
       const next = Number(rawValue)
@@ -1103,7 +1103,10 @@ export const GpuWheelsPanel = memo(function GpuWheelsPanel({
                 onCommit={(raw) => updateLevelFromDisplay(raw, 'commit')}
                 className={chipClass}
               />
-              <span aria-hidden="true" className="mt-0.5 h-0.5 w-7 rounded-full bg-zinc-200" />
+              <span
+                aria-hidden="true"
+                className="mt-0.5 h-0.5 w-7 rounded-full bg-muted-foreground"
+              />
             </span>
           )}
           {WHEEL_CHANNEL_INDICES.map((index) => (

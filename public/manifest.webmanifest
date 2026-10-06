@@ -6,8 +6,8 @@
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
-  "background_color": "#111827",
-  "theme_color": "#111827",
+  "background_color": "#e8edf5",
+  "theme_color": "#0b1f33",
   "orientation": "any",
   "categories": ["video", "productivity", "utilities"],
   "icons": [

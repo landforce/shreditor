@@ -111,7 +111,7 @@ function FilterTypeSelect({
       <DropdownMenuTrigger asChild>
         <button
           type="button"
-          className="inline-flex h-6 w-11 items-center justify-center gap-0.5 rounded-[4px] border border-border bg-background px-1 text-muted-foreground transition-colors hover:text-zinc-200"
+          className="inline-flex h-6 w-11 items-center justify-center gap-0.5 rounded-[4px] border border-border bg-card px-1 text-muted-foreground transition-colors hover:text-foreground"
           title={AUDIO_EQ_FILTER_TYPE_LABELS[value]}
         >
           <FilterTypeGlyph type={value} />
@@ -123,14 +123,14 @@ function FilterTypeSelect({
         side="bottom"
         sideOffset={4}
         container={portalContainer ?? undefined}
-        className="z-[80] w-14 min-w-14 rounded-[4px] border-border bg-background p-1"
+        className="z-[80] w-14 min-w-14 rounded-[4px] border-border bg-popover p-1"
       >
         {options.map((option) => (
           <DropdownMenuItem
             key={option}
             className={cn(
-              'my-0.5 flex h-7 items-center justify-center rounded-[4px] px-2 text-zinc-300 focus:bg-white/10 focus:text-white',
-              option === value && 'bg-white/10 text-white',
+              'my-0.5 flex h-7 items-center justify-center rounded-[4px] px-2 text-muted-foreground focus:bg-accent focus:text-foreground',
+              option === value && 'bg-accent text-foreground',
             )}
             title={AUDIO_EQ_FILTER_TYPE_LABELS[option]}
             onSelect={() => onChange(option)}
@@ -217,7 +217,7 @@ function QFactorControl({
 }) {
   return (
     <>
-      <div className="text-[10px] text-zinc-500">Q Factor</div>
+      <div className="text-[10px] text-muted-foreground">Q Factor</div>
       <div className="flex items-center gap-1.5">
         <NumberInput
           value={value}
@@ -237,7 +237,7 @@ function QFactorControl({
           step={0.05}
         />
       </div>
-      <div className="mt-0.5 flex justify-between text-[9px] text-zinc-600">
+      <div className="mt-0.5 flex justify-between text-[9px] text-muted-foreground/80">
         <span>{AUDIO_EQ_Q_MIN.toFixed(1)}</span>
         <span>{AUDIO_EQ_Q_MAX.toFixed(1)}</span>
       </div>
@@ -317,7 +317,9 @@ function EqOutputGainControl({
         disabled && 'opacity-50',
       )}
     >
-      <div className="text-[10px] uppercase tracking-[0.16em] text-zinc-500 text-center">Gain</div>
+      <div className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground text-center">
+        Gain
+      </div>
       <div
         className={cn(
           'relative mt-1 min-h-0 flex-1 w-full touch-none select-none',
@@ -368,21 +370,21 @@ function EqOutputGainControl({
                 className="pointer-events-none absolute inset-x-0"
                 style={{ top: `${tickPercent}%` }}
               >
-                <div className="absolute left-2 right-7 h-px -translate-y-1/2 bg-[#34363d]" />
-                <span className="absolute right-1 -translate-y-1/2 text-[9px] font-mono text-zinc-500 text-right">
+                <div className="absolute left-2 right-7 h-px -translate-y-1/2 bg-foreground/15" />
+                <span className="absolute right-1 -translate-y-1/2 text-[9px] font-mono text-muted-foreground text-right">
                   {tick > 0 ? `+${tick}` : tick}
                 </span>
               </div>
             )
           })}
-          <div className="absolute bottom-0 left-[16px] top-0 w-px bg-[#2f3138]" />
+          <div className="absolute bottom-0 left-[16px] top-0 w-px bg-foreground/25" />
           <div
-            className="absolute left-[7px] h-7 w-[18px] -translate-y-1/2 rounded-[2px] border border-[#666a73] bg-[#b9bbc2] shadow-[0_1px_2px_rgba(0,0,0,0.35)]"
+            className="absolute left-[7px] h-7 w-[18px] -translate-y-1/2 rounded-[2px] border border-muted-foreground/70 bg-popover shadow-[0_1px_2px_rgba(11,31,51,0.3)]"
             style={{ top: `${thumbPercent}%` }}
           />
         </div>
       </div>
-      <div className="mt-0.5 min-h-[18px] w-full text-center text-sm font-medium tabular-nums text-[#16d9ff]">
+      <div className="mt-0.5 min-h-[18px] w-full text-center text-sm font-medium tabular-nums text-primary">
         {formatOutputGainDb(displayValue)}
       </div>
     </div>
@@ -463,7 +465,7 @@ function BandCard({
                 portalContainer={portalContainer}
               />
             ) : (
-              <div className="flex h-6 items-center rounded-[4px] border border-border bg-background px-1.5 text-muted-foreground">
+              <div className="flex h-6 items-center rounded-[4px] border border-border bg-card px-1.5 text-muted-foreground">
                 <FilterTypeGlyph type={filterType} />
               </div>
             )}
@@ -472,7 +474,7 @@ function BandCard({
         <button
           type="button"
           className={cn(
-            'inline-flex shrink-0 items-center justify-center rounded-[3px] text-zinc-600 transition-colors hover:bg-white/5 hover:text-zinc-300',
+            'inline-flex shrink-0 items-center justify-center rounded-[3px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground',
             compact ? 'h-4 w-4' : 'h-5 w-5',
           )}
           onClick={onReset}
@@ -1440,14 +1442,14 @@ export function AudioEqPanelContent({
 
   if (!isTrackMode && audioItems.length === 0) {
     return (
-      <div className="flex h-full items-center justify-center px-6 text-sm text-zinc-500">
+      <div className="flex h-full items-center justify-center px-6 text-sm text-muted-foreground">
         No audio clips on {targetLabel}.
       </div>
     )
   }
 
   return (
-    <div className="flex flex-col bg-background text-foreground">
+    <div className="flex flex-col bg-card text-foreground">
       {!isCompactLayout ? (
         <div className="flex items-center gap-3 border-b border-border px-3 py-2">
           {onEnabledChange ? (
@@ -1464,7 +1466,9 @@ export function AudioEqPanelContent({
             Equalizer{targetLabel ? ` - ${targetLabel}` : ''}
           </div>
           <div className="ml-auto flex min-w-0 items-center gap-2">
-            <div className="text-[10px] uppercase tracking-[0.16em] text-zinc-500">Preset</div>
+            <div className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
+              Preset
+            </div>
             <Select
               value={selectedEqPresetId ?? undefined}
               onValueChange={handleEqPresetChange}
@@ -1546,7 +1550,7 @@ export function AudioEqPanelContent({
         ) : null}
         <div className={cn('relative', !isCompactLayout && 'border-b border-border')}>
           {!isTrackMode && !isCompactLayout ? (
-            <div className="pointer-events-none absolute right-3 top-1 z-10 text-[10px] uppercase tracking-[0.16em] text-zinc-500">
+            <div className="pointer-events-none absolute right-3 top-1 z-10 text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
               {audioItems.length} {audioItems.length === 1 ? 'clip' : 'clips'}
             </div>
           ) : null}
@@ -1555,9 +1559,9 @@ export function AudioEqPanelContent({
               <AudioEqCurveEditor
                 settings={eqCurveSettings}
                 disabled={eqControlsDisabled}
-                className="text-zinc-300"
+                className="text-foreground"
                 graphClassName={cn(
-                  'bg-background',
+                  'bg-card',
                   isDetachedLayout ? 'h-[clamp(288px,33vh,344px)]' : 'h-[220px]',
                 )}
                 onLiveChange={handleEqPatchLiveChange}
@@ -1662,7 +1666,7 @@ export function AudioEqPanelContent({
                     })
                   }
                 >
-                  <div className="text-[10px] text-zinc-500">Frequency</div>
+                  <div className="text-[10px] text-muted-foreground">Frequency</div>
                   <div className="flex items-center gap-1.5">
                     <NumberInput
                       value={eqBand1FrequencyHz}
@@ -1683,7 +1687,7 @@ export function AudioEqPanelContent({
                       step={1}
                     />
                   </div>
-                  <div className="mt-0.5 flex justify-between text-[9px] text-zinc-600">
+                  <div className="mt-0.5 flex justify-between text-[9px] text-muted-foreground/80">
                     <span>{AUDIO_EQ_LOW_CUT_MIN_FREQUENCY_HZ}</span>
                     <span>{AUDIO_EQ_LOW_CUT_MAX_FREQUENCY_HZ}</span>
                   </div>
@@ -1694,7 +1698,7 @@ export function AudioEqPanelContent({
                     />
                   ) : (
                     <>
-                      <div className="text-[10px] text-zinc-500">Gain</div>
+                      <div className="text-[10px] text-muted-foreground">Gain</div>
                       <div className="flex items-center gap-1.5">
                         <NumberInput
                           value={eqBand1GainDb}
@@ -1715,7 +1719,7 @@ export function AudioEqPanelContent({
                           step={0.1}
                         />
                       </div>
-                      <div className="mt-0.5 flex justify-between text-[9px] text-zinc-600">
+                      <div className="mt-0.5 flex justify-between text-[9px] text-muted-foreground/80">
                         <span>{AUDIO_EQ_GAIN_DB_MIN} dB</span>
                         <span>
                           {AUDIO_EQ_GAIN_DB_MAX > 0
@@ -1725,7 +1729,7 @@ export function AudioEqPanelContent({
                       </div>
                       {(eqBand1Type === 'mixed' ? 'high-pass' : eqBand1Type) === 'peaking' ? (
                         <>
-                          <div className="text-[10px] text-zinc-500">Q Factor</div>
+                          <div className="text-[10px] text-muted-foreground">Q Factor</div>
                           <div className="flex items-center gap-1.5">
                             <NumberInput
                               value={eqBand1Q}
@@ -1745,7 +1749,7 @@ export function AudioEqPanelContent({
                               step={0.05}
                             />
                           </div>
-                          <div className="mt-0.5 flex justify-between text-[9px] text-zinc-600">
+                          <div className="mt-0.5 flex justify-between text-[9px] text-muted-foreground/80">
                             <span>{AUDIO_EQ_Q_MIN.toFixed(1)}</span>
                             <span>{AUDIO_EQ_Q_MAX.toFixed(1)}</span>
                           </div>
@@ -1784,7 +1788,7 @@ export function AudioEqPanelContent({
                     })
                   }
                 >
-                  <div className="text-[10px] text-zinc-500">Frequency</div>
+                  <div className="text-[10px] text-muted-foreground">Frequency</div>
                   <div className="flex items-center gap-1.5">
                     <NumberInput
                       value={eqLowFrequencyHz}
@@ -1805,7 +1809,7 @@ export function AudioEqPanelContent({
                       step={1}
                     />
                   </div>
-                  <div className="mt-0.5 flex justify-between text-[9px] text-zinc-600">
+                  <div className="mt-0.5 flex justify-between text-[9px] text-muted-foreground/80">
                     <span>{formatFrequencyRangeLabel(lowRange.minFrequencyHz)}</span>
                     <span>{formatFrequencyRangeLabel(lowRange.maxFrequencyHz)}</span>
                   </div>
@@ -1822,7 +1826,7 @@ export function AudioEqPanelContent({
                           )
                         }
                       />
-                      <div className="text-[10px] text-zinc-500">Gain</div>
+                      <div className="text-[10px] text-muted-foreground">Gain</div>
                       <div className="flex items-center gap-1.5">
                         <NumberInput
                           value={eqLow}
@@ -1843,7 +1847,7 @@ export function AudioEqPanelContent({
                           step={0.1}
                         />
                       </div>
-                      <div className="mt-0.5 flex justify-between text-[9px] text-zinc-600">
+                      <div className="mt-0.5 flex justify-between text-[9px] text-muted-foreground/80">
                         <span>{AUDIO_EQ_GAIN_DB_MIN} dB</span>
                         <span>
                           {AUDIO_EQ_GAIN_DB_MAX > 0
@@ -1891,7 +1895,7 @@ export function AudioEqPanelContent({
                     })
                   }
                 >
-                  <div className="text-[10px] text-zinc-500">Frequency</div>
+                  <div className="text-[10px] text-muted-foreground">Frequency</div>
                   <div className="flex items-center gap-1.5">
                     <NumberInput
                       value={eqLowMidFrequencyHz}
@@ -1912,7 +1916,7 @@ export function AudioEqPanelContent({
                       step={1}
                     />
                   </div>
-                  <div className="mt-0.5 flex justify-between text-[9px] text-zinc-600">
+                  <div className="mt-0.5 flex justify-between text-[9px] text-muted-foreground/80">
                     <span>{formatFrequencyRangeLabel(lowMidRange.minFrequencyHz)}</span>
                     <span>{formatFrequencyRangeLabel(lowMidRange.maxFrequencyHz)}</span>
                   </div>
@@ -1929,7 +1933,7 @@ export function AudioEqPanelContent({
                           )
                         }
                       />
-                      <div className="text-[10px] text-zinc-500">Gain</div>
+                      <div className="text-[10px] text-muted-foreground">Gain</div>
                       <div className="flex items-center gap-1.5">
                         <NumberInput
                           value={eqLowMid}
@@ -1950,7 +1954,7 @@ export function AudioEqPanelContent({
                           step={0.1}
                         />
                       </div>
-                      <div className="mt-0.5 flex justify-between text-[9px] text-zinc-600">
+                      <div className="mt-0.5 flex justify-between text-[9px] text-muted-foreground/80">
                         <span>{AUDIO_EQ_GAIN_DB_MIN} dB</span>
                         <span>
                           {AUDIO_EQ_GAIN_DB_MAX > 0
@@ -1998,7 +2002,7 @@ export function AudioEqPanelContent({
                     })
                   }
                 >
-                  <div className="text-[10px] text-zinc-500">Frequency</div>
+                  <div className="text-[10px] text-muted-foreground">Frequency</div>
                   <div className="flex items-center gap-1.5">
                     <NumberInput
                       value={eqHighMidFrequencyHz}
@@ -2023,7 +2027,7 @@ export function AudioEqPanelContent({
                       step={1}
                     />
                   </div>
-                  <div className="mt-0.5 flex justify-between text-[9px] text-zinc-600">
+                  <div className="mt-0.5 flex justify-between text-[9px] text-muted-foreground/80">
                     <span>{formatFrequencyRangeLabel(highMidRange.minFrequencyHz)}</span>
                     <span>{formatFrequencyRangeLabel(highMidRange.maxFrequencyHz)}</span>
                   </div>
@@ -2040,7 +2044,7 @@ export function AudioEqPanelContent({
                           )
                         }
                       />
-                      <div className="text-[10px] text-zinc-500">Gain</div>
+                      <div className="text-[10px] text-muted-foreground">Gain</div>
                       <div className="flex items-center gap-1.5">
                         <NumberInput
                           value={eqHighMid}
@@ -2061,7 +2065,7 @@ export function AudioEqPanelContent({
                           step={0.1}
                         />
                       </div>
-                      <div className="mt-0.5 flex justify-between text-[9px] text-zinc-600">
+                      <div className="mt-0.5 flex justify-between text-[9px] text-muted-foreground/80">
                         <span>{AUDIO_EQ_GAIN_DB_MIN} dB</span>
                         <span>
                           {AUDIO_EQ_GAIN_DB_MAX > 0
@@ -2109,7 +2113,7 @@ export function AudioEqPanelContent({
                     })
                   }
                 >
-                  <div className="text-[10px] text-zinc-500">Frequency</div>
+                  <div className="text-[10px] text-muted-foreground">Frequency</div>
                   <div className="flex items-center gap-1.5">
                     <NumberInput
                       value={eqHighFrequencyHz}
@@ -2130,7 +2134,7 @@ export function AudioEqPanelContent({
                       step={1}
                     />
                   </div>
-                  <div className="mt-0.5 flex justify-between text-[9px] text-zinc-600">
+                  <div className="mt-0.5 flex justify-between text-[9px] text-muted-foreground/80">
                     <span>{formatFrequencyRangeLabel(highRange.minFrequencyHz)}</span>
                     <span>{formatFrequencyRangeLabel(highRange.maxFrequencyHz)}</span>
                   </div>
@@ -2147,7 +2151,7 @@ export function AudioEqPanelContent({
                           )
                         }
                       />
-                      <div className="text-[10px] text-zinc-500">Gain</div>
+                      <div className="text-[10px] text-muted-foreground">Gain</div>
                       <div className="flex items-center gap-1.5">
                         <NumberInput
                           value={eqHigh}
@@ -2168,7 +2172,7 @@ export function AudioEqPanelContent({
                           step={0.1}
                         />
                       </div>
-                      <div className="mt-0.5 flex justify-between text-[9px] text-zinc-600">
+                      <div className="mt-0.5 flex justify-between text-[9px] text-muted-foreground/80">
                         <span>{AUDIO_EQ_GAIN_DB_MIN} dB</span>
                         <span>
                           {AUDIO_EQ_GAIN_DB_MAX > 0
@@ -2217,7 +2221,7 @@ export function AudioEqPanelContent({
                     })
                   }
                 >
-                  <div className="text-[10px] text-zinc-500">Frequency</div>
+                  <div className="text-[10px] text-muted-foreground">Frequency</div>
                   <div className="flex items-center gap-1.5">
                     <NumberInput
                       value={eqBand6FrequencyHz}
@@ -2238,7 +2242,7 @@ export function AudioEqPanelContent({
                       step={1}
                     />
                   </div>
-                  <div className="mt-0.5 flex justify-between text-[9px] text-zinc-600">
+                  <div className="mt-0.5 flex justify-between text-[9px] text-muted-foreground/80">
                     <span>1.4K</span>
                     <span>22.0K</span>
                   </div>
@@ -2249,7 +2253,7 @@ export function AudioEqPanelContent({
                     />
                   ) : (
                     <>
-                      <div className="text-[10px] text-zinc-500">Gain</div>
+                      <div className="text-[10px] text-muted-foreground">Gain</div>
                       <div className="flex items-center gap-1.5">
                         <NumberInput
                           value={eqBand6GainDb}
@@ -2270,7 +2274,7 @@ export function AudioEqPanelContent({
                           step={0.1}
                         />
                       </div>
-                      <div className="mt-0.5 flex justify-between text-[9px] text-zinc-600">
+                      <div className="mt-0.5 flex justify-between text-[9px] text-muted-foreground/80">
                         <span>{AUDIO_EQ_GAIN_DB_MIN} dB</span>
                         <span>
                           {AUDIO_EQ_GAIN_DB_MAX > 0
@@ -2280,7 +2284,7 @@ export function AudioEqPanelContent({
                       </div>
                       {(eqBand6Type === 'mixed' ? 'low-pass' : eqBand6Type) === 'peaking' ? (
                         <>
-                          <div className="text-[10px] text-zinc-500">Q Factor</div>
+                          <div className="text-[10px] text-muted-foreground">Q Factor</div>
                           <div className="flex items-center gap-1.5">
                             <NumberInput
                               value={eqBand6Q}
@@ -2300,7 +2304,7 @@ export function AudioEqPanelContent({
                               step={0.05}
                             />
                           </div>
-                          <div className="mt-0.5 flex justify-between text-[9px] text-zinc-600">
+                          <div className="mt-0.5 flex justify-between text-[9px] text-muted-foreground/80">
                             <span>{AUDIO_EQ_Q_MIN.toFixed(1)}</span>
                             <span>{AUDIO_EQ_Q_MAX.toFixed(1)}</span>
                           </div>

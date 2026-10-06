@@ -18,7 +18,7 @@ export const TransitionDragTooltip = memo(function TransitionDragTooltip() {
         zIndex: 10000,
       }}
     >
-      <div className="max-w-[220px] rounded-md border border-slate-200/70 bg-slate-900/92 px-2.5 py-1.5 text-[11px] font-medium text-slate-50 shadow-xl backdrop-blur-sm">
+      <div className="max-w-[220px] rounded-md bg-ink px-2.5 py-1.5 text-[11px] font-medium text-ink-foreground shadow-float">
         {invalidHint.message}
       </div>
     </div>,

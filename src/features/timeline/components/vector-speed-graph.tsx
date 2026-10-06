@@ -106,7 +106,7 @@ export function VectorSpeedGraph({
   if (keyframes.length < 2 || !current) {
     return (
       <div
-        className="flex h-full min-h-0 items-center justify-center bg-[radial-gradient(circle_at_center,rgba(56,189,248,0.05),transparent_48%)]"
+        className="flex h-full min-h-0 items-center justify-center bg-[radial-gradient(circle_at_center,rgba(37,81,163,0.05),transparent_48%)]"
         data-testid="vector-speed-graph"
       >
         <div className="max-w-sm text-center">
@@ -174,9 +174,9 @@ export function VectorSpeedGraph({
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-background/20" data-testid="vector-speed-graph">
-      <div className="flex min-h-9 flex-wrap items-center gap-1 border-b border-border/60 bg-background/75 px-2 py-1">
+      <div className="flex min-h-9 flex-wrap items-center gap-1 border-b border-border/60 bg-panel-header px-2 py-1">
         <div className="mr-2 flex min-w-24 items-center gap-1.5 text-[10px] font-medium text-foreground">
-          <Gauge className="h-3 w-3 text-sky-400" />
+          <Gauge className="h-3 w-3 text-primary" />
           {label}
           <span className="text-muted-foreground">· {current.frame}f</span>
         </div>
@@ -219,7 +219,7 @@ export function VectorSpeedGraph({
           <RotateCcw className="h-3 w-3" />
         </button>
       </div>
-      <div className="relative min-h-0 flex-1 overflow-hidden bg-slate-950/45">
+      <div className="relative min-h-0 flex-1 overflow-hidden bg-timeline-bg">
         <svg
           aria-label={`${label} speed graph`}
           className="h-full w-full"
@@ -235,7 +235,7 @@ export function VectorSpeedGraph({
                 x2={GRAPH_WIDTH - GRAPH_PADDING_X}
                 y1={y}
                 y2={y}
-                stroke="rgba(148, 163, 184, 0.12)"
+                stroke="rgba(11, 31, 51, 0.1)"
                 vectorEffect="non-scaling-stroke"
               />
             )
@@ -247,18 +247,18 @@ export function VectorSpeedGraph({
               x2={xForFrame(keyframe.frame)}
               y1={GRAPH_PADDING_Y}
               y2={GRAPH_HEIGHT - GRAPH_PADDING_Y}
-              stroke="rgba(148, 163, 184, 0.12)"
+              stroke="rgba(11, 31, 51, 0.1)"
               vectorEffect="non-scaling-stroke"
             />
           ))}
           <path
             d={`${speedPath} L ${xForFrame(lastFrame)} ${GRAPH_HEIGHT - GRAPH_PADDING_Y} L ${xForFrame(firstFrame)} ${GRAPH_HEIGHT - GRAPH_PADDING_Y} Z`}
-            fill="rgba(56, 189, 248, 0.08)"
+            fill="rgba(37, 81, 163, 0.08)"
           />
           <path
             d={speedPath}
             fill="none"
-            stroke="rgb(56 189 248)"
+            stroke="#2551a3"
             strokeWidth={2}
             vectorEffect="non-scaling-stroke"
           />
@@ -267,7 +267,7 @@ export function VectorSpeedGraph({
             x2={currentX}
             y1={GRAPH_PADDING_Y}
             y2={GRAPH_HEIGHT - GRAPH_PADDING_Y}
-            stroke="rgba(250, 204, 21, 0.75)"
+            stroke="rgba(217, 119, 6, 0.8)"
             strokeDasharray="3 3"
             vectorEffect="non-scaling-stroke"
           />
@@ -278,15 +278,10 @@ export function VectorSpeedGraph({
                 x2={currentX}
                 y1={yForSpeed(incoming.speed)}
                 y2={yForSpeed(incoming.speed)}
-                stroke="rgb(250 204 21)"
+                stroke="#d97706"
                 vectorEffect="non-scaling-stroke"
               />
-              <circle
-                cx={incomingHandleX}
-                cy={yForSpeed(incoming.speed)}
-                r={4}
-                fill="rgb(250 204 21)"
-              />
+              <circle cx={incomingHandleX} cy={yForSpeed(incoming.speed)} r={4} fill="#d97706" />
             </>
           )}
           {next && (
@@ -296,15 +291,10 @@ export function VectorSpeedGraph({
                 x2={outgoingHandleX}
                 y1={yForSpeed(outgoing.speed)}
                 y2={yForSpeed(outgoing.speed)}
-                stroke="rgb(250 204 21)"
+                stroke="#d97706"
                 vectorEffect="non-scaling-stroke"
               />
-              <circle
-                cx={outgoingHandleX}
-                cy={yForSpeed(outgoing.speed)}
-                r={4}
-                fill="rgb(250 204 21)"
-              />
+              <circle cx={outgoingHandleX} cy={yForSpeed(outgoing.speed)} r={4} fill="#d97706" />
             </>
           )}
           {keyframes.map((keyframe) => {
@@ -320,8 +310,8 @@ export function VectorSpeedGraph({
                 cx={xForFrame(keyframe.frame)}
                 cy={yForSpeed(nearest.speed)}
                 r={selected ? 5 : 4}
-                fill={selected ? 'rgb(250 204 21)' : 'rgb(226 232 240)'}
-                stroke="rgb(15 23 42)"
+                fill={selected ? '#d97706' : '#ffffff'}
+                stroke="#0b1f33"
                 strokeWidth={2}
                 className="cursor-pointer"
                 onClick={() => onSelectKeyframe?.(keyframe)}

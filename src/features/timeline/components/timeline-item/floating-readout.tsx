@@ -43,7 +43,7 @@ export function FloatingReadout({
 
   return createPortal(
     <div
-      className="pointer-events-none fixed z-[10000] -translate-x-1/2 -translate-y-full rounded bg-slate-950/95 px-1.5 py-0.5 text-[10px] font-medium text-white shadow-lg whitespace-nowrap"
+      className="pointer-events-none fixed z-[10000] -translate-x-1/2 -translate-y-full rounded bg-ink px-1.5 py-0.5 text-[10px] font-medium text-ink-foreground shadow-float whitespace-nowrap"
       style={{ left: position.x, top: position.y }}
     >
       {children}

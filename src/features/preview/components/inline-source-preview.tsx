@@ -121,11 +121,11 @@ const InlineSourcePreviewContent = memo(function InlineSourcePreviewContent({
       >
         <div className="relative">
           <div
-            className="relative shadow-2xl overflow-hidden"
+            className="relative shadow-float overflow-hidden"
             style={{
               width: `${playerSize.width}px`,
               height: `${playerSize.height}px`,
-              outline: '2px solid hsl(var(--border))',
+              outline: '2px solid var(--border)',
               outlineOffset: 0,
             }}
           >

@@ -579,7 +579,7 @@ export const Timeline = memo(function Timeline({ duration }: TimelineProps) {
           el.style.zIndex = '100'
           el.style.opacity = '0.5'
           el.style.transition = 'none'
-          el.style.boxShadow = '0 4px 6px -1px rgba(0,0,0,0.1)'
+          el.style.boxShadow = '0 4px 6px -1px rgba(11,31,51,0.1)'
         }
       }
       // Clip rows ghost-follow the header. No horizontal scale here — it would shift the

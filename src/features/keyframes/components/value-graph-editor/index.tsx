@@ -51,7 +51,7 @@ import {
 } from '@/features/keyframes/utils/procedural-preview'
 import type { TransformAnimatableProperty } from '@/types/keyframe'
 
-const OVERLAY_COLORS = ['#6366f1', '#22d3ee', '#a3e635', '#f472b6', '#fb923c', '#a78bfa', '#34d399']
+const OVERLAY_COLORS = ['#4f46e5', '#0891b2', '#65a30d', '#db2777', '#ea580c', '#7c3aed', '#059669']
 
 interface ValueGraphEditorSharedProps {
   /** Shared time viewport when split mode needs synchronized frame zoom/pan */
@@ -430,8 +430,7 @@ const ValueGraphEditorBase = memo(function ValueGraphEditorBase({
   }> => {
     if (
       !proceduralPreview ||
-      (proceduralPreview.modifiers.length === 0 &&
-        (proceduralPreview.layers?.length ?? 0) === 0)
+      (proceduralPreview.modifiers.length === 0 && (proceduralPreview.layers?.length ?? 0) === 0)
     )
       return []
     const { graphLeft, graphTop, graphWidth, graphHeight, frameRange } = getGraphDimensions(
@@ -1301,7 +1300,7 @@ const ValueGraphEditorBase = memo(function ValueGraphEditorBase({
               key={`procedural-${prop}`}
               d={d}
               fill="none"
-              stroke="#38bdf8"
+              stroke="#0284c7"
               strokeWidth={primary ? 1.5 : 1}
               strokeDasharray="4 3"
               strokeOpacity={primary ? 0.85 : 0.4}
@@ -1389,7 +1388,7 @@ const ValueGraphEditorBase = memo(function ValueGraphEditorBase({
                   y1={draggingPoint.y}
                   x2={graphRight}
                   y2={draggingPoint.y}
-                  stroke="#f97316"
+                  stroke="#ea580c"
                   strokeWidth={1.5}
                   strokeDasharray="6 3"
                   opacity={0.8}
@@ -1402,7 +1401,7 @@ const ValueGraphEditorBase = memo(function ValueGraphEditorBase({
                   y1={graphTop}
                   x2={draggingPoint.x}
                   y2={graphBottom}
-                  stroke="#f97316"
+                  stroke="#ea580c"
                   strokeWidth={1.5}
                   strokeDasharray="6 3"
                   opacity={0.8}

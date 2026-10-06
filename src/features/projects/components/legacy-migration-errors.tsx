@@ -126,7 +126,7 @@ export function LegacyMigrationErrors({ onRetried }: Props) {
   return (
     <div className="panel-bg border border-yellow-500/40 rounded-lg p-4 text-sm">
       <div className="flex items-start gap-3">
-        <AlertTriangle className="h-4 w-4 mt-0.5 text-yellow-500 shrink-0" />
+        <AlertTriangle className="h-4 w-4 mt-0.5 text-yellow-600 shrink-0" />
         <div className="flex-1 min-w-0">
           <div className="font-medium">
             {t('projects.legacyMigrationErrors.failedCount', { count: total })}

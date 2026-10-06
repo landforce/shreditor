@@ -314,7 +314,7 @@ export function SegmentEasingPopover({
           data-dopesheet-min-width={2}
           className={cn(
             'absolute z-[6] h-2 -translate-y-1/2 rounded-full',
-            'bg-transparent hover:bg-blue-400/25 focus-visible:bg-blue-400/30',
+            'bg-transparent hover:bg-primary/20 focus-visible:bg-primary/25',
             'cursor-pointer outline-none transition-colors',
           )}
           style={{ left: bandLeft, width: bandWidth, top: '50%' }}
@@ -654,7 +654,7 @@ function PresetChip({
       className={cn(
         'group relative flex flex-col rounded-md border transition-colors',
         active
-          ? 'border-blue-500/70 bg-blue-500/10'
+          ? 'border-primary/70 bg-primary/10'
           : 'border-transparent hover:border-border hover:bg-muted/50',
       )}
     >

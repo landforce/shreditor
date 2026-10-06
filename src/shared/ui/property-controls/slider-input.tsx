@@ -599,7 +599,7 @@ export const SliderInput = memo(function SliderInput({
               className={cn(
                 'absolute top-1/2 -translate-y-1/2 w-px h-2 rounded-full',
                 'transition-opacity duration-150',
-                isActive ? 'bg-foreground/15' : 'bg-foreground/8',
+                isActive ? 'bg-foreground/20' : 'bg-foreground/12',
               )}
               style={{ left: `${pct}%` }}
             />
@@ -613,8 +613,8 @@ export const SliderInput = memo(function SliderInput({
           style={{
             width: `${Math.max(0, Math.min(100, fillPercentRef.current))}%`,
             background: isActive
-              ? 'hsl(var(--foreground) / 0.12)'
-              : 'hsl(var(--foreground) / 0.08)',
+              ? 'color-mix(in srgb, var(--foreground) 12%, transparent)'
+              : 'color-mix(in srgb, var(--foreground) 8%, transparent)',
           }}
         />
 
@@ -648,7 +648,7 @@ export const SliderInput = memo(function SliderInput({
             autoComplete="off"
             data-bwignore="true"
             inputMode="decimal"
-            className="absolute right-1.5 top-1/2 -translate-y-1/2 w-14 h-5 text-xs font-mono tabular-nums text-foreground text-right bg-background/80 border border-ring rounded px-1 outline-none"
+            className="absolute right-1.5 top-1/2 -translate-y-1/2 w-14 h-5 text-xs font-mono tabular-nums text-foreground text-right bg-card border border-ring rounded px-1 outline-none"
             value={inputValue}
             onChange={handleInputChange}
             onKeyDown={handleInputKeyDown}

@@ -374,12 +374,12 @@ export const PreviewStage = memo(function PreviewStage({
             <div
               ref={setPixelSnappedPlayerContainerRef}
               data-player-container
-              className="relative shadow-2xl"
+              className="relative shadow-float"
               style={{
                 width: `${playerSize.width}px`,
                 height: `${playerSize.height}px`,
                 transition: 'none',
-                outline: '2px solid hsl(var(--border))',
+                outline: '2px solid var(--border)',
                 outlineOffset: 0,
                 overflow: 'hidden',
                 contain: 'paint',

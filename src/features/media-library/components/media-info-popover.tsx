@@ -216,9 +216,9 @@ export function MediaInfoPopover({
         {/* Header */}
         <div className="flex items-center gap-1.5 px-3 py-1.5 border-b border-border/50">
           {mediaType === 'video' && <Video className="w-3.5 h-3.5 text-primary" />}
-          {mediaType === 'audio' && <FileAudio className="w-3.5 h-3.5 text-green-500" />}
-          {mediaType === 'image' && <ImageIcon className="w-3.5 h-3.5 text-blue-500" />}
-          {mediaType === 'lottie' && <FileJson className="w-3.5 h-3.5 text-purple-500" />}
+          {mediaType === 'audio' && <FileAudio className="w-3.5 h-3.5 text-timeline-audio" />}
+          {mediaType === 'image' && <ImageIcon className="w-3.5 h-3.5 text-timeline-image" />}
+          {mediaType === 'lottie' && <FileJson className="w-3.5 h-3.5 text-purple-600" />}
           <span className="text-[11px] font-medium text-foreground truncate">{media.fileName}</span>
         </div>
 
