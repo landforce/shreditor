@@ -142,7 +142,31 @@ export function collectAddClipMedia(workspaceDir, ops) {
   }))
 }
 
-/** Resolve a media id to its source file path under media/{id}/ (first non-reserved file). */
+/**
+ * Follow media/{id}/source.link.json, written when footage was imported in
+ * place from a volume the workspace can't clone onto (see
+ * server/media-bridge.mjs). Returns the original's absolute path when it is
+ * still a regular file, else null.
+ */
+function resolveSourceLink(mediaDir) {
+  let link
+  try {
+    link = JSON.parse(fs.readFileSync(path.join(mediaDir, 'source.link.json'), 'utf8'))
+  } catch {
+    return null
+  }
+  if (typeof link?.path !== 'string' || !path.isAbsolute(link.path)) return null
+  try {
+    return fs.statSync(link.path).isFile() ? link.path : null
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Resolve a media id to its source file: the first non-reserved file under
+ * media/{id}/, else the original a source.link.json points at.
+ */
 export function resolveMediaFile(workspaceDir, mediaId) {
   assertSinglePathComponent(mediaId, 'media id')
   const mediaRoot = path.join(workspaceDir, 'media')
@@ -153,7 +177,7 @@ export function resolveMediaFile(workspaceDir, mediaId) {
     if (NON_SOURCE_NAMES.has(entry.name)) continue
     return resolveContained(mediaRoot, path.join(mediaId, entry.name))
   }
-  return null
+  return resolveSourceLink(mediaDir)
 }
 
 /**

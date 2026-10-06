@@ -11,6 +11,20 @@ import { fileURLToPath } from 'node:url'
 // SW file is byte-identical across deploys, so registration.update() never detects a new
 // version and old cached chunks are never purged. Uses the content hash (not a timestamp)
 // so identical builds produce an identical SW and avoid needless update churn.
+// Serves the workspace folder to the editor at /__shreditor/ (see server/workspace-bridge.mjs).
+function workspaceBridgePlugin(): Plugin {
+  const bridge = async () => (await import('./server/workspace-bridge.mjs')).createWorkspaceBridge()
+  return {
+    name: 'shreditor-workspace-bridge',
+    configureServer: async (server) => {
+      server.middlewares.use(await bridge())
+    },
+    configurePreviewServer: async (server) => {
+      server.middlewares.use(await bridge())
+    },
+  }
+}
+
 function serviceWorkerVersionPlugin(): Plugin {
   const placeholder = '__FREECUT_BUILD_ID__'
   let buildId = ''
@@ -94,7 +108,12 @@ export default defineConfig({
       },
     },
   },
-  plugins: lazyPlugins(() => [react(), tailwindcss(), serviceWorkerVersionPlugin()]),
+  plugins: lazyPlugins(() => [
+    react(),
+    tailwindcss(),
+    serviceWorkerVersionPlugin(),
+    workspaceBridgePlugin(),
+  ]),
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),

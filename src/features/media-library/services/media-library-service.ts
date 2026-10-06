@@ -585,7 +585,7 @@ class MediaLibraryService {
   private async importMediaFileToOpfs(
     file: File,
     projectId: string,
-    options?: { attribution?: MediaAttribution },
+    options?: { attribution?: MediaAttribution; mediaId?: string },
   ): Promise<MediaMetadata & { isDuplicate?: boolean; hasUnsupportedCodec?: boolean }> {
     const validationResult = await validateMediaFileContent(file)
     if (!validationResult.valid) {
@@ -613,7 +613,7 @@ class MediaLibraryService {
     if (isLottieMime(resolvedMimeType)) {
       const lottie = await this.parseLottieFile(file)
       const thumb = await this.generateLottieThumbnailBlob(file, lottie.width, lottie.height)
-      const mediaId = crypto.randomUUID()
+      const mediaId = options?.mediaId ?? crypto.randomUUID()
       const createdAt = Date.now()
       const mediaMetadata: MediaMetadata = {
         id: mediaId,
@@ -658,7 +658,7 @@ class MediaLibraryService {
       }
     }
 
-    const mediaId = crypto.randomUUID()
+    const mediaId = options?.mediaId ?? crypto.randomUUID()
     const createdAt = Date.now()
     const codecCheck = mediaProcessorService.hasUnsupportedAudioCodec(metadata)
     const previewAudioCodec =
@@ -1166,6 +1166,21 @@ class MediaLibraryService {
       ...mediaMetadata,
       hasUnsupportedCodec: codecCheck.unsupported,
     }
+  }
+
+  /**
+   * Finish an in-place import: the workspace bridge already put the source in
+   * `media/{mediaId}/` (clone or link) and `file` was read back from there,
+   * so probe it and write its metadata
+   * and thumbnail like a copy import, without writing the bytes again.
+   * May return an existing record (`isDuplicate`) instead of `mediaId`.
+   */
+  async importPlacedMedia(
+    file: File,
+    projectId: string,
+    mediaId: string,
+  ): Promise<MediaMetadata & { isDuplicate?: boolean; hasUnsupportedCodec?: boolean }> {
+    return this.importMediaFileToOpfs(file, projectId, { mediaId })
   }
 
   /**

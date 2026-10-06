@@ -5,6 +5,12 @@ import { proxyService } from '../services/proxy-service'
 import { getMimeType } from '../utils/validation'
 import { getSharedProxyKey } from '../utils/proxy-key'
 import { hasMediaFilePickerSupport, showMediaFilePicker } from '../utils/media-file-picker'
+import {
+  canImportMediaInPlace,
+  chooseMediaInPlace,
+  discardPlacedMedia,
+  getPlacedMediaId,
+} from '../deps/storage'
 import { createLogger, createOperationId } from '@/shared/logging/logger'
 import { useMediaPreparationStore } from './media-preparation-store'
 
@@ -348,16 +354,22 @@ export function createImportActions(
           continue
         }
 
+        // Files the workspace bridge already placed in media/{id}/ (in-place import).
+        const placedId = getPlacedMediaId(task.handle)
         try {
           markImportPreparationRunning(task.tempId)
-          const metadata = await mediaLibraryService.importMediaWithHandle(task.handle, projectId, {
-            storageMode,
-          })
+          const metadata = placedId
+            ? await mediaLibraryService.importPlacedMedia(task.file, projectId, placedId)
+            : await mediaLibraryService.importMediaWithHandle(task.handle, projectId, {
+                storageMode,
+              })
+          if (placedId && metadata.id !== placedId) await discardPlacedMedia(placedId)
           results[index] = {
             status: 'fulfilled',
             value: { metadata, tempId: task.tempId, file: task.file, handle: task.handle },
           }
         } catch (reason) {
+          if (placedId) await discardPlacedMedia(placedId).catch(() => {})
           results[index] = { status: 'rejected', reason }
         }
       }
@@ -430,8 +442,21 @@ export function createImportActions(
         return []
       }
 
+      // With the workspace bridge, the server shows a Finder chooser and
+      // places the files in the workspace itself (clone or link, no upload).
+      // null means this bridge can't, so use the browser picker below.
+      let inPlaceHandles: FileSystemFileHandle[] | null = null
+      if (canImportMediaInPlace()) {
+        try {
+          inPlaceHandles = await chooseMediaInPlace()
+        } catch (error) {
+          set({ error: error instanceof Error ? error.message : String(error), errorLink: null })
+          return []
+        }
+      }
+
       // Check if File System Access API is supported
-      if (!hasMediaFilePickerSupport()) {
+      if (!inPlaceHandles && !hasMediaFilePickerSupport()) {
         const isBrave = 'brave' in navigator
         set({
           error: isBrave
@@ -444,18 +469,18 @@ export function createImportActions(
 
       const opId = createOperationId()
       const event = logger.startEvent('import', opId)
-      event.set('source', 'picker')
+      event.set('source', inPlaceHandles ? 'bridge-picker' : 'picker')
       event.set('projectId', currentProjectId)
 
       try {
         // Open file picker
-        const handles = await showMediaFilePicker({ multiple: true })
+        const handles = inPlaceHandles ?? (await showMediaFilePicker({ multiple: true }))
 
         event.set('fileCount', handles.length)
 
         // Create optimistic placeholders for all files immediately
         const serviceModulePromise = loadMediaLibraryService()
-        const storageMode = options?.storageMode ?? 'copy'
+        const storageMode = inPlaceHandles ? 'copy' : (options?.storageMode ?? 'copy')
         const importTasks = await createOptimisticImportTasks(handles, storageMode)
         const importResults = await runImportTasks(
           importTasks,

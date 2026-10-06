@@ -30,6 +30,12 @@ import {
   type HandleRecord,
 } from '@/infrastructure/storage/handles-db'
 
+import { BridgeWorkspaceIndicator } from './bridge-workspace-indicator'
+import {
+  connectWorkspaceBridge,
+  type BridgeInfo,
+} from '@/infrastructure/storage/bridge-fs/bridge-handles'
+
 const logger = createLogger('WorkspaceIndicator')
 
 interface WorkspaceEntry {
@@ -43,6 +49,12 @@ export function WorkspaceIndicator() {
   const [activeName, setActiveName] = useState<string | null>(null)
   const [popoverOpen, setPopoverOpen] = useState(false)
   const [confirmRemoveId, setConfirmRemoveId] = useState<string | null>(null)
+  // undefined while checking; null when not served with the workspace bridge.
+  const [bridge, setBridge] = useState<BridgeInfo | null | undefined>(undefined)
+
+  useEffect(() => {
+    void connectWorkspaceBridge().then((b) => setBridge(b?.info ?? null))
+  }, [])
 
   const loadEntries = useCallback(async () => {
     try {
@@ -126,6 +138,9 @@ export function WorkspaceIndicator() {
     },
     [loadEntries],
   )
+
+  if (bridge) return <BridgeWorkspaceIndicator info={bridge} />
+  if (bridge === undefined) return null
 
   // Don't render anything until we've finished loading.
   if (entries === null) return null

@@ -2,6 +2,9 @@
   "name": "freecut",
   "version": "0.0.0",
   "private": true,
+  "bin": {
+    "shreditor": "bin/shreditor.mjs"
+  },
   "type": "module",
   "scripts": {
     "dev": "vp dev --host",

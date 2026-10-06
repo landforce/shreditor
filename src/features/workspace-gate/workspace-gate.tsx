@@ -19,7 +19,7 @@
  * back to the Reconnect state mid-session.
  */
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   ensureKnownWorkspaceForCurrent,
@@ -30,6 +30,10 @@ import {
   saveWorkspaceHandleRecord,
 } from '@/infrastructure/storage/handles-db'
 import { onPermissionLost, setWorkspaceRoot } from '@/infrastructure/storage/workspace-fs/root'
+import {
+  connectWorkspaceBridge,
+  setBridgeWorkspace,
+} from '@/infrastructure/storage/bridge-fs/bridge-handles'
 import { createLogger } from '@/shared/logging/logger'
 import { WorkspaceGateSplash } from './workspace-gate-splash'
 import { usePathname } from './use-pathname'
@@ -58,6 +62,7 @@ export function WorkspaceGate({ children }: { children: React.ReactNode }) {
   const { t } = useTranslation()
   const pathname = usePathname()
   const needsWorkspace = isStorageProtectedPath(pathname)
+  const bridgeModeRef = useRef(false)
 
   const activate = useCallback(async (handle: FileSystemDirectoryHandle) => {
     setWorkspaceRoot(handle)
@@ -83,6 +88,16 @@ export function WorkspaceGate({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     let cancelled = false
     ;(async () => {
+      // Served with the local workspace bridge: the folder was chosen on the
+      // machine (Finder dialog or `shreditor open`), so there is no browser
+      // picker or permission prompt.
+      const bridge = await connectWorkspaceBridge()
+      if (cancelled) return
+      if (bridge) {
+        bridgeModeRef.current = true
+        await activate(bridge.root)
+        return
+      }
       if (!isFileSystemAccessSupported()) {
         if (!cancelled) setStatus({ kind: 'unavailable' })
         return
@@ -128,6 +143,15 @@ export function WorkspaceGate({ children }: { children: React.ReactNode }) {
 
   const handlePick = useCallback(async () => {
     setError(null)
+    if (bridgeModeRef.current) {
+      try {
+        if (await setBridgeWorkspace(null)) window.location.reload()
+      } catch (error) {
+        logger.error('Folder choose failed', error)
+        setError(t('projects.workspaceGate.folderPickFailed'))
+      }
+      return
+    }
     try {
       const handle = await window.showDirectoryPicker({
         id: 'freecut-workspace',

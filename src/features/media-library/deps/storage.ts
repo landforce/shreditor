@@ -38,3 +38,9 @@ export {
   updateMedia,
   writeMediaSource,
 } from '@/infrastructure/storage'
+export {
+  canImportMediaInPlace,
+  chooseMediaInPlace,
+  discardPlacedMedia,
+  getPlacedMediaId,
+} from '@/infrastructure/storage/bridge-fs/bridge-media'
