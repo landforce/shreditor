@@ -1,4 +1,4 @@
-// Creator Stylesheet (kit.json, schema v2): a creator's look and editing rules,
+// Video Style Kit (kit.json, schema v2): a creator's look and editing rules,
 // defined outside Shreditor. This module reads one: validation with clear
 // errors for the parts Shreditor needs (unknown fields are kept and ignored),
 // a canonical form for hashing and diffing, sections with their aspect
@@ -6,7 +6,7 @@
 // the agent tools (Node) and the editor, like ../registry.mjs.
 //
 // Units are the kit's: pixels at `canvas` (1080x1920), weights 400/500/600/700,
-// times in seconds (milliseconds when a key ends in Ms). See docs/creator-kit.md.
+// times in seconds (milliseconds when a key ends in Ms). See docs/video-style-kit.md.
 
 import { aspectKey } from '../../src/shared/projects/aspect.mjs'
 

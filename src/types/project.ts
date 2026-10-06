@@ -43,7 +43,7 @@ export interface Project {
    */
   format?: ProjectFormat
   /**
-   * The Creator Stylesheet (kit.json) the project follows, recorded by
+   * The Video Style Kit (kit.json) the project follows, recorded by
    * `shred kit apply`: its styles become the project's `kit:*` text styles and
    * its rules join `shred check`. Absent when the project has no kit.
    */
@@ -62,14 +62,14 @@ export interface Project {
   rootFolderName?: string
 }
 
-/** A brand colour from a creator kit, offered as a swatch by the text colour pickers. */
+/** A brand colour from a Video Style Kit, offered as a swatch by the text colour pickers. */
 export interface ProjectKitColor {
   hex: string
   /** What the colour is for, in the creator's words. */
   job?: string
 }
 
-/** The creator kit a project follows (see `Project.kit`). */
+/** The Video Style Kit a project follows (see `Project.kit`). */
 export interface ProjectKit {
   /** Where the kit.json lives (absolute path on the machine that applied it). */
   path: string

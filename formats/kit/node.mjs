@@ -1,4 +1,4 @@
-// Creator kit on disk (Node only): read a kit.json (or a kit folder holding
+// Video Style Kit on disk (Node only): read a kit.json (or a kit folder holding
 // one), hash it, write it back atomically, and list the fonts this machine
 // can draw. The pure model is in ./kit.mjs.
 import { execFileSync } from 'node:child_process'

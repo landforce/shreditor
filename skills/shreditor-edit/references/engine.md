@@ -133,9 +133,9 @@ shred styles clone "Kit Title" --aspect 16:9 --project <projectId>   # a 16:9 ve
 ]
 ```
 
-## Creator kit
+## Video Style Kit
 
-A Creator Stylesheet (`kit.json`, schema v2, made outside Shreditor) holds a creator's look and editing rules: text styles for titles, captions and overlays, image and object placement, greenscreen rules, checkable `must` rules, and editing preferences. Shreditor maps it once onto a project and keeps it linked. Mapping table and limits: `docs/creator-kit.md` in the repo.
+A Video Style Kit (`kit.json`, schema v2, made outside Shreditor) holds a creator's look and editing rules: text styles for titles, captions and overlays, image and object placement, greenscreen rules, checkable `must` rules, and editing preferences. Shreditor maps it once onto a project and keeps it linked. Mapping table and limits: `docs/video-style-kit.md` in the repo.
 
 - `shred kit apply <kit.json|kit folder> --project <id> [--force]` maps the text sections to project text styles (and library copies, described as coming from the kit): `kit:title` (role title), `kit:caption` (role caption, the default position, aboveHead), `kit:caption-low` (the belowChin position: use it when the face fills the middle), `kit:overlay` and `kit:listicle-headline` (role label) and `kit:emphasis` (a one- or two-word label in the title look). It records `project.kit` (`path`, `kitVersion`, `hash`, `appliedAt`, `brandColors` when on; drafts copy it), keeps a copy of the applied kit in `projects/<id>/agent/kit-applied.json`, and prints what mapped, what didn't and why, the fonts (the first family in each stack that is installed or in Shreditor's catalog, with licences), the kit's preferences in words, and its reference frames (never compare against ones marked placeholder).
 - Applying the same kit again changes nothing. A changed kit updates the styles whose mapping changed and every item using them (live link) and prints the kit diff. A style changed in the project is kept unless the kit changed that style too (`--force` takes the kit's for all).

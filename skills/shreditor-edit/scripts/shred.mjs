@@ -69,9 +69,9 @@
 //                                        frame ranges to look at; numbers are guidelines (warn), format-defining rules and kit musts
 //                                        can fail (exit 1); --frames renders every flagged frame into one
 //                                        contact sheet with what each is for
-//                                        (a project with a creator kit adds the kit's rules: Kit section)
+//                                        (a project with a Video Style Kit adds the kit's rules: Kit section)
 //   shred kit apply <kit.json|folder> --project <id> [--force]
-//                                        a Creator Stylesheet: its titles, captions and overlays become
+//                                        a Video Style Kit: its titles, captions and overlays become
 //                                        kit:* text styles (project and library), the kit is recorded on
 //                                        the project; prints the mapping, fonts and the kit's preferences
 //   shred kit status <id>                the project's kit: version, hash, drift since apply, fonts, prefs

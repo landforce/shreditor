@@ -792,7 +792,7 @@ const projectFormatSchema = z
   })
 
 // ============================================================================
-// Project creator kit (shred kit apply)
+// Project Video Style Kit (shred kit apply)
 // ============================================================================
 
 const projectKitSchema = z

@@ -1,4 +1,4 @@
-// Creator kit -> Shreditor: the kit's titles, captions and overlays as project
+// Video Style Kit -> Shreditor: the kit's titles, captions and overlays as project
 // text styles (`kit:*` ids), and back (save-back reads a style into kit
 // values). Pixel values are the kit's own at its canvas; a style variant's
 // lengths are pixels on the aspect's reference canvas (short side 1080), so a
@@ -177,7 +177,7 @@ function kitCaptionRules(section, look) {
   }
 }
 
-const FROM_KIT = (kit) => `From the creator kit${kit.creator ? ` (${kit.creator})` : ''}.`
+const FROM_KIT = (kit) => `From the Video Style Kit${kit.creator ? ` (${kit.creator})` : ''}.`
 
 function describe(kit, ...notes) {
   return [FROM_KIT(kit), ...notes, 'Change the kit, not this style: shred kit apply.']

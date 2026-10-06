@@ -47,7 +47,7 @@ export interface ScoreOptions {
   /** Format id or resolved format; defaults to project.format. */
   format?: string | ResolvedFormat
   variant?: string | null
-  /** Targets patched by key, e.g. a creator kit's pause limit: { pauseMaxSec: { max: 0.3 } }. */
+  /** Targets patched by key, e.g. a Video Style Kit's pause limit: { pauseMaxSec: { max: 0.3 } }. */
   targetOverrides?: Record<string, Partial<FormatTarget>>
 }
 
