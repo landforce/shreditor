@@ -77,7 +77,13 @@ const samples = {
   addLut: { op: 'addLut', itemId: 'i', lut: 'Warm Look.cube', intensity: 0.8 },
   setTransform: { op: 'setTransform', id: 'i', transform: { opacity: 0.5, rotation: 2 } },
   unlinkItems: { op: 'unlinkItems', ids: ['i'] },
-  addMarker: { op: 'addMarker', frame: 30, id: 'plan-b01', label: 'hook: the claim', color: '#F59E0B' },
+  addMarker: {
+    op: 'addMarker',
+    frame: 30,
+    id: 'plan-b01',
+    label: 'hook: the claim',
+    color: '#F59E0B',
+  },
   removeMarkers: { op: 'removeMarkers', ids: ['plan-b01'] },
   addTemplate: {
     op: 'addTemplate',

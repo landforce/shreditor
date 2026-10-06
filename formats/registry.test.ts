@@ -280,10 +280,17 @@ test("each format's story structure opens on the hook and keeps story order", ()
     const roles = format.structure.map((part) => part.role)
     assert.equal(roles[0], 'hook', format.id)
     const order = roles.map((role) => STRUCTURE_ROLES.indexOf(role))
-    assert.ok(order.every((index, i) => index >= 0 && (i === 0 || index > order[i - 1]!)), format.id)
-    assert.ok(format.structure.some((part) => part.role === 'body' && part.required), format.id)
+    assert.ok(
+      order.every((index, i) => index >= 0 && (i === 0 || index > order[i - 1]!)),
+      format.id,
+    )
+    assert.ok(
+      format.structure.some((part) => part.role === 'body' && part.required),
+      format.id,
+    )
     // Every section is named in the guide's own Structure list.
     const guide = read(format.guide.path)
-    for (const part of format.structure) assert.ok(guide.includes(part.name.split(' ')[0]!), part.name)
+    for (const part of format.structure)
+      assert.ok(guide.includes(part.name.split(' ')[0]!), part.name)
   }
 })

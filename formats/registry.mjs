@@ -207,9 +207,17 @@ const greenscreen = {
   defaultVariant: null,
   variants: [],
   structure: [
-    part('hook', 'Hook', '0 to ~3.5 s: one spoken claim on the densest plate; change plate by ~3 s'),
+    part(
+      'hook',
+      'Hook',
+      '0 to ~3.5 s: one spoken claim on the densest plate; change plate by ~3 s',
+    ),
     part('setup', 'Setup', 'ends around 9 to 17 s'),
-    part('body', 'Body', 'a list (a run of plates per item) or a story: incident, evidence, context'),
+    part(
+      'body',
+      'Body',
+      'a list (a run of plates per item) or a story: incident, evidence, context',
+    ),
     part('close', 'Close', 'a line straight to the audience, or the thesis; no end card'),
   ],
   tracks: [
