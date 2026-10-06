@@ -6,9 +6,11 @@ import {
   createDefaultGradientItem,
   createDefaultSolidColorItem,
   createTimelineTemplateItem,
+  getDefaultGeneratedLayerDurationInFrames,
   getTemplateEffectsForDirectApplication,
 } from './generated-layer-items'
 import { useProjectTextStylesStore } from '@/shared/state/text-styles'
+import { useItemsStore } from '../stores/items-store'
 import type { TextStyleDefinition } from '@/types/text-style'
 
 describe('getTemplateEffectsForDirectApplication', () => {
@@ -326,5 +328,41 @@ describe('full-frame shape presets', () => {
       fillType: 'linear',
       transform: { width: 1920, height: 1080 },
     })
+  })
+})
+
+describe('getDefaultGeneratedLayerDurationInFrames', () => {
+  const clipTo = (end: number) =>
+    useItemsStore.getState().setItems([
+      {
+        id: 'v',
+        type: 'video',
+        trackId: 't',
+        from: 0,
+        durationInFrames: end,
+        label: 'v',
+        src: 'blob:v',
+      },
+    ])
+
+  it('effect and adjustment layers reach the end of the video, no further', () => {
+    clipTo(450)
+    expect(getDefaultGeneratedLayerDurationInFrames(30, { from: 300, kind: 'adjustment' })).toBe(
+      150,
+    )
+  })
+
+  it('text and shapes stop after five seconds, or at the end of the video if sooner', () => {
+    clipTo(450)
+    expect(getDefaultGeneratedLayerDurationInFrames(30, { from: 0, kind: 'text' })).toBe(150)
+    expect(getDefaultGeneratedLayerDurationInFrames(30, { from: 400, kind: 'shape' })).toBe(50)
+  })
+
+  it('an empty timeline, or a layer past the end, gets five seconds', () => {
+    clipTo(0)
+    useItemsStore.getState().setItems([])
+    expect(getDefaultGeneratedLayerDurationInFrames(30, { from: 0, kind: 'adjustment' })).toBe(150)
+    clipTo(450)
+    expect(getDefaultGeneratedLayerDurationInFrames(30, { from: 600, kind: 'text' })).toBe(150)
   })
 })

@@ -12,12 +12,12 @@ import {
   type TextStylePresetId,
 } from '@/shared/typography/text-style-presets'
 import { useProjectTextStylesStore } from '@/shared/state/text-styles'
+import { usePlaybackStore } from '@/shared/state/playback'
+import { useItemsStore } from '../stores/items-store'
 import {
   buildApplyTextStyleUpdates,
   textStyleVariantForCanvas,
 } from '@/shared/typography/text-styles/text-style-resolve'
-
-export const DEFAULT_GENERATED_LAYER_DURATION_SECONDS = 60
 
 export interface TimelineTemplateDragData {
   type: 'timeline-template'
@@ -90,8 +90,36 @@ export function isTimelineTemplateDragData(value: unknown): value is TimelineTem
   )
 }
 
-export function getDefaultGeneratedLayerDurationInFrames(fps: number): number {
-  return Math.max(1, Math.round(fps * DEFAULT_GENERATED_LAYER_DURATION_SECONDS))
+/** What a new text, shape or adjustment layer is. */
+type GeneratedLayerKind = TimelineTemplateDragData['itemType']
+
+/** Text and shapes default to a short beat; past the end of the video, so does everything. */
+const SHORT_LAYER_SECONDS = 5
+
+/** Last frame any item on the timeline reaches (0 when it is empty). */
+function timelineContentEnd(): number {
+  let end = 0
+  for (const item of useItemsStore.getState().items)
+    end = Math.max(end, item.from + item.durationInFrames)
+  return end
+}
+
+/**
+ * Default length of a new generated layer placed at `from` (the playhead by
+ * default). It never runs past the end of what's on the timeline, so adding
+ * one doesn't stretch the project: adjustment and effect layers reach the
+ * end of the video, text and shapes stop after a short beat. On an empty
+ * timeline, or past its end, a layer gets the short beat.
+ */
+export function getDefaultGeneratedLayerDurationInFrames(
+  fps: number,
+  options: { from?: number; kind?: GeneratedLayerKind } = {},
+): number {
+  const from = options.from ?? usePlaybackStore.getState().currentFrame
+  const short = Math.max(1, Math.round(fps * SHORT_LAYER_SECONDS))
+  const toEnd = timelineContentEnd() - Math.max(0, from)
+  if (toEnd < fps) return short
+  return options.kind === 'adjustment' ? toEnd : Math.min(toEnd, short)
 }
 
 export function getTemplateEffectsForDirectApplication(template: unknown): VisualEffect[] | null {

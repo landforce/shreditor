@@ -130,4 +130,41 @@ describe('addAdjustmentLayer', () => {
     expect(useItemsStore.getState().tracks.map((track) => track.id)).toEqual(['top', 'main'])
     expect(useItemsStore.getState().items.map((item) => item.id)).toEqual(['top-clip', 'main-clip'])
   })
+
+  it('ends where the video ends instead of stretching the project', () => {
+    useItemsStore.getState().setTracks([makeTrack('top', 0), makeTrack('main', 1)])
+    useItemsStore.getState().setItems([makeVideoItem('clip', 'main', 0, 90)])
+
+    expect(addAdjustmentLayer()).toBe(true)
+
+    const adjustment = useItemsStore.getState().items.find((item) => item.type === 'adjustment')
+    expect(adjustment).toMatchObject({ from: 10, durationInFrames: 80 })
+  })
+
+  it('goes under the title and captions, above the picture', () => {
+    const title = { ...makeTrack('title', 0), formatRole: 'title' as const }
+    const captions = makeTrack('captions', 1)
+    useItemsStore.getState().setTracks([title, captions, makeTrack('shots', 2)])
+    useItemsStore.getState().setItems([
+      makeVideoItem('clip', 'shots', 0, 90),
+      {
+        id: 'cap',
+        type: 'text',
+        trackId: 'captions',
+        from: 0,
+        durationInFrames: 90,
+        label: 'c',
+        text: 'hi',
+        color: '#fff',
+      },
+    ])
+
+    expect(addAdjustmentLayer([], 'Trigger Wave Layer')).toBe(true)
+
+    const { items, tracks } = useItemsStore.getState()
+    const adjustment = items.find((item) => item.type === 'adjustment')!
+    const order = (id: string) => tracks.find((track) => track.id === id)!.order
+    expect(order(adjustment.trackId)).toBeGreaterThan(order('captions'))
+    expect(order(adjustment.trackId)).toBeLessThan(order('shots'))
+  })
 })

@@ -212,7 +212,7 @@ const addTitle = defineTool({
     })
     if (!targetTrack) throw new Error('No available track for a text layer.')
 
-    const durationInFrames = getDefaultGeneratedLayerDurationInFrames(fps)
+    const durationInFrames = getDefaultGeneratedLayerDurationInFrames(fps, { kind: 'text' })
     const proposed =
       args.atSeconds !== undefined
         ? Math.round(args.atSeconds * fps)

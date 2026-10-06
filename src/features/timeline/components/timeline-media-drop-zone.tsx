@@ -414,7 +414,10 @@ export const TimelineMediaDropZone = memo(function TimelineMediaDropZone({
         return []
       }
 
-      const durationInFrames = getDefaultGeneratedLayerDurationInFrames(fps)
+      const durationInFrames = getDefaultGeneratedLayerDurationInFrames(fps, {
+        from: dropFrame,
+        kind: template.itemType,
+      })
       const finalPosition = findNearestAvailablePreviewSpace(
         dropFrame,
         durationInFrames,
@@ -558,7 +561,10 @@ export const TimelineMediaDropZone = memo(function TimelineMediaDropZone({
         return null
       }
 
-      const durationInFrames = getDefaultGeneratedLayerDurationInFrames(fps)
+      const durationInFrames = getDefaultGeneratedLayerDurationInFrames(fps, {
+        from: dropFrame,
+        kind: template.itemType,
+      })
       const finalPosition = findNearestAvailablePreviewSpace(
         dropFrame,
         durationInFrames,

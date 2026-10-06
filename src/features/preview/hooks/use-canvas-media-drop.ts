@@ -353,7 +353,10 @@ export function useCanvasMediaDrop({ coordParams, projectSize }: UseCanvasMediaD
         return
       }
 
-      const durationInFrames = getDefaultGeneratedLayerDurationInFrames(timelineState.fps)
+      const durationInFrames = getDefaultGeneratedLayerDurationInFrames(timelineState.fps, {
+        from: playbackState.currentFrame,
+        kind: template.itemType,
+      })
       const baseItem = createTimelineTemplateItem({
         template,
         placement: {

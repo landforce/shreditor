@@ -4,7 +4,7 @@
  * Adjustment layers grade every clip below them — the scene-wide
  * counterpart to per-clip grading.
  */
-import type { AdjustmentItem } from '@/types/timeline'
+import type { AdjustmentItem, TimelineItem, TimelineTrack } from '@/types/timeline'
 import type { VisualEffect } from '@/types/effects'
 import {
   executeTimelineCommand,
@@ -31,6 +31,17 @@ interface AddAdjustmentLayerOptions {
   durationInFrames?: number
 }
 
+const TEXT_ROLES = new Set(['title', 'captions', 'labels'])
+
+/** A track for words: a title, captions or labels track, or one holding only text. */
+function isTextTrack(track: TimelineTrack, items: TimelineItem[]): boolean {
+  if (track.formatRole && TEXT_ROLES.has(track.formatRole)) return true
+  const onTrack = items.filter((item) => item.trackId === track.id)
+  return (
+    onTrack.length > 0 && onTrack.every((item) => item.type === 'text' || item.type === 'subtitle')
+  )
+}
+
 export function addAdjustmentLayer(
   effects?: VisualEffect[],
   label?: string,
@@ -55,12 +66,21 @@ export function addAdjustmentLayer(
   const durationInFrames =
     typeof options.durationInFrames === 'number' && Number.isFinite(options.durationInFrames)
       ? Math.max(1, Math.round(options.durationInFrames))
-      : getDefaultGeneratedLayerDurationInFrames(fps)
+      : getDefaultGeneratedLayerDurationInFrames(fps, {
+          from: options.from ?? usePlaybackStore.getState().currentFrame,
+          kind: 'adjustment',
+        })
 
   const videoTracks = tracks
     .filter((track) => !track.isGroup && getTrackKind(track) === 'video' && !track.locked)
     .sort((left, right) => (left.order ?? 0) - (right.order ?? 0))
-  const topVideoTrack = videoTracks[0] ?? referenceTrack
+  // Grade the picture, not the words: sit on the top picture track (under
+  // title, caption and label tracks), so effects never warp text.
+  const topVideoTrack =
+    videoTracks.find((track) => !isTextTrack(track, items)) ?? videoTracks[0] ?? referenceTrack
+  const trackAbove = videoTracks
+    .filter((track) => (track.order ?? 0) < (topVideoTrack.order ?? 0))
+    .at(-1)
 
   const proposedPosition =
     typeof options.from === 'number' && Number.isFinite(options.from)
@@ -79,7 +99,10 @@ export function addAdjustmentLayer(
     targetTrack = createClassicTrack({
       tracks,
       kind: 'video',
-      order: (topVideoTrack.order ?? 0) - 1,
+      // Between the picture and the text above it (track order is a sort key).
+      order: trackAbove
+        ? ((trackAbove.order ?? 0) + (topVideoTrack.order ?? 0)) / 2
+        : (topVideoTrack.order ?? 0) - 1,
       height: topVideoTrack.height,
     })
     createdTrack = true

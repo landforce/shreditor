@@ -515,7 +515,10 @@ export const TimelineTrack = memo(function TimelineTrack({ track }: TimelineTrac
       }
 
       const store = useTimelineStore.getState()
-      const durationInFrames = getDefaultGeneratedLayerDurationInFrames(fps)
+      const durationInFrames = getDefaultGeneratedLayerDurationInFrames(fps, {
+        from: dropFrame,
+        kind: template.itemType,
+      })
       const targetTrack = findCompatibleTrackForItemType({
         tracks: store.tracks,
         items: store.items,
@@ -659,7 +662,10 @@ export const TimelineTrack = memo(function TimelineTrack({ track }: TimelineTrac
       }
 
       const store = useTimelineStore.getState()
-      const durationInFrames = getDefaultGeneratedLayerDurationInFrames(fps)
+      const durationInFrames = getDefaultGeneratedLayerDurationInFrames(fps, {
+        from: dropFrame,
+        kind: template.itemType,
+      })
       const targetTrack = findCompatibleTrackForItemType({
         tracks: store.tracks,
         items: store.items,

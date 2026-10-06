@@ -397,7 +397,7 @@ export const MediaSidebar = memo(function MediaSidebar() {
         return
       }
 
-      const durationInFrames = getDefaultGeneratedLayerDurationInFrames(fps)
+      const durationInFrames = getDefaultGeneratedLayerDurationInFrames(fps, { kind: 'text' })
 
       // Get canvas dimensions for initial transform
       const canvasWidth = currentProject?.metadata.width ?? DEFAULT_PROJECT_WIDTH
@@ -457,7 +457,7 @@ export const MediaSidebar = memo(function MediaSidebar() {
     const placement = {
       trackId: newTrack.trackId,
       from: Math.max(0, usePlaybackStore.getState().currentFrame),
-      durationInFrames: getDefaultGeneratedLayerDurationInFrames(fps),
+      durationInFrames: getDefaultGeneratedLayerDurationInFrames(fps, { kind: 'shape' }),
       canvasWidth,
       canvasHeight,
       shapeType,
