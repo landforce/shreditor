@@ -33,7 +33,7 @@
 //   setTransformParent { id, parentItemId, behavior?, frame? }
 import fs from 'node:fs'
 import path from 'node:path'
-import { loadProject, collectAddClipMedia } from './lib/workspace.mjs'
+import { loadProject, collectEditResources } from './lib/workspace.mjs'
 import { parseArgs } from './lib/cli.mjs'
 import { withHarnessPage } from './lib/page-session.mjs'
 import { startHarness } from './lib/render-core.mjs'
@@ -77,8 +77,9 @@ async function main() {
   if (!args.json) console.log(`Project: ${project.name ?? project.id} (${projectJsonPath})`)
   if (!args.json) console.log(`Ops: ${ops.length}`)
 
-  // Collect metadata for media referenced by addClip ops (for duration/fps/codec).
-  const media = collectAddClipMedia(args.workspace, ops)
+  // Collect metadata for media referenced by addClip ops (for duration/fps/codec)
+  // and the text of LUTs referenced by addLut ops.
+  const { media, luts } = collectEditResources(args.workspace, ops)
   const missingMeta = media.filter((m) => !m.metadata).map((m) => m.mediaId)
   if (missingMeta.length > 0) {
     throw new Error(`addClip media not found in workspace: ${missingMeta.join(', ')}`)
@@ -102,6 +103,7 @@ async function main() {
           project,
           ops,
           media,
+          luts,
         }),
     )
   } finally {

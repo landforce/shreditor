@@ -5,6 +5,7 @@ import { resolveCompatibleMedia } from '../../server/media-compatibility.mjs'
 import fs from 'node:fs'
 import path from 'node:path'
 import { assertSinglePathComponent, HttpError, resolveContained } from './http-security.mjs'
+import { collectLuts } from './luts.mjs'
 
 // Files in media/{id}/ that are NOT the source blob (mirrors
 // NON_SOURCE_NAMES in workspace-fs/media-source.ts).
@@ -159,6 +160,16 @@ export function collectAddClipMedia(workspaceDir, ops) {
     if (notReady) throw new HttpError(409, 'MEDIA_NOT_READY', notReady)
     return { mediaId, metadata }
   })
+}
+
+/**
+ * Everything from the workspace an op batch needs besides the project, for
+ * the browser's edit input: metadata for addClip media and the text of the
+ * LUTs addLut ops name. Every caller of window.freecut.editProject spreads
+ * this in, so none can forget a kind.
+ */
+export function collectEditResources(workspaceDir, ops) {
+  return { media: collectAddClipMedia(workspaceDir, ops), luts: collectLuts(workspaceDir, ops) }
 }
 
 /**

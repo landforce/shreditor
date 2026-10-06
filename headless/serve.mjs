@@ -37,7 +37,7 @@ import { pathToFileURL } from 'node:url'
 import {
   loadProjectById,
   listProjects,
-  collectAddClipMedia,
+  collectEditResources,
   resolveMediaFile,
 } from './lib/workspace.mjs'
 import { parseArgs, chromeLaunchArgs } from './lib/cli.mjs'
@@ -357,8 +357,7 @@ async function main() {
     if (body.project) assertSinglePathComponent(body.project, 'project id')
     const project = body.projectObject ?? loadProjectById(workspace, body.project).project
     const ops = body.ops
-    const media = collectAddClipMedia(workspace, ops)
-    const result = await runEdit({ project, ops, media })
+    const result = await runEdit({ project, ops, ...collectEditResources(workspace, ops) })
     sendJson(res, 200, result)
   }
 
@@ -483,8 +482,11 @@ async function main() {
     const body = validate(lifecycleEditRequestSchema, raw)
     const execute = async () => {
       const current = await getProjectResource(workspace, id)
-      const media = collectAddClipMedia(workspace, body.ops)
-      const result = await runEdit({ project: current.project, ops: body.ops, media })
+      const result = await runEdit({
+        project: current.project,
+        ops: body.ops,
+        ...collectEditResources(workspace, body.ops),
+      })
       if (!body.persist)
         return {
           status: 200,

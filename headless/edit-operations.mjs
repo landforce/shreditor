@@ -9,6 +9,8 @@ import { chromeLaunchArgs } from './lib/cli.mjs'
 import { EDIT_OPERATION_NAMES, editOpSchema } from './lib/contract.mjs'
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
+// 2x2x2 LUT that pushes everything warm.
+const WARM_CUBE = ['TITLE "Warm"', 'LUT_3D_SIZE 2', ...Array(8).fill('0.9 0.6 0.3')].join('\n')
 
 function baseProject() {
   return {
@@ -427,6 +429,19 @@ const cases = [
     failure: { op: 'updateEffect', itemId: 'text-1', effectId: 'missing-effect', enabled: false },
   },
   {
+    name: 'addLut',
+    op: { op: 'addLut', itemId: 'text-1', lut: 'warm.cube', intensity: 0.5 },
+    luts: [{ name: 'warm.cube', text: WARM_CUBE }],
+    assert: (project) => {
+      const { gpuEffectType, params } = item(project, 'text-1')?.effects?.[0]?.effect ?? {}
+      assert.deepEqual(
+        [gpuEffectType, params?.lutName, params?.lutSize, params?.intensity],
+        ['gpu-lut', 'Warm', '2', 0.5],
+      )
+    },
+    failure: { op: 'addLut', itemId: 'text-1', lut: 'not-provided.cube' },
+  },
+  {
     name: 'setTransform',
     op: { op: 'setTransform', id: 'text-1', transform: { opacity: 0.4, x: 12 } },
     assert: (project) =>
@@ -438,8 +453,13 @@ const cases = [
   },
 ]
 
-async function edit(page, project, ops, media) {
-  return page.evaluate((input) => window.freecut.editProject(input), { project, ops, media })
+async function edit(page, project, ops, media, luts) {
+  return page.evaluate((input) => window.freecut.editProject(input), {
+    project,
+    ops,
+    media,
+    luts,
+  })
 }
 
 async function main() {
@@ -473,7 +493,13 @@ async function main() {
     for (const testCase of cases) {
       const project = testCase.setup ? await testCase.setup(page) : baseProject()
       const operation = testCase.opFrom ? testCase.opFrom(project) : testCase.op
-      const result = await edit(page, project, testCase.ops ?? [operation], testCase.media)
+      const result = await edit(
+        page,
+        project,
+        testCase.ops ?? [operation],
+        testCase.media,
+        testCase.luts,
+      )
       assert.equal(result.ok, true, `${testCase.name} reports success`)
       testCase.assert(roundTrip(result.project))
 

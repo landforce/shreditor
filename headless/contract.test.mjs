@@ -74,6 +74,7 @@ const samples = {
   },
   removeEffect: { op: 'removeEffect', itemId: 'i', effectId: 'e' },
   updateEffect: { op: 'updateEffect', itemId: 'i', effectId: 'e', params: { amount: 0.2 } },
+  addLut: { op: 'addLut', itemId: 'i', lut: 'Warm Look.cube', intensity: 0.8 },
   setTransform: { op: 'setTransform', id: 'i', transform: { opacity: 0.5, rotation: 2 } },
 }
 
@@ -96,6 +97,9 @@ test('every published edit discriminator has a valid strict schema', () => {
     editOpSchema.safeParse({ op: 'setTransform', id: 'i', transform: {} }).success,
     false,
   )
+  for (const lut of ['look.png', '../look.cube', 'sub/look.cube', ''])
+    assert.equal(editOpSchema.safeParse({ ...samples.addLut, lut }).success, false, lut)
+  assert.equal(editOpSchema.safeParse({ ...samples.addLut, intensity: 1.5 }).success, false)
 })
 
 test('edit request requires exactly one project source and nonempty valid ops', () => {
