@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process'
 import crypto from 'node:crypto'
 import fs from 'node:fs'
 import os from 'node:os'
@@ -213,6 +214,52 @@ export async function saveProjectResource(
   })
 }
 
+let cachedMachineId = null
+
+/**
+ * A stable id for this Mac (~/.shreditor/machine-id, made once). The hostname
+ * isn't stable: macOS renames it when the network changes
+ * (Colins-MacBook-Pro.local one day, colins-mbp.lan the next), which made a
+ * dead service's lock look like another machine's and blocked every restart.
+ */
+export function machineId(home = os.homedir()) {
+  if (cachedMachineId) return cachedMachineId
+  const file = path.join(home, '.shreditor', 'machine-id')
+  try {
+    cachedMachineId = fs.readFileSync(file, 'utf8').trim()
+  } catch {
+    cachedMachineId = crypto.randomUUID()
+    try {
+      fs.mkdirSync(path.dirname(file), { recursive: true })
+      fs.writeFileSync(file, `${cachedMachineId}\n`, { flag: 'wx' })
+    } catch {
+      cachedMachineId = fs.readFileSync(file, 'utf8').trim()
+    }
+  }
+  return cachedMachineId
+}
+
+/** Names this Mac answers to now: the hostname, and the Bonjour name with and without .local. */
+function localHostNames() {
+  const names = new Set([os.hostname().toLowerCase()])
+  try {
+    const local = execFileSync('scutil', ['--get', 'LocalHostName'], { encoding: 'utf8' }).trim()
+    if (local) {
+      names.add(local.toLowerCase())
+      names.add(`${local.toLowerCase()}.local`)
+    }
+  } catch {
+    // Not macOS, or scutil unavailable: the hostname alone.
+  }
+  return names
+}
+
+/** Was this lock written on this machine? By machine id, else by any of its names. */
+export function isThisMachine(recorded) {
+  if (recorded.machineId) return recorded.machineId === machineId()
+  return !recorded.hostname || localHostNames().has(String(recorded.hostname).toLowerCase())
+}
+
 function localPidIsAlive(pid) {
   if (!Number.isInteger(pid) || pid <= 0) return null
   try {
@@ -243,7 +290,7 @@ export async function acquireWriterLock(
       } catch {
         throw new HttpError(503, 'WORKSPACE_LOCKED', 'Workspace writer lock is unreadable')
       }
-      const localHost = !recorded.hostname || recorded.hostname === os.hostname()
+      const localHost = isThisMachine(recorded)
       const alive = localHost ? localPidIsAlive(recorded.pid) : null
       if (alive !== false) {
         throw new HttpError(
@@ -286,7 +333,13 @@ export async function acquireWriterLock(
   }
   const token = crypto.randomUUID()
   await handle.writeFile(
-    JSON.stringify({ pid: process.pid, hostname: os.hostname(), token, createdAt: Date.now() }),
+    JSON.stringify({
+      pid: process.pid,
+      hostname: os.hostname(),
+      machineId: machineId(),
+      token,
+      createdAt: Date.now(),
+    }),
   )
   await handle.sync()
   await handle.close()

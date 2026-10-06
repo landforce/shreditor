@@ -108,3 +108,13 @@ test('media staging streams supported files and rejects traversal ids', async (t
     (error) => error.code === 'INVALID_ID',
   )
 })
+
+test('a writer lock from this Mac is recognised after macOS renames the host', async () => {
+  const { isThisMachine, machineId } = await import('./lib/lifecycle-store.mjs')
+  const os = await import('node:os')
+  assert.equal(isThisMachine({ machineId: machineId() }), true)
+  assert.equal(isThisMachine({ machineId: 'another-mac', hostname: os.hostname() }), false)
+  assert.equal(isThisMachine({ hostname: os.hostname().toUpperCase() }), true)
+  assert.equal(isThisMachine({ hostname: 'some-other-host.example' }), false)
+  assert.equal(isThisMachine({}), true)
+})
