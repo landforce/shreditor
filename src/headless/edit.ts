@@ -34,6 +34,8 @@ import { useTimelineSettingsStore } from '@/features/timeline/stores/timeline-se
 import { useMediaLibraryStore } from '@/features/media-library/stores/media-library-store'
 import { createClassicTrack } from '@/features/timeline/utils/classic-tracks'
 import { seedMediaLibrary } from './seed-media'
+import { applyTemplateOp, setTemplateEditInput, type TemplateOperationName } from './template-ops'
+import type { MotionTemplate } from '@/shared/motion-templates/template-core.mjs'
 import {
   addItem,
   updateItem,
@@ -91,6 +93,7 @@ export type EditOperationName =
   | 'updateEffect'
   | 'addLut'
   | 'setTransform'
+  | TemplateOperationName
 
 /** A wire operation. Node validates its discriminator and fields before this browser boundary. */
 export type EditOp = Record<string, unknown> & { op: EditOperationName }
@@ -102,6 +105,8 @@ export interface HeadlessEditInput {
   media?: Array<{ mediaId: string; metadata?: MediaMetadata }>
   /** Text of the workspace `luts/` files that addLut ops name (read by the Node side). */
   luts?: HeadlessLutFile[]
+  /** Library templates named by addTemplate/updateTemplate ops (read by the Node side). */
+  templates?: MotionTemplate[]
 }
 
 export interface HeadlessEditResult {
@@ -133,6 +138,9 @@ const REFERENCE_ID_FIELDS = new Set([
   'rightClipId',
   'effectId',
   'mediaId',
+  // Template ops: composition and control targets from createComposition results.
+  'compositionId',
+  'targetItemId',
 ])
 
 function resolveOperationRefs(
@@ -804,7 +812,7 @@ function applyOp(op: EditOp): unknown {
       return { id }
     }
     default:
-      throw new Error(`Unknown edit op: ${String(op.op)}`)
+      return applyTemplateOp(op, { overlap: context, canvas: editCanvas })
   }
 }
 
@@ -844,6 +852,7 @@ export async function editProject(input: HeadlessEditInput): Promise<HeadlessEdi
   await hydrateTimelineStoresFromProject(migrated)
   seedMediaLibrary(input.media)
   editLuts = input.luts ?? []
+  setTemplateEditInput(input.templates)
 
   log.info('Headless edit starting', { ops: input.ops.length })
 

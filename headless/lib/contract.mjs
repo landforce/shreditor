@@ -1,6 +1,11 @@
 import { readFileSync } from 'node:fs'
 import { z } from 'zod'
 import { FORMAT_IDS, getFormat } from '../../formats/registry.mjs'
+import {
+  TEMPLATE_OP_DESCRIPTIONS,
+  TEMPLATE_OP_NAMES,
+  TEMPLATE_OP_SCHEMAS,
+} from './template-contract.mjs'
 
 export const HEADLESS_API_VERSION = 1
 
@@ -270,6 +275,7 @@ const opSchemas = [
       ),
     })
     .strict(),
+  ...TEMPLATE_OP_SCHEMAS,
 ]
 
 export const EDIT_OPERATION_NAMES = [
@@ -295,6 +301,7 @@ export const EDIT_OPERATION_NAMES = [
   'updateEffect',
   'addLut',
   'setTransform',
+  ...TEMPLATE_OP_NAMES,
 ]
 const EDIT_OPERATION_DESCRIPTIONS = Object.fromEntries(
   EDIT_OPERATION_NAMES.map((name) => [name, samplesDescription(name)]),
@@ -324,6 +331,7 @@ function samplesDescription(name) {
     updateEffect: "Change an effect's params (merged) or turn it on/off",
     addLut: 'Add a gpu-lut effect from a .cube file in the workspace luts/ folder',
     setTransform: 'Update an item transform',
+    ...TEMPLATE_OP_DESCRIPTIONS,
   }
   return descriptions[name]
 }
@@ -459,6 +467,9 @@ export const lifecycleEditRequestSchema = z
       'rightClipId',
       'effectId',
       'mediaId',
+      // Template ops: composition and control targets from createComposition results.
+      'compositionId',
+      'targetItemId',
     ])
     for (let index = 0; index < value.ops.length; index++) {
       const callerId = value.ops[index]?.callerId

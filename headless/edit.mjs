@@ -79,7 +79,8 @@ async function main() {
 
   // Collect metadata for media referenced by addClip ops (for duration/fps/codec)
   // and the text of LUTs referenced by addLut ops.
-  const { media, luts } = collectEditResources(args.workspace, ops)
+  const resources = collectEditResources(args.workspace, ops)
+  const { media } = resources
   const missingMeta = media.filter((m) => !m.metadata).map((m) => m.mediaId)
   if (missingMeta.length > 0) {
     throw new Error(`addClip media not found in workspace: ${missingMeta.join(', ')}`)
@@ -102,8 +103,7 @@ async function main() {
         page.evaluate((payload) => window.freecut.editProject(payload), {
           project,
           ops,
-          media,
-          luts,
+          ...resources,
         }),
     )
   } finally {

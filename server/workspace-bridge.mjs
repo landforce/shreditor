@@ -12,6 +12,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { createEditorStateRoutes } from './editor-state.mjs'
 import { createMediaRoutes } from './media-bridge.mjs'
+import { createTemplateRoutes } from './template-bridge.mjs'
 import { createTranscriptionRoutes } from './transcription.mjs'
 
 const PREFIX = '/__shreditor/'
@@ -164,6 +165,8 @@ export function createWorkspaceBridge({ mode = 'dev' } = {}) {
   const editorStateRoutes = createEditorStateRoutes({ resolveInside, sendJson, readBody })
   // Native background transcription after imports (see transcription.mjs).
   const transcriptionRoutes = createTranscriptionRoutes({ sendJson, readBody })
+  // Motion template library change stamp (see template-bridge.mjs).
+  const templateRoutes = createTemplateRoutes({ sendJson })
   return async function workspaceBridge(req, res, next) {
     const url = new URL(req.url ?? '/', 'http://localhost')
     if (!url.pathname.startsWith(PREFIX)) return next?.()
@@ -175,6 +178,7 @@ export function createWorkspaceBridge({ mode = 'dev' } = {}) {
       if (await transcriptionRoutes(req, res, { route, rel, root, query: url.searchParams })) return
       if (await mediaRoutes(req, res, { route, rel, root, query: url.searchParams })) return
       if (await editorStateRoutes(req, res, { route, root, url })) return
+      if (await templateRoutes(req, res, { route, root })) return
       switch (route) {
         case 'GET info': {
           const config = readConfig()

@@ -7,6 +7,7 @@ import { chromium } from 'playwright'
 import { createHarnessServer } from './server.mjs'
 import { chromeLaunchArgs } from './lib/cli.mjs'
 import { EDIT_OPERATION_NAMES, editOpSchema } from './lib/contract.mjs'
+import { templateCases } from './template-edit-cases.mjs'
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 // 2x2x2 LUT that pushes everything warm.
@@ -453,14 +454,17 @@ const cases = [
   },
 ]
 
-async function edit(page, project, ops, media, luts) {
+async function edit(page, project, ops, media, luts, templates) {
   return page.evaluate((input) => window.freecut.editProject(input), {
     project,
     ops,
     media,
     luts,
+    ...(templates ? { templates } : {}),
   })
 }
+
+cases.push(...templateCases({ item, edit, baseProject }))
 
 async function main() {
   const distDir = path.join(ROOT, 'dist')
@@ -499,6 +503,7 @@ async function main() {
         testCase.ops ?? [operation],
         testCase.media,
         testCase.luts,
+        testCase.templates,
       )
       assert.equal(result.ok, true, `${testCase.name} reports success`)
       testCase.assert(roundTrip(result.project))

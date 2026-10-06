@@ -76,7 +76,43 @@ const samples = {
   updateEffect: { op: 'updateEffect', itemId: 'i', effectId: 'e', params: { amount: 0.2 } },
   addLut: { op: 'addLut', itemId: 'i', lut: 'Warm Look.cube', intensity: 0.8 },
   setTransform: { op: 'setTransform', id: 'i', transform: { opacity: 0.5, rotation: 2 } },
+  addTemplate: {
+    op: 'addTemplate',
+    template: 'Lower third',
+    from: 30,
+    durationInFrames: 90,
+    controls: { Name: 'Jane Doe', 'Bar colour': '#ff3366' },
+  },
+  updateTemplate: { op: 'updateTemplate', template: 'Lower third' },
+  setTemplateControls: {
+    op: 'setTemplateControls',
+    id: 'i',
+    controls: { Name: 'Bo', Accent: null },
+  },
+  createComposition: { op: 'createComposition', ids: ['bar', 'title'], name: 'Lower third' },
+  setCompositionControls: {
+    op: 'setCompositionControls',
+    compositionId: 'c',
+    controls: [{ name: 'Name', targetItemId: 'title', property: 'text.text' }],
+  },
 }
+
+test('template op schemas reject what the editor could not apply', () => {
+  const bad = [
+    { op: 'addTemplate' },
+    { op: 'addTemplate', template: 'x', controls: {} },
+    { op: 'addTemplate', template: 'x', controls: { Name: 3 } },
+    { op: 'setTemplateControls', id: 'i', controls: {} },
+    { op: 'createComposition', ids: [], name: 'x' },
+    { op: 'createComposition', ids: ['a'], name: '  ' },
+    {
+      op: 'setCompositionControls',
+      compositionId: 'c',
+      controls: [{ name: 'N', targetItemId: 't', property: 'text.fontSize' }],
+    },
+  ]
+  for (const op of bad) assert.equal(editOpSchema.safeParse(op).success, false, JSON.stringify(op))
+})
 
 test('every published edit discriminator has a valid strict schema', () => {
   assert.deepEqual(Object.keys(samples), EDIT_OPERATION_NAMES)
