@@ -40,6 +40,8 @@
       "**/*.test.ts",
       "**/*.test.tsx",
       "scripts/check-fallow-*.mjs",
+      // Quality evidence for media working copies (ffmpeg measurements, no product code).
+      "scripts/media-compat-quality.mjs",
       // Local Node tooling (CLI, workspace bridge, agent skill scripts), like scripts/ above.
       "bin/**",
       "server/**",

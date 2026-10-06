@@ -24,15 +24,3 @@ export async function requestNativeMedia(
     throw new Error('Invalid prepared media URL')
   return { url: result.url, alpha: result.alpha === true }
 }
-
-export async function prepareImportedVideo(file: File, mediaId: string): Promise<File | null> {
-  if (!file.type.startsWith('video/')) return null
-  const result = await requestNativeMedia(mediaId)
-  if (!result) return null
-  const response = await fetch(result.url)
-  if (!response.ok) throw new Error('Could not read prepared media')
-  return new File([await response.blob()], file.name, {
-    type: result.alpha ? 'video/quicktime' : 'video/mp4',
-    lastModified: file.lastModified,
-  })
-}

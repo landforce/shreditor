@@ -15,18 +15,34 @@ describe('workspace compatibility source selection', () => {
     const prepared = new Blob(['prepared'])
     mocked.readBlob.mockResolvedValueOnce(source).mockResolvedValueOnce(prepared)
     mocked.readJson.mockResolvedValue({
-      version: 1,
+      version: 2,
       file: `${'a'.repeat(64)}.mov`,
       source: { size: source.size, mtimeMs: 1234.5 },
       outputSize: prepared.size,
     })
     expect(await readMediaSource('clip')).toBe(prepared)
   })
+  it('reads a Matroska working copy and ignores older manifest versions', async () => {
+    const source = new File(['original'], 'original.mkv', { lastModified: 1234 })
+    const prepared = new Blob(['prepared'])
+    mocked.readBlob.mockResolvedValueOnce(source).mockResolvedValueOnce(prepared)
+    const manifest = {
+      version: 2,
+      file: `${'b'.repeat(64)}.mkv`,
+      source: { size: source.size, mtimeMs: 1234 },
+      outputSize: prepared.size,
+    }
+    mocked.readJson.mockResolvedValueOnce(manifest)
+    expect(await readMediaSource('clip')).toBe(prepared)
+    mocked.readBlob.mockResolvedValueOnce(source)
+    mocked.readJson.mockResolvedValueOnce({ ...manifest, version: 1 })
+    expect(await readMediaSource('clip')).toBe(source)
+  })
   it('does not use stale derivatives after source replacement', async () => {
     const source = new File(['original'], 'original.mov', { lastModified: 2000 })
     mocked.readBlob.mockResolvedValue(source)
     mocked.readJson.mockResolvedValue({
-      version: 1,
+      version: 2,
       file: `${'a'.repeat(64)}.mov`,
       source: { size: source.size, mtimeMs: 1234 },
       outputSize: 8,
@@ -43,7 +59,7 @@ describe('workspace compatibility source selection', () => {
   it('an incomplete derivative manifest does not hide the original', async () => {
     const source = new File(['original'], 'original.mov')
     mocked.readBlob.mockResolvedValue(source)
-    mocked.readJson.mockResolvedValue({ version: 1, file: `${'a'.repeat(64)}.mov` })
+    mocked.readJson.mockResolvedValue({ version: 2, file: `${'a'.repeat(64)}.mov` })
     expect(await readMediaSource('clip')).toBe(source)
   })
 })

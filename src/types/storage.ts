@@ -67,6 +67,65 @@ export interface NativeTranscriptionStatus {
   hint?: string
 }
 
+/** A probed file as the bridge records it (server/media-compatibility.mjs describeMedia). */
+export interface MediaStreamsDescription {
+  container?: string
+  duration?: number
+  video?: {
+    codec: string
+    profile?: string
+    pixFmt?: string
+    bitDepth?: number
+    chroma?: string
+    width?: number
+    height?: number
+    fps?: number
+    colorPrimaries?: string
+    colorTransfer?: string
+    colorSpace?: string
+    colorRange?: string
+    alpha?: boolean
+  }
+  audio?: { codec: string; sampleRate?: number; channels?: number; sampleFmt?: string }
+}
+
+/**
+ * Working copy the workspace bridge makes for media Chrome can't decode as it
+ * is (server/media-preparation.mjs). While it is 'preparing' or 'failed' the
+ * media can't be placed; when 'ready', the media's codec/size/mimeType fields
+ * describe the working copy and `original` the untouched original.
+ */
+export interface MediaCompatibility {
+  version: number
+  backend: 'native'
+  status?: 'preparing' | 'ready' | 'failed'
+  /** 0..1 while preparing. */
+  progress?: number
+  /** 'rewrap' | 'h264' | 'hevc' | 'prores-alpha' | 'vp9-alpha' */
+  action?: string
+  reason?: string
+  /** Why, in words ("Chrome can't decode ProRes ..."). */
+  detail?: string
+  alpha?: boolean
+  originalMimeType?: string
+  original?: MediaStreamsDescription
+  derivative?: MediaStreamsDescription & { file?: string }
+  /** Encoder settings, in words. */
+  settings?: string
+  /** Where the working copy differs from the original (bit depth, chroma, audio offset). */
+  notes?: string[]
+  verification?: {
+    frames?: [number | null, number | null]
+    framesMatch?: boolean
+    duration?: [number, number]
+    durationDelta?: number
+    audioOffsetDeltaMs?: number
+  }
+  error?: string
+  startedAt?: number
+  finishedAt?: number
+}
+
 export interface MediaMetadata {
   id: string
   /**
@@ -145,6 +204,8 @@ export interface MediaMetadata {
   tags: string[]
   /** Role in the edit (see {@link MediaCategory}); absent when uncategorized. */
   category?: MediaCategory
+  /** Working copy state when the original needs one (see {@link MediaCompatibility}). */
+  compatibility?: MediaCompatibility
   /**
    * Provenance for media pulled from a third-party provider (e.g. the
    * in-app LottieFiles browser). Persisted so the editor can surface the

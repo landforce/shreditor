@@ -54,7 +54,8 @@
     "changelog:append": "node scripts/changelog-append.mjs",
     "changelog:rollup": "node scripts/changelog-rollup.mjs",
     "prepare": "vp config",
-    "headless:test:compatibility": "node --test server/media-compatibility.test.mjs && node headless/media-compatibility-browser.mjs"
+    "headless:test:compatibility": "node --test server/media-compatibility.test.mjs server/media-preparation.test.mjs && node headless/media-compatibility-browser.mjs",
+    "media:quality": "node scripts/media-compat-quality.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "5.2.2",

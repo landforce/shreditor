@@ -125,8 +125,9 @@ Clip `volume` is plain gain with no limiter, so a loudness target (e.g. -14 LUFS
 
 ## Gotchas
 
-- **ProRes and other codecs browsers can't decode** will not play. `shred catalog` makes the playable copy for you (`proxy` in the catalog entry); import that. By hand: H.264 `-c:v libx264 -crf 16 -pix_fmt yuv420p`.
-- **Transparent video** (speaker cutouts, animated overlays) goes in as VP9 WebM with alpha (`-c:v libvpx-vp9 -pix_fmt yuva420p`; the catalog does this). Put it on a track above its background; it stays a separate layer. Check transparency on a rendered frame, not just in the preview.
+- **Files Chrome can't decode as they are** get a working copy on import (`shred import`, the editor's import): video copied into a playable container with PCM audio when only the container or audio is the problem, else HEVC Main10 (10-bit/HDR, same colour tags) or H.264 CRF 12 (8-bit, same chroma). ProRes is not converted (the editor decodes it itself). Never convert by hand; import the original. `metadata.json` `compatibility` records original, working copy, notes and checks.
+- **While a copy is made** the media is `preparing`: `shred import` waits (`--no-wait` returns at once), `shred media <id>` shows `making playable copy NN%`, `ready` or `failed: why` (`--wait`, `--retry`), the editor card shows it, and `addClip` with it fails with `MEDIA_NOT_READY` (409).
+- **Transparent video** (speaker cutouts, animated overlays) keeps its alpha. Put it on a track above its background; it stays a separate layer. Check transparency on a rendered frame, not just in the preview.
 - **The service holds the workspace writer lock** while it runs. Import with `shred import` (it does not need the lock). Never edit `project.json` by hand.
 - **Media imported while the editor is open** shows in its library within about a second (the editor polls the bridge). If it doesn't, reload the page; the timeline renders it either way.
 - `shred frames` renders the **saved** project. Apply first, then render.

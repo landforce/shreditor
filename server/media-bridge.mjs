@@ -31,6 +31,22 @@
 //     Also available as `shreditor import <file...> [--project <id>]`.
 //     Optional `category` (see below) is written into each file's metadata.
 //
+//     Video Chrome can't decode as it is gets a working copy in the background
+//     (server/media-preparation.mjs): its metadata says compatibility.status
+//     'preparing' with progress until 'ready' or 'failed'. `wait: true` waits.
+//
+//   POST media/ingest  { mediaId, fileName, projectId?, start? }
+//     For the editor's in-place import: whether a placed file needs a working
+//     copy ({ prepare }); with start, writes its metadata, links it to the
+//     project and starts the job ({ prepare: true, metadata }).
+//
+//   POST media/prepare  { mediaId, force? }
+//     Waits for the working copy (force: the browser failed to decode it):
+//     { prepared: false } or { prepared: true, url, alpha, cached }.
+//
+//   POST media/retry  { mediaId }
+//     Starts a failed preparation again. Returns { state }.
+//
 //   POST media/category  { items: [{ mediaId, category }] }
 //     Sets each media's category in media/{id}/metadata.json: 'speaker',
 //     'b-roll', 'graphics', 'overlay', 'voiceover', 'music', 'sfx', 'other',
@@ -50,9 +66,19 @@ import crypto from 'node:crypto'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { prepareCompatibleMedia } from './media-compatibility.mjs'
 import { resolveMediaFile } from '../headless/lib/workspace.mjs'
 import { autoTranscribe } from './transcription.mjs'
+import {
+  metadataFromProbe,
+  planFor,
+  preparationStates,
+  preparingRecord,
+  readMetadata,
+  resumePreparations,
+  retryPreparation,
+  startPreparation,
+  startPreparationDetached,
+} from './media-preparation.mjs'
 
 const SOURCE_LINK_FILENAME = 'source.link.json'
 
@@ -69,6 +95,13 @@ const MIME_BY_EXT = {
   '.webm': 'video/webm',
   '.mkv': 'video/x-matroska',
   '.avi': 'video/x-msvideo',
+  // Containers Chrome can't open; import rewraps or converts them (media-compatibility.mjs).
+  '.ts': 'video/mp2t',
+  '.mts': 'video/mp2t',
+  '.m2ts': 'video/mp2t',
+  '.mpg': 'video/mpeg',
+  '.mpeg': 'video/mpeg',
+  '.mxf': 'video/mxf',
   '.mp3': 'audio/mpeg',
   '.wav': 'audio/wav',
   '.ogg': 'audio/ogg',
@@ -312,50 +345,12 @@ function run(cmd, args) {
   })
 }
 
-// ffprobe codec names -> the names the editor's media worker (mediabunny) stores.
-const CODEC_NAMES = { h264: 'avc', mpeg4: 'mpeg4', pcm_s16le: 'pcm-s16', pcm_s24le: 'pcm-s24', pcm_f32le: 'pcm-f32' }
-const UNSUPPORTED_AUDIO = ['ac3', 'eac3', 'ec-3', 'ac-3', 'dts', 'truehd', 'mlp']
-
-function parseRate(rate) {
-  const [num, den] = String(rate ?? '').split('/').map(Number)
-  return den ? num / den : num || 0
-}
-
 async function probe(file) {
   try {
     return JSON.parse(await run('ffprobe', ['-v', 'error', '-print_format', 'json', '-show_format', '-show_streams', file]))
   } catch {
     return null
   }
-}
-
-function metadataFromProbe(probed, mimeType) {
-  const streams = probed?.streams ?? []
-  const video = streams.find((s) => s.codec_type === 'video' && !s.disposition?.attached_pic)
-  const audio = streams.find((s) => s.codec_type === 'audio')
-  const duration = Number(probed?.format?.duration) || Number(video?.duration) || Number(audio?.duration) || 0
-  const codecOf = (s) => (s ? (CODEC_NAMES[s.codec_name] ?? s.codec_name) : undefined)
-  const bitrate = Number(probed?.format?.bit_rate) || 0
-  if (mimeType.startsWith('video/') && video) {
-    const rotated = Math.abs(Number(video.side_data_list?.find((d) => 'rotation' in d)?.rotation ?? 0)) % 180 === 90
-    const audioCodec = codecOf(audio)
-    const codec = codecOf(video)
-    return {
-      duration,
-      width: (rotated ? video.height : video.width) ?? 0,
-      height: (rotated ? video.width : video.height) ?? 0,
-      fps: Number(parseRate(video.avg_frame_rate || video.r_frame_rate).toFixed(3)) || 30,
-      codec: codec ?? 'unknown',
-      bitrate,
-      audioCodec,
-      audioCodecSupported: !audioCodec || !UNSUPPORTED_AUDIO.some((c) => audioCodec.toLowerCase().includes(c)),
-      videoCodecSupported: codec !== 'prores',
-    }
-  }
-  if (mimeType.startsWith('audio/')) {
-    return { duration, width: 0, height: 0, fps: 0, codec: codecOf(audio) ?? 'unknown', bitrate }
-  }
-  return { duration: 0, width: video?.width ?? 0, height: video?.height ?? 0, fps: 0, codec: 'unknown', bitrate: 0 }
 }
 
 async function writeThumbnail(file, dir, metadata, mimeType) {
@@ -411,7 +406,7 @@ function associateWithProject(root, projectId, mediaId, resolveInside) {
  * metadata.json and thumbnail, and associate it with `projectId` if given.
  * Used by the HTTP route and by `shreditor import`.
  */
-export async function importMediaByPath(root, paths, { projectId, mode = 'auto', category, resolveInside } = {}) {
+export async function importMediaByPath(root, paths, { projectId, mode = 'auto', category, resolveInside, prepare = 'background' } = {}) {
   if (!Array.isArray(paths) || paths.length === 0) throw new MediaBridgeError(400, 'TypeError', 'paths must be a non-empty array')
   if (category !== undefined && category !== null && !CATEGORY_SET.has(category)) {
     throw new MediaBridgeError(400, 'TypeError', `category must be one of ${MEDIA_CATEGORIES.join(', ')}`)
@@ -425,6 +420,7 @@ export async function importMediaByPath(root, paths, { projectId, mode = 'auto',
   }
   const existing = listMediaMetadata(root)
   const results = []
+  const detached = []
   for (const sourcePath of paths) {
     try {
       const source = describeSource(sourcePath)
@@ -446,29 +442,20 @@ export async function importMediaByPath(root, paths, { projectId, mode = 'auto',
       try {
         const readable = placed.method === 'clone' ? path.join(dir, placed.entryName) : placed.sourcePath
         const probed = await probe(readable)
-        const prepared = placed.mimeType.startsWith('video/') && probed
-          ? await prepareCompatibleMedia(readable, dir) : null
-        const effectiveMime = prepared ? (prepared.manifest.policy.alpha ? 'video/quicktime' : 'video/mp4') : placed.mimeType
-        const details = metadataFromProbe(prepared?.manifest.probe ?? probed, effectiveMime)
-        const hasThumbnail = await writeThumbnail(readable, dir, details, placed.mimeType)
-        const now = Date.now()
-        const metadata = {
-          id: placed.id,
-          storageType: 'workspace',
-          fileName: placed.fileName,
-          fileSize: placed.size,
-          fileLastModified: placed.mtimeMs,
-          mimeType: effectiveMime,
-          ...details,
-          ...(prepared ? { compatibility: { version: 1, backend: 'native', reason: prepared.manifest.policy.reason, alpha: prepared.manifest.policy.alpha, originalMimeType: placed.mimeType } } : {}),
-          ...(hasThumbnail ? { thumbnailId: crypto.randomUUID() } : {}),
-          tags: [],
-          ...(category ? { category } : {}),
-          createdAt: now,
-          updatedAt: now,
-        }
-        writeJsonAtomic(path.join(dir, 'metadata.json'), metadata)
+        let metadata = await writeImportMetadata(readable, dir, {
+          id: placed.id, fileName: placed.fileName, fileSize: placed.size, fileLastModified: placed.mtimeMs, mimeType: placed.mimeType, category,
+        }, probed)
         if (projectId) associateWithProject(root, projectId, placed.id, inside)
+        if (metadata.compatibility?.status === 'preparing') {
+          if (prepare === 'detached') detached.push(placed.id)
+          else {
+            const job = startPreparation(root, placed.id)
+            if (prepare === 'wait') {
+              await job
+              metadata = readMetadata(root, placed.id) ?? metadata
+            }
+          }
+        }
         existing.push(metadata)
         autoTranscribe(root, placed.id)
         results.push({
@@ -487,10 +474,43 @@ export async function importMediaByPath(root, paths, { projectId, mode = 'auto',
         throw error
       }
     } catch (error) {
-      results.push({ sourcePath, error: { name: error.name, message: error.message } })
+      results.push({ sourcePath, error: { name: error.name, message: error.message, ...(error.code ? { code: error.code } : {}) } })
     }
   }
+  // One worker for the batch; it runs two jobs at a time.
+  if (detached.length) startPreparationDetached(root, detached)
   return results
+}
+
+/**
+ * Write metadata.json (and a thumbnail) for a placed media from its probe.
+ * Video the browser can't decode as it is gets a `compatibility` record in
+ * state 'preparing'; the caller starts the job. Throws HDR_POLICY_REQUIRED.
+ */
+async function writeImportMetadata(readable, dir, { id, fileName, fileSize, fileLastModified, mimeType, category }, probed) {
+  const { plan, error } = mimeType.startsWith('video/') && probed ? planFor(probed) : { plan: null }
+  if (error) throw error
+  const details = metadataFromProbe(probed, mimeType)
+  const hasThumbnail = await writeThumbnail(readable, dir, details, mimeType)
+  const now = Date.now()
+  const metadata = {
+    id,
+    storageType: 'workspace',
+    fileName,
+    fileSize,
+    fileLastModified,
+    mimeType,
+    ...details,
+    // Nothing plays until the working copy is ready.
+    ...(plan ? { videoCodecSupported: false, compatibility: preparingRecord(plan, probed, mimeType) } : {}),
+    ...(hasThumbnail ? { thumbnailId: crypto.randomUUID() } : {}),
+    tags: [],
+    ...(category ? { category } : {}),
+    createdAt: now,
+    updatedAt: now,
+  }
+  writeJsonAtomic(path.join(dir, 'metadata.json'), metadata)
+  return metadata
 }
 
 /**
@@ -565,6 +585,20 @@ export function projectMediaVersion(root, projectId, { resolveInside } = {}) {
   return `${ids.length}.${present}.${Math.round(newest)}`
 }
 
+// Working copies whose process died (a killed CLI worker, a restarted editor)
+// are picked up again by the open editor's media poll, at most every 10 s.
+const lastResume = new Map()
+function resumeStalePreparations(root) {
+  const now = Date.now()
+  if (now - (lastResume.get(root) ?? 0) < 10_000) return
+  lastResume.set(root, now)
+  try {
+    resumePreparations(root)
+  } catch {
+    // best effort
+  }
+}
+
 function defaultResolveInside(root, rel) {
   const full = path.join(root, ...String(rel).split('/').filter(Boolean))
   if (full !== root && !full.startsWith(root + path.sep)) throw new MediaBridgeError(403, 'SecurityError', 'Outside the workspace')
@@ -585,6 +619,10 @@ export function createMediaRoutes({ resolveInside, sendJson, readBody, serveFile
     } catch {
       throw new MediaBridgeError(400, 'SyntaxError', 'Body must be JSON')
     }
+  }
+  const mediaIdOf = (value) => {
+    if (typeof value !== 'string' || !ID_PATTERN.test(value)) throw new MediaBridgeError(400, 'TypeError', 'Invalid mediaId')
+    return value
   }
   const projectIdOf = (value) => {
     if (value === undefined || value === null || value === '') return undefined
@@ -619,36 +657,57 @@ export function createMediaRoutes({ resolveInside, sendJson, readBody, serveFile
           mode: body.mode ?? 'auto',
           category: body.category,
           resolveInside,
+          prepare: body.wait === true ? 'wait' : 'background',
         })
         sendJson(res, media.some((m) => !m.error) ? 200 : 422, { media })
         return true
       }
       case 'POST media/prepare': {
+        // Waits for the working copy (the frame decoder's safety net). The job
+        // is shared and keeps running if this request goes away.
         const body = await readJson(req)
-        if (typeof body.mediaId !== 'string' || !ID_PATTERN.test(body.mediaId)) throw new MediaBridgeError(400, 'TypeError', 'Invalid mediaId')
-        const source = resolveMediaFile(root, body.mediaId, { original: true })
+        const mediaId = mediaIdOf(body.mediaId)
+        if (!resolveMediaFile(root, mediaId, { original: true })) throw new MediaBridgeError(404, 'NotFoundError', 'Media source is missing')
+        const result = await startPreparation(root, mediaId, { force: body.force === true })
+        if (result.status === 'failed') throw result.error
+        const manifest = result.prepared?.manifest
+        sendJson(res, 200, manifest ? {
+          prepared: true, cached: result.prepared.cached,
+          url: `/__shreditor/fs/file?path=${encodeURIComponent(`media/${mediaId}/cache/compatibility/${manifest.file}`)}`,
+          alpha: manifest.policy.alpha,
+        } : { prepared: false })
+        return true
+      }
+      case 'POST media/ingest': {
+        // In-place import from the editor: does this placed file need a working
+        // copy? With start: write its metadata, link it, and start the job.
+        const body = await readJson(req)
+        const mediaId = mediaIdOf(body.mediaId)
+        const source = resolveMediaFile(root, mediaId, { original: true })
         if (!source) throw new MediaBridgeError(404, 'NotFoundError', 'Media source is missing')
-        const controller = new AbortController()
-        const cancel = () => { if (!res.writableEnded) controller.abort() }
-        res.once('close', cancel)
-        try {
-          const prepared = await prepareCompatibleMedia(source, path.join(root, 'media', body.mediaId), { force: body.force === true, signal: controller.signal })
-          if (prepared) {
-            const metadataPath = path.join(root, 'media', body.mediaId, 'metadata.json')
-            if (fs.existsSync(metadataPath)) {
-              const previous = JSON.parse(fs.readFileSync(metadataPath, 'utf8'))
-              const mimeType = prepared.manifest.policy.alpha ? 'video/quicktime' : 'video/mp4'
-              writeJsonAtomic(metadataPath, { ...previous, ...metadataFromProbe(prepared.manifest.probe, mimeType), mimeType,
-                compatibility: { version: 1, backend: 'native', reason: prepared.manifest.policy.reason, alpha: prepared.manifest.policy.alpha },
-                updatedAt: Date.now() })
-            }
-          }
-          sendJson(res, 200, prepared ? {
-            prepared: true, cached: prepared.cached,
-            url: `/__shreditor/fs/file?path=${encodeURIComponent(`media/${body.mediaId}/cache/compatibility/${prepared.manifest.file}`)}`,
-            alpha: prepared.manifest.policy.alpha,
-          } : { prepared: false })
-        } finally { res.off('close', cancel) }
+        const fileName = typeof body.fileName === 'string' && body.fileName ? body.fileName : path.basename(source)
+        const mimeType = MIME_BY_EXT[path.extname(fileName).toLowerCase()] ?? MIME_BY_EXT[path.extname(source).toLowerCase()]
+        const probed = mimeType?.startsWith('video/') ? await probe(source) : null
+        const { plan, error } = probed ? planFor(probed) : { plan: null }
+        if (error) throw error
+        if (!plan || !body.start) {
+          sendJson(res, 200, { prepare: Boolean(plan), ...(plan ? { action: plan.action, detail: plan.detail } : {}) })
+          return true
+        }
+        const projectId = projectIdOf(body.projectId)
+        const st = fs.statSync(source)
+        const dir = path.join(root, 'media', mediaId)
+        const metadata = await writeImportMetadata(source, dir, { id: mediaId, fileName, fileSize: st.size, fileLastModified: Math.round(st.mtimeMs), mimeType }, probed)
+        if (projectId) associateWithProject(root, projectId, mediaId, resolveInside)
+        void startPreparation(root, mediaId)
+        sendJson(res, 200, { prepare: true, metadata })
+        return true
+      }
+      case 'POST media/retry': {
+        const body = await readJson(req)
+        const mediaId = mediaIdOf(body.mediaId)
+        void retryPreparation(root, mediaId)
+        sendJson(res, 200, { state: preparationStates(root, [mediaId])[0] })
         return true
       }
       case 'POST media/category': {
@@ -659,6 +718,7 @@ export function createMediaRoutes({ resolveInside, sendJson, readBody, serveFile
       case 'GET media/version': {
         const projectId = projectIdOf(query?.get('projectId'))
         if (!projectId) throw new MediaBridgeError(400, 'TypeError', 'projectId is required')
+        resumeStalePreparations(root)
         sendJson(res, 200, { version: projectMediaVersion(root, projectId, { resolveInside }) })
         return true
       }

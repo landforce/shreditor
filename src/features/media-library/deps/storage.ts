@@ -40,7 +40,10 @@ export {
 } from '@/infrastructure/storage'
 export {
   canImportMediaInPlace,
+  checkPlacedMediaPreparation,
   chooseMediaInPlace,
   discardPlacedMedia,
   getPlacedMediaId,
+  retryMediaPreparation,
+  startPlacedMediaPreparation,
 } from '@/infrastructure/storage/bridge-fs/bridge-media'
