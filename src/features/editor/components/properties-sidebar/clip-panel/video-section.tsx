@@ -8,6 +8,7 @@ import type { CropSettings } from '@/types/transform'
 import type { ItemKeyframes } from '@/types/keyframe'
 import {
   captureSnapshot,
+  executeTimelineCommand,
   rateStretchItemWithoutHistory,
   useKeyframesStore,
   useTimelineCommandStore,
@@ -28,7 +29,7 @@ import {
   resolveAnimatedCrop,
 } from '@/features/editor/deps/keyframes'
 import { PropertySection, PropertyRow, SliderInput } from '../components'
-import { getMixedValue } from '../utils'
+import { getMixedValue, updateItemsInOneStep } from '../utils'
 import {
   cropPixelsToRatio,
   cropSignedPixelsToRatio,
@@ -350,10 +351,10 @@ export function VideoSection({ items }: VideoSectionProps) {
 
   const handleFadeInChange = useCallback(
     (value: number) => {
-      videoItemIds.forEach((id) => updateItem(id, { fadeIn: value }))
+      updateItemsInOneStep('SET_FADE_IN', videoItemIds, { fadeIn: value })
       commitPreviewClear()
     },
-    [videoItemIds, updateItem, commitPreviewClear],
+    [videoItemIds, commitPreviewClear],
   )
 
   const handleFadeOutLiveChange = useCallback(
@@ -369,10 +370,10 @@ export function VideoSection({ items }: VideoSectionProps) {
 
   const handleFadeOutChange = useCallback(
     (value: number) => {
-      videoItemIds.forEach((id) => updateItem(id, { fadeOut: value }))
+      updateItemsInOneStep('SET_FADE_OUT', videoItemIds, { fadeOut: value })
       commitPreviewClear()
     },
-    [videoItemIds, updateItem, commitPreviewClear],
+    [videoItemIds, commitPreviewClear],
   )
 
   const previewCropEdge = useCallback(
@@ -396,27 +397,30 @@ export function VideoSection({ items }: VideoSectionProps) {
       const snappedPixels = snapCropPixels(pixels)
       const autoOps: AutoKeyframeOperation[] = []
 
-      cropItems.forEach((item) => {
-        const operation = getAutoKeyframeOperation(
-          item,
-          keyframesByItemId.get(item.id) ?? undefined,
-          property,
-          snappedPixels,
-          currentFrame,
-        )
-        if (operation) {
-          autoOps.push(operation)
-          return
-        }
+      // Every selected clip in one undo step.
+      executeTimelineCommand('SET_CROP', () => {
+        cropItems.forEach((item) => {
+          const operation = getAutoKeyframeOperation(
+            item,
+            keyframesByItemId.get(item.id) ?? undefined,
+            property,
+            snappedPixels,
+            currentFrame,
+          )
+          if (operation) {
+            autoOps.push(operation)
+            return
+          }
 
-        updateItem(item.id, {
-          crop: buildCropUpdate(item.crop, edge, snappedPixels, getCropDimensions(item)),
+          updateItem(item.id, {
+            crop: buildCropUpdate(item.crop, edge, snappedPixels, getCropDimensions(item)),
+          })
         })
-      })
 
-      if (autoOps.length > 0) {
-        applyAutoKeyframeOperations(autoOps)
-      }
+        if (autoOps.length > 0) {
+          applyAutoKeyframeOperations(autoOps)
+        }
+      })
 
       commitPreviewClear()
     },
@@ -450,27 +454,30 @@ export function VideoSection({ items }: VideoSectionProps) {
       const snappedPixels = snapCropPixels(pixels)
       const autoOps: AutoKeyframeOperation[] = []
 
-      cropItems.forEach((item) => {
-        const operation = getAutoKeyframeOperation(
-          item,
-          keyframesByItemId.get(item.id) ?? undefined,
-          'cropSoftness',
-          snappedPixels,
-          currentFrame,
-        )
-        if (operation) {
-          autoOps.push(operation)
-          return
-        }
+      // Every selected clip in one undo step.
+      executeTimelineCommand('SET_CROP', () => {
+        cropItems.forEach((item) => {
+          const operation = getAutoKeyframeOperation(
+            item,
+            keyframesByItemId.get(item.id) ?? undefined,
+            'cropSoftness',
+            snappedPixels,
+            currentFrame,
+          )
+          if (operation) {
+            autoOps.push(operation)
+            return
+          }
 
-        updateItem(item.id, {
-          crop: buildCropSoftnessUpdate(item.crop, snappedPixels, getCropDimensions(item)),
+          updateItem(item.id, {
+            crop: buildCropSoftnessUpdate(item.crop, snappedPixels, getCropDimensions(item)),
+          })
         })
-      })
 
-      if (autoOps.length > 0) {
-        applyAutoKeyframeOperations(autoOps)
-      }
+        if (autoOps.length > 0) {
+          applyAutoKeyframeOperations(autoOps)
+        }
+      })
 
       commitPreviewClear()
     },
@@ -521,9 +528,9 @@ export function VideoSection({ items }: VideoSectionProps) {
         videoItemIds.includes(item.id) && ((item as VideoItem).fadeIn ?? 0) > tolerance,
     )
     if (needsUpdate) {
-      videoItemIds.forEach((id) => updateItem(id, { fadeIn: 0 }))
+      updateItemsInOneStep('RESET_FADE_IN', videoItemIds, { fadeIn: 0 })
     }
-  }, [updateItem, videoItemIds])
+  }, [videoItemIds])
 
   const handleResetFadeOut = useCallback(() => {
     const tolerance = 0.01
@@ -533,9 +540,9 @@ export function VideoSection({ items }: VideoSectionProps) {
         videoItemIds.includes(item.id) && ((item as VideoItem).fadeOut ?? 0) > tolerance,
     )
     if (needsUpdate) {
-      videoItemIds.forEach((id) => updateItem(id, { fadeOut: 0 }))
+      updateItemsInOneStep('RESET_FADE_OUT', videoItemIds, { fadeOut: 0 })
     }
-  }, [updateItem, videoItemIds])
+  }, [videoItemIds])
 
   if (cropItems.length === 0) return null
 

@@ -4,7 +4,11 @@ import { Music, RotateCcw, Volume2 } from 'lucide-react'
 import { useShallow } from 'zustand/react/shallow'
 import { Button } from '@/components/ui/button'
 import type { TimelineItem } from '@/types/timeline'
-import { useKeyframesStore, useTimelineStore } from '@/features/editor/deps/timeline-store'
+import {
+  executeTimelineCommand,
+  useKeyframesStore,
+  useTimelineStore,
+} from '@/features/editor/deps/timeline-store'
 import { useGizmoStore, useThrottledFrame } from '@/features/editor/deps/preview'
 import {
   getAutoKeyframeOperation,
@@ -14,7 +18,7 @@ import {
   KeyframeToggle,
 } from '@/features/editor/deps/keyframes'
 import { PropertyRow, PropertySection, SliderInput } from '../components'
-import { getMixedValue } from '../utils'
+import { getMixedValue, updateItemsInOneStep } from '../utils'
 import { getAudioSectionItems } from './audio-section-utils'
 import { AudioEqPanelContent } from './audio-eq-panel-content'
 import { AudioDynamicsSection } from './audio-dynamics-section'
@@ -54,6 +58,10 @@ export function AudioSection({ items }: AudioSectionProps) {
   const audioItems = useMemo(() => getAudioSectionItems(items), [items])
 
   const itemIds = useMemo(() => audioItems.map((item) => item.id), [audioItems])
+  const updateEach = useCallback(
+    (type: string, updates: Partial<TimelineItem>) => updateItemsInOneStep(type, itemIds, updates),
+    [itemIds],
+  )
   const audioItemsById = useMemo(
     () => new Map(audioItems.map((item) => [item.id, item])),
     [audioItems],
@@ -132,12 +140,11 @@ export function AudioSection({ items }: AudioSectionProps) {
           fallbackItemIds.push(itemId)
         }
       }
-      if (autoOps.length > 0) {
-        applyAutoKeyframeOperations(autoOps)
-      }
-      if (fallbackItemIds.length > 0) {
+      // Keyframed and plain clips change together: one undo step.
+      executeTimelineCommand('SET_VOLUME', () => {
+        if (autoOps.length > 0) applyAutoKeyframeOperations(autoOps)
         fallbackItemIds.forEach((id) => updateItem(id, { volume: value }))
-      }
+      })
       queueMicrotask(() => clearPreview())
     },
     [applyAutoKeyframeOperations, autoKeyframeVolume, clearPreview, itemIds, updateItem],
@@ -156,10 +163,10 @@ export function AudioSection({ items }: AudioSectionProps) {
 
   const handleFadeInChange = useCallback(
     (value: number) => {
-      itemIds.forEach((id) => updateItem(id, { audioFadeIn: value }))
+      updateEach('SET_AUDIO_FADE_IN', { audioFadeIn: value })
       queueMicrotask(() => clearPreview())
     },
-    [clearPreview, itemIds, updateItem],
+    [clearPreview, updateEach],
   )
 
   const handleFadeOutLiveChange = useCallback(
@@ -175,10 +182,10 @@ export function AudioSection({ items }: AudioSectionProps) {
 
   const handleFadeOutChange = useCallback(
     (value: number) => {
-      itemIds.forEach((id) => updateItem(id, { audioFadeOut: value }))
+      updateEach('SET_AUDIO_FADE_OUT', { audioFadeOut: value })
       queueMicrotask(() => clearPreview())
     },
-    [clearPreview, itemIds, updateItem],
+    [clearPreview, updateEach],
   )
 
   const handleAudioPitchLiveChange = useCallback(
@@ -212,7 +219,7 @@ export function AudioSection({ items }: AudioSectionProps) {
         >
       })
       setPropertiesPreviewNew(previews)
-      itemIds.forEach((id) => updateItem(id, { [field]: value } as Partial<TimelineItem>))
+      updateEach('SET_AUDIO_PITCH', { [field]: value } as Partial<TimelineItem>)
 
       const schedule =
         typeof window !== 'undefined' && typeof window.requestAnimationFrame === 'function'
@@ -242,7 +249,7 @@ export function AudioSection({ items }: AudioSectionProps) {
         })
       })
     },
-    [clearPreviewForItems, itemIds, setPropertiesPreviewNew, updateItem],
+    [clearPreviewForItems, itemIds, setPropertiesPreviewNew, updateEach],
   )
 
   const handleResetVolume = useCallback(() => {
@@ -252,9 +259,9 @@ export function AudioSection({ items }: AudioSectionProps) {
       (item) => itemIds.includes(item.id) && Math.abs(item.volume ?? 0) > tolerance,
     )
     if (needsUpdate) {
-      itemIds.forEach((id) => updateItem(id, { volume: 0 }))
+      updateEach('RESET_VOLUME', { volume: 0 })
     }
-  }, [itemIds, updateItem])
+  }, [itemIds, updateEach])
 
   const handleResetFadeIn = useCallback(() => {
     const tolerance = 0.01
@@ -263,9 +270,9 @@ export function AudioSection({ items }: AudioSectionProps) {
       (item) => itemIds.includes(item.id) && (item.audioFadeIn ?? 0) > tolerance,
     )
     if (needsUpdate) {
-      itemIds.forEach((id) => updateItem(id, { audioFadeIn: 0 }))
+      updateEach('RESET_AUDIO_FADE_IN', { audioFadeIn: 0 })
     }
-  }, [itemIds, updateItem])
+  }, [itemIds, updateEach])
 
   const handleResetFadeOut = useCallback(() => {
     const tolerance = 0.01
@@ -274,9 +281,9 @@ export function AudioSection({ items }: AudioSectionProps) {
       (item) => itemIds.includes(item.id) && (item.audioFadeOut ?? 0) > tolerance,
     )
     if (needsUpdate) {
-      itemIds.forEach((id) => updateItem(id, { audioFadeOut: 0 }))
+      updateEach('RESET_AUDIO_FADE_OUT', { audioFadeOut: 0 })
     }
-  }, [itemIds, updateItem])
+  }, [itemIds, updateEach])
 
   const handleResetPitchSemitones = useCallback(() => {
     const currentItems = useTimelineStore.getState().items
@@ -284,9 +291,9 @@ export function AudioSection({ items }: AudioSectionProps) {
       (item) => itemIds.includes(item.id) && (item.audioPitchSemitones ?? 0) !== 0,
     )
     if (needsUpdate) {
-      itemIds.forEach((id) => updateItem(id, { audioPitchSemitones: 0 }))
+      updateEach('RESET_AUDIO_PITCH', { audioPitchSemitones: 0 })
     }
-  }, [itemIds, updateItem])
+  }, [itemIds, updateEach])
 
   const handleResetPitchCents = useCallback(() => {
     const currentItems = useTimelineStore.getState().items
@@ -294,9 +301,9 @@ export function AudioSection({ items }: AudioSectionProps) {
       (item) => itemIds.includes(item.id) && (item.audioPitchCents ?? 0) !== 0,
     )
     if (needsUpdate) {
-      itemIds.forEach((id) => updateItem(id, { audioPitchCents: 0 }))
+      updateEach('RESET_AUDIO_PITCH', { audioPitchCents: 0 })
     }
-  }, [itemIds, updateItem])
+  }, [itemIds, updateEach])
 
   if (audioItems.length === 0) return null
 

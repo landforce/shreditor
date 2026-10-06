@@ -47,6 +47,58 @@ describe('SliderInput', () => {
     expect(onChange).toHaveBeenCalledWith(6)
   })
 
+  it('commits a drag whose live change feeds back into the value (speed)', () => {
+    const onChange = vi.fn()
+    let rerenderWith: (value: number) => void = () => {}
+    const onLiveChange = vi.fn((value: number) => rerenderWith(value))
+
+    const { rerender } = render(
+      <SliderInput
+        value={0}
+        onChange={onChange}
+        onLiveChange={onLiveChange}
+        min={0}
+        max={10}
+        step={1}
+        liveChangeThrottleMs={0}
+      />,
+    )
+    rerenderWith = (value) =>
+      rerender(
+        <SliderInput
+          value={value}
+          onChange={onChange}
+          onLiveChange={onLiveChange}
+          min={0}
+          max={10}
+          step={1}
+          liveChangeThrottleMs={0}
+        />,
+      )
+
+    const track = screen.getByText('0').closest('div[class*="relative"]') as HTMLDivElement
+    track.getBoundingClientRect = () => ({
+      x: 0,
+      y: 0,
+      top: 0,
+      left: 0,
+      right: 200,
+      bottom: 28,
+      width: 200,
+      height: 28,
+      toJSON: () => ({}),
+    })
+    ;(track as HTMLDivElement).setPointerCapture = vi.fn()
+
+    fireEvent.pointerDown(track, { clientX: 0, clientY: 14, pointerId: 1 })
+    fireEvent.pointerMove(track, { clientX: 80, clientY: 14, pointerId: 1 })
+    fireEvent.pointerMove(track, { clientX: 120, clientY: 14, pointerId: 1 })
+    fireEvent.pointerUp(track, { clientX: 120, clientY: 14, pointerId: 1 })
+
+    expect(onChange).toHaveBeenCalledTimes(1)
+    expect(onChange).toHaveBeenCalledWith(6)
+  })
+
   it('reflects committed text entry without waiting for a parent rerender', async () => {
     const onChange = vi.fn()
 

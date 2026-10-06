@@ -16,10 +16,10 @@ import {
 } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
 import { cn } from '@/shared/ui/cn'
-import { useTimelineStore } from '@/features/editor/deps/timeline-store'
 import { useGizmoStore } from '@/features/editor/deps/preview'
 import { type TimelineItem } from '@/types/timeline'
 import { NumberInput } from '../components'
+import { updateItemsInOneStep } from '../utils'
 import { RotaryKnob } from '@/shared/ui/property-controls/rotary-knob'
 import { getMixedValue } from '../utils/mixed-value'
 import { AudioEqCurveEditor, type AudioEqPatch } from './audio-eq-curve-editor'
@@ -925,7 +925,6 @@ export function AudioEqPanelContent({
   const isDetachedLayout = layoutMode === 'detached'
   const isCompactLayout = layoutMode === 'compact'
   const eqEnabled = enabled !== false
-  const updateItem = useTimelineStore((s) => s.updateItem)
   const setPropertiesPreviewNew = useGizmoStore((s) => s.setPropertiesPreviewNew)
   const clearPreviewForItems = useGizmoStore((s) => s.clearPreviewForItems)
 
@@ -942,9 +941,9 @@ export function AudioEqPanelContent({
 
   const handleClipEqEnabledChange = useCallback(
     (checked: boolean) => {
-      itemIds.forEach((id) => updateItem(id, { audioEqEnabled: checked }))
+      updateItemsInOneStep('SET_AUDIO_EQ', itemIds, { audioEqEnabled: checked })
     },
-    [itemIds, updateItem],
+    [itemIds],
   )
 
   const resolvedTrackEq = useMemo(
@@ -1383,11 +1382,11 @@ export function AudioEqPanelContent({
         onTrackEqChange(patch)
       } else {
         const normalizedPatch = toTimelineEqPatch(patch)
-        itemIds.forEach((id) => updateItem(id, normalizedPatch))
+        updateItemsInOneStep('SET_AUDIO_EQ', itemIds, normalizedPatch)
         queueMicrotask(() => clearClipEqPreview())
       }
     },
-    [clearClipEqPreview, isTrackMode, itemIds, onTrackEqChange, updateItem],
+    [clearClipEqPreview, isTrackMode, itemIds, onTrackEqChange],
   )
 
   const handleEqPresetChange = useCallback(
@@ -1405,11 +1404,11 @@ export function AudioEqPanelContent({
         onTrackEqChange(buildTimelineEqPatchFromResolvedSettings(preset.settings))
       } else {
         const patch = buildTimelineEqPatchFromResolvedSettings(preset.settings)
-        itemIds.forEach((id) => updateItem(id, patch))
+        updateItemsInOneStep('SET_AUDIO_EQ', itemIds, patch)
         queueMicrotask(() => clearClipEqPreview())
       }
     },
-    [clearClipEqPreview, isTrackMode, itemIds, onTrackEqChange, updateItem],
+    [clearClipEqPreview, isTrackMode, itemIds, onTrackEqChange],
   )
 
   const handleEqFieldChange = useCallback(

@@ -255,8 +255,11 @@ export const SliderInput = memo(function SliderInput({
   )
 
   useEffect(() => {
-    localValueRef.current = localValue
+    // While dragging, the pointer handlers own the value. A live change that
+    // feeds back into `value` (speed retimes the clip) re-runs this effect, and
+    // resetting the ref here would make pointerup commit nothing.
     if (!isInteracting) {
+      localValueRef.current = localValue
       updateDisplayedValue(localValue)
     }
   }, [isInteracting, localValue, updateDisplayedValue])

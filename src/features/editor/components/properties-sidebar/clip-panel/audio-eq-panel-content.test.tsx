@@ -71,6 +71,7 @@ vi.mock('@/shared/ui/property-controls/rotary-knob', () => ({
 
 vi.mock('@/features/editor/deps/timeline-store', () => ({
   useTimelineStore: createStoreHook(timelineState),
+  executeTimelineCommand: (_type: string, action: () => unknown) => action(),
 }))
 
 vi.mock('@/features/editor/deps/preview', () => ({
