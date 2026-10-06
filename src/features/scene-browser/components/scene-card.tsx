@@ -2,11 +2,13 @@ import { memo, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Film, Palette, Search } from 'lucide-react'
 import { cn } from '@/shared/ui/cn'
-import { formatDuration } from '../deps/media-library'
+import { cappedAspectBoxStyle } from '@/shared/ui/aspect-box'
+import { formatDuration, useMediaLibraryStore } from '../deps/media-library'
 import { useCaptionThumbnail } from '../hooks/use-caption-thumbnail'
 import { useSceneBrowserStore } from '../stores/scene-browser-store'
 import { nearestColorFamily } from '../utils/color-boost'
 import { seekToScene } from '../utils/seek'
+import { getSceneThumbAspect } from '../utils/scene-thumb-size'
 import { SceneMatchBadges, SceneMatchStrength } from './scene-match-badges'
 import { ScenePaletteSwatches } from './scene-palette-swatches'
 import type { ScoredScene } from '../utils/rank'
@@ -22,6 +24,9 @@ interface SceneCardVariantProps {
   /** Present while a search is active; toggling it preserves the fiber instead of remounting. */
   match?: SceneMatchState
 }
+
+/** Matches the old `max-h-32`: a tall (9:16) thumbnail narrows instead of growing. */
+const SCENE_CARD_THUMB_MAX_HEIGHT_PX = 128
 
 type SceneMatchRank = 'top' | 'default'
 type SceneMatchState = { rank: SceneMatchRank }
@@ -42,6 +47,11 @@ function SceneCardBase({ scene, mediaName, match }: SceneCardBaseProps) {
       ? undefined
       : { mediaId: scene.mediaId, captionIndex, timeSec: scene.timeSec },
   )
+
+  const thumbAspect = useMediaLibraryStore((s) => {
+    const media = s.mediaById[scene.mediaId]
+    return getSceneThumbAspect(media?.width, media?.height)
+  })
 
   const setQuery = useSceneBrowserStore((s) => s.setQuery)
   const setReference = useSceneBrowserStore((s) => s.setReference)
@@ -120,7 +130,10 @@ function SceneCardBase({ scene, mediaName, match }: SceneCardBaseProps) {
       )}
       title={t('sceneBrowser.scene.previewAndDragHint')}
     >
-      <div className="relative aspect-video max-h-32 w-full shrink-0 overflow-hidden rounded-md bg-secondary">
+      <div
+        className="relative mx-auto shrink-0 overflow-hidden rounded-md bg-secondary"
+        style={cappedAspectBoxStyle(thumbAspect, SCENE_CARD_THUMB_MAX_HEIGHT_PX)}
+      >
         {thumbUrl ? (
           <img
             src={thumbUrl}

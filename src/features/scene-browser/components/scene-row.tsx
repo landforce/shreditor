@@ -2,11 +2,12 @@ import { memo, useCallback, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Clock, Film, Palette, Search } from 'lucide-react'
 import { cn } from '@/shared/ui/cn'
-import { formatDuration } from '../deps/media-library'
+import { formatDuration, useMediaLibraryStore } from '../deps/media-library'
 import { useCaptionThumbnail } from '../hooks/use-caption-thumbnail'
 import { useSceneBrowserStore } from '../stores/scene-browser-store'
 import { nearestColorFamily } from '../utils/color-boost'
 import { seekToScene } from '../utils/seek'
+import { fitSceneThumb, getSceneThumbAspect } from '../utils/scene-thumb-size'
 import { HighlightedText } from './highlighted-text'
 import { SceneMatchBadges, SceneMatchStrength } from './scene-match-badges'
 import { ScenePaletteSwatches } from './scene-palette-swatches'
@@ -23,6 +24,9 @@ interface SceneRowVariantProps {
   /** Present while a search is active; toggling it preserves the fiber instead of remounting. */
   match?: SceneMatchState
 }
+
+/** The row's thumbnail slot (w-24 h-[54px]); the thumbnail fits inside at its media's shape. */
+const SCENE_ROW_THUMB_SLOT = { width: 96, height: 54 } as const
 
 type SceneMatchRank = 'top' | 'default'
 type SceneMatchState = { rank: SceneMatchRank }
@@ -46,6 +50,16 @@ function SceneRowBase({ scene, mediaName, match }: SceneRowBaseProps) {
     scene.thumbRelPath || captionIndex === null
       ? undefined
       : { mediaId: scene.mediaId, captionIndex, timeSec: scene.timeSec },
+  )
+
+  const thumbAspect = useMediaLibraryStore((s) => {
+    const media = s.mediaById[scene.mediaId]
+    return getSceneThumbAspect(media?.width, media?.height)
+  })
+  const thumbSize = fitSceneThumb(
+    thumbAspect,
+    SCENE_ROW_THUMB_SLOT.width,
+    SCENE_ROW_THUMB_SLOT.height,
   )
 
   const handleOpen = useCallback(() => {
@@ -126,23 +140,29 @@ function SceneRowBase({ scene, mediaName, match }: SceneRowBaseProps) {
       )}
       title={t('sceneBrowser.scene.previewAndDragHint')}
     >
-      <div className="relative h-[54px] w-24 shrink-0 overflow-hidden rounded-md bg-secondary">
-        {thumbUrl ? (
-          <img
-            src={thumbUrl}
-            alt=""
-            className="h-full w-full object-cover"
-            loading="lazy"
-            draggable={false}
-          />
-        ) : (
-          <div className="flex h-full w-full items-center justify-center text-muted-foreground">
-            <Film className="h-4 w-4" />
+      <div className="relative flex h-[54px] w-24 shrink-0 items-center justify-center">
+        <div
+          className="relative shrink-0 overflow-hidden rounded-md bg-secondary"
+          style={thumbSize}
+        >
+          {thumbUrl ? (
+            <img
+              src={thumbUrl}
+              alt=""
+              className="h-full w-full object-cover"
+              loading="lazy"
+              draggable={false}
+            />
+          ) : (
+            <div className="flex h-full w-full items-center justify-center text-muted-foreground">
+              <Film className="h-4 w-4" />
+            </div>
+          )}
+          <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 transition-opacity group-hover:opacity-100">
+            <Search className="h-4 w-4 text-white/90" />
           </div>
-        )}
-        <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 transition-opacity group-hover:opacity-100">
-          <Search className="h-4 w-4 text-white/90" />
         </div>
+        {/* On the slot, not the thumbnail, so a narrow (9:16) thumbnail never clips it. */}
         <span className="absolute bottom-0.5 right-0.5 rounded bg-black/70 px-1 font-mono text-[10px] leading-none text-white/90">
           {timestampLabel}
         </span>
