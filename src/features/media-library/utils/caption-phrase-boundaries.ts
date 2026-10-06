@@ -153,7 +153,7 @@ export function usesEnglishPhraseRules(
 }
 
 /** A pause between words, scaled by its length: 0.18 s is a hint, half a second a clear break. */
-export function pauseReward(gapSeconds: number): number {
+function pauseReward(gapSeconds: number): number {
   const reward = Math.min(6, Math.max(0, gapSeconds - 0.1) * 10)
   // Whisper timings are in centiseconds: no float dust from a 0.1 s gap.
   return reward < 0.01 ? 0 : -reward
@@ -168,8 +168,8 @@ function punctuationReward(previous: string): number {
 const isNumeric = (word: string) => HAS_DIGIT.test(word) || NUMBER_WORDS.has(word)
 
 /** "$5 million", "10 percent", "3 days", "twenty five", "40 000". */
-function numberGlue(previous: string, next: string): number {
-  if (CURRENCY_ONLY.test(previous)) return NUMBER_GLUE
+function numberGlue({ previous, next, previousText }: BoundaryContext): number {
+  if (CURRENCY_ONLY.test(previousText)) return NUMBER_GLUE
   if (HAS_DIGIT.test(previous) && HAS_DIGIT.test(next)) return NUMBER_GLUE
   if (isNumeric(previous) && UNITS.has(next)) return NUMBER_GLUE
   if (TENS.has(previous) && NUMBER_WORDS.has(next)) return NUMBER_GLUE
@@ -193,19 +193,26 @@ const isFunctionWord = (word: string) =>
 /** A preposition before another phrase start is a particle: "pop around | to", "click around | and". */
 const isParticle = (next: string) => PREPOSITIONS.has(next) || CLAUSE_STARTERS.has(next)
 
-/** How badly `previous` wants to stay with the word after it. */
-function englishGlue(previous: string, next: string): number {
-  if (DETERMINERS.has(previous)) return DETERMINER_GLUE
-  if (isNumeric(previous) && !isFunctionWord(next)) return QUANTITY_GLUE
-  if (PREPOSITIONS.has(previous)) return isParticle(next) ? PARTICLE_GLUE : PREPOSITION_GLUE
-  if (AUXILIARIES.has(previous) || AUX_CONTRACTION.test(previous)) return AUXILIARY_GLUE
-  if (CLAUSE_STARTERS.has(previous)) return CONJUNCTION_GLUE
-  if (SUBJECT_PRONOUNS.has(previous)) return PRONOUN_GLUE
+type GlueRule = readonly [(previous: string, next: string) => boolean, number]
+
+/** How badly `previous` wants to stay with the word after it: the first rule that matches. */
+const GLUE_RULES: readonly GlueRule[] = [
+  [(previous) => DETERMINERS.has(previous), DETERMINER_GLUE],
+  [(previous, next) => isNumeric(previous) && !isFunctionWord(next), QUANTITY_GLUE],
+  [(previous, next) => PREPOSITIONS.has(previous) && isParticle(next), PARTICLE_GLUE],
+  [(previous) => PREPOSITIONS.has(previous), PREPOSITION_GLUE],
+  [(previous) => AUXILIARIES.has(previous) || AUX_CONTRACTION.test(previous), AUXILIARY_GLUE],
+  [(previous) => CLAUSE_STARTERS.has(previous), CONJUNCTION_GLUE],
+  [(previous) => SUBJECT_PRONOUNS.has(previous), PRONOUN_GLUE],
   // An object pronoun ends its verb phrase.
-  if (OBJECT_PRONOUNS.has(previous)) return 0
-  if (OBJECT_PRONOUNS.has(next)) return OBJECT_GLUE
-  if (STARTS_WITH_DIGIT.test(next)) return NUMBER_AFTER_GLUE
-  return isFunctionWord(next) ? 0 : CONTENT_GLUE
+  [(previous) => OBJECT_PRONOUNS.has(previous), 0],
+  [(_, next) => OBJECT_PRONOUNS.has(next), OBJECT_GLUE],
+  [(_, next) => STARTS_WITH_DIGIT.test(next), NUMBER_AFTER_GLUE],
+  [(_, next) => isFunctionWord(next), 0],
+]
+
+function englishGlue(previous: string, next: string): number {
+  return GLUE_RULES.find(([matches]) => matches(previous, next))?.[1] ?? CONTENT_GLUE
 }
 
 /** How good a phrase start `next` is. */
@@ -249,7 +256,7 @@ function boundaryCost(context: BoundaryContext, english: boolean, inFixedPhrase:
   if (ATTACHES_LEFT.test(context.nextText)) return ATTACHED_GLUE
   const punctuated = ANY_TRAILING_PUNCTUATION.test(context.previousText)
   const rules = english && !punctuated ? englishCost(context, inFixedPhrase) : 0
-  const numbers = numberGlue(context.previous, context.next)
+  const numbers = numberGlue(context)
   return punctuationReward(context.previousText) + pauseReward(context.gap) + rules + numbers
 }
 
@@ -269,17 +276,21 @@ const gapBefore = (words: readonly TimedWord[], k: number) =>
 const endsPhrase = (text: string | undefined) =>
   text !== undefined && (SENTENCE_END.test(text) || CLAUSE_END.test(text))
 
+/** Set off by a pause after it, and by a pause or a sentence end before it: "Done." */
+function isPunchWord(words: readonly TimedWord[], k: number): boolean {
+  const pauseAfter = k === words.length - 1 || gapBefore(words, k + 1) >= PUNCH_PAUSE_SECONDS
+  if (!pauseAfter) return false
+  return gapBefore(words, k) >= PUNCH_PAUSE_SECONDS || SENTENCE_END.test(words[k - 1]!.text)
+}
+
 /**
- * A word on its own: a punch word ("Done." between pauses), a word set off by
- * punctuation, or a word torn from its phrase.
+ * A word on its own: a punch word, a word set off by punctuation ("inside."
+ * at a sentence end, "Okay," after one), or a word torn from its phrase.
  */
 function loneWordCost(words: readonly TimedWord[], k: number): number {
-  const pauseAfter = k === words.length - 1 || gapBefore(words, k + 1) >= PUNCH_PAUSE_SECONDS
-  const pauseBefore = gapBefore(words, k) >= PUNCH_PAUSE_SECONDS
-  const sentenceBefore = SENTENCE_END.test(words[k - 1]?.text ?? '')
-  if (pauseAfter && (pauseBefore || sentenceBefore)) return LONE_PUNCH_WORD_COST
-  if (endsPhrase(words[k]!.text) || endsPhrase(words[k - 1]?.text)) return LONE_PUNCTUATED_WORD_COST
-  return LONE_WORD_COST
+  if (isPunchWord(words, k)) return LONE_PUNCH_WORD_COST
+  const setOff = endsPhrase(words[k]!.text) || endsPhrase(words[k - 1]?.text)
+  return setOff ? LONE_PUNCTUATED_WORD_COST : LONE_WORD_COST
 }
 
 /**
