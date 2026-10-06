@@ -785,7 +785,7 @@ export function scoreProject(project, options = {}) {
 }
 
 /**
- * Targets patched by key (a creator kit's preferences replace the format's
+ * Targets patched by key (a Video Style Kit's preferences replace the format's
  * pause target, for one): `{ pauseMaxSec: { max: 0.3, source: 'kit', note } }`.
  */
 function withTargetOverrides(format, overrides) {

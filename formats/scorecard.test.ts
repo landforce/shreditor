@@ -179,7 +179,7 @@ test('graphic yap: a timeline that meets every rule and target passes', () => {
   })
 })
 
-test('graphic yap: late first image, an image gap, a pause and a transition fail with frame ranges', () => {
+test('graphic yap: a transition fails; late first image, an image gap and a pause warn, with frame ranges', () => {
   const images = graphicYapImages(3).filter((item) => item.from < f(20) || item.from >= f(28))
   const speaker = synced('track-speaker', 'track-speaker-audio', 0, 60, 'spk')
   const items = [text('track-title', 0, 3, 'Hook'), ...speaker, ...images]
@@ -198,12 +198,10 @@ test('graphic yap: late first image, an image gap, a pause and a transition fail
     mediaById: speakerMedia,
     transcripts: { spk: envelope(spoken) },
   })
-  assert.deepEqual(failing(card).sort(), [
-    'firstImageSec',
-    'longestNoNewImageSec',
-    'pauseMaxSec',
-    'transitions',
-  ])
+  // Pacing numbers are guidelines: they warn. A transition breaks a format rule.
+  assert.deepEqual(failing(card), ['transitions'])
+  for (const key of ['firstImageSec', 'longestNoNewImageSec', 'pauseMaxSec'])
+    assert.ok(warning(card).includes(key), key)
 
   const first = check(card, 'firstImageSec')
   assert.equal(first.value, 3)
@@ -226,7 +224,7 @@ test('graphic yap: late first image, an image gap, a pause and a transition fail
   assert.deepEqual(check(card, 'transitions').ranges, [
     { startFrame: nth(images, 1).from - 5, endFrame: nth(images, 1).from + 5 },
   ])
-  assert.ok(card.summary.fail === 4)
+  assert.equal(card.summary.fail, 1)
 })
 
 test('graphic yap intense: the same edit misses the denser targets', () => {
@@ -357,7 +355,7 @@ test('a cut that removes a silence leaves no pause; a gap between clips is one',
     transcripts: { spk: transcript },
   })
   const pause = check(looseCard, 'pauseMaxSec')
-  assert.equal(pause.status, 'fail')
+  assert.equal(pause.status, 'warn')
   assert.ok(num(pause) > 2.9 && num(pause) < 3.2)
   const gap = nth(pause.ranges)
   assert.ok(gap.startFrame > f(4.8) && gap.endFrame === f(8))
@@ -441,7 +439,7 @@ test('greenscreen: held hook plate, music and an extra label fail or warn', () =
   const card = scoreProject(makeProject('greenscreen', null, items, { tracks }), {
     mediaById: { ...speakerMedia, song: { category: 'music' } },
   })
-  assert.ok(failing(card).includes('firstPlateChangeSec'))
+  assert.ok(warning(card).includes('firstPlateChangeSec'))
   assert.ok(failing(card).includes('music'))
   assert.deepEqual(check(card, 'music').ranges, [{ startFrame: 0, endFrame: f(20) }])
   assert.equal(check(card, 'titleHold').status, 'warn')
@@ -519,7 +517,8 @@ test('vlog: no title, no captions, a VO gap and slow-pace cutting fail or warn',
     mediaById: { vo: { category: 'voiceover' } },
     transcripts: { vo: envelope(words(0.1, end / FPS, 0.3, 0.25)) },
   })
-  assert.deepEqual(failing(card).sort(), ['captions', 'pauseMaxSec', 'titleHook'])
+  assert.deepEqual(failing(card).sort(), ['captions', 'titleHook'])
+  assert.ok(warning(card).includes('pauseMaxSec'))
   assert.deepEqual(check(card, 'titleHook').ranges, [{ startFrame: 0, endFrame: f(3) }])
   assert.ok(warning(card).includes('cutsPerMin'), 'too fast for the slow pace')
   assert.ok(warning(card).includes('voCoveragePct'))
@@ -548,9 +547,10 @@ test('10 shot: a music montage with a title passes the rules (the guide cut rate
   assert.deepEqual(failing(card), [])
   assert.equal(check(card, 'shotCount').status, 'pass')
   assert.equal(check(card, 'titleWords').value, 6)
-  // 13 cuts in 14 s is 55.7 a minute: inside the guide's length and shot count,
-  // outside its 31-38 cuts per minute (measured on longer videos).
-  assert.deepEqual(warning(card), ['cutsPerMin'])
+  // 13 cuts in 14 s is 55.7 a minute: a faster 10 Shot. Pace is the edit's call,
+  // so cuts per minute is reported, not scored.
+  assert.deepEqual(warning(card), [])
+  assert.equal(check(card, 'cutsPerMin').status, 'info')
 })
 
 test('10 shot: talking, captions, sync sound and too few shots fail', () => {
@@ -577,13 +577,8 @@ test('10 shot: talking, captions, sync sound and too few shots fail', () => {
     ...Object.fromEntries(shots.map((s) => [s.mediaId, { category: 'b-roll' }])),
   }
   const card = scoreProject(makeProject('ten-shot', null, items, { tracks }), { mediaById })
-  assert.deepEqual(failing(card).sort(), [
-    'captions',
-    'music',
-    'shotCountMin',
-    'speech',
-    'syncSound',
-  ])
+  assert.deepEqual(failing(card).sort(), ['captions', 'music', 'speech', 'syncSound'])
+  assert.ok(warning(card).includes('shotCountMin'))
   assert.equal(check(card, 'syncSound').ranges.length, 7)
   assert.equal(check(card, 'titleHold').status, 'pass')
 })

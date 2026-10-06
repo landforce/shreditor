@@ -1,4 +1,4 @@
-// Types for ./kit.mjs: a Creator Stylesheet (kit.json, schema v2). Only the
+// Types for ./kit.mjs: a Video Style Kit (kit.json, schema v2). Only the
 // parts Shreditor reads are typed; everything else is kept as is.
 
 export interface KitRect {

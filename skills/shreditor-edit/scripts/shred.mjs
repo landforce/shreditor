@@ -65,11 +65,13 @@
 //   shred apply <id> <ops.json>          apply an op batch atomically (revision-checked)
 //   shred frames <id> --at 30,95,... [--out grid.jpg] [--size 270x480]
 //                                        render saved frames and tile them for review
-//   shred check <id> [--json]            the format scorecard: rules and targets, pass/warn/fail, with
-//                                        frame ranges to look at; exit 1 when a fail-severity check fails
-//                                        (a project with a creator kit adds the kit's rules: Kit section)
+//   shred check <id> [--json] [--frames]            the format scorecard: rules and targets, pass/warn/fail, with
+//                                        frame ranges to look at; numbers are guidelines (warn), format-defining rules and kit musts
+//                                        can fail (exit 1); --frames renders every flagged frame into one
+//                                        contact sheet with what each is for
+//                                        (a project with a Video Style Kit adds the kit's rules: Kit section)
 //   shred kit apply <kit.json|folder> --project <id> [--force]
-//                                        a Creator Stylesheet: its titles, captions and overlays become
+//                                        a Video Style Kit: its titles, captions and overlays become
 //                                        kit:* text styles (project and library), the kit is recorded on
 //                                        the project; prints the mapping, fonts and the kit's preferences
 //   shred kit status <id>                the project's kit: version, hash, drift since apply, fonts, prefs
@@ -129,6 +131,7 @@ import {
 import { describeTarget, scoreProject, trackRole } from '../../../formats/scorecard.mjs'
 import { suggestFormat } from '../../../formats/suggest.mjs'
 import { qcMedia } from './qc.mjs'
+import { flaggedFrames } from './check-frames.mjs'
 import { stylesCommands } from './styles.mjs'
 import { kitCheck, kitCommands, printKitCheck } from './kit.mjs'
 import {
@@ -169,6 +172,7 @@ const { values: opt, positionals } = parseArgs({
     format: { type: 'string' },
     variant: { type: 'string' },
     'no-transcribe': { type: 'boolean' },
+    frames: { type: 'boolean' },
     'no-wait': { type: 'boolean' },
     wait: { type: 'boolean' },
     retry: { type: 'boolean' },
@@ -704,7 +708,9 @@ function printScorecard(card, project) {
         `        frames ${c.ranges.map((r) => `${r.startFrame}-${r.endFrame} [${sec(r.startFrame)}-${sec(r.endFrame)} s]`).join(', ')}`,
       )
   }
-  if (s.fail) say('Fix every FAIL before publishing, or tell the user why it stays.')
+  if (s.fail)
+    say('A FAIL is a rule that makes this the format: fix it, or tell the user why it stays.')
+  if (s.warn) say('WARNs are guidelines from videos that work, not quotas: look, then decide.')
 }
 
 /**
@@ -755,6 +761,56 @@ function serviceLogTail(from) {
     .slice(-3)
     .join('\n')
   return tail ? `\nservice log:\n${tail}` : ''
+}
+
+/** Render frames of the saved project and tile them into one image. */
+async function renderFrameGrid(id, at, size = '270x480', outPath) {
+  const [w, h] = size.split('x').map(Number)
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'shred-frames-'))
+  const { revision } = await getProject(id)
+  for (const frame of at) {
+    const bytes = await call('POST', '/frame', {
+      project: id,
+      frame,
+      width: w,
+      height: h,
+      format: 'jpeg',
+    })
+    fs.writeFileSync(path.join(dir, `f${String(frame).padStart(6, '0')}.jpg`), bytes)
+  }
+  const out = path.resolve(outPath ?? path.join(dir, 'grid.jpg'))
+  const cols = Math.min(at.length, 10)
+  const rows = Math.ceil(at.length / cols)
+  execFileSync('ffmpeg', [
+    '-v',
+    'error',
+    '-y',
+    '-pattern_type',
+    'glob',
+    '-i',
+    path.join(dir, 'f*.jpg'),
+    '-vf',
+    `tile=${cols}x${rows}:padding=4:color=gray`,
+    '-frames:v',
+    '1',
+    out,
+  ])
+  return { out, revision }
+}
+
+/** `shred check --frames`: the flagged frames as one contact sheet, with what each is for. */
+async function printFlaggedFrames(id, card, kitCard) {
+  const frames = flaggedFrames(card, kitCard)
+  if (!frames.length) return say('\nNo flagged frames to look at.')
+  const { out } = await renderFrameGrid(
+    id,
+    frames.map((f) => f.frame),
+    opt.size,
+    opt.out,
+  )
+  say(`\nFlagged frames: ${out}  (left to right, top to bottom; open it and look)`)
+  for (const [i, f] of frames.entries())
+    say(`  ${String(i + 1).padStart(2)}. frame ${f.frame}  ${f.ids.join(', ')}`)
 }
 
 const commands = {
@@ -911,6 +967,7 @@ const commands = {
       if (card) printScorecard(card, project)
       else say(`${id} has no format: kit rules only (shred format set ${id} <format>)`)
       printKitCheck(say, kit, project.metadata?.fps ?? 30)
+      if (opt.frames) await printFlaggedFrames(id, card, kit?.card)
     }
     if (card?.summary.fail || kit?.card?.summary.fail) process.exitCode = 1
   },
@@ -1460,40 +1517,11 @@ const commands = {
 
   async frames([id]) {
     if (!opt.at) throw new Error('--at frame,frame,... is required')
-    const [w, h] = (opt.size ?? '270x480').split('x').map(Number)
     const at = opt.at
       .split(',')
       .map((x) => Number(x.trim()))
       .filter(Number.isFinite)
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'shred-frames-'))
-    const { revision } = await getProject(id)
-    for (const frame of at) {
-      const bytes = await call('POST', '/frame', {
-        project: id,
-        frame,
-        width: w,
-        height: h,
-        format: 'jpeg',
-      })
-      fs.writeFileSync(path.join(dir, `f${String(frame).padStart(6, '0')}.jpg`), bytes)
-    }
-    const out = path.resolve(opt.out ?? path.join(dir, 'grid.jpg'))
-    const cols = Math.min(at.length, 10)
-    const rows = Math.ceil(at.length / cols)
-    execFileSync('ffmpeg', [
-      '-v',
-      'error',
-      '-y',
-      '-pattern_type',
-      'glob',
-      '-i',
-      path.join(dir, 'f*.jpg'),
-      '-vf',
-      `tile=${cols}x${rows}:padding=4:color=gray`,
-      '-frames:v',
-      '1',
-      out,
-    ])
+    const { out, revision } = await renderFrameGrid(id, at, opt.size, opt.out)
     say(`${out}  (frames ${at.join(', ')} of revision ${revision.slice(0, 19)}…; open it and look)`)
   },
 

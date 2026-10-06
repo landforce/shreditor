@@ -1,6 +1,6 @@
-# Creator kit (kit.json)
+# Video Style Kit (kit.json)
 
-A Creator Stylesheet is a creator's look and editing rules in one JSON file, `kit.json`, made and edited outside Shreditor. Shreditor applies it to a project, keeps the project linked to it, checks edits against its rules, and can write style tweaks back into it when the user asks.
+A Video Style Kit is a creator's look and editing rules in one JSON file, `kit.json`, made and edited outside Shreditor. Shreditor applies it to a project, keeps the project linked to it, checks edits against its rules, and can write style tweaks back into it when the user asks.
 
 The code is in `formats/kit/` (plain ESM shared by the agent tools and the editor), the commands in `skills/shreditor-edit/scripts/kit.mjs` (`shred kit ...`), and the stock kits used as fixtures in `formats/kit-fixtures/` (`stock-kit.v3.json` is current, `stock-kit.v2.json` the one before).
 

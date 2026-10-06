@@ -1,4 +1,4 @@
-// Creator kit in words: its editing preferences for the agent's plan, what
+// Video Style Kit in words: its editing preferences for the agent's plan, what
 // `shred kit apply` maps and what it can't (and why), the format targets a
 // kit preference replaces, and a readable summary of a kit.
 import { kitStyleSpecs } from './mapping.mjs'
@@ -54,7 +54,7 @@ export function kitTargetOverrides(kit) {
     pauseMaxSec: {
       max: ms / 1000,
       source: 'kit',
-      note: `creator kit tightCuts ${on(cuts) ? 'on' : 'off'}: ${ms} ms`,
+      note: `Video Style Kit tightCuts ${on(cuts) ? 'on' : 'off'}: ${ms} ms`,
     },
   }
 }
@@ -240,7 +240,7 @@ function unmappedNotes(kit) {
 /** A readable summary of a kit (shred kit show). */
 export function summarizeKit(kit) {
   const lines = [
-    `${kit.creator ?? 'Creator kit'} v${kit.kitVersion}  (schema ${kit.schemaVersion}, canvas ${kit.canvas.join('x')}${kit.updatedAt ? `, updated ${kit.updatedAt}` : ''})`,
+    `${kit.creator ?? 'Video Style Kit'} v${kit.kitVersion}  (schema ${kit.schemaVersion}, canvas ${kit.canvas.join('x')}${kit.updatedAt ? `, updated ${kit.updatedAt}` : ''})`,
     '',
     'Fonts',
     ...Object.entries(kit.fonts).map(

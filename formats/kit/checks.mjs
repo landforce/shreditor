@@ -1,4 +1,4 @@
-// Kit checks: every `must` rule of a creator kit, measured on a project's
+// Kit checks: every `must` rule of a Video Style Kit, measured on a project's
 // timeline and its rendered layout (dumpLayout boxes and line counts), next to
 // the format scorecard in `shred check`.
 //

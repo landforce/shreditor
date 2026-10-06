@@ -2,7 +2,7 @@ import { useMemo } from 'react'
 import { useProjectStore } from '@/features/editor/deps/projects'
 
 /**
- * The project's brand colours (from its creator kit, when the kit turns them
+ * The project's brand colours (from its Video Style Kit, when the kit turns them
  * on), as swatches for the text colour pickers. Undefined when there are none.
  */
 export function useBrandSwatches(): string[] | undefined {

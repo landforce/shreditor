@@ -1,4 +1,4 @@
-// `shred kit`: a Creator Stylesheet (kit.json) on a project. `apply` maps the
+// `shred kit`: a Video Style Kit (kit.json) on a project. `apply` maps the
 // kit's titles, captions and overlays to `kit:*` text styles (project and
 // library), records the kit on the project and prints what mapped, what
 // didn't, the fonts and the kit's preferences; `status` says whether the
@@ -217,7 +217,7 @@ export function kitCommands({ say, opt, workspace, getProject, applyBatch, call,
     const { project } = await getProject(id)
     const base = readSnapshot(workspace(), id)
     say(
-      `Kit: ${kit.creator ?? 'creator kit'} v${kit.kitVersion}  ${read.path}  (${read.hash.slice(0, 19)}…)`,
+      `Kit: ${kit.creator ?? 'Video Style Kit'} v${kit.kitVersion}  ${read.path}  (${read.hash.slice(0, 19)}…)`,
     )
     for (const warning of read.warnings) say(`warning: ${warning}`)
     printList(say, 'Fonts', describeKitFonts(kitFonts(kit).fonts))
@@ -254,7 +254,7 @@ export function kitCommands({ say, opt, workspace, getProject, applyBatch, call,
     const { project } = await getProject(id)
     if (!project.kit) return say(`${id} has no kit (shred kit apply <kit.json> --project ${id}).`)
     const record = project.kit
-    say(`Kit: ${record.creator ?? 'creator kit'} v${record.kitVersion}  ${record.path}`)
+    say(`Kit: ${record.creator ?? 'Video Style Kit'} v${record.kitVersion}  ${record.path}`)
     say(`hash ${record.hash}  applied ${record.appliedAt}`)
     const now = currentKit(project)
     if (!now.kit) return say(`The kit file can't be read: ${now.error}`)
@@ -403,7 +403,7 @@ export function printKitCheck(say, result, fps) {
   const { card } = result
   const s = card.summary
   say(
-    `Kit: ${card.creator ?? 'creator kit'} v${card.kitVersion}  (${s.pass} pass, ${s.fail} fail, ${s.warn} warn, ${s.look} look, ${s.listen} listen, ${s.na} n/a)`,
+    `Kit: ${card.creator ?? 'Video Style Kit'} v${card.kitVersion}  (${s.pass} pass, ${s.fail} fail, ${s.warn} warn, ${s.look} look, ${s.listen} listen, ${s.na} n/a)`,
   )
   if (result.note) say(`  note: ${result.note}`)
   const sec = (frame) => (frame / fps).toFixed(2)

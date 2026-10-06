@@ -33,7 +33,7 @@ export interface FormatTarget {
   max: number | null
   ideal: number | null
   severity: 'fail' | 'warn'
-  /** 'kit': replaced by the project's creator kit (its preferences). */
+  /** 'kit': replaced by the project's Video Style Kit (its preferences). */
   source: 'measured' | 'vdb' | 'colin' | 'kit'
   /** Range seen in the VDB sample. */
   seen?: [number, number]

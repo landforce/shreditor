@@ -37,7 +37,7 @@ interface TextPaddingControlProps {
 
 /**
  * Text box padding: one value (keyframable), or split into left/right and
- * top/bottom (`textPaddingX` / `textPaddingY`, as a creator kit's title box
+ * top/bottom (`textPaddingX` / `textPaddingY`, as a Video Style Kit's title box
  * has). The link button splits or joins them.
  */
 export function TextPaddingControl({

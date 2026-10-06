@@ -455,8 +455,8 @@ test('kit preferences replace the format pause target in the scorecard', () => {
   }).checks.find((c) => c.key === 'pauseMaxSec')!
   assert.notEqual(plain.target, withKit.target)
   assert.equal(withKit.target, '<= 0.3 s')
-  assert.equal(withKit.status, 'fail')
-  assert.match(withKit.detail, /creator kit tightCuts on: 300 ms/)
+  assert.equal(withKit.status, 'warn')
+  assert.match(withKit.detail, /Video Style Kit tightCuts on: 300 ms/)
   kit.preferences!.tightCuts!.on = false
   const off = scoreProject(p, {
     transcripts,

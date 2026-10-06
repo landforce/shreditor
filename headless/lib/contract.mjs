@@ -369,7 +369,7 @@ const formatChoice = z
   )
 const storedFormat = formatChoice.and(z.object({ reviewedHash: z.string().optional() }))
 
-// The creator kit a project follows (shred kit apply): where it is, its
+// The Video Style Kit a project follows (shred kit apply): where it is, its
 // version and hash as applied (and when, and its brand colours). The browser
 // checks the whole record against the project schema when it normalizes.
 const projectKit = z
@@ -455,7 +455,7 @@ export const projectUpdateRequestSchema = z
           .optional(),
         // null clears it. Recording a format doesn't touch the canvas or tracks.
         format: formatChoice.nullable().optional(),
-        // The creator kit record (shred kit apply); null clears it.
+        // The Video Style Kit record (shred kit apply); null clears it.
         kit: projectKit.nullable().optional(),
       })
       .strict()
