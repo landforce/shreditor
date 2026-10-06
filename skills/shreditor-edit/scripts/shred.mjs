@@ -2,7 +2,8 @@
 // The one way an agent touches a Shreditor project. Every engine call in the
 // shreditor-edit skill goes through here, so edits are consistent and checked.
 //
-//   shred up                             start the editor (5273) and the agent service (8787)
+//   shred up [--dev] [--build]           start the editor (5273, a built preview; --dev for live reload)
+//                                        and the agent service (8787)
 //   shred start                          start only the agent edit service
 //   shred status                         editor, service, workspace and writer-lock state
 //   shred catalog <folder|file...> --name <slug> [--no-transcribe] [--no-proxies]
@@ -21,6 +22,7 @@
 //   shred changes <id>                   what the user changed since the last published pass
 //   shred master <audio|video> [--lufs -14] [--tp -1.5] [--out file.wav]
 //                                        loudness-master to a new WAV (two-pass loudnorm)
+//   shred sync <id> [--timeout 20]       make the open editor save now, so the agent sees unsaved tweaks
 //
 // Service: 127.0.0.1:8787 (SHRED_SERVICE to override). Workspace: SHRED_WORKSPACE,
 // else ~/.shreditor/config.json, else ~/Movies/Shreditor. Times are frames at the
@@ -62,6 +64,8 @@ const { values: opt, positionals } = parseArgs({
     link: { type: 'boolean' },
     category: { type: 'string' },
     build: { type: 'boolean' },
+    dev: { type: 'boolean' },
+    timeout: { type: 'string' },
     json: { type: 'boolean' },
   },
 })
@@ -117,6 +121,81 @@ const editorUp = async () => {
     return false
   }
 }
+const editorInfo = async () => {
+  try {
+    const res = await fetch(`${EDITOR}/__shreditor/info`)
+    return res.ok ? await res.json() : null
+  } catch {
+    return null
+  }
+}
+// 'dev' or 'preview'. Older bridges don't say; a dev server serves /@vite/client.
+async function editorKind(info) {
+  if (info.mode) return info.mode
+  try {
+    const res = await fetch(`${EDITOR}/@vite/client`)
+    return (res.headers.get('content-type') ?? '').includes('javascript') ? 'dev' : 'preview'
+  } catch {
+    return 'unknown'
+  }
+}
+const portAnswers = async () => {
+  try {
+    await fetch(EDITOR)
+    return true
+  } catch {
+    return false
+  }
+}
+const gitHead = () => {
+  try {
+    const [sha, time] = execFileSync('git', ['log', '-1', '--format=%h %ct', 'HEAD'], { cwd: REPO, encoding: 'utf8' }).trim().split(' ')
+    return { sha, time: Number(time) }
+  } catch {
+    return null
+  }
+}
+let built = false
+function build(reason) {
+  const log = path.join(os.tmpdir(), 'shreditor-build.log')
+  say(`Building Shreditor (${reason})…`)
+  try {
+    execFileSync('npm', ['run', 'build'], { cwd: REPO, stdio: ['ignore', fs.openSync(log, 'w'), fs.openSync(log, 'a')] })
+  } catch {
+    throw new Error(`Build failed; see ${log}`)
+  }
+  built = true
+}
+// The built editor is stale when missing or older than the checked-out commit.
+function staleBuild() {
+  const index = path.join(REPO, 'dist', 'index.html')
+  if (!fs.existsSync(index)) return 'no build yet'
+  const head = gitHead()
+  if (head && fs.statSync(index).mtimeMs / 1000 < head.time) return `build is older than ${head.sha}`
+  return null
+}
+
+// What the open editor has not saved yet (see server/editor-state.mjs).
+// null when no editor answers, or it predates the heartbeat.
+async function editorState(id) {
+  try {
+    const res = await fetch(`${EDITOR}/__shreditor/editor-state?project=${encodeURIComponent(id)}`)
+    return res.ok ? await res.json() : null
+  } catch {
+    return null
+  }
+}
+const ago = (t) => `${Math.max(0, Math.round((Date.now() - t) / 1000))}s ago`
+const CONFLICT = 'The editor is showing a conflict banner for this project (it changed on disk while the user had unsaved edits). Ask the user to pick a version, then run shred sync again.'
+async function warnUnsaved(id) {
+  const s = await editorState(id)
+  if (!s?.dirty && !s?.conflict) return null
+  const line = s.conflict ? `WARNING: ${CONFLICT}` : `WARNING: The editor has unsaved edits (last edit ${s.lastEditAt ? ago(s.lastEditAt) : 'just now'}); run shred sync ${id} first. Below is the saved state only.`
+  if (opt.json) process.stderr.write(`${line}\n`)
+  else say(`${line}\n`)
+  return { unsaved: Boolean(s.dirty), conflict: Boolean(s.conflict), lastEditAt: s.lastEditAt }
+}
+
 const slug = (t) => t.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 60) || 'footage'
 const MEDIA_EXT = /\.(mov|mp4|m4v|mkv|webm|avi|mts|mxf|wav|mp3|m4a|aac|aif|aiff|flac|png|jpe?g|webp|heic|gif)$/i
 const WHISPER_MODEL = path.join(os.homedir(), 'Library/Application Support/whisper.cpp/models/ggml-large-v3-turbo.bin')
@@ -183,19 +262,60 @@ function diffTimelines(before, after) {
 
 const commands = {
   async up() {
-    if (!(await editorUp())) {
+    const info = await editorInfo()
+    if (info) {
+      // Never kill or replace a running editor: the user may be mid-edit in it.
+      const kind = await editorKind(info)
+      const what = { dev: 'dev server (reloads on source edits)', preview: 'built preview' }[kind] ?? 'unknown kind'
+      say(`Editor   ${EDITOR}  already running: ${what}; left as is`)
+      if (opt.dev ? kind === 'preview' : kind === 'dev') say(`         (stop it yourself to switch to ${opt.dev ? 'the dev server' : 'a built preview'})`)
+    } else if (await portAnswers()) {
+      throw new Error(`Something other than the Shreditor editor is serving ${EDITOR}. Stop it, or set SHRED_EDITOR to a free port.`)
+    } else {
+      const port = new URL(EDITOR).port
+      if (!opt.dev) {
+        const reason = opt.build ? 'requested' : staleBuild()
+        if (reason) build(reason)
+      }
       const log = path.join(os.tmpdir(), 'shreditor-editor.log')
-      const child = spawn('npm', ['run', 'dev', '--', '--port', new URL(EDITOR).port, '--strictPort'], {
+      const child = spawn('npm', ['run', opt.dev ? 'dev' : 'preview', '--', '--port', port, '--strictPort'], {
         cwd: REPO,
+        // An overridden workspace is pinned for the editor too; otherwise it follows the config.
+        env: { ...process.env, ...(process.env.SHRED_WORKSPACE ? { SHREDITOR_WORKSPACE: process.env.SHRED_WORKSPACE } : {}) },
         detached: true,
         stdio: ['ignore', fs.openSync(log, 'a'), fs.openSync(log, 'a')],
       })
       child.unref()
       for (let i = 0; i < 120 && !(await editorUp()); i++) await new Promise((r) => setTimeout(r, 1000))
       if (!(await editorUp())) throw new Error(`Editor did not start; see ${log}`)
+      say(`Editor   ${EDITOR}  ${opt.dev ? 'dev server (reloads on source edits)' : `built preview of ${gitHead()?.sha ?? 'this checkout'}`}`)
     }
-    say(`Editor   ${EDITOR}`)
     await commands.start()
+  },
+
+  async sync([id]) {
+    if (!id) throw new Error('Pass a project id')
+    const first = await editorState(id)
+    if (!first) return say(`No editor answering at ${EDITOR} (or it predates shred sync); the saved state is all there is.`)
+    if (!first.open) return say(`No editor open on ${id}; the saved state is current.`)
+    if (first.conflict) throw new Error(CONFLICT)
+    // Clean, not saving, and holding the revision that is on disk.
+    const settled = (s) => s.editors.every((e) => !e.dirty && !e.saving && (!e.revision || e.revision === s.diskRevision))
+    if (settled(first)) return say(`Editor has no unsaved edits (revision ${String(first.diskRevision).slice(0, 19)}…).`)
+    const res = await fetch(`${EDITOR}/__shreditor/editor-state/save?project=${encodeURIComponent(id)}`, { method: 'POST' })
+    if (!res.ok) throw new Error(`Save request failed: HTTP ${res.status}`)
+    const seconds = Number(opt.timeout ?? 20)
+    const deadline = Date.now() + seconds * 1000
+    let last = first
+    while (Date.now() < deadline) {
+      await new Promise((r) => setTimeout(r, 250))
+      const s = await editorState(id)
+      if (!s?.open) return say('The editor closed while syncing; the saved state is all there is (shred changes shows it).')
+      if (s.conflict) throw new Error(CONFLICT)
+      if (settled(s)) return say(`Saved: the editor's edits are on disk (revision ${String(s.diskRevision).slice(0, 19)}…).`)
+      last = s
+    }
+    throw new Error(`Timed out after ${seconds}s: the editor still has unsaved edits (last edit ${last.lastEditAt ? ago(last.lastEditAt) : 'unknown'}). The user may be mid-drag or in a dialog; ask them to save (Cmd+S), then run shred sync again.`)
   },
 
   async new() {
@@ -305,6 +425,7 @@ const commands = {
   },
 
   async changes([id]) {
+    const editor = await warnUnsaved(id)
     const dir = path.join(workspace(), 'projects', id, 'agent', 'passes')
     const passes = fs.existsSync(dir) ? fs.readdirSync(dir).filter((f) => f.endsWith('.json')).sort() : []
     if (!passes.length) return say('No published passes yet.')
@@ -312,7 +433,7 @@ const commands = {
     const { revision, project } = await getProject(id)
     if (revision === last.resultRevision) return say(`No changes since pass #${Number(last.id)} "${last.label}".`)
     const diff = diffTimelines(last.timeline, project.timeline)
-    if (opt.json) return say(JSON.stringify({ since: last.id, revision, diff }, null, 2))
+    if (opt.json) return say(JSON.stringify({ since: last.id, revision, diff, ...(editor ? { editor } : {}) }, null, 2))
     say(`Since pass #${Number(last.id)} "${last.label}" the user changed ${diff.length} item(s). Treat these as decisions:`)
     for (const d of diff) say(`  ${d.kind.padEnd(7)} ${String(d.from).padStart(5)}  ${d.name}${d.fields ? `  (${d.fields.join(', ')})` : ''}`)
     const notes = path.join(workspace(), 'projects', id, 'agent', 'notes.json')
@@ -324,10 +445,7 @@ const commands = {
     const ws = workspace()
     const log = path.join(os.tmpdir(), 'shreditor-service.log')
     // The service renders and edits through the built app; rebuild after code changes.
-    if (opt.build || !fs.existsSync(path.join(REPO, 'dist', 'headless.html'))) {
-      say('Building Shreditor…')
-      execFileSync('npm', ['run', 'build'], { cwd: REPO, stdio: 'ignore' })
-    }
+    if (!built && (opt.build || !fs.existsSync(path.join(REPO, 'dist', 'headless.html')))) build(opt.build ? 'requested' : 'no build yet')
     const child = spawn(process.execPath, [path.join(REPO, 'headless/serve.mjs'), '--workspace', ws, '--port', new URL(SERVICE).port], {
       cwd: REPO,
       detached: true,
@@ -352,9 +470,10 @@ const commands = {
   },
 
   async project([id]) {
+    const editor = await warnUnsaved(id)
     const { revision, project } = await getProject(id)
     const s = summarize(project)
-    if (opt.json) return say(JSON.stringify({ revision, ...s }, null, 2))
+    if (opt.json) return say(JSON.stringify({ revision, ...s, ...(editor ? { editor } : {}) }, null, 2))
     say(`${project.name}  ${project.metadata?.width}x${project.metadata?.height} @${s.fps}  ${s.end} frames (${(s.end / s.fps).toFixed(2)}s)`)
     say(`revision ${revision}`)
     for (const t of [...s.tracks].sort((x, y) => x.order - y.order)) {

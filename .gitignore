@@ -100,3 +100,4 @@ ds-bundle/
 artifacts/
 .playwright-cli/
 agent/composition-actions.reference.schema.json
+.claude/worktrees/

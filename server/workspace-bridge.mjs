@@ -10,6 +10,7 @@ import crypto from 'node:crypto'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
+import { createEditorStateRoutes } from './editor-state.mjs'
 import { createMediaRoutes } from './media-bridge.mjs'
 
 const PREFIX = '/__shreditor/'
@@ -152,11 +153,14 @@ function serveFile(req, res, full, st) {
 
 /**
  * Connect/Express-style middleware. Calls `next()` for anything outside
- * /__shreditor/ so it can sit in front of the app.
+ * /__shreditor/ so it can sit in front of the app. `mode` ('dev' or 'preview')
+ * is reported by GET info so `shred up` can say what is serving the editor.
  */
-export function createWorkspaceBridge() {
+export function createWorkspaceBridge({ mode = 'dev' } = {}) {
   // In-place media import and linked media sources (see media-bridge.mjs).
   const mediaRoutes = createMediaRoutes({ resolveInside, sendJson, readBody, serveFile })
+  // Unsaved-edit heartbeat and save requests (see editor-state.mjs).
+  const editorStateRoutes = createEditorStateRoutes({ resolveInside, sendJson, readBody })
   return async function workspaceBridge(req, res, next) {
     const url = new URL(req.url ?? '/', 'http://localhost')
     if (!url.pathname.startsWith(PREFIX)) return next?.()
@@ -166,10 +170,11 @@ export function createWorkspaceBridge() {
       const root = currentWorkspace()
       fs.mkdirSync(root, { recursive: true })
       if (await mediaRoutes(req, res, { route, rel, root, query: url.searchParams })) return
+      if (await editorStateRoutes(req, res, { route, root, url })) return
       switch (route) {
         case 'GET info': {
           const config = readConfig()
-          return sendJson(res, 200, { version: 1, root, name: path.basename(root), recent: config.recent ?? [root], platform: process.platform })
+          return sendJson(res, 200, { version: 1, root, name: path.basename(root), recent: config.recent ?? [root], platform: process.platform, mode })
         }
         case 'POST workspace': {
           const { path: dir } = JSON.parse((await readBody(req)).toString() || '{}')

@@ -12,18 +12,40 @@ import { fileURLToPath } from 'node:url'
 // version and old cached chunks are never purged. Uses the content hash (not a timestamp)
 // so identical builds produce an identical SW and avoid needless update churn.
 // Serves the workspace folder to the editor at /__shreditor/ (see server/workspace-bridge.mjs).
+// `mode` lets `shred up` tell a dev server from a built preview on the same port.
 function workspaceBridgePlugin(): Plugin {
-  const bridge = async () => (await import('./server/workspace-bridge.mjs')).createWorkspaceBridge()
+  const bridge = async (mode: 'dev' | 'preview') =>
+    (await import('./server/workspace-bridge.mjs')).createWorkspaceBridge({ mode })
   return {
     name: 'shreditor-workspace-bridge',
     configureServer: async (server) => {
-      server.middlewares.use(await bridge())
+      server.middlewares.use(await bridge('dev'))
     },
     configurePreviewServer: async (server) => {
-      server.middlewares.use(await bridge())
+      server.middlewares.use(await bridge('preview'))
     },
   }
 }
+
+// WebCodecs and SharedArrayBuffer need cross-origin isolation, in dev and in
+// the built preview that `shred up` serves.
+const crossOriginIsolationHeaders = {
+  'Cross-Origin-Embedder-Policy': 'require-corp',
+  'Cross-Origin-Opener-Policy': 'same-origin',
+}
+
+// Not app source. Nested git worktrees (another agent session's checkout under
+// .claude/worktrees) hold a second copy of src/ and index.html; watching them
+// full-reloads the editor whenever that session edits a file. Top-level dirs
+// are anchored to the repo root so same-named folders under src/ still reload.
+const fromRoot = (dir: string) => `${fileURLToPath(new URL(`./${dir}`, import.meta.url))}/**`
+const watchIgnored = [
+  '**/.claude/**',
+  '**/.worktrees/**',
+  ...['worktrees', 'dist', 'coverage', 'tmp', 'output', 'agent', 'skills', 'headless', 'docs'].map(
+    fromRoot,
+  ),
+]
 
 function serviceWorkerVersionPlugin(): Plugin {
   const placeholder = '__FREECUT_BUILD_ID__'
@@ -125,19 +147,16 @@ export default defineConfig({
   server: {
     port: 5173,
     strictPort: true,
+    watch: { ignored: watchIgnored },
     headers: {
-      'Cross-Origin-Embedder-Policy': 'require-corp',
-      'Cross-Origin-Opener-Policy': 'same-origin',
+      ...crossOriginIsolationHeaders,
       // Enables the JS self-profiling API (new Profiler(...)) for dev-time
       // performance investigation, e.g. profiling play-start latency.
       'Document-Policy': 'js-profiling',
     },
   },
   preview: {
-    headers: {
-      'Cross-Origin-Embedder-Policy': 'require-corp',
-      'Cross-Origin-Opener-Policy': 'same-origin',
-    },
+    headers: crossOriginIsolationHeaders,
   },
   build: {
     target: 'esnext',
