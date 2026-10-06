@@ -69,6 +69,7 @@ const DecodedPitchFallbackAudio: React.FC<DecodedPitchFallbackAudioProps> = ({
   audioPitchCents,
   audioPitchShiftSemitones,
   audioEqStages,
+  audioDynamics,
   clipFadeSpans,
   contentStartOffsetFrames,
   contentEndOffsetFrames,
@@ -137,6 +138,7 @@ const DecodedPitchFallbackAudio: React.FC<DecodedPitchFallbackAudioProps> = ({
       audioFadeInCurveX={audioFadeInCurveX}
       audioFadeOutCurveX={audioFadeOutCurveX}
       audioEqStages={audioEqStages}
+      audioDynamics={audioDynamics}
       clipFadeSpans={clipFadeSpans}
       contentStartOffsetFrames={contentStartOffsetFrames}
       contentEndOffsetFrames={contentEndOffsetFrames}
@@ -198,6 +200,7 @@ const CustomDecoderPitchPreservedAudio: React.FC<CustomDecoderAudioProps> = ({
   audioPitchCents,
   audioPitchShiftSemitones,
   audioEqStages,
+  audioDynamics,
   clipFadeSpans,
   contentStartOffsetFrames,
   contentEndOffsetFrames,
@@ -425,6 +428,7 @@ const CustomDecoderPitchPreservedAudio: React.FC<CustomDecoderAudioProps> = ({
       audioFadeInCurveX={audioFadeInCurveX}
       audioFadeOutCurveX={audioFadeOutCurveX}
       audioEqStages={audioEqStages}
+      audioDynamics={audioDynamics}
       clipFadeSpans={clipFadeSpans}
       contentStartOffsetFrames={contentStartOffsetFrames}
       contentEndOffsetFrames={contentEndOffsetFrames}
@@ -462,6 +466,7 @@ const CustomDecoderPitchPreservedAudio: React.FC<CustomDecoderAudioProps> = ({
       audioFadeInCurveX={audioFadeInCurveX}
       audioFadeOutCurveX={audioFadeOutCurveX}
       audioEqStages={audioEqStages}
+      audioDynamics={audioDynamics}
       clipFadeSpans={clipFadeSpans}
       contentStartOffsetFrames={contentStartOffsetFrames}
       contentEndOffsetFrames={contentEndOffsetFrames}

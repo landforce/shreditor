@@ -16,6 +16,11 @@ import {
 import { resolvePreviewAudioEqStages } from '@/shared/utils/audio-eq'
 import { useMixerLiveGain, clearMixerLiveGain } from '@/shared/state/mixer-live-gain'
 import type { ResolvedAudioEqSettings } from '@/types/audio'
+import { resolveAudioDynamics } from '@/shared/utils/audio-dynamics'
+import {
+  setPreviewClipDynamics,
+  type PreviewClipDynamicsTarget,
+} from '../utils/preview-clip-dynamics'
 import {
   createPreviewClipAudioGraph,
   getSharedPreviewAudioContext,
@@ -37,6 +42,7 @@ export function applyVideoElementAudioState(
   video: HTMLVideoElement,
   audioVolume: number,
   audioEqStages: ReadonlyArray<ResolvedAudioEqSettings>,
+  audioDynamics?: PreviewClipDynamicsTarget,
 ): void {
   // Pool creates elements muted. Keep element unmuted and control via volume/gain.
   video.muted = false
@@ -46,6 +52,7 @@ export function applyVideoElementAudioState(
   if (connectedVideoElements.has(video)) {
     const graph = videoAudioGraphs.get(video)
     const audioContext = videoAudioContexts.get(video)
+    if (graph && audioDynamics) setPreviewClipDynamics(graph, audioDynamics)
     if (graph && audioContext?.state === 'running') {
       rampPreviewClipEq(graph, audioEqStages)
       rampPreviewClipGain(graph, safeVolume)
@@ -81,6 +88,7 @@ export function applyVideoElementAudioState(
       graph.context.resume()
     }
     setPreviewClipEq(graph, audioEqStages)
+    if (audioDynamics) setPreviewClipDynamics(graph, audioDynamics)
     rampPreviewClipGain(graph, safeVolume)
   } catch {
     // Fallback if Web Audio setup fails.
@@ -152,7 +160,7 @@ export function transitionSafePlay(video: HTMLVideoElement, targetRate: number):
 
 /**
  * Hook to calculate video audio state with fades and preview support.
- * Returns both the final volume and resolved EQ stage chain for the clip.
+ * Returns the final volume, the resolved EQ stage chain and the clip dynamics.
  */
 export function useVideoAudioState(
   item: VideoItem & { _sequenceFrameOffset?: number; trackVolumeDb?: number },
@@ -161,6 +169,7 @@ export function useVideoAudioState(
 ): {
   audioVolume: number
   resolvedAudioEqStages: ResolvedAudioEqSettings[]
+  audioDynamics: PreviewClipDynamicsTarget
 } {
   const { fps } = useVideoConfig()
   // Get local frame from Sequence context (0-based within this Sequence)
@@ -205,6 +214,19 @@ export function useVideoAudioState(
     [audioEqStages, preview],
   )
 
+  // Master bus and monitor volume sit before the limiter in preview but after
+  // it in export; the limiter scales its ceiling by them (see ClipLimiter).
+  const limiterInputScale =
+    Math.pow(10, masterBusDb / 20) * (previewMasterMuted ? 0 : previewMasterVolume)
+  const { audioDenoise, audioCompressor, audioDeEsser, audioLimiter } = item
+  const audioDynamics = useMemo<PreviewClipDynamicsTarget>(
+    () => ({
+      dynamics: resolveAudioDynamics({ audioDenoise, audioCompressor, audioDeEsser, audioLimiter }),
+      limiterInputScale,
+    }),
+    [audioDenoise, audioCompressor, audioDeEsser, audioLimiter, limiterInputScale],
+  )
+
   // Mixer fader live gain - updated during drag without re-rendering the composition.
   // Clear when the composition re-renders with updated track volume (trackVolumeDb changes).
   const mixerGain = useMixerLiveGain(item.id)
@@ -217,6 +239,7 @@ export function useVideoAudioState(
     return {
       audioVolume: 0,
       resolvedAudioEqStages,
+      audioDynamics,
     }
   }
 
@@ -278,5 +301,6 @@ export function useVideoAudioState(
   return {
     audioVolume: itemVolume * masterBusGain * effectiveMonitorVolume * mixerGain,
     resolvedAudioEqStages,
+    audioDynamics,
   }
 }

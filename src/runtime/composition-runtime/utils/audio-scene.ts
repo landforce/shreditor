@@ -1,5 +1,5 @@
 import type { AudioItem, VideoItem } from '@/types/timeline'
-import type { ResolvedAudioEqSettings } from '@/types/audio'
+import type { ResolvedAudioDynamics, ResolvedAudioEqSettings } from '@/types/audio'
 import type { Transition } from '@/types/transition'
 import {
   timelineToSourceFrames,
@@ -12,6 +12,7 @@ import {
   areAudioEqStagesEqual,
   getAudioEqSettings,
 } from '@/shared/utils/audio-eq'
+import { areAudioDynamicsEqual, resolveAudioDynamics } from '@/shared/utils/audio-dynamics'
 import {
   clampAudioPitchCents,
   clampAudioPitchSemitones,
@@ -82,6 +83,7 @@ export interface AudioSegment {
   audioPitchSemitones: number
   audioPitchCents: number
   audioEqStages: ResolvedAudioEqSettings[]
+  audioDynamics: ResolvedAudioDynamics | null
   clipFadeSpans?: AudioClipFadeSpan[]
 }
 
@@ -303,6 +305,7 @@ export function buildStandaloneAudioSegments(
         item.trackAudioEq,
         getAudioEqSettings(item),
       ),
+      audioDynamics: resolveAudioDynamics(item),
       clipFadeSpans: [
         buildClipFadeSpan({
           startFrame: 0,
@@ -338,7 +341,8 @@ export function buildStandaloneAudioSegments(
       active.muted === segment.muted &&
       active.audioPitchSemitones === segment.audioPitchSemitones &&
       active.audioPitchCents === segment.audioPitchCents &&
-      areAudioEqStagesEqual(active.audioEqStages, segment.audioEqStages)
+      areAudioEqStagesEqual(active.audioEqStages, segment.audioEqStages) &&
+      areAudioDynamicsEqual(active.audioDynamics, segment.audioDynamics)
 
     if (canMerge) {
       const activeFrom = active.from
@@ -380,6 +384,7 @@ export function buildStandaloneAudioSegments(
       audioPitchSemitones: active.audioPitchSemitones,
       audioPitchCents: active.audioPitchCents,
       audioEqStages: active.audioEqStages,
+      audioDynamics: active.audioDynamics,
       clipFadeSpans: active.clipFadeSpans,
     })
     active = { ...segment }
@@ -409,6 +414,7 @@ export function buildStandaloneAudioSegments(
       audioPitchSemitones: active.audioPitchSemitones,
       audioPitchCents: active.audioPitchCents,
       audioEqStages: active.audioEqStages,
+      audioDynamics: active.audioDynamics,
       clipFadeSpans: active.clipFadeSpans,
     })
   }
@@ -548,6 +554,7 @@ export function buildTransitionVideoAudioSegments(
         item.trackAudioEq,
         getAudioEqSettings(item),
       ),
+      audioDynamics: resolveAudioDynamics(item),
       clipFadeSpans: [
         buildClipFadeSpan({
           startFrame: before,
@@ -595,6 +602,7 @@ export function buildTransitionVideoAudioSegments(
       active.audioPitchSemitones === segment.audioPitchSemitones &&
       active.audioPitchCents === segment.audioPitchCents &&
       areAudioEqStagesEqual(active.audioEqStages, segment.audioEqStages) &&
+      areAudioDynamicsEqual(active.audioDynamics, segment.audioDynamics) &&
       active.afterFrames === 0 &&
       segment.beforeFrames === 0
 
@@ -642,6 +650,7 @@ export function buildTransitionVideoAudioSegments(
       audioPitchSemitones: active.audioPitchSemitones,
       audioPitchCents: active.audioPitchCents,
       audioEqStages: active.audioEqStages,
+      audioDynamics: active.audioDynamics,
       clipFadeSpans: active.clipFadeSpans,
       contentStartOffsetFrames: active.contentStartOffsetFrames,
       contentEndOffsetFrames: active.contentEndOffsetFrames,
@@ -677,6 +686,7 @@ export function buildTransitionVideoAudioSegments(
       audioPitchSemitones: active.audioPitchSemitones,
       audioPitchCents: active.audioPitchCents,
       audioEqStages: active.audioEqStages,
+      audioDynamics: active.audioDynamics,
       clipFadeSpans: active.clipFadeSpans,
       contentStartOffsetFrames: active.contentStartOffsetFrames,
       contentEndOffsetFrames: active.contentEndOffsetFrames,

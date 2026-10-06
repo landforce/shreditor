@@ -89,3 +89,70 @@ export interface ResolvedAudioEqSettings {
   highCutFrequencyHz: number
   highCutSlopeDbPerOct: AudioEqCutSlopeDbPerOct
 }
+
+/**
+ * Per-clip noise reduction (RNNoise). Absent or `enabled: false` = off.
+ * `amount` is the wet/dry mix in percent (0..100).
+ */
+export interface AudioDenoiseSettings {
+  enabled: boolean
+  amount?: number
+}
+
+/** Per-clip feed-forward compressor, applied after the EQ and before volume/fades. */
+export interface AudioCompressorSettings {
+  enabled: boolean
+  thresholdDb?: number
+  ratio?: number
+  attackMs?: number
+  releaseMs?: number
+  makeupDb?: number
+  kneeDb?: number
+}
+
+/** Per-clip split-band de-esser: compresses only the band above `frequencyHz`. */
+export interface AudioDeEsserSettings {
+  enabled: boolean
+  frequencyHz?: number
+  thresholdDb?: number
+  maxReductionDb?: number
+}
+
+/** Per-clip lookahead peak limiter, applied after volume and fades. */
+export interface AudioLimiterSettings {
+  enabled: boolean
+  ceilingDb?: number
+  releaseMs?: number
+}
+
+export interface ResolvedAudioDenoiseSettings {
+  amount: number
+}
+
+export interface ResolvedAudioCompressorSettings {
+  thresholdDb: number
+  ratio: number
+  attackMs: number
+  releaseMs: number
+  makeupDb: number
+  kneeDb: number
+}
+
+export interface ResolvedAudioDeEsserSettings {
+  frequencyHz: number
+  thresholdDb: number
+  maxReductionDb: number
+}
+
+export interface ResolvedAudioLimiterSettings {
+  ceilingDb: number
+  releaseMs: number
+}
+
+/** The clip dynamics chain with every stage resolved; `null` = stage off. */
+export interface ResolvedAudioDynamics {
+  denoise: ResolvedAudioDenoiseSettings | null
+  compressor: ResolvedAudioCompressorSettings | null
+  deEsser: ResolvedAudioDeEsserSettings | null
+  limiter: ResolvedAudioLimiterSettings | null
+}

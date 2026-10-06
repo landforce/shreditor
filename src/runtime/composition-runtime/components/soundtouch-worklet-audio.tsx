@@ -6,6 +6,7 @@ import { getAudioPitchRatioFromSemitones } from '@/shared/utils/audio-pitch'
 import type { AudioPlaybackProps } from './audio-playback-props'
 import { getBrowserMediaPlaybackRate } from '@/shared/state/playback/shuttle'
 import { useAudioPlaybackState } from './hooks/use-audio-playback-state'
+import { usePreviewClipDynamics } from './hooks/use-preview-clip-dynamics'
 import { useReverseShuttleAudio } from './hooks/use-reverse-shuttle-audio'
 import { getAudioTargetTimeSeconds } from '../utils/video-timing'
 import {
@@ -57,6 +58,7 @@ export const SoundTouchWorkletAudio: React.FC<SoundTouchWorkletAudioProps> = Rea
     audioPitchCents,
     audioPitchShiftSemitones,
     audioEqStages,
+    audioDynamics,
     clipFadeSpans,
     contentStartOffsetFrames = 0,
     contentEndOffsetFrames = 0,
@@ -75,6 +77,7 @@ export const SoundTouchWorkletAudio: React.FC<SoundTouchWorkletAudioProps> = Rea
       resolvedVolume: finalVolume,
       resolvedPitchShiftSemitones,
       resolvedAudioEqStages,
+      audioDynamicsTarget,
     } = useAudioPlaybackState({
       itemId,
       liveGainItemIds,
@@ -91,6 +94,7 @@ export const SoundTouchWorkletAudio: React.FC<SoundTouchWorkletAudioProps> = Rea
       audioPitchCents,
       audioPitchShiftSemitones,
       audioEqStages,
+      audioDynamics,
       clipFadeSpans,
       contentStartOffsetFrames,
       contentEndOffsetFrames,
@@ -255,6 +259,8 @@ export const SoundTouchWorkletAudio: React.FC<SoundTouchWorkletAudioProps> = Rea
       if (!graph) return
       rampPreviewClipEq(graph, resolvedAudioEqStages)
     }, [resolvedAudioEqStages])
+
+    usePreviewClipDynamics(graphRef, audioDynamicsTarget, null)
 
     useReverseShuttleAudio({
       graphRef,

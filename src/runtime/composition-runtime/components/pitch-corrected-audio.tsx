@@ -24,6 +24,7 @@ import type { AudioPlaybackProps } from './audio-playback-props'
 import { getBrowserMediaPlaybackRate } from '@/shared/state/playback/shuttle'
 import { useClockPlaybackRate } from '@/runtime/composition-runtime/deps/player'
 import { useAudioPlaybackState } from './hooks/use-audio-playback-state'
+import { usePreviewClipDynamics } from './hooks/use-preview-clip-dynamics'
 import {
   hasAudioPitchOverride,
   isAudioPitchShiftActive,
@@ -163,6 +164,7 @@ export const NativePitchCorrectedAudio: React.FC<PitchCorrectedAudioProps> = Rea
     audioFadeInCurveX = 0.52,
     audioFadeOutCurveX = 0.52,
     audioEqStages,
+    audioDynamics,
     clipFadeSpans,
     contentStartOffsetFrames = 0,
     contentEndOffsetFrames = 0,
@@ -180,6 +182,7 @@ export const NativePitchCorrectedAudio: React.FC<PitchCorrectedAudioProps> = Rea
       transportPlaybackRate,
       resolvedVolume: finalVolume,
       resolvedAudioEqStages,
+      audioDynamicsTarget,
     } = useAudioPlaybackState({
       itemId,
       liveGainItemIds,
@@ -193,6 +196,7 @@ export const NativePitchCorrectedAudio: React.FC<PitchCorrectedAudioProps> = Rea
       audioFadeInCurveX,
       audioFadeOutCurveX,
       audioEqStages,
+      audioDynamics,
       clipFadeSpans,
       contentStartOffsetFrames,
       contentEndOffsetFrames,
@@ -277,6 +281,8 @@ export const NativePitchCorrectedAudio: React.FC<PitchCorrectedAudioProps> = Rea
       if (!graph) return
       rampPreviewClipEq(graph, resolvedAudioEqStages)
     }, [resolvedAudioEqStages])
+
+    usePreviewClipDynamics(graphRef, audioDynamicsTarget, src)
 
     useEffect(() => {
       const audio = audioRef.current
@@ -734,6 +740,7 @@ const DecodedPitchCorrectedAudio: React.FC<DecodedPitchCorrectedAudioProps> = Re
         audioFadeInCurveX={audioFadeInCurveX}
         audioFadeOutCurveX={audioFadeOutCurveX}
         audioEqStages={audioEqStages}
+        audioDynamics={props.audioDynamics}
         clipFadeSpans={clipFadeSpans}
         contentStartOffsetFrames={contentStartOffsetFrames}
         contentEndOffsetFrames={contentEndOffsetFrames}

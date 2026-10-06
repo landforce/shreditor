@@ -6,6 +6,7 @@ import type { Transition } from '@/types/transition'
 import { getMediaFileById, getMediaMetadataById } from '../deps/media-library'
 import type { ClientExportSettings, ClientRenderResult, RenderProgress } from './client-renderer'
 import { normalizeVideoCodec } from './video-bitrate'
+import { hasAudioDynamics } from '@/shared/utils/audio-dynamics'
 
 export type SmartCopyReason =
   | 'eligible'
@@ -77,6 +78,7 @@ function hasEqProcessing(eq: AudioEqSettings | undefined): boolean {
 
 function hasItemAudioProcessing(item: VideoItem | AudioItem): boolean {
   return (
+    hasAudioDynamics(item) ||
     hasNonZeroField(item, [
       'volume',
       'audioFadeIn',

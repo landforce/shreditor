@@ -1,5 +1,5 @@
 import type { AudioClipFadeSpan } from '@/shared/utils/audio-fade-curve'
-import type { ResolvedAudioEqSettings } from '@/types/audio'
+import type { ResolvedAudioDynamics, ResolvedAudioEqSettings } from '@/types/audio'
 
 /**
  * Shared clip-level playback controls used by all preview audio backends.
@@ -29,6 +29,8 @@ export interface AudioPlaybackProps {
   /** Pre-computed total pitch shift in semitones (semitones + cents/100 + parent composition shift) */
   audioPitchShiftSemitones?: number
   audioEqStages?: ResolvedAudioEqSettings[]
+  /** Clip noise reduction / compressor / de-esser / limiter; null = all off. */
+  audioDynamics?: ResolvedAudioDynamics | null
   clipFadeSpans?: AudioClipFadeSpan[]
   contentStartOffsetFrames?: number
   contentEndOffsetFrames?: number

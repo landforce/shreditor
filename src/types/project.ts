@@ -240,6 +240,10 @@ export interface ProjectTimeline {
       audioEqHighCutEnabled?: boolean
       audioEqHighCutFrequencyHz?: number
       audioEqHighCutSlopeDbPerOct?: 6 | 12 | 18 | 24
+      audioDenoise?: import('./audio').AudioDenoiseSettings
+      audioCompressor?: import('./audio').AudioCompressorSettings
+      audioDeEsser?: import('./audio').AudioDeEsserSettings
+      audioLimiter?: import('./audio').AudioLimiterSettings
       // Video properties
       fadeIn?: number
       fadeOut?: number

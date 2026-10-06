@@ -499,6 +499,7 @@ export const MainComposition: React.FC<MainCompositionProps> = ({
                       audioFadeInCurveX={segment.audioFadeInCurveX}
                       audioFadeOutCurveX={segment.audioFadeOutCurveX}
                       audioEqStages={segment.audioEqStages}
+                      audioDynamics={segment.audioDynamics}
                       clipFadeSpans={segment.clipFadeSpans}
                       contentStartOffsetFrames={segment.contentStartOffsetFrames}
                       contentEndOffsetFrames={segment.contentEndOffsetFrames}
@@ -529,6 +530,7 @@ export const MainComposition: React.FC<MainCompositionProps> = ({
                       audioFadeInCurveX={segment.audioFadeInCurveX}
                       audioFadeOutCurveX={segment.audioFadeOutCurveX}
                       audioEqStages={segment.audioEqStages}
+                      audioDynamics={segment.audioDynamics}
                       clipFadeSpans={segment.clipFadeSpans}
                       contentStartOffsetFrames={segment.contentStartOffsetFrames}
                       contentEndOffsetFrames={segment.contentEndOffsetFrames}
@@ -575,6 +577,7 @@ export const MainComposition: React.FC<MainCompositionProps> = ({
                       audioFadeInCurveX={segment.audioFadeInCurveX}
                       audioFadeOutCurveX={segment.audioFadeOutCurveX}
                       audioEqStages={segment.audioEqStages}
+                      audioDynamics={segment.audioDynamics}
                       clipFadeSpans={segment.clipFadeSpans}
                     />
                   ) : (
@@ -599,6 +602,7 @@ export const MainComposition: React.FC<MainCompositionProps> = ({
                       audioFadeInCurveX={segment.audioFadeInCurveX}
                       audioFadeOutCurveX={segment.audioFadeOutCurveX}
                       audioEqStages={segment.audioEqStages}
+                      audioDynamics={segment.audioDynamics}
                       clipFadeSpans={segment.clipFadeSpans}
                     />
                   )}

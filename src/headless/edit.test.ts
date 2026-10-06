@@ -478,6 +478,33 @@ describe('editProject', () => {
         ]),
       ).rejects.toThrow(/updates\.volume: /)
     })
+
+    it('updateItem validates clip dynamics settings and keeps valid ones', async () => {
+      const update = (updates: Record<string, unknown>) =>
+        withText([{ op: 'updateItem', id: { $ref: 'txt#/detail/id' }, updates } as EditOp])
+      await expect(update({ audioCompressor: { enabled: true, ratio: 40 } })).rejects.toThrow(
+        /updates\.audioCompressor\.ratio: /,
+      )
+      await expect(update({ audioLimiter: { enabled: true, ceilingDb: 3 } })).rejects.toThrow(
+        /updates\.audioLimiter\.ceilingDb: /,
+      )
+      await expect(update({ audioDenoise: { enabled: true, strength: 50 } })).rejects.toThrow(
+        /updates\.audioDenoise: /,
+      )
+      await expect(update({ audioDeEsser: { thresholdDb: -30 } })).rejects.toThrow(
+        /updates\.audioDeEsser\.enabled: /,
+      )
+
+      const result = await update({
+        audioDenoise: { enabled: true, amount: 60 },
+        audioCompressor: { enabled: true, thresholdDb: -20, ratio: 3 },
+        audioLimiter: null,
+      })
+      expect(result.project.timeline!.items[0]).toMatchObject({
+        audioDenoise: { enabled: true, amount: 60 },
+        audioCompressor: { enabled: true, thresholdDb: -20, ratio: 3 },
+      })
+    })
   })
 
   describe('same-track overlaps fail instead of shifting', () => {

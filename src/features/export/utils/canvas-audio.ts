@@ -14,7 +14,7 @@ import type {
   TimelineItem,
   TimelineTrack,
 } from '@/types/timeline'
-import type { AudioEqSettings, ResolvedAudioEqSettings } from '@/types/audio'
+import type { AudioEqSettings, ResolvedAudioDynamics, ResolvedAudioEqSettings } from '@/types/audio'
 import type { Keyframe as VolumeKeyframe } from '@/types/keyframe'
 import type { Transition } from '@/types/transition'
 import { createLogger } from '@/shared/logging/logger'
@@ -50,6 +50,8 @@ import {
   getAudioEqSettings,
   isAudioEqStageActive,
 } from '@/shared/utils/audio-eq'
+import { areAudioDynamicsEqual, resolveAudioDynamics } from '@/shared/utils/audio-dynamics'
+import { applyClipDynamicsStageOffline } from '@/infrastructure/audio/clip-dynamics/clip-dynamics-stage'
 import { decodedRangeFrameCount, sliceDecodedSampleIntoRange } from './decoded-audio-range'
 import {
   getAudioPitchRatioFromSemitones,
@@ -97,6 +99,8 @@ interface AudioSegment {
   fadeOutCurveX: number
   pitchShiftSemitones: number
   audioEqStages: ResolvedAudioEqSettings[]
+  /** Clip noise reduction / compressor / de-esser / limiter (null = off). */
+  audioDynamics: ResolvedAudioDynamics | null
   contentStartOffsetFrames?: number
   contentEndOffsetFrames?: number
   fadeInDelayFrames?: number
@@ -476,6 +480,7 @@ function buildManagedTransitionAudioSegments<TItem extends TransitionAudioItem>(
         entry.trackAudioEq,
         getAudioEqSettings(item),
       ),
+      audioDynamics: resolveAudioDynamics(item),
       beforeFrames: before,
       afterFrames: after,
       volumeKeyframes: entry.volumeKeyframes,
@@ -502,6 +507,7 @@ function buildManagedTransitionAudioSegments<TItem extends TransitionAudioItem>(
     if (Math.abs(left.volume - right.volume) > 0.0001) return false
     if (left.muted !== right.muted) return false
     if (!areAudioEqStagesEqual(left.audioEqStages, right.audioEqStages)) return false
+    if (!areAudioDynamicsEqual(left.audioDynamics, right.audioDynamics)) return false
     if (Math.abs(left.pitchShiftSemitones - right.pitchShiftSemitones) > 0.0001) return false
     if (left.afterFrames !== 0 || right.beforeFrames !== 0) return false
     if (left.volumeKeyframes || right.volumeKeyframes) return false
@@ -525,6 +531,7 @@ function buildManagedTransitionAudioSegments<TItem extends TransitionAudioItem>(
     fadeOutCurveX: segment.fadeOutCurveX,
     pitchShiftSemitones: segment.pitchShiftSemitones,
     audioEqStages: segment.audioEqStages,
+    audioDynamics: segment.audioDynamics,
     contentStartOffsetFrames: segment.contentStartOffsetFrames,
     contentEndOffsetFrames: segment.contentEndOffsetFrames,
     fadeInDelayFrames: segment.fadeInDelayFrames,
@@ -863,6 +870,7 @@ function appendCompositionAudioSegments(params: {
         subTrack?.audioEq,
         getAudioEqSettings(subItem),
       ),
+      audioDynamics: resolveAudioDynamics(subItem),
       contentStartOffsetFrames: 0,
       contentEndOffsetFrames: 0,
       fadeInDelayFrames: 0,
@@ -1031,6 +1039,7 @@ export function extractAudioSegments(
             track.audioEq,
             getAudioEqSettings(item),
           ),
+          audioDynamics: resolveAudioDynamics(item),
           contentStartOffsetFrames: 0,
           contentEndOffsetFrames: 0,
           fadeInDelayFrames: 0,
@@ -2036,6 +2045,19 @@ async function resample(
  * are returned untouched. If the source has fewer channels (e.g. mono into
  * stereo) the lone channel is duplicated.
  */
+async function resampleChannels(
+  channels: Float32Array[],
+  fromSampleRate: number,
+  toSampleRate: number,
+): Promise<Float32Array[]> {
+  if (fromSampleRate === toSampleRate) return channels
+  const resampled: Float32Array[] = []
+  for (const channel of channels) {
+    resampled.push(await resample(channel, fromSampleRate, toSampleRate))
+  }
+  return resampled
+}
+
 export function downmixToOutputChannels(
   source: readonly Float32Array[],
   outputChannels: number,
@@ -2218,13 +2240,14 @@ function supportsWindowedAudioSegment(segment: AudioSegment): boolean {
     Math.abs(segment.speed - 1) <= 0.0001 &&
     !segment.isReversed &&
     !isAudioPitchShiftActive(segment.pitchShiftSemitones) &&
-    !segment.audioEqStages?.some(isAudioEqStageActive)
+    !segment.audioEqStages?.some(isAudioEqStageActive) &&
+    !segment.audioDynamics
   )
 }
 
 /**
  * Long, ordinary clips can be mixed in bounded windows. Stateful DSP paths
- * retain the full-segment implementation so speed/pitch/EQ continuity remains
+ * retain the full-segment implementation so speed/pitch/EQ/dynamics continuity remains
  * identical to preview.
  */
 export function supportsWindowedAudioProcessing(composition: CompositionInputProps): boolean {
@@ -2280,7 +2303,8 @@ function hasPacketCopyFadeSpans(segment: AudioSegment, durationInFrames: number)
 function hasPacketCopyEffects(segment: AudioSegment): boolean {
   return (
     isAudioPitchShiftActive(segment.pitchShiftSemitones) ||
-    segment.audioEqStages.some(isAudioEqStageActive)
+    segment.audioEqStages.some(isAudioEqStageActive) ||
+    segment.audioDynamics !== null
   )
 }
 
@@ -2826,10 +2850,24 @@ export async function processAudio(
           decoded.sampleRate,
         )
       }
+      // Clip chain: noise reduction -> EQ -> compressor/de-esser -> volume/fades -> limiter.
+      // The dynamics stages run the same processors as the preview worklet.
+      processedChannels = await applyClipDynamicsStageOffline(
+        'denoise',
+        processedChannels,
+        decoded.sampleRate,
+        segment.audioDynamics,
+      )
       processedChannels = applyAudioEqStages(
         processedChannels,
         decoded.sampleRate,
         segment.audioEqStages,
+      )
+      processedChannels = await applyClipDynamicsStageOffline(
+        'dynamics',
+        processedChannels,
+        decoded.sampleRate,
+        segment.audioDynamics,
       )
 
       // Apply per-channel volume, fades, and resampling
@@ -2917,13 +2955,20 @@ export async function processAudio(
           )
         }
 
-        // Resample to target sample rate
-        if (decoded.sampleRate !== config.sampleRate) {
-          channelSamples = await resample(channelSamples, decoded.sampleRate, config.sampleRate)
-        }
-
         processedChannels[c] = channelSamples
       }
+
+      processedChannels = await applyClipDynamicsStageOffline(
+        'limiter',
+        processedChannels,
+        decoded.sampleRate,
+        segment.audioDynamics,
+      )
+      processedChannels = await resampleChannels(
+        processedChannels,
+        decoded.sampleRate,
+        config.sampleRate,
+      )
 
       // Calculate start position in output
       const startSample = Math.floor((segment.startFrame / fps) * config.sampleRate)
