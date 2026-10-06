@@ -49,7 +49,20 @@
         "liveAction": "Imagen real",
         "animation": "Anime",
         "threeD": "Render 3D"
-      }
+      },
+      "menuCategory": "Categoría",
+      "clearCategory": "Quitar categoría"
+    },
+    "category": {
+      "speaker": "Presentador",
+      "b-roll": "B-roll",
+      "graphics": "Gráficos",
+      "overlay": "Superposiciones",
+      "voiceover": "Voz en off",
+      "music": "Música",
+      "sfx": "SFX",
+      "other": "Otros",
+      "uncategorized": "Sin categoría"
     },
     "compositions": {
       "compositionsGroup": "Composiciones",

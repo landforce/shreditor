@@ -49,7 +49,20 @@
         "liveAction": "实拍",
         "animation": "动漫",
         "threeD": "3D 渲染"
-      }
+      },
+      "menuCategory": "类别",
+      "clearCategory": "清除类别"
+    },
+    "category": {
+      "speaker": "主讲人",
+      "b-roll": "B-roll",
+      "graphics": "图形",
+      "overlay": "叠加层",
+      "voiceover": "旁白",
+      "music": "音乐",
+      "sfx": "音效",
+      "other": "其他",
+      "uncategorized": "未分类"
     },
     "compositions": {
       "compositionsGroup": "合成",
