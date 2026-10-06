@@ -8,6 +8,10 @@
 //   shred status                         editor, service, workspace and writer-lock state
 //   shred catalog <folder|file...> --name <slug> [--no-transcribe] [--no-proxies]
 //                                        probe, contact-sheet, transcribe, and make playable proxies
+//                                        (reuses the built-in transcript of footage already imported)
+//   shred transcript <mediaId> [--json]  the built-in transcript: words with start/end seconds
+//   shred transcribe <mediaId...> | --project <id> [--force]   transcribe now (imports do it on their own)
+//   shred setup [--yes]                  check ffmpeg, whisper-cli and the model; --yes downloads the model
 //   shred new --name "..." [--size 1080x1920] [--fps 30]   create a project; prints id and editor URL
 //   shred project <id>                   timeline summary (tracks, items, frames)
 //   shred import <file...> --project <id> [--category <c>]   bring footage in (clone/link in place)
@@ -33,7 +37,7 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { parseArgs } from 'node:util'
-import { fileURLToPath } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..')
 const SERVICE = process.env.SHRED_SERVICE || 'http://127.0.0.1:8787'
@@ -67,6 +71,8 @@ const { values: opt, positionals } = parseArgs({
     dev: { type: 'boolean' },
     timeout: { type: 'string' },
     json: { type: 'boolean' },
+    yes: { type: 'boolean' },
+    force: { type: 'boolean' },
   },
 })
 const [command, ...args] = positionals
@@ -217,6 +223,13 @@ const isPhantomSpeech = (text, seconds) => {
   return words <= 2 && seconds > 3
 }
 
+// Built-in transcripts (server/transcription.mjs), read straight from the workspace.
+const transcription = () => import(pathToFileURL(path.join(REPO, 'server/transcription.mjs')).href)
+const shreditorCli = (args) => {
+  const r = spawnSync(process.execPath, [path.join(REPO, 'bin/shreditor.mjs'), ...args], { stdio: 'inherit', env: { ...process.env, SHREDITOR_WORKSPACE: workspace(), SHREDITOR_PORT: new URL(EDITOR).port } })
+  if (r.status) process.exitCode = r.status
+}
+
 const key = (tag) => `${tag}-${crypto.randomUUID()}`
 const getProject = (id) => call('GET', `/v1/projects/${encodeURIComponent(id)}`)
 
@@ -343,6 +356,7 @@ const commands = {
     const dir = path.join(workspace(), 'catalogs', name)
     fs.mkdirSync(path.join(dir, 'sheets'), { recursive: true })
     const transcribe = !opt['no-transcribe'] && which('whisper-cli') && fs.existsSync(WHISPER_MODEL)
+    const { transcriptForFile } = await transcription()
     const entries = []
     for (const file of files) {
       // Extension included: floor-plan.png and floor-plan.mov must not share a sheet.
@@ -392,7 +406,18 @@ const commands = {
           entry.proxyError = 'ffmpeg could not make a playable copy'
         }
       }
-      if (transcribe && a && duration > 1) {
+      // Footage already imported was transcribed on import: use that.
+      const builtIn = a ? transcriptForFile(workspace(), file) : null
+      if (builtIn?.envelope) {
+        entry.mediaId = builtIn.mediaId
+        entry.transcript = builtIn.path
+        entry.speech = builtIn.envelope.data.text.slice(0, 400)
+      } else if (builtIn?.status?.status === 'none') {
+        entry.mediaId = builtIn.mediaId
+        entry.speech = null
+        entry.speechNote = `no clear speech (built-in transcription: ${builtIn.status.reason ?? 'none'})`
+      }
+      if (transcribe && a && duration > 1 && !builtIn?.envelope && builtIn?.status?.status !== 'none') {
         const wav = path.join(os.tmpdir(), `shred-${crypto.randomUUID()}.wav`)
         const outBase = path.join(dir, 'transcripts', base)
         fs.mkdirSync(path.dirname(outBase), { recursive: true })
@@ -422,6 +447,36 @@ const commands = {
     say(`\n${entries.length} items → ${out}`)
     say(`Contact sheets in ${path.join(dir, 'sheets')}: open them and write what each shot shows into catalog.json ("content", "usable").`)
     say('Import an entry\'s "proxy" instead of its file when it has one (originals are untouched).')
+  },
+
+  async transcript([id]) {
+    if (!id) throw new Error('Pass a media id')
+    const { readStoredTranscript, readTranscriptionStatus } = await transcription()
+    const stored = readStoredTranscript(workspace(), id)
+    const status = readTranscriptionStatus(workspace(), id)
+    if (!stored) {
+      const why = status ? `${status.status}${status.reason ? ` (${status.reason})` : ''}${status.error ? `: ${status.error}` : ''}${status.hint ? `\n${status.hint}` : ''}` : 'never transcribed (run: shred transcribe ' + id + ')'
+      if (opt.json) return say(JSON.stringify({ mediaId: id, transcription: status, transcript: null }, null, 2))
+      say(`No transcript for ${id}: ${why}`)
+      process.exitCode = status?.status === 'none' ? 0 : 1
+      return
+    }
+    const data = stored.data
+    const source = stored.service === 'whisper.cpp' ? `whisper.cpp ${stored.model}` : `made in the app (${data.modelVariant ?? data.model ?? 'unknown model'})`
+    if (opt.json) return say(JSON.stringify({ mediaId: id, language: data.language, source, transcription: status, text: data.text, segments: data.segments }, null, 2))
+    say(`${id}  ${data.language ?? '?'}  ${source}`)
+    for (const seg of data.segments ?? []) {
+      say(`\n[${seg.start.toFixed(2)}-${seg.end.toFixed(2)}] ${seg.text}`)
+      for (const w of seg.words ?? []) say(`  ${w.start.toFixed(3).padStart(8)} ${w.end.toFixed(3).padStart(8)}  ${w.text}`)
+    }
+  },
+
+  async transcribe(ids) {
+    shreditorCli(['transcribe', ...ids, ...(opt.project ? ['--project', opt.project] : []), ...(opt.force ? ['--force'] : [])])
+  },
+
+  async setup() {
+    shreditorCli(['setup', 'whisper', ...(opt.yes ? ['--yes'] : [])])
   },
 
   async changes([id]) {
