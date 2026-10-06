@@ -5,7 +5,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
 
-const DEFAULT_BASE_REF = 'origin/staging';
+// origin/main once this repo has been pushed, else the FreeCut upstream.
+const DEFAULT_BASE_REFS = ['origin/main', 'upstream/main'];
 const FALLOW_PACKAGE = 'fallow@2.89.0';
 
 function getBaseRef() {
@@ -18,7 +19,25 @@ function getBaseRef() {
     return value;
   }
 
-  return process.env.FALLOW_AUDIT_BASE || DEFAULT_BASE_REF;
+  return process.env.FALLOW_AUDIT_BASE || getDefaultBaseRef();
+}
+
+function refExists(ref) {
+  const result = spawnSync('git', ['rev-parse', '--verify', '--quiet', `${ref}^{commit}`], {
+    cwd: process.cwd(),
+    stdio: 'ignore',
+  });
+  return result.status === 0;
+}
+
+function getDefaultBaseRef() {
+  const baseRef = DEFAULT_BASE_REFS.find(refExists);
+  if (!baseRef) {
+    throw new Error(
+      `None of ${DEFAULT_BASE_REFS.join(', ')} exist. Fetch one, or pass --base or FALLOW_AUDIT_BASE.`
+    );
+  }
+  return baseRef;
 }
 
 function valueOrDefault(value, fallback) {
