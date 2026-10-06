@@ -5,6 +5,7 @@ import path from 'node:path'
 import test from 'node:test'
 import {
   MAX_LUT_BYTES,
+  checkCubeText,
   collectLuts,
   listLutNames,
   readCubeHeader,
@@ -115,4 +116,12 @@ test('readCubeHeader reads TITLE and size and spots 1D LUTs', () => {
     size: null,
     oneDimensional: true,
   })
+})
+
+test('checkCubeText accepts a whole 3D LUT and says why it refuses others', () => {
+  assert.equal(checkCubeText(CUBE).size, 2)
+  assert.throws(() => checkCubeText('LUT_1D_SIZE 2\n0 0 0\n1 1 1'), /1D LUT/)
+  assert.throws(() => checkCubeText('TITLE "x"\n0 0 0'), /no LUT_3D_SIZE/)
+  assert.throws(() => checkCubeText('LUT_3D_SIZE 200\n0 0 0'), /no LUT_3D_SIZE between 2 and 129/)
+  assert.throws(() => checkCubeText('LUT_3D_SIZE 2\n0 0 0'), /needs 8 data lines, found 1/)
 })

@@ -433,9 +433,9 @@ const cases = [
     op: { op: 'addLut', itemId: 'text-1', lut: 'warm.cube', intensity: 0.5 },
     luts: [{ name: 'warm.cube', text: WARM_CUBE }],
     assert: (project) => {
-      const { gpuEffectType, params } = item(project, 'text-1')?.effects?.[0]?.effect ?? {}
+      const { gpuEffectType, params } = item(project, 'text-1').effects[0].effect
       assert.deepEqual(
-        [gpuEffectType, params?.lutName, params?.lutSize, params?.intensity],
+        [gpuEffectType, params.lutName, params.lutSize, params.intensity],
         ['gpu-lut', 'Warm', '2', 0.5],
       )
     },

@@ -62,22 +62,33 @@ export function collectLuts(workspaceDir, ops) {
   }))
 }
 
+const HEADER_LINES = [
+  [/^TITLE\s+(?:"(.*)"|(.*))$/, (header, m) => (header.title = (m[1] ?? m[2]).trim())],
+  [/^LUT_3D_SIZE\s+(\S+)/, (header, m) => (header.size = Number.parseInt(m[1], 10))],
+  [/^LUT_1D_SIZE\b/, (header) => (header.oneDimensional = true)],
+]
+
+function readHeaderLine(header, line) {
+  for (const [pattern, apply] of HEADER_LINES) {
+    const match = pattern.exec(line)
+    if (match) return apply(header, match)
+  }
+}
+
 /**
  * What a `.cube` header says: TITLE, LUT_3D_SIZE, and whether it is a 1D LUT.
  * Reads up to the first data line only.
  */
 export function readCubeHeader(text) {
   const header = { title: null, size: null, oneDimensional: false }
-  for (const raw of text.split(/\r?\n/)) {
-    const line = raw.trim()
-    if (isDataLine(line)) break
-    const title = /^TITLE\s+(?:"(.*)"|(.*))\s*$/.exec(line)
-    if (title) header.title = (title[1] ?? title[2]).trim()
-    else if (line.startsWith('LUT_3D_SIZE')) header.size = Number.parseInt(line.split(/\s+/)[1], 10)
-    else if (line.startsWith('LUT_1D_SIZE')) header.oneDimensional = true
-  }
+  const lines = text.split(/\r?\n/).map((line) => line.trim())
+  const firstData = lines.findIndex(isDataLine)
+  for (const line of firstData === -1 ? lines : lines.slice(0, firstData))
+    readHeaderLine(header, line)
   return header
 }
+
+const isUsableSize = (size) => Number.isInteger(size) && size >= 2 && size <= 129
 
 /**
  * Check `.cube` text is a 3D LUT the editor can load: a LUT_3D_SIZE header
@@ -88,7 +99,7 @@ export function checkCubeText(text) {
   const header = readCubeHeader(text)
   if (header.oneDimensional) throw new Error('a 1D LUT (LUT_1D_SIZE); only 3D LUTs work here')
   const { size } = header
-  if (!Number.isInteger(size) || size < 2 || size > 129)
+  if (!isUsableSize(size))
     throw new Error('no LUT_3D_SIZE between 2 and 129 in the header; not a 3D .cube LUT')
   const entries = text.split(/\r?\n/).filter((raw) => isDataLine(raw.trim())).length
   if (entries !== size ** 3)
