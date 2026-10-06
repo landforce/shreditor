@@ -66,6 +66,19 @@ export interface FormatTrackSpec {
   role: FormatRole
 }
 
+/** A story role a plan's beat plays (`shred plan`), shared across formats. */
+export type StructureRole = 'hook' | 'setup' | 'body' | 'payoff' | 'close'
+
+/** One section of the guide's Structure, in story order. */
+export interface FormatStructurePart {
+  role: StructureRole
+  /** The guide's word for it (a vlog's close is its "End"). */
+  name: string
+  /** false: the guide makes it optional. */
+  required: boolean
+  note: string
+}
+
 export interface FormatVariant {
   id: string
   name: string
@@ -98,6 +111,8 @@ export interface FormatDefinition {
   canvas: { width: number; height: number; fps: number }
   defaultVariant: string | null
   variants: readonly FormatVariant[]
+  /** The guide's Structure: the story roles a plan's beats use, in order. */
+  structure: readonly FormatStructurePart[]
   /** Tracks top to bottom. */
   tracks: readonly FormatTrackSpec[]
   /** Media category -> role in this format. */
@@ -133,6 +148,7 @@ export interface FormatTrack {
 }
 
 export const FORMAT_ROLES: readonly FormatRole[]
+export const STRUCTURE_ROLES: readonly StructureRole[]
 export const FORMATS: readonly FormatDefinition[]
 export const FORMAT_IDS: readonly FormatId[]
 export const CHOOSING_GUIDE: { path: string; source: string; reviewedHash: string }
