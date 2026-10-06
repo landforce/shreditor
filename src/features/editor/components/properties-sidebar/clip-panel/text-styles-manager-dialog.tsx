@@ -19,6 +19,10 @@ import {
 } from '@/features/editor/deps/timeline-store'
 import { duplicateTextStyle, roleLabelKey } from './text-style-picker-model'
 
+/** The aspects a style has a version for: "9:16, 16:9". */
+const aspectsOf = (style: TextStyleDefinition) =>
+  style.variants.map((variant) => variant.aspect).join(', ')
+
 interface TextStylesManagerDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -71,7 +75,7 @@ export function TextStylesManagerDialog({
                 <span className="truncate">
                   {style.name}
                   <span className="ml-1 text-muted-foreground">
-                    · {t(roleLabelKey(style.role))}
+                    · {t(roleLabelKey(style.role))} · {aspectsOf(style)}
                   </span>
                 </span>
                 <Button
@@ -134,8 +138,10 @@ function ProjectStyleRow({
           if (event.key === 'Enter') rename()
         }}
       />
-      <span className="w-16 shrink-0 text-[10px] text-muted-foreground">
+      <span className="w-20 shrink-0 text-[10px] leading-tight text-muted-foreground">
         {t('textStyles.usedBy', { count: usedBy })}
+        <br />
+        {aspectsOf(style)}
       </span>
       <Button variant="ghost" size="sm" className="h-7 text-[11px]" onClick={duplicate}>
         {t('textStyles.duplicate')}

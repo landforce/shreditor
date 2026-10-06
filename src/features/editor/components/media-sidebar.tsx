@@ -35,7 +35,7 @@ import { usePlaybackStore } from '@/shared/state/playback'
 import { useSelectionStore } from '@/shared/state/selection'
 import type { TextStyleDefinition } from '@/types/text-style'
 import { StyledTextTemplates } from './styled-text-templates'
-import { ensureTextStyleInProject, withTextStyle } from './styled-text-item'
+import { ensureTextStyleInProject, fitTextStyleToCanvas, withTextStyle } from './styled-text-item'
 import { useProjectStore } from '@/features/editor/deps/projects'
 import { DEFAULT_PROJECT_HEIGHT, DEFAULT_PROJECT_WIDTH } from '@/shared/projects/defaults'
 import {
@@ -383,6 +383,17 @@ export const MediaSidebar = memo(function MediaSidebar() {
   // NOTE: Don't subscribe to tracks, items, currentProject here!
   // These change frequently and would cause re-renders cascading to MediaLibrary/MediaCards
   // Read from store directly in callbacks using getState()
+  // (The canvas size is two numbers that change only when the project's size does.)
+  const projectWidth = useProjectStore(
+    (s) => s.currentProject?.metadata.width ?? DEFAULT_PROJECT_WIDTH,
+  )
+  const projectHeight = useProjectStore(
+    (s) => s.currentProject?.metadata.height ?? DEFAULT_PROJECT_HEIGHT,
+  )
+  const textStyleCanvas = useMemo(
+    () => ({ width: projectWidth, height: projectHeight }),
+    [projectHeight, projectWidth],
+  )
 
   // Add text item on its own new layer at the playhead, matching what dragging
   // the same preset onto the canvas does (minus the cursor-driven position).
@@ -423,10 +434,11 @@ export const MediaSidebar = memo(function MediaSidebar() {
         textStylePresetId: presetId,
       })
       const canvas = { width: canvasWidth, height: canvasHeight }
-      const styledItem = withTextStyle(textItem, style, canvas)
+      const fitted = fitTextStyleToCanvas(style, canvas)
+      const styledItem = withTextStyle(textItem, fitted, canvas)
 
       addItemOnNewTrack(styledItem, newTrack.tracks)
-      ensureTextStyleInProject(style, canvas)
+      ensureTextStyleInProject(fitted, canvas)
       setActiveTrack(newTrack.trackId)
       selectItems([textItem.id])
     },
@@ -781,7 +793,10 @@ export const MediaSidebar = memo(function MediaSidebar() {
                   <div className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
                     {t('editor.mediaSidebar.templates')}
                   </div>
-                  <StyledTextTemplates onAdd={(style) => handleAddText(undefined, style)} />
+                  <StyledTextTemplates
+                    canvas={textStyleCanvas}
+                    onAdd={(style) => handleAddText(undefined, style)}
+                  />
                   {TEXT_TEMPLATE_GROUPS.map((group) => {
                     const presets = textTemplatesByLayout[group.key]
                     const showAddText = group.key === 'single'

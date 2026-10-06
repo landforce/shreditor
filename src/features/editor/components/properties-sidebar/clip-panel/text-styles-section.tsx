@@ -17,7 +17,11 @@ import type { TextItem, TimelineItem } from '@/types/timeline'
 import type { CanvasSettings } from '@/types/transform'
 import { TEXT_STYLE_ROLES, type TextStyleDefinition, type TextStyleRole } from '@/types/text-style'
 import { useLibraryTextStylesStore, useProjectTextStylesStore } from '@/shared/state/text-styles'
-import { textStyleDifferences } from '@/shared/typography/text-styles/text-style-resolve'
+import {
+  canvasAspect,
+  textStyleDifferences,
+  textStyleVariantForCanvas,
+} from '@/shared/typography/text-styles/text-style-resolve'
 import {
   applyTextStyleToItems,
   detachItemsFromTextStyle,
@@ -27,6 +31,7 @@ import {
   useItemsStore,
   useTimelineStore,
 } from '@/features/editor/deps/timeline-store'
+import { mergeTextStyleFamilies } from '@/shared/typography/text-styles/text-style-family.mjs'
 import { PropertySection } from '../components'
 import { TEXT_STYLE_PRESETS, buildTextStylePresetTemplate } from './text-style-presets'
 import {
@@ -35,6 +40,7 @@ import {
   newTextStyleFromItem,
   roleLabelKey,
   textStyleUpdatedFromItem,
+  textStyleWithVersionFor,
 } from './text-style-picker-model'
 import { TextStylesManagerDialog } from './text-styles-manager-dialog'
 
@@ -45,7 +51,19 @@ interface TextStylesSectionProps {
 
 const MIXED = '__mixed__'
 
-/** Pick, save, reset and manage the text style of the selected text items. */
+/**
+ * Give the items a style, making its version for the canvas's aspect first
+ * (cloned from its closest one) when it has none: one undo step.
+ */
+function applyWithVersion(
+  ids: readonly string[],
+  style: TextStyleDefinition,
+  canvas: CanvasSettings,
+): void {
+  saveTextStyleFromItems(textStyleWithVersionFor(style, canvas), ids, canvas)
+}
+
+/** Pick, save, reset and manage the saved text style of the selected text items. */
 export function TextStylesSection({ items, canvas }: TextStylesSectionProps) {
   const { t } = useTranslation()
   const textItems = useMemo(
@@ -54,8 +72,11 @@ export function TextStylesSection({ items, canvas }: TextStylesSectionProps) {
   )
   const projectStyles = useProjectTextStylesStore((s) => s.styles)
   const libraryStyles = useLibraryTextStylesStore((s) => s.styles)
+  const librarySeeded = useLibraryTextStylesStore((s) => s.seeded)
   const tracks = useItemsStore((s) => s.tracks)
   const [managing, setManaging] = useState(false)
+  // A style picked that has no look for this aspect yet: offer to make one.
+  const [unfit, setUnfit] = useState<TextStyleDefinition | null>(null)
   const first = textItems[0]
   const ids = useMemo(() => textItems.map((item) => item.id), [textItems])
 
@@ -66,8 +87,8 @@ export function TextStylesSection({ items, canvas }: TextStylesSectionProps) {
   const formatRole =
     first?.formatRole ?? tracks.find((track) => track.id === first?.trackId)?.formatRole
   const groups = useMemo(
-    () => buildTextStylePickerGroups(projectStyles, libraryStyles, formatRole),
-    [formatRole, libraryStyles, projectStyles],
+    () => buildTextStylePickerGroups(projectStyles, libraryStyles, formatRole, canvas),
+    [canvas, formatRole, libraryStyles, projectStyles],
   )
 
   const pick = useCallback(
@@ -83,7 +104,10 @@ export function TextStylesSection({ items, canvas }: TextStylesSectionProps) {
       }
       const source = kind === 'project' ? projectStyles : libraryStyles
       const picked = source.find((entry) => entry.id === id)
-      if (picked) applyTextStyleToItems(ids, picked, canvas)
+      if (!picked) return
+      if (!textStyleVariantForCanvas(picked, canvas)) return setUnfit(picked)
+      setUnfit(null)
+      applyTextStyleToItems(ids, picked, canvas)
     },
     [canvas, ids, libraryStyles, projectStyles],
   )
@@ -106,22 +130,37 @@ export function TextStylesSection({ items, canvas }: TextStylesSectionProps) {
               label={t('textStyles.groupProject')}
               kind="project"
               entries={groups.project}
+              aspect={canvasAspect(canvas)}
             />
             <StyleGroup
               label={t('textStyles.groupLibrary')}
               kind="library"
               entries={groups.library}
+              aspect={canvasAspect(canvas)}
             />
-            <SelectGroup>
-              <SelectLabel className="text-[10px]">{t('textStyles.groupPresets')}</SelectLabel>
-              {TEXT_STYLE_PRESETS.map((preset) => (
-                <SelectItem key={preset.id} value={`preset:${preset.id}`} className="text-xs">
-                  {preset.label}
-                </SelectItem>
-              ))}
-            </SelectGroup>
+            {/* The built-ins live in the library once it is seeded. */}
+            {librarySeeded ? null : (
+              <SelectGroup>
+                <SelectLabel className="text-[10px]">{t('textStyles.groupPresets')}</SelectLabel>
+                {TEXT_STYLE_PRESETS.map((preset) => (
+                  <SelectItem key={preset.id} value={`preset:${preset.id}`} className="text-xs">
+                    {preset.label}
+                  </SelectItem>
+                ))}
+              </SelectGroup>
+            )}
           </SelectContent>
         </Select>
+        {unfit && unfit.id !== style?.id ? (
+          <MissingVersionNotice
+            style={unfit}
+            canvas={canvas}
+            onMake={() => {
+              applyWithVersion(ids, unfit, canvas)
+              setUnfit(null)
+            }}
+          />
+        ) : null}
         {style ? (
           <LinkedStyleControls item={first} ids={ids} style={style} canvas={canvas} />
         ) : null}
@@ -144,26 +183,60 @@ function StyleGroup({
   label,
   kind,
   entries,
+  aspect,
 }: {
   label: string
   kind: 'project' | 'library'
   entries: ReturnType<typeof buildTextStylePickerGroups>['project']
+  aspect: string
 }) {
   const { t } = useTranslation()
   if (entries.length === 0) return null
   return (
     <SelectGroup>
       <SelectLabel className="text-[10px]">{label}</SelectLabel>
-      {entries.map(({ style, suggested }) => (
+      {entries.map(({ style, suggested, fits }) => (
         <SelectItem key={style.id} value={`${kind}:${style.id}`} className="text-xs">
           {style.name}
           <span className="ml-1 text-muted-foreground">
             · {t(roleLabelKey(style.role))}
             {suggested ? ` · ${t('textStyles.suggested')}` : ''}
+            {fits ? '' : ` · ${t('textStyles.noVersion', { aspect })}`}
           </span>
         </SelectItem>
       ))}
     </SelectGroup>
+  )
+}
+
+/** "No 16:9 version" and the button that makes one from the closest. */
+function MissingVersionNotice({
+  style,
+  canvas,
+  onMake,
+}: {
+  style: TextStyleDefinition
+  canvas: CanvasSettings
+  onMake: () => void
+}) {
+  const { t } = useTranslation()
+  const aspect = canvasAspect(canvas)
+  return (
+    <div
+      className="space-y-1.5 rounded-md border border-dashed border-border p-2"
+      data-testid="text-style-missing-version"
+    >
+      <p className="text-[11px]">
+        {t('textStyles.noVersionFor', {
+          name: style.name,
+          aspect,
+          aspects: style.variants.map((variant) => variant.aspect).join(', '),
+        })}
+      </p>
+      <Button variant="outline" size="sm" className="h-7 w-full text-[11px]" onClick={onMake}>
+        {t('textStyles.makeVersion', { aspect })}
+      </Button>
+    </div>
   )
 }
 
@@ -180,45 +253,29 @@ function LinkedStyleControls({
   canvas: CanvasSettings
 }) {
   const { t } = useTranslation()
-  const libraryStyles = useLibraryTextStylesStore((s) => s.styles)
   const differences = textStyleDifferences(item, style, canvas)
-  const libraryState = libraryStateOf(style, libraryStyles)
-  const librarySource = libraryStyles.find((entry) => entry.id === style.id)
-
-  const saveToLibrary = () =>
-    useLibraryTextStylesStore
-      .getState()
-      .saveStyle(style)
-      .then(() => toast.success(t('textStyles.savedToLibrary', { name: style.name })))
-      .catch(() => toast.error(t('textStyles.libraryWriteFailed')))
+  const fits = Boolean(textStyleVariantForCanvas(style, canvas))
+  const overridden = Boolean(item.textStyleOverrides?.length)
 
   return (
     <div
       className="space-y-1.5 rounded-md border border-border/70 p-2"
       data-testid="text-style-status"
     >
-      <div className="flex items-center justify-between gap-2 text-[11px]">
-        <span className="truncate">{t('textStyles.linked', { name: style.name })}</span>
-        {differences.length > 0 ? (
-          <span
-            className="shrink-0 rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] text-amber-500"
-            title={differences.join(', ')}
-            data-testid="text-style-differs"
-          >
-            {t('textStyles.differs', { count: differences.length })}
-          </span>
-        ) : (
-          <span className="shrink-0 text-[10px] text-muted-foreground">
-            {t('textStyles.matches')}
-          </span>
-        )}
-      </div>
+      <LinkedStyleStatus style={style} canvas={canvas} fits={fits} differences={differences} />
+      {fits ? null : (
+        <MissingVersionNotice
+          style={style}
+          canvas={canvas}
+          onMake={() => applyWithVersion(ids, style, canvas)}
+        />
+      )}
       <div className="grid grid-cols-1 gap-1.5">
         <Button
           variant="outline"
           size="sm"
           className="h-7 text-[11px]"
-          disabled={differences.length === 0 && !item.textStyleOverrides?.length}
+          disabled={!fits || (differences.length === 0 && !overridden)}
           onClick={() => resetItemsToTextStyle(ids, canvas)}
         >
           {t('textStyles.resetToStyle')}
@@ -227,7 +284,8 @@ function LinkedStyleControls({
           variant="outline"
           size="sm"
           className="h-7 text-[11px]"
-          disabled={differences.length === 0}
+          disabled={!fits || differences.length === 0}
+          title={t('textStyles.updateStyleHint', { aspect: canvasAspect(canvas) })}
           onClick={() =>
             saveTextStyleFromItems(textStyleUpdatedFromItem(style, item, canvas), [item.id], canvas)
           }
@@ -242,37 +300,98 @@ function LinkedStyleControls({
         >
           {t('textStyles.detach')}
         </Button>
-        {libraryState === 'same' ? (
-          <span className="self-center text-center text-[10px] text-muted-foreground">
-            {t('textStyles.librarySame')}
-          </span>
-        ) : (
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-7 text-[11px]"
-            onClick={() => void saveToLibrary()}
-          >
-            {t('textStyles.saveToLibrary')}
-          </Button>
-        )}
+        <SaveToLibraryControl style={style} />
       </div>
-      {libraryState === 'differs' && librarySource ? (
-        <Button
-          variant="outline"
-          size="sm"
-          className="h-7 w-full text-[11px]"
-          onClick={() =>
-            upsertProjectTextStyle(
-              { ...librarySource, version: Math.max(librarySource.version, style.version + 1) },
-              canvas,
-            )
-          }
-        >
-          {t('textStyles.updateFromLibrary', { version: librarySource.version })}
-        </Button>
-      ) : null}
+      <UpdateFromLibraryControl style={style} canvas={canvas} />
     </div>
+  )
+}
+
+/** "Uses Kit Title 9:16" and whether the item still matches its style. */
+function LinkedStyleStatus({
+  style,
+  canvas,
+  fits,
+  differences,
+}: {
+  style: TextStyleDefinition
+  canvas: CanvasSettings
+  fits: boolean
+  differences: readonly string[]
+}) {
+  const { t } = useTranslation()
+  const marker =
+    differences.length > 0 ? (
+      <span
+        className="shrink-0 rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] text-amber-500"
+        title={differences.join(', ')}
+        data-testid="text-style-differs"
+      >
+        {t('textStyles.differs', { count: differences.length })}
+      </span>
+    ) : (
+      <span className="shrink-0 text-[10px] text-muted-foreground">{t('textStyles.matches')}</span>
+    )
+  return (
+    <div className="flex items-center justify-between gap-2 text-[11px]">
+      <span className="truncate">
+        {t('textStyles.linked', { name: style.name })}
+        <span className="ml-1 text-[10px] text-muted-foreground">{canvasAspect(canvas)}</span>
+      </span>
+      {fits ? marker : null}
+    </div>
+  )
+}
+
+/** "Save to library", or a note that the library has the same style. */
+function SaveToLibraryControl({ style }: { style: TextStyleDefinition }) {
+  const { t } = useTranslation()
+  const libraryStyles = useLibraryTextStylesStore((s) => s.styles)
+  if (libraryStateOf(style, libraryStyles) === 'same') {
+    return (
+      <span className="self-center text-center text-[10px] text-muted-foreground">
+        {t('textStyles.librarySame')}
+      </span>
+    )
+  }
+  const save = () =>
+    useLibraryTextStylesStore
+      .getState()
+      .saveStyle(style)
+      .then(() => toast.success(t('textStyles.savedToLibrary', { name: style.name })))
+      .catch(() => toast.error(t('textStyles.libraryWriteFailed')))
+  return (
+    <Button variant="ghost" size="sm" className="h-7 text-[11px]" onClick={() => void save()}>
+      {t('textStyles.saveToLibrary')}
+    </Button>
+  )
+}
+
+/** "Update from library (vN)" when the library's copy differs. */
+function UpdateFromLibraryControl({
+  style,
+  canvas,
+}: {
+  style: TextStyleDefinition
+  canvas: CanvasSettings
+}) {
+  const { t } = useTranslation()
+  const libraryStyles = useLibraryTextStylesStore((s) => s.styles)
+  const source = libraryStyles.find((entry) => entry.id === style.id)
+  if (!source || libraryStateOf(style, libraryStyles) !== 'differs') return null
+  const update = () =>
+    upsertProjectTextStyle(
+      {
+        // The library's looks win; versions only this project has stay.
+        ...mergeTextStyleFamilies(style, source),
+        version: Math.max(source.version, style.version + 1),
+      },
+      canvas,
+    )
+  return (
+    <Button variant="outline" size="sm" className="h-7 w-full text-[11px]" onClick={update}>
+      {t('textStyles.updateFromLibrary', { version: source.version })}
+    </Button>
   )
 }
 

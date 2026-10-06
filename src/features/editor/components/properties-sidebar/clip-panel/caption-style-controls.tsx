@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { Separator } from '@/components/ui/separator'
 import { cn } from '@/shared/ui/cn'
 import { useTimelineStore } from '@/features/editor/deps/timeline-store'
+import { useLibraryTextStylesStore } from '@/shared/state/text-styles'
 import type { SubtitleSegmentItem, TextItem } from '@/types/timeline'
 
 import { ColorPicker, PropertyRow, SliderInput } from '../components'
@@ -44,6 +45,8 @@ export const CaptionStyleControls = memo(function CaptionStyleControls({
 }: CaptionStyleControlsProps) {
   const { t } = useTranslation()
   const updateItem = useTimelineStore((s) => s.updateItem)
+  // Once seeded, the built-in caption presets are library styles in the choices above.
+  const librarySeeded = useLibraryTextStylesStore((s) => s.seeded)
 
   const applyPatch = useCallback(
     (patch: Partial<CaptionStylableItem>) => {
@@ -107,7 +110,7 @@ export const CaptionStyleControls = memo(function CaptionStyleControls({
         canvasHeight={canvasHeight}
         onApplyPatch={applyPatch}
       />
-      <div>
+      <div hidden={librarySeeded}>
         <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground pb-1.5">
           {t('editor.captionStyleControls.stylePreset')}
         </p>
