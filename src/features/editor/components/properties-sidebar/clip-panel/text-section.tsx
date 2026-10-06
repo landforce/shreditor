@@ -461,9 +461,9 @@ function TextSectionComposer({ items, canvas, slots }: TextSectionComposerProps)
   // Update all selected text items
   const updateTextItems = useCallback(
     (updates: Partial<TextItem>) => {
-      textItems.forEach((item) => {
-        updateItem(item.id, updates)
-      })
+      executeTimelineCommand('UPDATE_TEXT', () =>
+        textItems.forEach((item) => updateItem(item.id, updates)),
+      )
     },
     [textItems, updateItem],
   )
@@ -520,13 +520,15 @@ function TextSectionComposer({ items, canvas, slots }: TextSectionComposerProps)
             (firstTextItem ? getTextItemPrimaryText(firstTextItem) : ''))
           : (sharedValues?.text ?? firstTextItem?.text ?? '')
       const label = buildTextItemLabelFromText(plainText)
-      textItems.forEach((item) => {
-        updateItem(item.id, {
-          text: plainText,
-          textSpans: sanitizedSpans,
-          label,
-        })
-      })
+      executeTimelineCommand('UPDATE_TEXT', () =>
+        textItems.forEach((item) => {
+          updateItem(item.id, {
+            text: plainText,
+            textSpans: sanitizedSpans,
+            label,
+          })
+        }),
+      )
     },
     [activeEditorSpans, firstTextItem, sharedValues?.text, textItems, updateItem],
   )
@@ -1092,9 +1094,11 @@ function TextSectionComposer({ items, canvas, slots }: TextSectionComposerProps)
 
   const handleApplyTextStylePreset = useCallback(
     (presetId: TextStylePresetId) => {
-      textItems.forEach((item) => {
-        updateItem(item.id, buildTextStylePresetTemplate(presetId, canvas, 1))
-      })
+      executeTimelineCommand('APPLY_TEXT_PRESET', () =>
+        textItems.forEach((item) => {
+          updateItem(item.id, buildTextStylePresetTemplate(presetId, canvas, 1))
+        }),
+      )
       finalizePreviewChange()
     },
     [canvas, finalizePreviewChange, textItems, updateItem],

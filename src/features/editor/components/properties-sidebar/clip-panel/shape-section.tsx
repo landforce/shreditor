@@ -19,7 +19,11 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import type { ShapeItem, ShapeType, TimelineItem } from '@/types/timeline'
-import { useKeyframesStore, useTimelineStore } from '@/features/editor/deps/timeline-store'
+import {
+  executeTimelineCommand,
+  useKeyframesStore,
+  useTimelineStore,
+} from '@/features/editor/deps/timeline-store'
 import { useGizmoStore, useMaskEditorStore } from '@/features/editor/deps/preview'
 import { hasPathVertexKeyframes } from '@/features/editor/deps/keyframes'
 import {
@@ -240,9 +244,9 @@ export function ShapeSection({ items }: ShapeSectionProps) {
   // Update all selected shape items
   const updateShapeItems = useCallback(
     (updates: Partial<ShapeItem>) => {
-      shapeItems.forEach((item) => {
-        updateItem(item.id, updates)
-      })
+      executeTimelineCommand('UPDATE_SHAPE', () =>
+        shapeItems.forEach((item) => updateItem(item.id, updates)),
+      )
     },
     [shapeItems, updateItem],
   )

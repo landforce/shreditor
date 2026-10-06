@@ -68,6 +68,7 @@ vi.mock('../components', () => ({
 
 vi.mock('@/features/editor/deps/timeline-store', () => ({
   useTimelineStore: (selector: (state: typeof timelineState) => unknown) => selector(timelineState),
+  executeTimelineCommand: (_type: string, action: () => unknown) => action(),
 }))
 
 import { AudioDynamicsSection } from './audio-dynamics-section'

@@ -17,7 +17,11 @@ import type { BlendMode } from '@/types/blend-modes'
 import { BLEND_MODE_GROUPS, BLEND_MODE_LABELS } from '@/types/blend-modes'
 import type { TransformProperties, CanvasSettings } from '@/types/transform'
 import { useGizmoStore, useThrottledFrame } from '@/features/editor/deps/preview'
-import { useKeyframesStore, useTimelineStore } from '@/features/editor/deps/timeline-store'
+import {
+  executeTimelineCommand,
+  useKeyframesStore,
+  useTimelineStore,
+} from '@/features/editor/deps/timeline-store'
 import { resolveTransform, getSourceDimensions } from '@/features/editor/deps/composition-runtime'
 import {
   getAutoKeyframeOperation,
@@ -211,10 +215,12 @@ export const FillSection = memo(function FillSection({
   // Handle blend mode change
   const handleBlendModeChange = useCallback(
     (value: string) => {
-      for (const item of items) {
-        if (item.type === 'shape' && item.isMask) continue
-        updateItem(item.id, { blendMode: value as BlendMode })
-      }
+      executeTimelineCommand('SET_BLEND_MODE', () => {
+        for (const item of items) {
+          if (item.type === 'shape' && item.isMask) continue
+          updateItem(item.id, { blendMode: value as BlendMode })
+        }
+      })
     },
     [items, updateItem],
   )

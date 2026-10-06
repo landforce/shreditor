@@ -74,7 +74,6 @@ export const EffectsSection = memo(function EffectsSection({
   // Grade panels collapse to a summary row in the sidebar (the Edit workspace);
   // the dock owns the full grading surface, so it never collapses.
   const gradePanelCollapsible = !isDock
-  const addEffect = useTimelineStore((s) => s.addEffect)
   const addEffects = useTimelineStore((s) => s.addEffects)
   const updateEffect = useTimelineStore((s) => s.updateEffect)
   const removeEffect = useTimelineStore((s) => s.removeEffect)
@@ -151,13 +150,15 @@ export const EffectsSection = memo(function EffectsSection({
   const handleAddGpuEffect = useCallback(
     (gpuEffectId: string) => {
       const defaults = getGpuEffectDefaultParams(gpuEffectId)
-      itemIds.forEach((id) => {
-        addEffect(id, {
-          type: 'gpu-effect',
-          gpuEffectType: gpuEffectId,
-          params: defaults,
-        } as GpuEffect)
-      })
+      // One undo step for every selected clip.
+      addEffects(
+        itemIds.map((itemId) => ({
+          itemId,
+          effects: [
+            { type: 'gpu-effect', gpuEffectType: gpuEffectId, params: defaults } as GpuEffect,
+          ],
+        })),
+      )
 
       if (gpuEffectId === 'gpu-power-window' && itemIds.length === 1) {
         const itemId = itemIds[0]!
@@ -172,7 +173,7 @@ export const EffectsSection = memo(function EffectsSection({
         }
       }
     },
-    [addEffect, itemIds, startPowerWindowEditing, stopSpatialEffectEditing],
+    [addEffects, itemIds, startPowerWindowEditing, stopSpatialEffectEditing],
   )
 
   const { gpuCategories, triggerPreviews } = useGpuEffectPreviewData()

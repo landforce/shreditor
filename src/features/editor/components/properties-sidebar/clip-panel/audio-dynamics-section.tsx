@@ -10,7 +10,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import type { TimelineItem } from '@/types/timeline'
-import { useTimelineStore } from '@/features/editor/deps/timeline-store'
+import { executeTimelineCommand, useTimelineStore } from '@/features/editor/deps/timeline-store'
 import {
   AUDIO_DYNAMICS_FIELD_SPECS,
   AUDIO_DYNAMICS_PRESETS,
@@ -177,11 +177,14 @@ export function AudioDynamicsSection({ items }: { items: TimelineItem[] }) {
 
   const handlePatch = useCallback(
     (field: AudioDynamicsItemField, patch: StageRecord) => {
-      for (const item of audioItems) {
-        const current = readStage(item, field)
-        const next = { ...current, enabled: current.enabled === true, ...patch }
-        updateItem(item.id, { [field]: next } as Partial<TimelineItem>)
-      }
+      // A clip and its own audio (or several clips) change in one undo step.
+      executeTimelineCommand('SET_AUDIO_DYNAMICS', () => {
+        for (const item of audioItems) {
+          const current = readStage(item, field)
+          const next = { ...current, enabled: current.enabled === true, ...patch }
+          updateItem(item.id, { [field]: next } as Partial<TimelineItem>)
+        }
+      })
     },
     [audioItems, updateItem],
   )
@@ -190,9 +193,9 @@ export function AudioDynamicsSection({ items }: { items: TimelineItem[] }) {
     (presetId: string) => {
       const preset = AUDIO_DYNAMICS_PRESETS.find((entry) => entry.id === presetId)
       if (!preset) return
-      for (const item of audioItems) {
-        updateItem(item.id, preset.patch as Partial<TimelineItem>)
-      }
+      executeTimelineCommand('SET_AUDIO_DYNAMICS', () => {
+        for (const item of audioItems) updateItem(item.id, preset.patch as Partial<TimelineItem>)
+      })
     },
     [audioItems, updateItem],
   )

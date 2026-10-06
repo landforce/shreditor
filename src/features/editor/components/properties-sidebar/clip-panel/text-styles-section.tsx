@@ -25,6 +25,7 @@ import {
 import {
   applyTextStyleToItems,
   detachItemsFromTextStyle,
+  executeTimelineCommand,
   resetItemsToTextStyle,
   saveTextStyleFromItems,
   upsertProjectTextStyle,
@@ -96,10 +97,12 @@ export function TextStylesSection({ items, canvas }: TextStylesSectionProps) {
       const [kind, id] = value.split(':') as [string, string]
       if (kind === 'preset') {
         // A built-in preset is a starting point: the items leave their style.
-        detachItemsFromTextStyle(ids, canvas)
         const { updateItem } = useTimelineStore.getState()
-        for (const itemId of ids)
-          updateItem(itemId, buildTextStylePresetTemplate(id as never, canvas, 1))
+        executeTimelineCommand('APPLY_TEXT_PRESET', () => {
+          detachItemsFromTextStyle(ids, canvas)
+          for (const itemId of ids)
+            updateItem(itemId, buildTextStylePresetTemplate(id as never, canvas, 1))
+        })
         return
       }
       const source = kind === 'project' ? projectStyles : libraryStyles

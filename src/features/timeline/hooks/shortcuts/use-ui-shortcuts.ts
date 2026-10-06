@@ -10,6 +10,38 @@ import { HOTKEY_OPTIONS } from '@/config/hotkeys'
 import type { TimelineShortcutCallbacks } from '../use-timeline-shortcuts'
 import { useResolvedHotkeys, useSettingsStore } from '@/features/timeline/deps/settings'
 
+const NON_TEXT_INPUT_TYPES = new Set([
+  'button',
+  'checkbox',
+  'color',
+  'file',
+  'image',
+  'radio',
+  'range',
+  'reset',
+  'submit',
+])
+
+/**
+ * Typing in a text field: Cmd+Z there is the field's own undo, so the timeline
+ * history leaves it alone. Sliders, checkboxes and buttons still undo the timeline.
+ */
+function isTextEntryTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false
+  if (target.isContentEditable) return true
+  if (target instanceof HTMLTextAreaElement) return !target.readOnly
+  if (target instanceof HTMLInputElement) {
+    return !target.readOnly && !NON_TEXT_INPUT_TYPES.has(target.type)
+  }
+  return false
+}
+
+const HISTORY_HOTKEY_OPTIONS = {
+  ...HOTKEY_OPTIONS,
+  enableOnFormTags: true,
+  ignoreEventWhen: (event: KeyboardEvent) => isTextEntryTarget(event.target),
+}
+
 export function useUIShortcuts(callbacks: TimelineShortcutCallbacks) {
   const hotkeys = useResolvedHotkeys()
   const toggleSnap = useTimelineStore((s) => s.toggleSnap)
@@ -26,10 +58,7 @@ export function useUIShortcuts(callbacks: TimelineShortcutCallbacks) {
         callbacks.onUndo()
       }
     },
-    {
-      ...HOTKEY_OPTIONS,
-      enableOnFormTags: true,
-    },
+    HISTORY_HOTKEY_OPTIONS,
     [callbacks],
   )
 
@@ -43,10 +72,7 @@ export function useUIShortcuts(callbacks: TimelineShortcutCallbacks) {
         callbacks.onRedo()
       }
     },
-    {
-      ...HOTKEY_OPTIONS,
-      enableOnFormTags: true,
-    },
+    HISTORY_HOTKEY_OPTIONS,
     [callbacks],
   )
 

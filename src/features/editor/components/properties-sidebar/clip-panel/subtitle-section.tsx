@@ -7,7 +7,7 @@ import { i18n } from '@/i18n'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { DEFAULT_PROJECT_HEIGHT, DEFAULT_PROJECT_WIDTH } from '@/shared/projects/defaults'
-import { useTimelineStore } from '@/features/editor/deps/timeline-store'
+import { executeTimelineCommand, useTimelineStore } from '@/features/editor/deps/timeline-store'
 import { usePlaybackStore } from '@/shared/state/playback'
 import {
   buildCueText,
@@ -174,33 +174,37 @@ const VirtualTranscriptSubtitleEditor = memo(function VirtualTranscriptSubtitleE
 
   const applyStylePatch = useCallback(
     (patch: Partial<SubtitleSegmentItem | TextItem>) => {
-      for (const clip of clips) {
-        updateItem(clip.id, {
-          transcriptCaptions: {
-            ...clip.transcriptCaptions,
-            style: {
-              ...(clip.transcriptCaptions.style ?? {}),
-              ...patch,
+      executeTimelineCommand('SET_CAPTION_STYLE', () => {
+        for (const clip of clips) {
+          updateItem(clip.id, {
+            transcriptCaptions: {
+              ...clip.transcriptCaptions,
+              style: {
+                ...(clip.transcriptCaptions.style ?? {}),
+                ...patch,
+              },
+              updatedAt: Date.now(),
             },
-            updatedAt: Date.now(),
-          },
-        } as Partial<TimelineItem>)
-      }
+          } as Partial<TimelineItem>)
+        }
+      })
     },
     [clips, updateItem],
   )
 
   const setCaptionsVisible = useCallback(
     (enabled: boolean) => {
-      for (const clip of clips) {
-        updateItem(clip.id, {
-          transcriptCaptions: {
-            ...clip.transcriptCaptions,
-            enabled,
-            updatedAt: Date.now(),
-          },
-        } as Partial<TimelineItem>)
-      }
+      executeTimelineCommand('SET_CAPTIONS_VISIBLE', () => {
+        for (const clip of clips) {
+          updateItem(clip.id, {
+            transcriptCaptions: {
+              ...clip.transcriptCaptions,
+              enabled,
+              updatedAt: Date.now(),
+            },
+          } as Partial<TimelineItem>)
+        }
+      })
     },
     [clips, updateItem],
   )
