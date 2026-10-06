@@ -62,6 +62,50 @@ describe('DomTextScrubOverlay', () => {
     vi.unstubAllGlobals()
   })
 
+  const inputProps = {
+    fps: 30,
+    width: 1920,
+    height: 1080,
+    tracks: [],
+    transitions: [],
+    keyframes: [],
+  }
+
+  const renderOverlay = (visible: boolean) => (
+    <DomTextScrubOverlay
+      playerRef={createRef<PlayerRef>()}
+      visible={visible}
+      durationInFrames={120}
+      fps={30}
+      renderSize={{ width: 1920, height: 1080 }}
+      layoutSize={{ width: 1280, height: 720 }}
+      inputProps={inputProps}
+    />
+  )
+
+  it('hides with opacity so explicitly visible track layers cannot show stale text', () => {
+    const { container, rerender } = render(renderOverlay(false))
+    const overlay = container.querySelector<HTMLElement>('[data-dom-text-scrub-overlay]')
+
+    // Track layers inside the composition set `visibility: visible`, which
+    // overrides an inherited `visibility: hidden`.
+    expect(overlay?.style.opacity).toBe('0')
+    expect(seekToMock).not.toHaveBeenCalled()
+
+    rerender(renderOverlay(true))
+    expect(overlay?.style.opacity).toBe('1')
+  })
+
+  it('seeks to the visible frame before paint when it becomes visible', () => {
+    const { rerender } = render(renderOverlay(false))
+    usePlaybackStore.setState({ currentFrame: 600, previewFrame: 600 })
+    usePreviewBridgeStore.setState({ displayedFrame: 600 })
+
+    rerender(renderOverlay(true))
+    expect(seekToMock).toHaveBeenCalledOnce()
+    expect(seekToMock).toHaveBeenLastCalledWith(600)
+  })
+
   it('waits for the displayed canvas frame before advancing scrub text', () => {
     render(
       <DomTextScrubOverlay
