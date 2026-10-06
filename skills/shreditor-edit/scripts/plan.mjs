@@ -1,6 +1,8 @@
 // `shred plan` and `shred build`: the first edit of every project comes from a
 // plan. The agent writes agent/plan.json (story first: the user's request, the
-// arc, then beats with a why), `shred plan` validates it and records its hash,
+// arc, then beats with a why; for a speaker format the performance: the lines
+// kept or cut with visuals per line, ./performance.mjs), `shred plan` validates
+// it and records its hash,
 // `shred draft` refuses a project's first pass until that hash validated clean,
 // and `shred build` turns the plan into the first assembly in one atomic batch
 // (`--markers-only`: just the beat markers, so the user sees the structure
@@ -16,6 +18,16 @@ import { validatePlan } from '../../../formats/plan/validate.mjs'
 import { planEstimates } from '../../../formats/plan/estimate.mjs'
 import { buildPlanOps } from '../../../formats/plan/build.mjs'
 import { comparePlan } from '../../../formats/plan/compare.mjs'
+import { validatePerformance } from '../../../formats/plan/performance/validate.mjs'
+import { performanceEstimates } from '../../../formats/plan/performance/estimate.mjs'
+import { buildPerformanceOps } from '../../../formats/plan/performance/build.mjs'
+import { comparePerformance } from '../../../formats/plan/performance/compare.mjs'
+import {
+  printPerformancePlaced,
+  printPerformanceSheet,
+  scaffoldCommand,
+  wordsReader,
+} from './performance.mjs'
 import { readStoredTranscript, transcriptForFile } from '../../../server/transcription.mjs'
 import { effectiveActivity, readActivity } from '../../../server/agent-activity.mjs'
 
@@ -86,6 +98,7 @@ function importedMedia(ws, mediaId, projectFps) {
     sourceFps: meta.fps > 0 ? meta.fps : projectFps,
     audioCodec: meta.audioCodec ?? null,
     category: meta.category ?? null,
+    ...(meta.width > 0 && meta.height > 0 ? { width: meta.width, height: meta.height } : {}),
   }
 }
 
@@ -128,6 +141,20 @@ const formatOf = (project) => {
   return resolveFormat(project.format.id, project.format.variant)
 }
 
+/** Validate a read plan of either mode against the format, media and transcripts. */
+function validateRead(ws, plan, { format, fps, brief }) {
+  if (!plan || (plan.mode === 'performance' && !plan.performance))
+    return { errors: [], warnings: [] }
+  const options = {
+    format,
+    resolveMedia: mediaResolver(ws, fps),
+    briefTargetSec: brief.durationTargetSec,
+  }
+  return plan.mode === 'performance'
+    ? validatePerformance(plan, { ...options, wordsFor: wordsReader(ws) })
+    : validatePlan(plan, options)
+}
+
 /**
  * Read and validate a project's plan. `projectId` owns the agent files (a
  * draft's target); `project` gives the format and fps. Returns everything the
@@ -155,21 +182,17 @@ function checkPlan(ws, projectId, project, file) {
       format,
     }
   }
-  const read = readPlan(raw, { projectFps: fps })
+  const read = readPlan(raw, { projectFps: fps, defaultMode: format.planMode })
   const brief = readBrief(files.brief)
-  const checked = read.plan
-    ? validatePlan(read.plan, {
-        format,
-        resolveMedia: mediaResolver(ws, fps),
-        briefTargetSec: brief.durationTargetSec,
-      })
-    : { beats: [], errors: [], warnings: [] }
+  const checked = validateRead(ws, read.plan, { format, fps, brief })
   return {
     files,
     planFile,
     hash: hashOf(text),
     plan: read.plan,
-    beats: checked.beats,
+    beats: checked.beats ?? [],
+    lines: checked.lines ?? [],
+    layout: checked.layout ?? null,
     errors: [...read.errors, ...checked.errors],
     warnings: [...read.warnings, ...checked.warnings],
     format,
@@ -220,6 +243,10 @@ function printSheet(say, result, projectFps) {
   const { plan, format } = result
   say(`Plan  ${result.planFile}  (${result.hash.slice(0, 19)}…)`)
   if (!plan) return
+  if (plan.mode === 'performance') {
+    printPerformanceSheet(say, result)
+    return
+  }
   const fps = plan.fps || projectFps
   say(
     `v${plan.version}, ${fps} fps, ${plan.durationFrames} frames (${(plan.durationFrames / fps).toFixed(2)} s), ${plan.beats.length} beats, ${format.name}`,
@@ -233,6 +260,14 @@ function printSheet(say, result, projectFps) {
     `Story  ${roles.join(' → ')}   (${format.name}: ${format.structure.map((p) => `${p.name}${p.required ? '' : '?'}`).join(' → ')})\n`,
   )
   for (const beat of [...result.beats].sort((a, b) => a.start - b.start)) printBeat(say, beat, fps)
+}
+
+function estimatesFor(ws, result) {
+  const performance = result.plan.mode === 'performance'
+  const transcripts = transcriptsFor(ws, performance ? result.lines : result.beats)
+  return performance
+    ? performanceEstimates(result.plan, result.layout, result.format, { transcripts })
+    : planEstimates(result.plan, result.beats, result.format, { transcripts })
 }
 
 function writeState(result) {
@@ -319,6 +354,36 @@ function printPlaced(say, placed, fps) {
   }
 }
 
+/** What a plan uses that isn't imported yet, as `<id> <file>`. */
+function unimported(result) {
+  if (result.plan.mode !== 'performance')
+    return result.beats
+      .filter((beat) => !beat.media?.mediaId)
+      .map((beat) => `${beat.id} ${beat.media?.fileName ?? beat.source.asset}`)
+  return result.layout.visuals
+    .filter((visual) => visual.media && !visual.media.mediaId)
+    .map((visual) => `${visual.id} ${visual.media.fileName}`)
+}
+
+/** The build batch for a plan of either mode: `{ ops, starts, print(say) }`. */
+function assemble(result, options) {
+  const { plan } = result
+  if (plan.mode === 'performance') {
+    const { ops, placed } = buildPerformanceOps(plan, result.layout, result.lines, options)
+    return {
+      ops,
+      starts: [...result.layout.spans.values()].map((span) => span.start),
+      print: (say) => printPerformancePlaced(say, placed, result.layout, plan.fps),
+    }
+  }
+  const { ops, placed } = buildPlanOps(plan, result.beats, options)
+  return {
+    ops,
+    starts: placed.map((p) => p.beat.start),
+    print: (say) => printPlaced(say, placed, plan.fps),
+  }
+}
+
 export function planCommands({
   say,
   opt,
@@ -330,10 +395,27 @@ export function planCommands({
   warnUnsaved,
 }) {
   return {
-    async plan([id]) {
-      if (!id) throw new Error('Usage: shred plan <projectId> [--file plan.json]')
+    async plan([id, ...mediaIds]) {
+      if (!id)
+        throw new Error(
+          'Usage: shred plan <projectId> [--file plan.json] | shred plan <projectId> --scaffold <speaker mediaId...>',
+        )
       const target = readDrafts()[id]?.targetId ?? id
       const { project } = await getProject(id)
+      if (opt.scaffold) {
+        scaffoldCommand(
+          { say, workspace },
+          {
+            id,
+            target,
+            project,
+            format: formatOf(project),
+            mediaIds,
+            check: (file) => checkPlan(workspace(), target, project, file),
+          },
+        )
+        return
+      }
       const result = checkPlan(workspace(), target, project, opt.file)
       if (result.missing)
         throw new Error(
@@ -342,12 +424,7 @@ export function planCommands({
       const fps = project.metadata?.fps ?? 30
       printSheet(say, result, fps)
       if (result.plan && !result.errors.length)
-        printEstimates(
-          say,
-          planEstimates(result.plan, result.beats, result.format, {
-            transcripts: transcriptsFor(workspace(), result.beats),
-          }),
-        )
+        printEstimates(say, estimatesFor(workspace(), result))
       printIssues(say, 'Errors', result.errors)
       printIssues(say, 'Warnings', result.warnings)
       writeState(result)
@@ -390,25 +467,24 @@ export function planCommands({
         printIssues(say, 'Errors', result.errors)
         throw new Error(`The plan has ${result.errors.length} error(s): shred plan ${target}`)
       }
-      const notImported = result.beats.filter((beat) => !beat.media?.mediaId)
+      const notImported = unimported(result)
       if (notImported.length && !markersOnly)
         throw new Error(
-          `Import first (shred import ... --project ${target}): ${notImported.map((b) => `${b.id} ${b.media?.fileName ?? b.source.asset}`).join(', ')}`,
+          `Import first (shred import ... --project ${target}): ${notImported.join(', ')}`,
         )
-      const { ops, placed } = buildPlanOps(result.plan, result.beats, {
+      const built = assemble(result, {
         project,
         format: result.format,
         replace: Boolean(opt.replace),
         markersOnly,
       })
-      await applyBatch(id, ops, revision)
-      const fps = result.plan.fps
+      await applyBatch(id, built.ops, revision)
       say(
         markersOnly
-          ? `Beat markers on ${id} (no clips), from ${result.planFile}:`
+          ? `Plan markers on ${id} (no clips), from ${result.planFile}:`
           : `Built ${id} from ${result.planFile} (${result.hash.slice(0, 19)}…):`,
       )
-      printPlaced(say, placed, fps)
+      built.print(say)
       if (origin) {
         const drafts = readDrafts()
         drafts[id] = {
@@ -423,8 +499,8 @@ export function planCommands({
       }
       say(
         markersOnly
-          ? 'The editor shows them on the ruler. Walk the user through the beats and wait for their OK before shred draft.'
-          : `Next: shred frames ${id} --at ${placed.map((p) => p.beat.start + 1).join(',')} (open it: order matches the plan?), refine, then shred check ${id}.`,
+          ? 'The editor shows them on the ruler. Walk the user through the plan and wait for their OK before shred draft.'
+          : `Next: shred frames ${id} --at ${built.starts.map((frame) => frame + 1).join(',')} (open it: order matches the plan?), refine, then shred check ${id}.`,
       )
     },
   }
@@ -439,12 +515,17 @@ export function planCheck({ workspace, readDrafts }, id, project) {
   const result = checkPlan(workspace(), target, project)
   if (result.missing || !result.plan) return null
   const state = readJson(result.files.state)
-  const compared = comparePlan(
-    result.plan,
-    result.beats.filter((b) => b.media),
-    project.timeline,
-  )
+  const performance = result.plan.mode === 'performance'
+  if (performance && !result.layout) return null
+  const compared = performance
+    ? comparePerformance(result.plan, result.lines, result.layout, project.timeline)
+    : comparePlan(
+        result.plan,
+        result.beats.filter((b) => b.media),
+        project.timeline,
+      )
   return {
+    mode: result.plan.mode,
     file: result.planFile,
     hash: result.hash,
     validated: state?.hash === result.hash && !state.errors,
@@ -460,12 +541,17 @@ export function printPlanCheck(say, report) {
   )
   if (!report.findings.length)
     say(
-      `  pass  all ${report.checked} beats are where the plan puts them, in order, at the planned length`,
+      report.mode === 'performance'
+        ? `  pass  every kept line is on the timeline, in order, no cut line is back in, at the planned length (${report.checked} lines checked)`
+        : `  pass  all ${report.checked} beats are where the plan puts them, in order, at the planned length`,
     )
   for (const f of report.findings) {
     say(`  ${TAG[f.level].padEnd(4)}  ${f.message}`)
   }
-  if (report.skipped) say(`  info  ${report.skipped} beat(s) not checked (media not imported)`)
+  if (report.skipped)
+    say(
+      `  info  ${report.skipped} ${report.mode === 'performance' ? 'line' : 'beat'}(s) not checked (media not imported)`,
+    )
   if (report.findings.length)
     say(
       "  The user's tweaks are decisions: plan drift is reported, never failed. When the story itself changed, update plan.json and run shred plan.",
