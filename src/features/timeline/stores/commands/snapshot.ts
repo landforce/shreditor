@@ -199,25 +199,30 @@ function sameItems(a: TimelineSnapshot['items'], b: TimelineSnapshot['items']): 
   return a.every((item, i) => item === b[i] || JSON.stringify(item) === JSON.stringify(b[i]))
 }
 
+/** Snapshot fields compared by reference (the stores replace them on change). */
+const REFERENCE_FIELDS = [
+  'tracks',
+  'transitions',
+  'keyframes',
+  'markers',
+  'compositions',
+  'textStyles',
+  'topLevelSequenceIds',
+  'inPoint',
+  'outPoint',
+  'fps',
+  'scrollPosition',
+  'snapEnabled',
+  'currentFrame',
+  'masterBusDb',
+  'projectId',
+] as const satisfies ReadonlyArray<keyof TimelineSnapshot>
+
 export function snapshotsEqual(a: TimelineSnapshot, b: TimelineSnapshot): boolean {
   return (
     sameItems(a.items, b.items) &&
-    a.tracks === b.tracks &&
-    a.transitions === b.transitions &&
-    a.keyframes === b.keyframes &&
-    a.markers === b.markers &&
-    a.compositions === b.compositions &&
-    a.textStyles === b.textStyles &&
-    a.topLevelSequenceIds === b.topLevelSequenceIds &&
-    a.inPoint === b.inPoint &&
-    a.outPoint === b.outPoint &&
-    a.fps === b.fps &&
-    a.scrollPosition === b.scrollPosition &&
-    a.snapEnabled === b.snapEnabled &&
-    a.currentFrame === b.currentFrame &&
+    REFERENCE_FIELDS.every((field) => a[field] === b[field]) &&
     JSON.stringify(a.busAudioEq ?? null) === JSON.stringify(b.busAudioEq ?? null) &&
-    a.masterBusDb === b.masterBusDb &&
-    a.projectId === b.projectId &&
     projectMetadataEqual(a.projectMetadata, b.projectMetadata) &&
     sameFormat(a.projectFormat, b.projectFormat)
   )
