@@ -28,6 +28,20 @@ function makeWorkspace(t) {
   return { root, project, media, read, link }
 }
 
+/** Serve the workspace bridge for `root`; resolves to its http://127.0.0.1:<port> origin. */
+async function startBridge(t, root) {
+  const previous = process.env.SHREDITOR_WORKSPACE
+  process.env.SHREDITOR_WORKSPACE = root
+  const server = http.createServer(createWorkspaceBridge())
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve))
+  t.after(() => {
+    server.close()
+    if (previous === undefined) delete process.env.SHREDITOR_WORKSPACE
+    else process.env.SHREDITOR_WORKSPACE = previous
+  })
+  return `http://127.0.0.1:${server.address().port}`
+}
+
 test('setMediaCategories sets, clears and reports what changed', (t) => {
   const ws = makeWorkspace(t)
   ws.media('a')
@@ -98,16 +112,7 @@ test('bridge routes: POST media/category and GET media/version', async (t) => {
   ws.project('p1')
   ws.media('a')
   ws.link('p1', ['a'])
-  const previous = process.env.SHREDITOR_WORKSPACE
-  process.env.SHREDITOR_WORKSPACE = ws.root
-  const server = http.createServer(createWorkspaceBridge())
-  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve))
-  t.after(() => {
-    server.close()
-    if (previous === undefined) delete process.env.SHREDITOR_WORKSPACE
-    else process.env.SHREDITOR_WORKSPACE = previous
-  })
-  const base = `http://127.0.0.1:${server.address().port}/__shreditor`
+  const base = `${await startBridge(t, ws.root)}/__shreditor`
   const post = (items) =>
     fetch(`${base}/media/category`, { method: 'POST', body: JSON.stringify({ items }) })
 
@@ -133,13 +138,8 @@ test('native preparation route validates media IDs and returns a workspace deriv
   const ws = makeWorkspace(t)
   const source = path.join(ws.root, 'legacy.mov')
   execFileSync('ffmpeg', ['-v', 'error', '-y', '-f', 'lavfi', '-i', 'color=red:s=64x48:r=10:d=0.2', '-c:v', 'mpeg4', source])
-  const [imported] = await importMediaByPath(ws.root, [source], { mode: 'link' })
-  const previous = process.env.SHREDITOR_WORKSPACE
-  process.env.SHREDITOR_WORKSPACE = ws.root
-  const server = http.createServer(createWorkspaceBridge())
-  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve))
-  t.after(() => { server.close(); if (previous === undefined) delete process.env.SHREDITOR_WORKSPACE; else process.env.SHREDITOR_WORKSPACE = previous })
-  const base = `http://127.0.0.1:${server.address().port}`
+  const [imported] = await importMediaByPath(ws.root, [source], { mode: 'link', prepare: 'wait' })
+  const base = await startBridge(t, ws.root)
   const prepare = (mediaId) => fetch(`${base}/__shreditor/media/prepare`, { method: 'POST', body: JSON.stringify({ mediaId }) })
   assert.equal((await prepare('../outside')).status, 400)
   assert.equal((await prepare('missing')).status, 404)
@@ -152,4 +152,36 @@ test('native preparation route validates media IDs and returns a workspace deriv
   assert.equal(file.status, 200)
   assert.ok((await file.arrayBuffer()).byteLength > 0)
   assert.equal(ws.read(imported.id).codec, 'avc')
+})
+
+test('in-place ingest route reports, then starts, a working copy for a placed file', async (t) => {
+  const { execFileSync } = await import('node:child_process')
+  const { waitForPreparation } = await import('./media-preparation.mjs')
+  const ws = makeWorkspace(t)
+  ws.project('p1')
+  const original = path.join(ws.root, 'outside', 'card.mov')
+  fs.mkdirSync(path.dirname(original))
+  execFileSync('ffmpeg', ['-v', 'error', '-y', '-f', 'lavfi', '-i', 'color=red:s=64x48:r=10:d=0.2', '-c:v', 'mpeg4', original])
+  const playable = path.join(ws.root, 'outside', 'phone.mp4')
+  execFileSync('ffmpeg', ['-v', 'error', '-y', '-f', 'lavfi', '-i', 'color=red:s=64x48:r=10:d=0.2', '-c:v', 'libx264', playable])
+  // What media/choose leaves behind for a linked placement.
+  for (const [id, file] of [['placed', original], ['plays', playable]]) {
+    fs.mkdirSync(path.join(ws.root, 'media', id), { recursive: true })
+    fs.writeFileSync(path.join(ws.root, 'media', id, 'source.link.json'), JSON.stringify({ version: 1, path: file, fileName: path.basename(file) }))
+  }
+  const base = await startBridge(t, ws.root)
+  const ingest = async (body) => (await fetch(`${base}/__shreditor/media/ingest`, { method: 'POST', body: JSON.stringify(body) })).json()
+  assert.deepEqual(await ingest({ mediaId: 'plays', fileName: 'phone.mp4' }), { prepare: false })
+  const check = await ingest({ mediaId: 'placed', fileName: 'card.mov' })
+  assert.equal(check.prepare, true)
+  assert.equal(check.action, 'h264')
+  assert.equal(fs.existsSync(path.join(ws.root, 'media', 'placed', 'metadata.json')), false, 'a check writes nothing')
+  const started = await ingest({ mediaId: 'placed', fileName: 'card.mov', projectId: 'p1', start: true })
+  assert.equal(started.metadata.compatibility.status, 'preparing')
+  assert.equal(started.metadata.fileName, 'card.mov')
+  const links = JSON.parse(fs.readFileSync(path.join(ws.root, 'projects', 'p1', 'media-links.json'), 'utf8'))
+  assert.deepEqual(links.mediaIds.map((m) => m.id), ['placed'])
+  const [state] = await waitForPreparation(ws.root, ['placed'], { detached: false, intervalMs: 50 })
+  assert.equal(state.status, 'ready')
+  assert.equal(ws.read('placed').codec, 'avc')
 })

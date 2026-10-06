@@ -44,7 +44,8 @@ async function findSourceSegments(
   const entries = await listDirectory(root, mediaDir(mediaId))
   for (const entry of entries) {
     if (entry.kind !== 'file') continue
-    if (NON_SOURCE_NAMES.has(entry.name)) continue
+    // Dotfiles are atomic-write temporaries (the bridge writes metadata.json progress).
+    if (NON_SOURCE_NAMES.has(entry.name) || entry.name.startsWith('.')) continue
     return [...mediaDir(mediaId), entry.name]
   }
   return null
@@ -67,10 +68,11 @@ export async function readMediaSource(mediaId: string): Promise<Blob | null> {
       source: { size: number; mtimeMs: number }
       outputSize: number
     }>(root, [...mediaDir(mediaId), 'cache', 'compatibility', 'manifest.json']).catch(() => null)
+    // Mirrors resolveCompatibleMedia in server/media-compatibility.mjs.
     if (
       source &&
-      manifest?.version === 1 &&
-      /^[a-f0-9]{64}\.(mp4|mov)$/.test(manifest.file) &&
+      manifest?.version === 2 &&
+      /^[a-f0-9]{64}\.(mp4|mov|mkv)$/.test(manifest.file) &&
       source.size === manifest.source?.size &&
       source instanceof File &&
       Math.abs(source.lastModified - manifest.source.mtimeMs) < 2
