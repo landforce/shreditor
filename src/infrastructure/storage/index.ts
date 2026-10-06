@@ -185,6 +185,14 @@ export {
   type UserEffectPreset,
 } from '@/infrastructure/storage/workspace-fs/effect-presets'
 
+// Workspace LUT library (luts/*.cube)
+export {
+  listWorkspaceLuts,
+  readWorkspaceLut,
+  saveWorkspaceLut,
+  type WorkspaceLut,
+} from '@/infrastructure/storage/workspace-fs/luts'
+
 // Per-project animation presets
 export {
   readAnimationPresets,

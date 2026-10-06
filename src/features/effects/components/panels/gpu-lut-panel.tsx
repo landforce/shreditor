@@ -2,31 +2,37 @@ import { memo, useCallback, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { FileUp, RotateCcw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import {
-  parseCubeLut,
-  resampleCubeLut,
-  encodeLutData,
-} from '@/infrastructure/gpu-effects/lut/cube-lut'
+import { embedCubeLut } from '@/infrastructure/gpu-effects/lut/cube-lut'
+import { readWorkspaceLut, saveWorkspaceLut } from '@/infrastructure/storage'
 import { KeyframeToggle } from '@/features/effects/deps/keyframes-contract'
 import { PropertyRow, SliderInput } from '@/shared/ui/property-controls'
 import { createLogger } from '@/shared/logging/logger'
 import { getEffectDefinitionName } from '@/features/effects/utils/effect-i18n'
 import { EffectPanelHeaderRow } from './effect-panel-header-actions'
 import { ParamResetButton } from './param-reset-button'
+import { LutLibraryRow } from './lut-library-row'
+import { useWorkspaceLuts } from '@/features/effects/hooks/use-workspace-luts'
 import type { GpuKeyframePanelProps, GpuParamUpdates } from './panel-props'
 
 const logger = createLogger('GpuLutPanel')
 
-/** Imported LUTs are resampled down to this grid to bound param/project size (~143KB rgba8). */
-const MAX_EMBEDDED_LUT_SIZE = 33
+/** Keep a copy of a LUT picked from disk in the workspace library (luts/). */
+async function saveToLibrary(fileName: string, text: string): Promise<void> {
+  try {
+    await saveWorkspaceLut(fileName, text)
+  } catch (error) {
+    logger.warn('Could not save the imported LUT to the library:', error)
+  }
+}
 
 interface GpuLutPanelProps extends GpuKeyframePanelProps {
   onParamsBatchChange: (effectId: string, updates: GpuParamUpdates) => void
 }
 
 /**
- * Panel for the gpu-lut effect: imports a .cube file, embeds the (resampled)
- * LUT into the effect params, and exposes an intensity slider.
+ * Panel for the gpu-lut effect: picks a LUT from the workspace library or
+ * imports a .cube file (and saves a copy into the library), embeds the
+ * (resampled) LUT into the effect params, and exposes an intensity slider.
  */
 export const GpuLutPanel = memo(function GpuLutPanel({
   itemIds,
@@ -47,6 +53,7 @@ export const GpuLutPanel = memo(function GpuLutPanel({
   const { t } = useTranslation()
   const [importError, setImportError] = useState<string | null>(null)
   const [collapsed, setCollapsed] = useState(false)
+  const { luts: libraryLuts, refresh: refreshLibrary } = useWorkspaceLuts()
 
   const lutName = typeof gpuEffect.params.lutName === 'string' ? gpuEffect.params.lutName : ''
   const hasLut = typeof gpuEffect.params.lutData === 'string' && gpuEffect.params.lutData.length > 0
@@ -90,18 +97,32 @@ export const GpuLutPanel = memo(function GpuLutPanel({
 
     try {
       const file = await handle.getFile()
-      const parsed = resampleCubeLut(parseCubeLut(await file.text()), MAX_EMBEDDED_LUT_SIZE)
-      onParamsBatchChange(effect.id, {
-        lutName: parsed.title ?? file.name.replace(/\.cube$/i, ''),
-        lutSize: String(parsed.size),
-        lutData: encodeLutData(parsed.data),
-      })
+      const text = await file.text()
+      onParamsBatchChange(effect.id, embedCubeLut(text, file.name))
       setImportError(null)
+      await saveToLibrary(file.name, text)
+      await refreshLibrary()
     } catch (error) {
       logger.warn('Failed to import .cube LUT:', error)
       setImportError(t('effects.lut.importFailed'))
     }
-  }, [effect.id, onParamsBatchChange, t])
+  }, [effect.id, onParamsBatchChange, t, refreshLibrary])
+
+  const handlePickFromLibrary = useCallback(
+    async (name: string) => {
+      try {
+        const text = await readWorkspaceLut(name)
+        if (text === null) throw new Error(`luts/${name} is gone`)
+        onParamsBatchChange(effect.id, embedCubeLut(text, name))
+        setImportError(null)
+      } catch (error) {
+        logger.warn('Failed to load a LUT from the library:', error)
+        setImportError(t('effects.lut.libraryReadFailed'))
+        void refreshLibrary()
+      }
+    },
+    [effect.id, onParamsBatchChange, t, refreshLibrary],
+  )
 
   const keyframeProperty = getKeyframeProperty(effect.id, 'intensity')
 
@@ -124,6 +145,12 @@ export const GpuLutPanel = memo(function GpuLutPanel({
 
       {collapsed ? null : (
         <div className="space-y-0">
+          <LutLibraryRow
+            luts={libraryLuts}
+            disabled={!effect.enabled}
+            onPick={handlePickFromLibrary}
+            onOpen={refreshLibrary}
+          />
           <PropertyRow
             label={t('effects.lut.file')}
             className={!effect.enabled ? 'opacity-50' : undefined}

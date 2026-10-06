@@ -34,6 +34,8 @@
  * │               ├── captions.json
  * │               ├── scenes.json
  * │               └── {kind}.json          # new AI outputs go here, one file per kind
+ * ├── luts/
+ * │   └── {name}.cube               # LUT library (editor and agent)
  * └── content/
  *     ├── {hash[0:2]}/{hash}/            # content-addressable source dedup (reserved)
  *     │   ├── refs.json
@@ -67,6 +69,11 @@ export const CONTENT_DIR = 'content'
  * of the cache layout — never swept by the orphan sweep.
  */
 export const EXPORTS_DIR = 'exports'
+/**
+ * The workspace LUT library (`{workspace}/luts/*.cube`), shared by the user
+ * (the editor's LUT panel) and the agent (`shred lut`, the `addLut` op).
+ */
+export const LUTS_DIR = 'luts'
 
 const PROJECT_FILENAME = 'project.json'
 const PROJECT_THUMBNAIL_FILENAME = 'thumbnail.jpg'
@@ -158,6 +165,11 @@ export function projectExportFilePath(id: string, fileName: string): string[] {
 /** Segments for `projects/{id}/.freecut-trashed.json`. */
 export function projectTrashedMarkerPath(id: string): string[] {
   return [...projectDir(id), PROJECT_TRASHED_MARKER_FILENAME]
+}
+
+/** Segments for `luts/{fileName}` (fileName must already be a safe single name). */
+export function lutFilePath(fileName: string): string[] {
+  return [LUTS_DIR, fileName]
 }
 
 /** Segments for `media/{id}/`. */

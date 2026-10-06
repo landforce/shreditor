@@ -128,6 +128,9 @@ export class MemFileHandle {
         new Uint8Array(copy).set(data)
         return copy
       },
+      slice(start?: number, end?: number) {
+        return new Blob([data.slice(start, end)])
+      },
     }
   }
 
@@ -155,6 +158,7 @@ interface BlobLike {
   size: number
   text(): Promise<string>
   arrayBuffer(): Promise<ArrayBuffer>
+  slice(start?: number, end?: number): Blob
 }
 
 export class MemWritable {

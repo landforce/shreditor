@@ -236,6 +236,11 @@
     "importTooltip": "Carregar um arquivo de LUT 3D .cube",
     "importFailed": "Não foi possível ler este arquivo .cube",
     "intensity": "Intensidade",
-    "unsupportedBrowser": "A importação de LUT requer um navegador baseado em Chromium"
+    "unsupportedBrowser": "A importação de LUT requer um navegador baseado em Chromium",
+    "library": "Biblioteca",
+    "libraryPlaceholder": "Escolher uma LUT",
+    "libraryEmpty": "Ainda não há LUTs na biblioteca",
+    "libraryTooltip": "LUTs salvas na pasta luts do espaço de trabalho. Arquivos .cube importados são adicionados automaticamente.",
+    "libraryReadFailed": "Não foi possível ler esta LUT da biblioteca"
   }
 }

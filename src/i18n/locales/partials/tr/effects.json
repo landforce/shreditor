@@ -235,6 +235,11 @@
     "importTooltip": "Bir .cube 3D LUT dosyası yükleyin",
     "importFailed": "Bu .cube dosyası okunamadı",
     "intensity": "Yoğunluk",
-    "unsupportedBrowser": "LUT içe aktarma Chromium tabanlı bir tarayıcı gerektirir"
+    "unsupportedBrowser": "LUT içe aktarma Chromium tabanlı bir tarayıcı gerektirir",
+    "library": "Kitaplık",
+    "libraryPlaceholder": "LUT seçin",
+    "libraryEmpty": "Kitaplıkta henüz LUT yok",
+    "libraryTooltip": "Çalışma alanının luts klasöründe kayıtlı LUT'lar. İçe aktarılan .cube dosyaları otomatik olarak eklenir.",
+    "libraryReadFailed": "Bu LUT kitaplıktan okunamadı"
   }
 }
