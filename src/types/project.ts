@@ -42,6 +42,12 @@ export interface Project {
    * formats, or without one chosen.
    */
   format?: ProjectFormat
+  /**
+   * The Creator Stylesheet (kit.json) the project follows, recorded by
+   * `shred kit apply`: its styles become the project's `kit:*` text styles and
+   * its rules join `shred check`. Absent when the project has no kit.
+   */
+  kit?: ProjectKit
   timeline?: ProjectTimeline
   /**
    * Root folder handle for the project's media files.
@@ -54,6 +60,28 @@ export interface Project {
    * Updated when rootFolderHandle is set.
    */
   rootFolderName?: string
+}
+
+/** A brand colour from a creator kit, offered as a swatch by the text colour pickers. */
+export interface ProjectKitColor {
+  hex: string
+  /** What the colour is for, in the creator's words. */
+  job?: string
+}
+
+/** The creator kit a project follows (see `Project.kit`). */
+export interface ProjectKit {
+  /** Where the kit.json lives (absolute path on the machine that applied it). */
+  path: string
+  creator?: string
+  /** The kit's own semver, as applied. */
+  kitVersion: string
+  /** Content hash of the kit as applied ("sha256:..."), to tell when the file changed since. */
+  hash: string
+  /** When it was applied (ISO time). */
+  appliedAt: string
+  /** The kit's brand colours, when it turns them on. */
+  brandColors?: ProjectKitColor[]
 }
 
 export interface ProjectTimeline {

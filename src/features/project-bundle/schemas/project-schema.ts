@@ -792,6 +792,27 @@ const projectFormatSchema = z
   })
 
 // ============================================================================
+// Project creator kit (shred kit apply)
+// ============================================================================
+
+const projectKitSchema = z
+  .object({
+    path: z.string().min(1),
+    creator: z.string().optional(),
+    kitVersion: z.string().min(1),
+    hash: z.string().min(1),
+    appliedAt: z.string().min(1),
+    brandColors: z
+      .array(
+        z
+          .object({ hex: z.string().regex(/^#[0-9A-Fa-f]{6}$/), job: z.string().optional() })
+          .strict(),
+      )
+      .optional(),
+  })
+  .strict()
+
+// ============================================================================
 // Project Schema
 // ============================================================================
 
@@ -809,6 +830,7 @@ const projectSchema = z
     rootFolderName: z.string().optional(),
     metadata: projectResolutionSchema,
     format: projectFormatSchema.optional(),
+    kit: projectKitSchema.optional(),
     timeline: timelineSchema.optional(),
   })
   .strict()

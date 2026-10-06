@@ -457,6 +457,13 @@ export async function main(argv = process.argv.slice(2)) {
       : { ...rest, format: projectFormatRecord(format.id, format.variant) }
   }
 
+  // updates.kit: a record replaces the project's kit, null clears it.
+  const withKit = (project, kit) => {
+    if (kit === undefined) return project
+    const { kit: _previous, ...rest } = project
+    return kit === null ? rest : { ...rest, kit }
+  }
+
   const handleV1ProjectUpdate = async (req, res, id) => {
     const body = validate(
       projectUpdateRequestSchema,
@@ -464,7 +471,7 @@ export async function main(argv = process.argv.slice(2)) {
     )
     const current = await getProjectResource(workspace, id)
     const project = await browserNormalize({
-      ...withFormat(current.project, body.updates.format),
+      ...withKit(withFormat(current.project, body.updates.format), body.updates.kit),
       ...(body.updates.name !== undefined ? { name: body.updates.name } : {}),
       ...(body.updates.description !== undefined ? { description: body.updates.description } : {}),
       metadata: {

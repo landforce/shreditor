@@ -369,6 +369,13 @@ const formatChoice = z
   )
 const storedFormat = formatChoice.and(z.object({ reviewedHash: z.string().optional() }))
 
+// The creator kit a project follows (shred kit apply): where it is, its
+// version and hash as applied (and when, and its brand colours). The browser
+// checks the whole record against the project schema when it normalizes.
+const projectKit = z
+  .object({ path: z.string().min(1), kitVersion: z.string().min(1), hash: z.string().min(1) })
+  .passthrough()
+
 export const projectCreateRequestSchema = z
   .object({
     id: portableIdSchema.optional(),
@@ -416,6 +423,7 @@ const lifecycleProjectSchema = z
       })
       .strict(),
     format: storedFormat.optional(),
+    kit: projectKit.optional(),
     timeline: lifecycleTimelineSchema.optional(),
   })
   .strict()
@@ -447,6 +455,8 @@ export const projectUpdateRequestSchema = z
           .optional(),
         // null clears it. Recording a format doesn't touch the canvas or tracks.
         format: formatChoice.nullable().optional(),
+        // The creator kit record (shred kit apply); null clears it.
+        kit: projectKit.nullable().optional(),
       })
       .strict()
       .refine((v) => Object.keys(v).length > 0, 'updates must not be empty'),

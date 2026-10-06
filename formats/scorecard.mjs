@@ -761,9 +761,13 @@ function ruleChecks(context) {
  * `variant`. `mediaById` (id -> media metadata: category, audioCodec, fps) and
  * `transcripts` (id -> stored transcript envelope or { segments } / { words },
  * in source seconds) are optional; without transcripts the speech checks say 'na'.
+ * `targetOverrides` patches targets by key (see withTargetOverrides).
  */
 export function scoreProject(project, options = {}) {
-  const format = resolveScoringFormat(project, options)
+  const format = withTargetOverrides(
+    resolveScoringFormat(project, options),
+    options.targetOverrides,
+  )
   const context = buildContext(project, format, options)
   const checks = [
     ...ruleChecks(context),
@@ -778,6 +782,18 @@ export function scoreProject(project, options = {}) {
     checks,
     summary,
   }
+}
+
+/**
+ * Targets patched by key (a creator kit's preferences replace the format's
+ * pause target, for one): `{ pauseMaxSec: { max: 0.3, source: 'kit', note } }`.
+ */
+function withTargetOverrides(format, overrides) {
+  if (!overrides) return format
+  const targets = format.targets.map((target) =>
+    overrides[target.key] ? { ...target, ...overrides[target.key] } : target,
+  )
+  return { ...format, targets }
 }
 
 const isResolved = (format) =>

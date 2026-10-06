@@ -1,0 +1,216 @@
+{
+  "schemaVersion": 2,
+  "kitVersion": "0.2.0",
+  "updatedAt": "2026-10-06T00:00:00Z",
+  "creator": "Boilerplate",
+  "canvas": [1080, 1920],
+  "units": "px at canvas size; scales are fractions (1 = 100%); times in seconds unless the key ends in Ms; levels in dB relative to the voice",
+  "anchors": {
+    "top": "y is the top edge of the element's box, including any text box padding and outline. Text grows downward.",
+    "center": "y is the vertical center of the element's box. Text grows up and down equally.",
+    "bottom": "y is the bottom edge of the element's box. Text grows upward.",
+    "free": "Position chosen per shot within the element's rules."
+  },
+
+  "safeZones": {
+    "topUi": { "x": 0, "y": 0, "w": 1080, "h": 250 },
+    "rightRail": { "x": 930, "y": 250, "w": 150, "h": 1210 },
+    "bottomUi": { "x": 0, "y": 1460, "w": 1080, "h": 460 }
+  },
+
+  "fonts": {
+    "classic": {
+      "stack": ["Instagram Sans", "Figtree", "Helvetica Neue", "Arial"],
+      "resolved": "Figtree",
+      "resolvedNote": "The font picked when the kit was last checked on the creator's machine, not a promise. Re-resolve against what's installed.",
+      "families": [
+        { "family": "Instagram Sans", "license": "Personal use only; never bundled", "files": [] },
+        { "family": "Figtree", "license": "SIL Open Font License 1.1", "files": [] },
+        { "family": "Helvetica Neue", "license": "System font (macOS)", "files": [] },
+        { "family": "Arial", "license": "System font", "files": [] }
+      ],
+      "weights": [400, 500, 600, 700]
+    }
+  },
+
+  "titles": {
+    "style": {
+      "font": "classic", "weight": 700, "size": 96, "sizeSmall": 78,
+      "sizeSmallWhen": { "linesOver": 3, "note": "Set at size; if it wraps past 3 lines, use sizeSmall instead of adding a line." },
+      "lineHeight": 1.2, "letterSpacing": -1,
+      "color": "#000000",
+      "box": { "color": "#FFFFFF", "radius": 16, "padX": 29, "padY": 4, "perLine": true, "perLineNote": "One box behind each line, hugging that line's text; not one box around the block." },
+      "outline": null, "tiltDeg": 0
+    },
+    "placement": { "anchor": "top", "x": 70, "width": 940, "align": "center", "y": 320, "zone": [250, 960] },
+    "motion": { "in": "cut", "out": "cut", "note": "No animation." },
+    "variants": {},
+    "must": [
+      { "id": "title.on-screen", "text": "On screen from frame 0, for at least the first 2.5–3 s.", "check": { "type": "onScreenFrom", "frame": 0, "minSeconds": 2.5 } },
+      { "id": "title.top-half", "text": "Top half: between y=250 and y=960.", "check": { "type": "inZone", "y": [250, 960] } },
+      { "id": "title.no-face", "text": "Never over the face.", "check": { "type": "notOverFace", "judgment": "look" } },
+      { "id": "title.max-lines", "text": "Max 3 lines.", "check": { "type": "maxLines", "value": 3 } },
+      { "id": "title.one-per-video", "text": "One title per video.", "check": { "type": "count", "max": 1 } }
+    ],
+    "startingPoint": [
+      "Classic IG font: Instagram Sans Bold if installed, else Figtree Bold, 96px, or 78px for long hooks.",
+      "Black type on a white bar behind each line, rounded corners. No tilt."
+    ],
+    "notes": ["Drop to the small size before adding a fourth line."]
+  },
+
+  "captions": {
+    "style": {
+      "font": "classic", "weight": 700, "size": 64, "lineHeight": 1.1, "letterSpacing": 0,
+      "color": "#FFFFFF", "outline": { "color": "#000000", "width": 10 }, "box": null, "highlightColor": null
+    },
+    "placement": {
+      "anchor": "top", "x": 70, "width": 860, "align": "center",
+      "default": "aboveHead",
+      "positions": {
+        "aboveHead": { "y": 720, "when": "Default. The speaker is low in frame or there's no face in the middle: greenscreen, wide shots, vlog voiceover." },
+        "belowChin": { "y": 1250, "when": "The face fills the middle of the frame, so aboveHead would cover it. Judge from the frame; move down, never up over the face." }
+      }
+    },
+    "chunking": { "wordsPerChunk": [2, 3], "lines": 1, "breakOn": "phrase", "highlightWords": false },
+    "motion": { "in": "cut", "out": "cut", "timing": "with the words", "note": "Cut on with the words. No bounce." },
+    "variants": {},
+    "must": [
+      { "id": "caption.no-face", "text": "Never over the face, from the hairline to the chin.", "check": { "type": "notOverFace", "judgment": "look" } },
+      { "id": "caption.above-ui", "text": "Last line ends above y=1460.", "check": { "type": "bottomAbove", "y": 1460 } },
+      { "id": "caption.clear-rail", "text": "Clear of the right rail.", "check": { "type": "clearOf", "regions": ["rightRail"] } },
+      { "id": "caption.clear-title-images", "text": "Clear of the title, images, and the plate's key content.", "check": { "type": "clearOf", "regions": ["title", "images", "plateKeyContent"] } },
+      { "id": "caption.transcript", "text": "Words come from the transcript, checked against the audio.", "check": { "type": "matchesTranscript", "judgment": "listen" } }
+    ],
+    "startingPoint": [
+      "Classic IG font: Instagram Sans Bold if installed, else Figtree Bold, 64px, white, 10px black outline.",
+      "Every word the same: no highlighted or colored words.",
+      "2–3 words per caption clip, one line, broken on phrases.",
+      "Cut on with the words. No bounce."
+    ],
+    "notes": []
+  },
+
+  "overlays": {
+    "style": {
+      "font": "classic", "weight": 600, "size": 56, "lineHeight": 1.18, "letterSpacing": 0,
+      "color": "#FFFFFF", "outline": { "color": "#000000", "width": 6 }, "box": null
+    },
+    "placement": { "anchor": "center", "x": 70, "width": 860, "align": "center", "y": 960, "nudgeToClearSubject": true },
+    "oneShot": { "lines": [3, 8] },
+    "tenShot": { "lines": [1, 2], "shortList": true },
+    "listicle": { "headlineSize": 72, "headlineWeight": 700, "align": "left", "x": 150, "width": 780 },
+    "motion": { "in": "cut", "out": "cut" },
+    "variants": {},
+    "must": [
+      { "id": "overlay.middle", "text": "Bias to the middle of the frame. Move only as far as needed to keep the subject or face visible.", "check": { "type": "nearY", "y": 960, "judgment": "look" } },
+      { "id": "overlay.safe-zones", "text": "Inside the safe zones.", "check": { "type": "clearOf", "regions": ["topUi", "rightRail", "bottomUi"] } },
+      { "id": "overlay.no-face", "text": "Never over the face.", "check": { "type": "notOverFace", "judgment": "look" } },
+      { "id": "overlay.reads-muted", "text": "Readable with the sound off: the text alone carries the point.", "check": { "type": "readsWithoutSound", "judgment": "look" } }
+    ],
+    "startingPoint": [
+      "Native caption look: Instagram Sans if installed, else Figtree, 56px, white, thin 6px black outline. Centered, sentence case.",
+      "One Shot: long, 3–8 lines. 10 Shot: short, 1–2 lines or a short list of a few words per line.",
+      "Listicle: a bigger overlay-style headline right before a numbered list, set as one left-aligned block.",
+      "No highlighted words, no background box."
+    ],
+    "notes": []
+  },
+
+  "images": {
+    "placement": "above",
+    "options": {
+      "full": { "label": "Full bleed", "rect": { "x": 0, "y": 0, "w": 1080, "h": 1920 }, "fit": "cover", "radius": 0, "maxSize": { "w": 1080, "h": 1920 }, "keepClear": [], "note": "Cut to the image, flat. Speaker returns between images." },
+      "above": { "label": "Above the speaker", "rect": { "x": 40, "y": 250, "w": 1000, "h": 440 }, "fit": "cover", "radius": 0, "maxSize": { "w": 1000, "h": 600 }, "keepClear": ["face", "title"], "note": "Almost full width, filling the space above the head. Works on wider shots." },
+      "over": { "label": "Over the speaker", "rect": { "x": 40, "y": 250, "w": 1000, "h": 900 }, "fit": "cover", "radius": 0, "maxSize": { "w": 1000, "h": 1100 }, "keepClear": ["title"], "note": "Half the screen or more, in the top half, briefly covering the face." }
+    },
+    "style": { "outline": null, "shadow": null, "tiltDeg": 0 },
+    "motion": { "in": "cut", "out": "cut" },
+    "variants": {},
+    "must": [
+      { "id": "image.one-placement", "text": "One placement for the whole video.", "check": { "type": "onePlacementPerVideo" } },
+      { "id": "image.face", "text": "Only Over the speaker covers the face, and only briefly. Full bleed replaces the shot.", "check": { "type": "notOverFace", "except": ["over", "full"], "judgment": "look" } },
+      { "id": "image.real-is-photo", "text": "Real things are real photos. Never a generated lookalike.", "check": { "type": "realSubjectIsPhoto", "judgment": "look" } }
+    ],
+    "startingPoint": [
+      "Plain: square corners, no edge, no shadow, no tilt. Treatment is the creator's call.",
+      "One image at a time. Cut in, cut out."
+    ],
+    "notes": []
+  },
+
+  "greenscreen": {
+    "speaker": {
+      "default": { "scale": 1, "anchor": "bottom", "side": "alternate", "sides": ["left", "right"], "headY": 870 },
+      "corner": { "scale": 0.65, "anchor": "bottom", "side": "alternate" },
+      "chaos": { "scale": 0.65, "anchor": "free", "tiltDeg": -8, "tiltOptional": true }
+    },
+    "plateKeyContent": { "x": 60, "y": 250, "w": 960, "h": 440 },
+    "backgroundTypes": ["screenshot", "fullBleedImage", "designedGraphic", "quadrant"],
+    "variants": {},
+    "must": [
+      { "id": "greenscreen.plate-clear", "text": "The speaker never covers the background's key content.", "check": { "type": "clearOf", "subject": "speaker", "regions": ["plateKeyContent"] } },
+      { "id": "greenscreen.fills-frame", "text": "Backgrounds fill the frame. No borders, no letterbox.", "check": { "type": "fillsCanvas" } },
+      { "id": "greenscreen.hard-cuts", "text": "Hard cuts between backgrounds. No transitions.", "check": { "type": "hardCutsOnly" } }
+    ],
+    "startingPoint": [
+      "Speaker low in frame, head about y=870, clear of the captions. Corner and chaos: 65% size.",
+      "No edge or shadow on the speaker."
+    ],
+    "notes": ["Side per shot comes from the greenscreen skill: alternate left and right, away from the plate's key content."]
+  },
+
+  "objects": {
+    "style": "real",
+    "options": {
+      "real": { "label": "Real object", "prompt": "Photograph of [OBJECT] as a real product shot. One complete object, centered, generous padding, even studio light, sharp focus. Transparent background. No text, logos, shadows, floor, or props.", "sample": "objects/style-real.png" },
+      "illustration": { "label": "Illustration", "prompt": "Flat illustration of [OBJECT]. Bold simple shapes, thick dark outline, palette of [BRAND COLORS]. One object, centered, generous padding. Transparent background. No text, no shadow.", "sample": "objects/style-illustration.png" },
+      "hand-drawn": { "label": "Hand drawn", "prompt": "Hand-drawn marker sketch of [OBJECT]. Black marker lines with one [ACCENT] highlight, loose but readable, like a quick whiteboard doodle. Transparent background. No text.", "sample": "objects/style-hand-drawn.png" },
+      "custom": { "label": "Other", "prompt": "", "sample": null }
+    },
+    "assets": "objects/",
+    "placement": {
+      "anchor": "free", "fit": "contain", "radius": 0,
+      "sizePx": [300, 500], "maxSize": { "w": 500, "h": 500 }, "maxOnScreen": 2,
+      "keepClear": ["face", "speaker", "title", "topUi", "rightRail", "bottomUi"],
+      "pairWith": ["none", "caption", "emphasisWord"]
+    },
+    "motion": { "in": "cut", "out": "cut", "timing": "on the word that names it" },
+    "variants": {},
+    "must": [
+      { "id": "object.locked-prompt", "text": "One style, one locked prompt. Same prompt every time.", "check": { "type": "lockedPrompt" } },
+      { "id": "object.transparent", "text": "Transparent PNG. No text in the image.", "check": { "type": "transparentPng" } },
+      { "id": "object.clean", "text": "Clean cutout. Nothing baked in: no edge, shadow, or tilt.", "check": { "type": "cleanCutout", "judgment": "look" } },
+      { "id": "object.clear", "text": "Never over the speaker or the face. Sits in empty space beside or above them, inside the safe zones.", "check": { "type": "clearOf", "regions": ["speaker", "topUi", "rightRail", "bottomUi"] } }
+    ],
+    "startingPoint": [
+      "Same look and motion as images. No tilt.",
+      "About 300–500px. One at a time, max 2 on screen.",
+      "Cut in on the word that names it.",
+      "Can pair with its caption line, or with a one- or two-word emphasis label in the title style."
+    ],
+    "notes": []
+  },
+
+  "preferences": {
+    "punchIns": { "on": true, "when": "emphasis", "scale": [1.15, 1.3], "maxPerMinute": 10 },
+    "tightCuts": { "on": true, "maxPauseMs": 300, "offMaxPauseMs": 800, "cutBreaths": true, "paddingFrames": 2 },
+    "alternateSides": { "on": true },
+    "sfx": { "on": false, "source": "", "levelDb": -18 },
+    "musicBed": { "on": false, "source": "", "levelDb": -22, "duckDb": -6 },
+    "brandColors": { "on": false, "colors": [] }
+  },
+
+  "referenceFrames": {
+    "graphic-yap": "frames/base-graphic-yap.jpg",
+    "greenscreen": { "speaker": "frames/speaker-cutout.png", "wide": "frames/base-greenscreen.jpg", "plates": ["frames/greenscreen-bg.svg", "frames/greenscreen-photo.svg", "frames/greenscreen-graphic.svg", "frames/greenscreen-quadrant.svg"] },
+    "vlog": "frames/greenscreen-photo.svg",
+    "ten-shot": "frames/greenscreen-photo.svg",
+    "one-shot": "frames/image.svg"
+  },
+
+  "changelog": [
+    { "date": "2026-10-06", "version": "0.1.0", "change": "Stock Creator Stylesheet", "why": "Default starting point" },
+    { "date": "2026-10-06", "version": "0.2.0", "change": "Schema v2: defined anchors, check ids and type, motion, image and object geometry, preference numbers, captions and overlays kept clear of the right rail", "why": "Editor agent feedback" }
+  ]
+}

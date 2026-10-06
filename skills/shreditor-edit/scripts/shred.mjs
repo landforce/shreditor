@@ -67,6 +67,16 @@
 //                                        render saved frames and tile them for review
 //   shred check <id> [--json]            the format scorecard: rules and targets, pass/warn/fail, with
 //                                        frame ranges to look at; exit 1 when a fail-severity check fails
+//                                        (a project with a creator kit adds the kit's rules: Kit section)
+//   shred kit apply <kit.json|folder> --project <id> [--force]
+//                                        a Creator Stylesheet: its titles, captions and overlays become
+//                                        kit:* text styles (project and library), the kit is recorded on
+//                                        the project; prints the mapping, fonts and the kit's preferences
+//   shred kit status <id>                the project's kit: version, hash, drift since apply, fonts, prefs
+//   shred kit show <kit.json|folder>     a kit in words
+//   shred kit save-back <id> [--style kit:title] [--force]
+//                                        write the project's kit:* style tweaks into kit.json (version
+//                                        bump, changelog); only when the user asks
 //   shred publish <draftId> <targetId> --label "..." --summary <file.md>
 //                                        hand the finished draft to the user's project as one pass
 //                                        (the pass record carries the scorecard; refreshes the
@@ -120,6 +130,7 @@ import { describeTarget, scoreProject, trackRole } from '../../../formats/scorec
 import { suggestFormat } from '../../../formats/suggest.mjs'
 import { qcMedia } from './qc.mjs'
 import { stylesCommands } from './styles.mjs'
+import { kitCheck, kitCommands, printKitCheck } from './kit.mjs'
 import {
   LUTS_DIR,
   MAX_LUT_BYTES,
@@ -180,6 +191,7 @@ const { values: opt, positionals } = parseArgs({
     aspect: { type: 'string' },
     from: { type: 'string' },
     hold: { type: 'string' },
+    style: { type: 'string' },
   },
 })
 const [command, ...args] = positionals
@@ -878,14 +890,29 @@ const commands = {
     if (!id) throw new Error('Pass a project id')
     const editor = await warnUnsaved(id)
     const { project, revision } = await getProject(id)
-    if (!project.format)
+    if (!project.format && !project.kit)
       throw new Error(
         `${id} has no format. Choose one (shred format list), then: shred format set ${id} <format>`,
       )
-    const card = scoreProject(project, await scoringInputs(project))
-    if (opt.json) say(JSON.stringify({ revision, ...card, ...(editor ? { editor } : {}) }, null, 2))
-    else printScorecard(card, project)
-    if (card.summary.fail) process.exitCode = 1
+    const inputs = await scoringInputs(project)
+    const kit = await kitCheck({ call, workspace }, id, project, inputs.mediaById)
+    const card = project.format
+      ? scoreProject(project, { ...inputs, targetOverrides: kit?.overrides })
+      : null
+    if (opt.json)
+      say(
+        JSON.stringify(
+          { revision, ...(card ?? {}), ...(kit ? { kit } : {}), ...(editor ? { editor } : {}) },
+          null,
+          2,
+        ),
+      )
+    else {
+      if (card) printScorecard(card, project)
+      else say(`${id} has no format: kit rules only (shred format set ${id} <format>)`)
+      printKitCheck(say, kit, project.metadata?.fps ?? 30)
+    }
+    if (card?.summary.fail || kit?.card?.summary.fail) process.exitCode = 1
   },
 
   async catalog(inputs) {
@@ -1378,6 +1405,7 @@ const commands = {
     const copy = {
       ...fresh.project,
       ...(project.format ? { format: project.format } : {}),
+      ...(project.kit ? { kit: project.kit } : {}),
       timeline: project.timeline,
     }
     await call(
@@ -1397,6 +1425,12 @@ const commands = {
     const body = JSON.parse(fs.readFileSync(file, 'utf8'))
     const { revision } = await getProject(id)
     await applyBatch(id, Array.isArray(body) ? body : body.ops, revision)
+  },
+
+  async kit([sub, ...rest]) {
+    const run = kitCommands({ say, opt, workspace, getProject, applyBatch, call, key })[sub]
+    if (!run) throw new Error('Usage: shred kit apply|status|show|save-back (see shred help)')
+    await run(rest)
   },
 
   async styles([sub, ...rest]) {
@@ -1496,9 +1530,12 @@ const commands = {
     )
     // The format scorecard of what was published, kept with the pass.
     const published = { ...target.project, timeline: draft.project.timeline }
+    const inputs = await scoringInputs(published)
+    const kitResult = await kitCheck({ call, workspace }, draftId, draft.project, inputs.mediaById)
     const scorecard = published.format
-      ? scoreProject(published, await scoringInputs(published))
+      ? scoreProject(published, { ...inputs, targetOverrides: kitResult?.overrides })
       : null
+    const kit = kitResult?.card ? { ...kitResult.card, note: kitResult.note } : null
     const record = {
       id: n,
       label: opt.label,
@@ -1511,6 +1548,7 @@ const commands = {
       resultRevision: saved.revision,
       changes,
       ...(scorecard ? { scorecard } : {}),
+      ...(kit ? { kit } : {}),
       timeline: draft.project.timeline,
     }
     fs.writeFileSync(path.join(dir, `${n}.json`), `${JSON.stringify(record, null, 2)}\n`)
@@ -1526,6 +1564,10 @@ const commands = {
       printScorecard(scorecard, published)
       say(`(saved in ${path.join(dir, `${n}.json`)} as "scorecard")`)
     } else say('No format on this project, so no scorecard (shred format set).')
+    if (kitResult) {
+      printKitCheck(say, kitResult, published.metadata?.fps ?? 30)
+      say(`(saved in ${path.join(dir, `${n}.json`)} as "kit")`)
+    }
   },
 
   async thumbnail([id]) {

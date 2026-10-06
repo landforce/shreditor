@@ -38,6 +38,8 @@ import {
   SliderInput,
 } from '../components'
 import { FontPicker } from './font-picker'
+import { TextPaddingControl } from './text-padding-control'
+import { useBrandSwatches } from './brand-swatches'
 import { FONT_CATALOG, FONT_WEIGHT_MAP } from '@/shared/typography/fonts'
 import {
   applyTextStylePresetToItem,
@@ -303,6 +305,7 @@ export function TextEffectsSection(props: TextSectionProps) {
 function TextSectionComposer({ items, canvas, slots }: TextSectionComposerProps) {
   const { t } = useTranslation()
   const updateItem = useTimelineStore((s) => s.updateItem)
+  const brandSwatches = useBrandSwatches()
 
   // Gizmo store for live property preview
   const setPropertiesPreviewNew = useGizmoStore((s) => s.setPropertiesPreviewNew)
@@ -400,9 +403,6 @@ function TextSectionComposer({ items, canvas, slots }: TextSectionComposerProps)
         : ('mixed' as const),
       lineHeight: textItems.every((i) => (i.lineHeight ?? 1.2) === (first.lineHeight ?? 1.2))
         ? (first.lineHeight ?? 1.2)
-        : ('mixed' as const),
-      textPadding: textItems.every((i) => (i.textPadding ?? 16) === (first.textPadding ?? 16))
-        ? (first.textPadding ?? 16)
         : ('mixed' as const),
       shadowColor: textItems.every(
         (i) => (i.textShadow?.color ?? '') === (first.textShadow?.color ?? ''),
@@ -908,16 +908,9 @@ function TextSectionComposer({ items, canvas, slots }: TextSectionComposerProps)
     [finalizePreviewChange, updateTextItems],
   )
 
-  const handleTextPaddingLiveChange = useCallback(
-    (value: number) => {
-      setTextPropertiesPreview({ textPadding: value })
-    },
-    [setTextPropertiesPreview],
-  )
-
   const handleTextPaddingChange = useCallback(
-    (value: number) => {
-      updateTextItems({ textPadding: value })
+    (updates: Partial<TextItem>) => {
+      updateTextItems(updates)
       finalizePreviewChange()
     },
     [finalizePreviewChange, updateTextItems],
@@ -1128,7 +1121,6 @@ function TextSectionComposer({ items, canvas, slots }: TextSectionComposerProps)
   const backgroundColorValue =
     sharedValues.backgroundColor || textItems[0]?.backgroundColor || '#000000'
   const hasAnyBackground = textItems.some((item) => item.backgroundColor !== undefined)
-  const textPadding = sharedValues.textPadding
   const backgroundRadius = sharedValues.backgroundRadius
   const spanEditorConfigs = getSpanEditorConfigs(activeEditorSpans.length, t)
   const showContentSection = slots.includes('content')
@@ -1529,6 +1521,7 @@ function TextSectionComposer({ items, canvas, slots }: TextSectionComposerProps)
               onLiveChange={handleColorLiveChange}
               onReset={() => handleColorChange('#ffffff')}
               defaultColor="#ffffff"
+              presets={brandSwatches}
               allowAlpha
             />
           )}
@@ -1540,6 +1533,7 @@ function TextSectionComposer({ items, canvas, slots }: TextSectionComposerProps)
                   color={backgroundColorValue}
                   onChange={handleBackgroundColorChange}
                   onLiveChange={handleBackgroundColorLiveChange}
+                  presets={brandSwatches}
                   allowAlpha
                 />
               </div>
@@ -1592,25 +1586,12 @@ function TextSectionComposer({ items, canvas, slots }: TextSectionComposerProps)
             </div>
           </PropertyRow>
 
-          <PropertyRow label={t('editor.textSection.padding')}>
-            <div className="flex items-center gap-1 min-w-0 w-full">
-              <NumberInput
-                value={textPadding}
-                onChange={handleTextPaddingChange}
-                onLiveChange={handleTextPaddingLiveChange}
-                min={0}
-                max={160}
-                step={1}
-                unit="px"
-                className="flex-1 min-w-0"
-              />
-              <KeyframeToggle
-                itemIds={itemIds}
-                property="textPadding"
-                currentValue={firstTextItem?.textPadding ?? 16}
-              />
-            </div>
-          </PropertyRow>
+          <TextPaddingControl
+            items={textItems}
+            itemIds={itemIds}
+            onChange={handleTextPaddingChange}
+            onLiveChange={setTextPropertiesPreview}
+          />
 
           <PropertyRow label={t('editor.textSection.radius')}>
             <div className="flex items-center gap-1 min-w-0 w-full">

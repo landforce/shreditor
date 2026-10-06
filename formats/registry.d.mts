@@ -33,7 +33,8 @@ export interface FormatTarget {
   max: number | null
   ideal: number | null
   severity: 'fail' | 'warn'
-  source: 'measured' | 'vdb' | 'colin'
+  /** 'kit': replaced by the project's creator kit (its preferences). */
+  source: 'measured' | 'vdb' | 'colin' | 'kit'
   /** Range seen in the VDB sample. */
   seen?: [number, number]
   /** Metric to measure when it differs from key. */
