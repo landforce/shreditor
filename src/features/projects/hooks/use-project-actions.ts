@@ -1,6 +1,7 @@
 import { useProjectStore } from '../stores/project-store'
 import { useCallback } from 'react'
 import type { ProjectFormData } from '../utils/validation'
+import type { ProjectFormatChoice } from '../utils/project-helpers'
 
 /**
  * Hook for project CRUD actions
@@ -55,9 +56,9 @@ export const useCreateProject = () => {
   const createProject = useProjectStore((s) => s.createProject)
 
   return useCallback(
-    async (data: ProjectFormData) => {
+    async (data: ProjectFormData, format?: ProjectFormatChoice | null) => {
       try {
-        const project = await createProject(data)
+        const project = await createProject(data, { format })
         return { success: true, project, error: null }
       } catch (error) {
         return {

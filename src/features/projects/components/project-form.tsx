@@ -1,6 +1,6 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useForm } from 'react-hook-form'
+import { useForm, type UseFormSetValue } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Button } from '@/components/ui/button'
 import {
@@ -22,6 +22,16 @@ import {
 import { getProjectFpsOptions } from '../utils/project-fps'
 import { ProjectTemplatePicker } from './project-template-picker'
 
+/** A canvas set by something else (a format): shown instead of the size and fps pickers. */
+export interface LockedCanvas {
+  width: number
+  height: number
+  fps: number
+  title: string
+  summary: string
+  cue?: ReactNode
+}
+
 interface ProjectFormBaseProps {
   onSubmit: (data: ProjectFormData) => Promise<void> | void
   onCancel?: () => void
@@ -29,6 +39,9 @@ interface ProjectFormBaseProps {
   isSubmitting?: boolean
   mode: 'create' | 'edit'
   surface: 'page' | 'inline'
+  lockedCanvas?: LockedCanvas
+  /** Shown next to a disabled submit button while something else must be chosen first. */
+  blockedHint?: string
 }
 
 type ProjectFormProps = Omit<ProjectFormBaseProps, 'mode' | 'surface'>
@@ -48,6 +61,8 @@ function ProjectFormBase({
   isSubmitting = false,
   mode,
   surface,
+  lockedCanvas,
+  blockedHint,
 }: ProjectFormBaseProps) {
   const { t } = useTranslation()
   const isEditing = mode === 'edit'
@@ -93,6 +108,9 @@ function ProjectFormBase({
 
   const fps = watch('fps')
   const fpsOptions = useMemo(() => getProjectFpsOptions(fps), [fps])
+
+  useLockedCanvasValues(lockedCanvas, setValue)
+  const canvasLocked = lockedCanvas !== undefined
 
   const handleSelectTemplate = (template: ProjectTemplate) => {
     setSelectedTemplateId(template.id)
@@ -175,7 +193,7 @@ function ProjectFormBase({
                 </div>
 
                 {/* Frame Rate */}
-                <div>
+                <div hidden={canvasLocked}>
                   <label htmlFor="fps" className="block text-sm font-medium text-foreground mb-2">
                     {t('projects.form.frameRate')}
                   </label>
@@ -203,8 +221,10 @@ function ProjectFormBase({
               </div>
             </div>
 
+            {lockedCanvas && <LockedCanvasPanel canvas={lockedCanvas} />}
+
             {/* Video Settings */}
-            <div className="panel-bg border border-border rounded-lg p-6">
+            <div className="panel-bg border border-border rounded-lg p-6" hidden={canvasLocked}>
               <div className="flex items-center gap-3 mb-6">
                 <div className="h-8 w-1 bg-primary rounded-full" />
                 <h2 className="text-lg font-medium text-foreground">
@@ -265,40 +285,80 @@ function ProjectFormBase({
 
           <Separator />
 
-          {/* Actions */}
-          <div className="flex gap-3 justify-end">
-            {onCancel ? (
-              <Button
-                type="button"
-                variant="outline"
-                size="lg"
-                disabled={isSubmitting}
-                onClick={onCancel}
-              >
-                {t('common.cancel')}
-              </Button>
-            ) : (
-              <Link to="/projects">
-                <Button type="button" variant="outline" size="lg" disabled={isSubmitting}>
-                  {t('common.cancel')}
-                </Button>
-              </Link>
-            )}
-            <Button
-              type="submit"
-              size="lg"
-              className="min-w-[160px]"
-              disabled={!isValid || isSubmitting}
-            >
-              {isSubmitting
-                ? t('common.saving')
-                : isEditing
-                  ? t('projects.form.updateProject')
-                  : t('projects.form.createProject')}
-            </Button>
-          </div>
+          <FormActions
+            isEditing={isEditing}
+            isSubmitting={isSubmitting}
+            canSubmit={isValid && !blockedHint}
+            blockedHint={blockedHint}
+            onCancel={onCancel}
+          />
         </form>
       </div>
+    </div>
+  )
+}
+
+function LockedCanvasPanel({ canvas }: { canvas: LockedCanvas }) {
+  return (
+    <div className="panel-bg flex items-center gap-5 rounded-lg border border-border p-6">
+      {canvas.cue}
+      <div className="space-y-1">
+        <h2 className="text-lg font-medium text-foreground">{canvas.title}</h2>
+        <p className="font-mono text-sm text-muted-foreground">{canvas.summary}</p>
+      </div>
+    </div>
+  )
+}
+
+/** Keep the form's canvas fields on the locked canvas (they're hidden meanwhile). */
+function useLockedCanvasValues(
+  lockedCanvas: LockedCanvas | undefined,
+  setValue: UseFormSetValue<ProjectFormData>,
+) {
+  useEffect(() => {
+    if (!lockedCanvas) return
+    setValue('width', lockedCanvas.width, { shouldValidate: true })
+    setValue('height', lockedCanvas.height, { shouldValidate: true })
+    setValue('fps', lockedCanvas.fps, { shouldValidate: true })
+  }, [lockedCanvas, setValue])
+}
+
+function FormActions({
+  isEditing,
+  isSubmitting,
+  canSubmit,
+  blockedHint,
+  onCancel,
+}: {
+  isEditing: boolean
+  isSubmitting: boolean
+  canSubmit: boolean
+  blockedHint?: string
+  onCancel?: () => void
+}) {
+  const { t } = useTranslation()
+  const submitLabel = isSubmitting
+    ? t('common.saving')
+    : isEditing
+      ? t('projects.form.updateProject')
+      : t('projects.form.createProject')
+  const cancel = (
+    <Button type="button" variant="outline" size="lg" disabled={isSubmitting} onClick={onCancel}>
+      {t('common.cancel')}
+    </Button>
+  )
+  return (
+    <div className="flex items-center gap-3 justify-end">
+      {blockedHint && <p className="mr-auto text-sm text-muted-foreground">{blockedHint}</p>}
+      {onCancel ? cancel : <Link to="/projects">{cancel}</Link>}
+      <Button
+        type="submit"
+        size="lg"
+        className="min-w-[160px]"
+        disabled={!canSubmit || isSubmitting}
+      >
+        {submitLabel}
+      </Button>
     </div>
   )
 }

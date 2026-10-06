@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import { devtools } from 'zustand/middleware'
 import { temporal } from 'zundo'
 import type { Project } from '@/types/project'
+import type { ProjectFormat } from '@formats/registry.mjs'
 import type { ProjectFormData } from '../utils/validation'
 import { useSettingsStore } from '@/features/projects/deps/settings-contract'
 import {
@@ -16,7 +17,11 @@ import {
   restoreProject as restoreProjectDB,
   getTrashedProjectMediaIds,
 } from '@/infrastructure/storage'
-import { createProjectObject, duplicateProject } from '../utils/project-helpers'
+import {
+  createProjectObject,
+  duplicateProject,
+  type ProjectFormatChoice,
+} from '../utils/project-helpers'
 // v3: Lazy-load media service for cascade operations
 import { importMediaLibraryService } from '@/features/projects/deps/media-library-contract'
 import { createLogger } from '@/shared/logging/logger'
@@ -44,8 +49,17 @@ interface ProjectActions {
   // CRUD Operations
   loadProjects: () => Promise<void>
   loadProject: (id: string) => Promise<Project | null>
-  createProject: (data: ProjectFormData) => Promise<Project>
+  /** With a format, the project takes its canvas, track layout and `format` record. */
+  createProject: (
+    data: ProjectFormData,
+    options?: { format?: ProjectFormatChoice | null },
+  ) => Promise<Project>
   updateProject: (id: string, data: Partial<ProjectFormData>) => Promise<Project>
+  /**
+   * Record (or, with null, clear) the project's format in project.json. Only
+   * the `format` field is written; the canvas and timeline are untouched.
+   */
+  setProjectFormat: (id: string, format: ProjectFormat | null) => Promise<void>
   /**
    * Soft-delete: moves the project to the workspace trash (marker file;
    * content preserved). Returns the trash state so the caller can surface
@@ -140,10 +154,10 @@ export const useProjectStore = create<ProjectState & ProjectActions>()(
         },
 
         // Create a new project with optimistic update
-        createProject: async (data: ProjectFormData) => {
+        createProject: async (data, options) => {
           set({ error: null })
 
-          const newProject = createProjectObject(data)
+          const newProject = createProjectObject(data, undefined, options?.format)
 
           // Optimistic update - add to state immediately
           const previousProjects = get().projects
@@ -231,6 +245,21 @@ export const useProjectStore = create<ProjectState & ProjectActions>()(
             set({ error: errorMessage })
             throw error
           }
+        },
+
+        setProjectFormat: async (id, format) => {
+          // Partial write: updateProject re-reads project.json and merges, so
+          // only `format` changes (undefined drops the key).
+          await updateProjectDB(id, { format: format ?? undefined })
+          const withFormat = (project: Project): Project => {
+            if (project.id !== id) return project
+            const { format: _previous, ...rest } = project
+            return format ? { ...rest, format } : rest
+          }
+          set((state) => ({
+            projects: state.projects.map(withFormat),
+            currentProject: state.currentProject ? withFormat(state.currentProject) : null,
+          }))
         },
 
         // Delete a project with optimistic update

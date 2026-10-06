@@ -1,6 +1,14 @@
 import { CURRENT_SCHEMA_VERSION } from '@/shared/projects/migrations'
 import { i18n } from '@/i18n'
 import type { Project } from '@/types/project'
+import { createFormatTracks, projectFormatRecord, resolveFormat } from '@formats/registry.mjs'
+import { DEFAULT_TRACK_HEIGHT } from '@/shared/timeline/defaults'
+
+/** A format chosen for a new project: its id and, optionally, a variant. */
+export interface ProjectFormatChoice {
+  id: string
+  variant?: string | null
+}
 
 /**
  * Generate a unique project ID (8-character base62 hash)
@@ -134,7 +142,9 @@ export function getUniqueFps(projects: Project[]): number[] {
 }
 
 /**
- * Create a new project object
+ * Create a new project object. A format defines the project: it sets the
+ * canvas, records `project.format` and lays out the format's named tracks
+ * (each tagged with its formatRole).
  */
 export function createProjectObject(
   formData: {
@@ -145,23 +155,35 @@ export function createProjectObject(
     fps: number
   },
   id?: string,
+  format?: ProjectFormatChoice | null,
 ): Project {
   const now = Date.now()
+  const chosen = format ? resolveFormat(format.id, format.variant) : null
+  const canvas = chosen?.canvas ?? formData
 
   return {
     id: id || generateProjectId(),
     name: formData.name,
     description: formData.description || '',
     metadata: {
-      width: formData.width,
-      height: formData.height,
-      fps: formData.fps,
+      width: canvas.width,
+      height: canvas.height,
+      fps: canvas.fps,
     },
     createdAt: now,
     updatedAt: now,
     duration: 0,
     schemaVersion: CURRENT_SCHEMA_VERSION,
     thumbnail: undefined,
+    ...(chosen
+      ? {
+          format: projectFormatRecord(chosen.id, chosen.variant?.id),
+          timeline: {
+            tracks: createFormatTracks(chosen, { height: DEFAULT_TRACK_HEIGHT }),
+            items: [],
+          },
+        }
+      : {}),
   }
 }
 
