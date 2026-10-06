@@ -113,6 +113,11 @@ export interface FormatDefinition {
   variants: readonly FormatVariant[]
   /** The guide's Structure: the story roles a plan's beats use, in order. */
   structure: readonly FormatStructurePart[]
+  /**
+   * What the plan lays out: 'performance' (a speaker's lines, kept or cut, with
+   * visuals per line) for the speaker formats, 'story' (beats) for the others.
+   */
+  planMode: 'story' | 'performance'
   /** Tracks top to bottom. */
   tracks: readonly FormatTrackSpec[]
   /** Media category -> role in this format. */

@@ -72,6 +72,11 @@ export function trackRole(
   format: ResolvedFormat | undefined,
 ): FormatRole | null
 
+/** A stored transcript's words (source seconds), from its words or segments. */
+export function transcriptWords(
+  transcript: ScorecardTranscript | null | undefined,
+): Array<{ start: number; end: number; text: string }>
+
 export function mapClipWords(
   item: {
     from: number

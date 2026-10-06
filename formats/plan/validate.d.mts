@@ -12,6 +12,20 @@ export interface PlanMedia {
   sourceFps: number
   audioCodec: string | null
   category: string | null
+  /** Pixels, when known. */
+  width?: number
+  height?: number
+}
+
+type Issues = import('./shape.mjs').IssueList
+interface Entry {
+  id: string
+  role?: string | null
+}
+interface Span {
+  id: string
+  start: number
+  end: number
 }
 
 export interface ResolvedBeat extends PlanBeat {
@@ -32,3 +46,23 @@ export function validatePlan(
     briefTargetSec?: number | null
   },
 ): { beats: ResolvedBeat[]; errors: PlanIssue[]; warnings: PlanIssue[] }
+export function checkRoleNames(
+  plan: Pick<Plan, 'story'>,
+  entries: Entry[],
+  format: ResolvedFormat,
+  issues: Issues,
+): void
+export function checkRequiredParts(
+  entries: Entry[],
+  format: ResolvedFormat,
+  issues: Issues,
+  noun: string,
+): void
+export function checkStoryOrder(ordered: Entry[], format: ResolvedFormat, issues: Issues): void
+export function checkPlanMode(
+  plan: Pick<Plan, 'mode'>,
+  format: ResolvedFormat,
+  issues: Issues,
+): void
+export function checkOverlaps(groups: Map<string, Span[]>, fps: number, issues: Issues): void
+export function groupBy<T, K>(entries: T[], key: (entry: T) => K): Map<K, T[]>
