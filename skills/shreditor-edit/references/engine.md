@@ -46,6 +46,10 @@ What `shred apply` accepts and how the project behaves. Verified against the Shr
 
 `GET /v1/capabilities` (on the service) lists the exact ops and limits for the running version.
 
+## Media categories
+
+Each media's `category` (in `media/<id>/metadata.json`) says what it is for: `speaker`, `b-roll`, `graphics`, `overlay`, `voiceover`, `music`, `sfx`, `other`. Absent means uncategorized. Set it with `shred import ... --category <c>` or `shred categorize <mediaId>=<c> ...` (`none` clears). When any media in a project has one, the editor's media pane groups by category (that order, uncategorized last) instead of by file type. Categories don't affect ops or rendering.
+
 ## Text that renders as intended
 
 - Fonts: any font installed on the machine works by its family name (e.g. `Helvetica Neue`, `Neue Haas Display`); unknown names fall back. Check a rendered frame; the editor can't tell you a font is missing.
@@ -57,6 +61,6 @@ What `shred apply` accepts and how the project behaves. Verified against the Shr
 - **ProRes and other codecs browsers can't decode** will not play. `shred catalog` makes the playable copy for you (`proxy` in the catalog entry); import that. By hand: H.264 `-c:v libx264 -crf 16 -pix_fmt yuv420p`.
 - **Transparent video** (speaker cutouts, animated overlays) goes in as VP9 WebM with alpha (`-c:v libvpx-vp9 -pix_fmt yuva420p`; the catalog does this). Put it on a track above its background; it stays a separate layer. Check transparency on a rendered frame, not just in the preview.
 - **The service holds the workspace writer lock** while it runs. Import with `shred import` (it does not need the lock). Never edit `project.json` by hand.
-- **Media imported while the editor is open** shows in its library after a reload. The timeline still renders it.
+- **Media imported while the editor is open** shows in its library within about a second (the editor polls the bridge). If it doesn't, reload the page; the timeline renders it either way.
 - `shred frames` renders the **saved** project. Apply first, then render.
 - `addClip` without `durationInFrames` on video uses the whole file; always pass the length you planned.

@@ -22,7 +22,8 @@ You are the agent half of Shreditor: you make the edit, the user previews and ad
 ### 1. Analyze and catalog the footage
 
 - `shred catalog <folder or files> --name <slug>` probes everything, makes a contact sheet per clip, and transcribes speech (whisper.cpp). Output: `<workspace>/catalogs/<slug>/catalog.json` plus `sheets/` and `transcripts/`.
-- Open every contact sheet and read every transcript. Add to each catalog entry: `content` (what it shows, in a few words), `best` (in-points worth using, seconds), `usable` (yes/no and why), and for talking heads where the face sits. Metadata does not tell you what a shot shows.
+- Open every contact sheet and read every transcript. Add to each catalog entry: `content` (what it shows, in a few words), `best` (in-points worth using, seconds), `usable` (yes/no and why), `category`, and for talking heads where the face sits. Metadata does not tell you what a shot shows.
+- `category` is what the file is for: `speaker` (talking head), `b-roll`, `graphics` (screenshots, evidence, title cards), `overlay` (transparent cutouts, animated overlays), `voiceover`, `music`, `sfx` or `other`. Every entry gets one. Apply them when you import (step 2); the editor's media pane groups by them.
 - Files the browser can't decode (ProRes, PNG-codec `.mov`, ...) get a playable copy automatically in `proxies/`: H.264 for normal video, VP9 WebM with alpha for transparent video (cutouts, animated overlays), so those stay separate, movable layers. Import an entry's `proxy` instead of its `file`. Originals are never touched.
 - Entries with `speechNote` had no real speech (Whisper's "Thank you." on music or typing is discarded). Flag duplicates.
 - Give the user a short catalog summary: what's there, what's strong, what's missing.
@@ -30,7 +31,7 @@ You are the agent half of Shreditor: you make the edit, the user previews and ad
 ### 2. Understand the format the user wants
 
 - Ask what they're making, if they haven't said: format (for example VO vlog, talking-head yap, 10 shot), length, audience, the one thing the viewer should leave with, must-keep moments, music or not, and whether they want to see the plan before you build. Offer the formats their style skill defines. One round of questions, only what changes the result.
-- `shred new --name "..." --size 1080x1920 --fps 30` creates the project (or use the one they name). Import the footage you'll use: `shred import <files> --project <id>` (clones in place, no copying).
+- `shred new --name "..." --size 1080x1920 --fps 30` creates the project (or use the one they name). Import the footage you'll use, one call per category: `shred import <files> --project <id> --category <category>` (clones in place, no copying). Fix or add categories later with `shred categorize <mediaId>=<category> ...`. The open editor shows imports and category changes within a second. The user can recategorize from a media card; their choice is in `media/<id>/metadata.json` and wins.
 - Write the brief (`<workspace>/projects/<id>/agent/brief.yaml`) and the beat plan (`plan.json`). Templates: `references/brief-and-plan.md`. Every beat has a viewer takeaway; the style skill decides pacing, type and placement.
 - If the brief says `review.plan: true`, show the plan and wait.
 
