@@ -874,6 +874,18 @@
     "colorPanel": {
       "emptyState": "选择要调色的剪辑",
       "adjustmentLayerLabel": "调色"
+    },
+    "agentActivity": {
+      "working": "智能体正在处理一轮编辑：{{label}}",
+      "workingNoLabel": "智能体正在处理一轮编辑",
+      "watchMode": "你可以播放、拖动播放头和查看。编辑会等智能体完成。",
+      "editAnyway": "仍要编辑",
+      "stop": "停止智能体",
+      "stopping": "正在停止… 智能体会在下一步看到",
+      "passReady": "本轮已就绪：{{label}}",
+      "passReadyNoLabel": "本轮已就绪",
+      "refused": "智能体正在工作。请等待，或选择“仍要编辑”。",
+      "actionFailed": "无法连接编辑器桥接服务。请重试。"
     }
   }
 }

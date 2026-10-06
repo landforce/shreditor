@@ -874,6 +874,18 @@
     "colorPanel": {
       "emptyState": "Selecciona un clip para etalonar",
       "adjustmentLayerLabel": "Etalonaje"
+    },
+    "agentActivity": {
+      "working": "El agente está trabajando en una pasada: {{label}}",
+      "workingNoLabel": "El agente está trabajando en una pasada",
+      "watchMode": "Puedes reproducir, recorrer y mirar. Las ediciones esperan al agente.",
+      "editAnyway": "Editar de todos modos",
+      "stop": "Detener al agente",
+      "stopping": "Deteniendo… el agente lo verá en su próximo paso",
+      "passReady": "Pasada lista: {{label}}",
+      "passReadyNoLabel": "Pasada lista",
+      "refused": "El agente está trabajando. Espéralo o elige Editar de todos modos.",
+      "actionFailed": "No se pudo contactar con el puente del editor. Inténtalo de nuevo."
     }
   }
 }

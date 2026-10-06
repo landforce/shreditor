@@ -19,6 +19,7 @@ import {
   useTimelineStore,
 } from '@/features/editor/deps/timeline-store'
 import { applyProjectFormat, useProjectFormatRecord } from './project-format'
+import { refuseEditWhileAgentWorks } from '@/shared/state/agent-edit-lock'
 
 /**
  * The format's layout tracks this timeline lacks, as role names ("Speaker
@@ -73,6 +74,8 @@ export function ChangeFormatDialog({
 
   const confirm = async () => {
     if (!selection) return
+    // An agent is mid-pass (watch mode): the format is written to project.json at once.
+    if (refuseEditWhileAgentWorks()) return
     setSaving(true)
     try {
       const { added } = await applyProjectFormat(projectId, selection, {

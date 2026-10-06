@@ -874,6 +874,18 @@
     "colorPanel": {
       "emptyState": "Renk düzenlemek için bir klip seçin",
       "adjustmentLayerLabel": "Renk düzenleme"
+    },
+    "agentActivity": {
+      "working": "Ajan bir geçiş üzerinde çalışıyor: {{label}}",
+      "workingNoLabel": "Ajan bir geçiş üzerinde çalışıyor",
+      "watchMode": "Oynatabilir, ileri geri sarabilir ve inceleyebilirsiniz. Düzenlemeler ajanı bekler.",
+      "editAnyway": "Yine de düzenle",
+      "stop": "Ajanı durdur",
+      "stopping": "Durduruluyor… ajan bunu bir sonraki adımında görecek",
+      "passReady": "Geçiş hazır: {{label}}",
+      "passReadyNoLabel": "Geçiş hazır",
+      "refused": "Ajan çalışıyor. Bekleyin ya da Yine de düzenle'yi seçin.",
+      "actionFailed": "Düzenleyici köprüsüne ulaşılamadı. Tekrar deneyin."
     }
   }
 }
