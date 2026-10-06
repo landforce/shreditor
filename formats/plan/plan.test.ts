@@ -594,3 +594,24 @@ test('compare: a moved clip is missing from its beat and out of order; length dr
   assert.match(lines, /b04 close: no clip from blue.mp4 .*; it is not on the timeline/)
   assert.match(lines, /info the timeline is 5.17 s/)
 })
+
+test('compare: a moved clip is found where it went, not on another beat that uses the same media', () => {
+  const { plan, beats } = check(tenShotPlan())
+  // b03 (red from 2 s) moved to the end; b01 (red too) is still on its frames.
+  const timeline = {
+    items: [
+      clip('a', 'red', 0, 45),
+      clip('b', 'still', 45, 45, 'image'),
+      clip('d', 'blue', 120, 30),
+      clip('c', 'red', 150, 30),
+    ],
+  }
+  const text = comparePlan(plan, beats, timeline)
+    .findings.map((f) => f.message)
+    .join('\n')
+  assert.match(
+    text,
+    /b03 body: no clip from red.mp4 at frames 90-120 .*; it plays at frames 150-180/,
+  )
+  assert.doesNotMatch(text, /b01/)
+})

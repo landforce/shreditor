@@ -19,15 +19,23 @@ function clipsOf(beat, items) {
 const overlaps = (item, beat) =>
   item.from < beat.end && item.from + item.durationInFrames > beat.start
 
-/** Where the beat's clip is now: on its planned frames, else its nearest use, else nowhere. */
-function locate(beat, items) {
-  const clips = clipsOf(beat, items)
-  const onPlan = clips.find((item) => overlaps(item, beat))
-  if (onPlan) return { item: onPlan, onPlan: true }
-  const nearest = [...clips].sort(
-    (a, b) => Math.abs(a.from - beat.start) - Math.abs(b.from - beat.start),
-  )[0]
-  return nearest ? { item: nearest, onPlan: false } : null
+const onPlanClip = (beat, items) => clipsOf(beat, items).find((item) => overlaps(item, beat))
+
+/**
+ * Where each beat's clip is now: on its planned frames, else the nearest clip
+ * of its media that no other beat sits on (a clip the user moved), else nowhere.
+ */
+function locateAll(beats, items) {
+  const onPlan = new Map(beats.map((beat) => [beat, onPlanClip(beat, items)]))
+  const claimed = new Set([...onPlan.values()].filter(Boolean))
+  const distance = (beat) => (item) => Math.abs(item.from - beat.start)
+  return beats.map((beat) => {
+    if (onPlan.get(beat)) return { beat, where: { item: onPlan.get(beat), onPlan: true } }
+    const free = clipsOf(beat, items).filter((item) => !claimed.has(item))
+    const nearest = free.sort((a, b) => distance(beat)(a) - distance(beat)(b))[0]
+    if (nearest) claimed.add(nearest)
+    return { beat, where: nearest ? { item: nearest, onPlan: false } : null }
+  })
 }
 
 function missingFinding(beat, where, fps) {
@@ -87,14 +95,16 @@ function lengthFinding(plan, end) {
 export function comparePlan(plan, beats, timeline) {
   const items = timeline?.items ?? []
   const usable = beats.filter((beat) => beat.media?.mediaId)
-  const located = []
-  const findings = []
-  for (const beat of usable) {
-    const where = locate(beat, items)
-    if (!where?.onPlan) findings.push(missingFinding(beat, where, plan.fps))
-    if (where) located.push({ beat, where })
-  }
-  findings.push(...orderFindings(located, plan.fps))
+  const all = locateAll(usable, items)
+  const findings = all
+    .filter(({ where }) => !where?.onPlan)
+    .map(({ beat, where }) => missingFinding(beat, where, plan.fps))
+  findings.push(
+    ...orderFindings(
+      all.filter(({ where }) => where),
+      plan.fps,
+    ),
+  )
   const end = Math.max(0, ...items.map((item) => item.from + item.durationInFrames))
   const length = lengthFinding(plan, end)
   if (length) findings.push(length)

@@ -73,20 +73,34 @@ The first edit of every project is built from this file (`shred plan` validates 
 `shred plan <id>` prints the beat sheet, the format's targets estimated from the plan (guidelines, not quotas), errors and warnings, and writes `agent/plan.state.json` (`file`, `hash`, `validatedAt`, `errors`, `warnings`). Example:
 
 ```
-Plan  <workspace>/projects/<id>/agent/plan.json  (sha256:3f1c0a9e2b…)
-v2, 30 fps, 300 frames (10.00 s), 10 beats, 10 Shot
-Ask    Ten seconds of the colours of the street
-Arc    Open on the brightest wall, run warm to cool, end on the calm blue.
+Plan  <workspace>/projects/<id>/agent/plan.json  (sha256:67749d691ac6…)
+v2, 30 fps, 400 frames (13.33 s), 10 beats, 10 Shot
+Ask    Cut the five colour clips into a 10 Shot of the street, about 13 seconds
+Arc    Open on calm blue, climb through green, yellow and orange to red, hold the heat, then come back down to blue: a there-and-back that bookends.
 Story  hook → body → close   (10 Shot: Hook shot → Premise setup? → Montage body → Premise payoff? → Ending)
 
-b01   0:00.00-0:01.50  [0-45]  hook   shots    red.mp4 @ 0.50 s
-      takeaway  The street is loud with colour
-      why       Brightest, widest frame first: it stops the scroll
+b01   0:00.00-0:01.60  [0-48]      hook   shots    5-blue.mp4 @ 0.50 s
+      takeaway  A calm blue street, then the heat
+      why       Calmest, widest frame first so the climb reads
       text      title "Five colours, one street" 0:00.00-0:03.00
+b02   0:01.60-0:02.80  [48-84]     body   shots    4-green.mp4 @ 0.20 s
+      takeaway  It warms up
+      why       Green is the first step from blue
 ...
+b10   0:11.20-0:13.33  [336-400]   close  shots    5-blue.mp4 @ 0.80 s
+      takeaway  Back to calm
+      why       End where we started: the bookend
+
 Estimated from the plan (the format's guidelines, not quotas)
-  pass  Title hook from 0 s                           yes  target required
-  WARN  Shots                                          10  target 12-16
+  pass  Title hook from 0 s                           yes  target required  (Five colours, one street)
+  pass  Title hook hold                                 3  target 1.9-4.8 s or all video
+  pass  Length                                      13.33  target 13-15 s
+  WARN  Shots                                          10  target 12-16 count  (10 shots; VDB: 8 to 15)
+  ...
+  WARN  Title words                                     4  target 5-7 words  ("Five colours, one street")
+
+Valid. sha256:67749d691ac6… recorded in <workspace>/projects/<id>/agent/plan.state.json.
+Next: shred draft <id> --label "...", then shred build <draftId>.
 ```
 
 `shred check` adds a **Plan** section when the project has one: beats whose clip is no longer on its planned frames (with where it plays now), beats out of order on their track, and length drift. Warnings and info only: the user's tweaks are decisions. Update the plan (and run `shred plan`) when the story itself changes.

@@ -189,7 +189,7 @@ function printBeat(say, beat, fps) {
     ? `${beat.media.fileName}${beat.media.kind === 'image' ? '' : ` @ ${beat.source.inSec.toFixed(2)} s`}`
     : (beat.source.mediaId ?? beat.source.asset)
   say(
-    `${beat.id.padEnd(5)} ${span(beat.start, beat.end, fps)}  [${beat.start}-${beat.end}]  ${(beat.role ?? '-').padEnd(6)} ${(beat.trackRole ?? '?').padEnd(8)} ${clip}`,
+    `${beat.id.padEnd(5)} ${span(beat.start, beat.end, fps)}  ${`[${beat.start}-${beat.end}]`.padEnd(11)} ${(beat.role ?? '-').padEnd(6)} ${(beat.trackRole ?? '?').padEnd(8)} ${clip}`,
   )
   if (beat.takeaway) say(`      takeaway  ${beat.takeaway}`)
   if (beat.why) say(`      why       ${beat.why}`)
