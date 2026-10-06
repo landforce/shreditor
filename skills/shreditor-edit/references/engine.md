@@ -150,12 +150,19 @@ Correction is a judgement, not a pipeline step: a clip gets it when you (or the 
 - Four bands: `audioEqLow…`, `audioEqLowMid…`, `audioEqHighMid…`, `audioEqHigh…`, each with `…Enabled`, `…Type` (`low-shelf`, `peaking`, `high-shelf`, `notch`), `…FrequencyHz` (20..22000), `…GainDb` (-20..20) and `…Q` (0.3..10.3). E.g. muddy voice: `audioEqLowMidType: "peaking"`, `…FrequencyHz: 300`, `…GainDb: -3`; harsh S sounds: a high-mid cut around 6–8 kHz. Mains hum: a `notch` at 50 or 60 Hz.
 - High cut (hiss above the voice): `audioEqHighCutEnabled: true`, `audioEqHighCutFrequencyHz` (1400..22000; 10–12 kHz for voice), `audioEqHighCutSlopeDbPerOct`.
 - `audioEqOutputGainDb` trims after the EQ.
+- Dynamics are objects on the audio item; absent or `enabled: false` is off, and `enabled` is required when the object is present. Chain: noise reduction → EQ → compressor → de-esser → volume/fades → limiter.
+  - `audioDenoise: { enabled, amount }`: RNNoise, `amount` 0–100 % wet (default 90). Lowers steady noise in pauses by about 14 dB at 80, 20 at 90; 100 can sound underwater. For hiss, room tone, fans.
+  - `audioCompressor: { enabled, thresholdDb (-60..0, -18), ratio (1..20, 3), attackMs (0.1..200, 10), releaseMs (10..2000, 150), makeupDb (0..24, 0), kneeDb (0..24, 6) }`. Gentle voice: -18, 2:1, 15/150 ms, +3 makeup. Firm voice: -26, 4:1, 5/100 ms, +7 makeup, plus the limiter.
+  - `audioDeEsser: { enabled, frequencyHz (3000..12000, 6000), thresholdDb (-60..0, -30), maxReductionDb (0..24, 8) }`: turns down only the band above `frequencyHz` when it gets loud.
+  - `audioLimiter: { enabled, ceilingDb (-24..0, -1), releaseMs (1..1000, 60) }`: after volume and fades; holds peaks under the ceiling.
+  - Plosives and rumble: the low cut at 90 Hz, 18 dB/oct (see above).
+  - Noise reduction makes preview audio play about 30 ms late; export is in sync. Clips with dynamics take their audio from the browser mix in native export.
 - Listen to what you changed, or say you couldn't: render an `audioOnly` WAV of the range and check it with ffmpeg, and re-run `shred qc` on mastered files.
 - EQ or volume keyframes make native export take its audio from the browser mix (fine; it prints so).
 
 ## Loudness
 
-Clip `volume` is plain gain with no limiter, so a loudness target (e.g. -14 LUFS integrated, true peak ≤ -1.5 dBTP) is met on the file, before import:
+Clip `volume` is plain gain (the per-clip limiter only holds peaks), so a loudness target (e.g. -14 LUFS integrated, true peak ≤ -1.5 dBTP) is met on the file, before import:
 
 - `shred master <voiceover or final mix stem> [--lufs -14] [--tp -1.5] [--out file.wav]` writes `<name>.mastered.wav` next to the input (original untouched) with ffmpeg's two-pass `loudnorm` (measure, then normalize with the measured values; it limits true peak itself) and prints before/after integrated LUFS and true peak measured with `ebur128`. Import the mastered file.
 - Everything playing together adds up: a -14 LUFS VO plus b-roll audio lands louder. Measure the final export (render `audioOnly` WAV, or the exported video): `ffmpeg -nostats -i out.wav -filter_complex ebur128=peak=true -f null -` and read `I:` and `Peak:` in the summary. If it misses, lower the beds, or master the exported mix and use that as the only audio.
