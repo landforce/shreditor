@@ -11,6 +11,7 @@ import { getObjectUrlSourceMetadata } from '@/infrastructure/browser/object-url-
  */
 
 import { createMediabunnyInputSource } from '@/infrastructure/browser/mediabunny-input-source'
+import { applyBitstreamColorSpace } from '@/infrastructure/browser/mediabunny-video-color-space'
 import { ensureProResDecoderRegistered } from '@/infrastructure/browser/register-prores-decoder'
 import { createLogger } from '@/shared/logging/logger'
 import { getAdaptiveStreamStart } from '@/shared/utils/keyframe-index-registry'
@@ -142,9 +143,11 @@ export class VideoFrameExtractor {
       this.canBeTransparent = properties.alpha
       this.duration = properties.duration
 
-      const track = this.videoTrack as unknown as ConstructorParameters<
-        typeof mb.VideoSampleSink
-      >[0]
+      // Decode with the colour space the H.264 stream declares (full-range
+      // BT.601 phone footage otherwise decodes as BT.709).
+      const track = applyBitstreamColorSpace(
+        this.videoTrack as unknown as ConstructorParameters<typeof mb.VideoSampleSink>[0],
+      )
       this.sinkFactory = (mode) => new mb.VideoSampleSink(track, { hardwareAcceleration: mode })
       this.sink = this.sinkFactory('no-preference')
 
