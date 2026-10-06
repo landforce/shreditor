@@ -52,10 +52,16 @@ const mediaResolverMocks = vi.hoisted(() => ({
   resolveProxyUrl: vi.fn((): string | null => null),
 }))
 
+type MediaLibraryState = {
+  proxyStatus: Map<string, string>
+  mediaById: Record<string, { width: number; height: number }>
+}
+
 const useMediaLibraryStoreMock = vi.hoisted(() =>
-  vi.fn((selector: (state: { proxyStatus: Map<string, string> }) => unknown) =>
+  vi.fn((selector: (state: MediaLibraryState) => unknown) =>
     selector({
       proxyStatus: new Map<string, string>(),
+      mediaById: {},
     }),
   ),
 )
@@ -160,6 +166,7 @@ describe('ClipFilmstrip', () => {
     useMediaLibraryStoreMock.mockImplementation((selector) =>
       selector({
         proxyStatus: new Map<string, string>(),
+        mediaById: {},
       }),
     )
     mediaResolverMocks.resolveProxyUrl.mockReturnValue(null)
@@ -169,6 +176,7 @@ describe('ClipFilmstrip', () => {
     useMediaLibraryStoreMock.mockImplementation((selector) =>
       selector({
         proxyStatus: new Map([['media-1', 'ready']]),
+        mediaById: {},
       }),
     )
     mediaResolverMocks.resolveProxyUrl.mockReturnValue('blob:proxy')
@@ -218,6 +226,7 @@ describe('ClipFilmstrip', () => {
     useMediaLibraryStoreMock.mockImplementation((selector) =>
       selector({
         proxyStatus: new Map([['media-1', 'ready']]),
+        mediaById: {},
       }),
     )
     mediaResolverMocks.resolveProxyUrl.mockReturnValue('blob:stale-proxy')
@@ -613,5 +622,101 @@ describe('ClipFilmstrip', () => {
       expect(TestImage.instances.some((image) => image.src === 'blob:streamed')).toBe(true)
     })
     expect(container.querySelectorAll('img')).toHaveLength(0)
+  })
+
+  describe('source aspect', () => {
+    const useMediaSize = (width: number, height: number) =>
+      useMediaLibraryStoreMock.mockImplementation((selector) =>
+        selector({
+          proxyStatus: new Map<string, string>(),
+          mediaById: { 'media-1': { width, height } },
+        }),
+      )
+    const props = {
+      mediaId: 'media-1',
+      sourceStart: 0,
+      trimStart: 0,
+      speed: 1,
+      fps: 30,
+      isVisible: true,
+    }
+
+    it('gives a vertical clip tall, narrow tiles that draw its whole frame', async () => {
+      useMediaSize(1080, 1920)
+      useFilmstripMock.mockReturnValue({
+        frames: [{ index: 0, timestamp: 0, url: 'blob:vertical-0' }],
+        isLoading: false,
+        isComplete: true,
+        progress: 100,
+        error: null,
+      })
+
+      const { container } = render(
+        <ClipFilmstrip {...props} clipWidth={200} sourceDuration={10} pixelsPerSecond={20} />,
+      )
+
+      const fallback = container.querySelector('[data-filmstrip-fallback]') as HTMLDivElement
+      // 60px tall at 9:16 -> 34px wide tiles (16:9 would be 107px).
+      expect(fallback.style.backgroundSize).toBe('34px 60px')
+
+      const source = TestImage.instances.find((image) => image.src === 'blob:vertical-0')!
+      source.width = 90
+      source.height = 160
+      source.onload?.()
+
+      await waitFor(() => {
+        expect(canvasContextMocks.rect).toHaveBeenCalledWith(0, 0, 34, 60)
+        const drawCall = canvasContextMocks.drawImage.mock.calls.at(-1)!
+        // The frame fills the tile: no centre crop beyond sub-pixel rounding.
+        expect(Math.abs(Number(drawCall[3]) - 34)).toBeLessThan(1)
+        expect(Math.abs(Number(drawCall[4]) - 60)).toBeLessThan(1)
+      })
+    })
+
+    it('keeps a 16:9 clip on its old tile width', () => {
+      useMediaSize(1920, 1080)
+      useFilmstripMock.mockReturnValue({
+        frames: [{ index: 0, timestamp: 0, url: 'blob:wide-0' }],
+        isLoading: false,
+        isComplete: true,
+        progress: 100,
+        error: null,
+      })
+
+      const { container } = render(
+        <ClipFilmstrip {...props} clipWidth={200} sourceDuration={10} pixelsPerSecond={20} />,
+      )
+
+      const fallback = container.querySelector('[data-filmstrip-fallback]') as HTMLDivElement
+      expect(fallback.style.backgroundSize).toBe('107px 60px')
+    })
+
+    it('asks for 16:9-spaced frames first, then one per narrow tile', () => {
+      useMediaSize(1080, 1920)
+      const clip = { ...props, clipWidth: 2000, sourceDuration: 200, pixelsPerSecond: 10 }
+      const { rerender } = render(<ClipFilmstrip {...clip} />)
+
+      const requested = useFilmstripMock.mock.calls.map((call) => call[0]?.targetFrameIndices)
+      const coarse = requested.at(-1) ?? []
+      // 2000px of 107px (16:9) slots: as many frames as a landscape strip asks for,
+      // and never a per-tile request before those are in.
+      expect(coarse).toHaveLength(19)
+      expect(requested.every((indices) => !indices || indices.length === 19)).toBe(true)
+
+      useFilmstripMock.mockReturnValue({
+        frames: coarse.map((index) => ({ index, timestamp: index, url: `blob:${index}` })),
+        isLoading: false,
+        isComplete: true,
+        progress: 100,
+        error: null,
+      })
+      // (A new fps only forces the memoised component to render with the mocked frames.)
+      rerender(<ClipFilmstrip {...clip} fps={31} />)
+
+      const perTile = useFilmstripMock.mock.calls.at(-1)?.[0]?.targetFrameIndices ?? []
+      // Then one per 34px tile (3.4 s apart at 10 px/s).
+      expect(perTile).toHaveLength(59)
+      expect(perTile.slice(0, 4)).toEqual([1, 5, 8, 11])
+    })
   })
 })

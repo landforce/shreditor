@@ -121,3 +121,15 @@ describe('computeCoverDrawRect', () => {
     })
   })
 })
+
+describe('computeCoverDrawRect for source-shaped tiles', () => {
+  it('fills a 9:16 tile with a 9:16 frame without cropping', () => {
+    expect(computeCoverDrawRect(90, 160, 45, 80)).toEqual({ x: 0, y: 0, width: 45, height: 80 })
+  })
+
+  it('would centre-crop a 9:16 frame into a 16:9 tile (the old tile shape)', () => {
+    const rect = computeCoverDrawRect(90, 160, 142, 80)
+    expect(rect.width).toBe(142)
+    expect(rect.height).toBeGreaterThan(250)
+  })
+})

@@ -2,6 +2,11 @@ import { memo, useEffect, useState, useMemo, useCallback, useRef } from 'react'
 import { FilmstripSkeleton } from './filmstrip-skeleton'
 import { computeFilmstripRenderWindow } from './render-window'
 import { VisibleFilmstripCanvas } from './visible-filmstrip-canvas'
+import {
+  computeFilmstripFrameTargets,
+  isFilmstripCoarsePassLoaded,
+  pickFilmstripTargetFrames,
+} from './filmstrip-target-frames'
 import { useFilmstrip, type FilmstripFrame } from '../../hooks/use-filmstrip'
 import { resolveMediaUrl, resolveProxyUrl } from '@/features/timeline/deps/media-library-resolver'
 import { useMediaBlobUrl } from '../../hooks/use-media-blob-url'
@@ -11,6 +16,11 @@ import { useMediaLibraryStore } from '@/features/timeline/deps/media-library-sto
 import { observeParentElementHeight } from '../measure-parent-height'
 import { useTimelineViewportStore } from '../../stores/timeline-viewport-store'
 import { CLIP_VISIBILITY_PREFETCH_MARGIN_PX } from '../../hooks/use-clip-visibility'
+import {
+  getFilmstripSampleWidth,
+  getFilmstripTileAspect,
+  getFilmstripTileWidth,
+} from '../../utils/filmstrip-tile-aspect'
 
 const logger = createLogger('ClipFilmstrip')
 
@@ -82,6 +92,10 @@ export const ClipFilmstrip = memo(function ClipFilmstrip({
   const { blobUrl, setBlobUrl, hasStartedLoadingRef, blobUrlVersion } = useMediaBlobUrl(mediaId)
   const refreshingFrameIndicesRef = useRef<Set<number>>(new Set())
   const proxyStatus = useMediaLibraryStore((s) => s.proxyStatus.get(mediaId) ?? null)
+  const tileAspect = useMediaLibraryStore((s) => {
+    const media = s.mediaById[mediaId]
+    return getFilmstripTileAspect(media?.width, media?.height)
+  })
 
   // A tab-wake refresh replaces the proxy URL while its status stays `ready`.
   // Re-read it on render so the blob URL version update cannot retain a revoked URL.
@@ -93,8 +107,11 @@ export const ClipFilmstrip = memo(function ClipFilmstrip({
     return observeParentElementHeight(containerRef.current, setHeight)
   }, [])
 
-  // Calculate thumbnail width based on height (16:9 aspect ratio)
-  const thumbnailWidth = Math.round(height * (16 / 9)) || THUMBNAIL_WIDTH
+  // Tiles take the source's own shape (a 9:16 clip gets tall, narrow tiles), so
+  // frames are shown whole instead of centre-cropped to 16:9.
+  const thumbnailWidth = getFilmstripTileWidth(height, tileAspect) || THUMBNAIL_WIDTH
+  // Never sample frames closer than a 16:9 tile would (see frameTargets).
+  const sampleWidth = getFilmstripSampleWidth(thumbnailWidth, height)
 
   const renderPixelsPerSecond = pixelsPerSecond
   const visibleClipWidth = clipWidth
@@ -154,38 +171,40 @@ export const ClipFilmstrip = memo(function ClipFilmstrip({
       viewportWidth,
     ],
   )
-  const targetFrameIndices = useMemo(() => {
-    if (!isVisible || height <= 0 || renderPixelsPerSecond <= 0) return undefined
-    if (effectiveEnd <= effectiveStart || sourceDuration <= 0) return undefined
-
-    const pixelsPerSourceSecond = renderPixelsPerSecond / Math.max(0.0001, speed)
-    const tileWidth = thumbnailWidth
-    const { startTile, endTile } = filmstripRenderWindow
-    if (endTile <= startTile) return undefined
-
-    const totalFrameCount = Math.max(1, Math.ceil(sourceDuration))
-    const indices = new Set<number>()
-    for (let slot = startTile; slot < endTile; slot++) {
-      const slotCenterX = slot * tileWidth + tileWidth * 0.5
-      const slotCenterTime = isReversed
-        ? effectiveEnd - slotCenterX / pixelsPerSourceSecond
-        : effectiveStart + slotCenterX / pixelsPerSourceSecond
-      indices.add(Math.max(0, Math.min(totalFrameCount - 1, Math.floor(slotCenterTime))))
-    }
-
-    return indices.size > 0 ? Array.from(indices).sort((a, b) => a - b) : undefined
-  }, [
-    isVisible,
-    height,
-    renderPixelsPerSecond,
-    effectiveEnd,
-    effectiveStart,
-    sourceDuration,
-    speed,
-    thumbnailWidth,
-    filmstripRenderWindow,
-    isReversed,
-  ])
+  // Frames to extract: first one per 16:9-wide slot (as many as a landscape
+  // strip asks for, so the strip fills just as fast), then one per tile once
+  // those are in, so narrow tiles end up showing their own frames.
+  const frameTargets = useMemo(
+    () =>
+      computeFilmstripFrameTargets({
+        isVisible,
+        height,
+        pixelsPerSecond: renderPixelsPerSecond,
+        speed,
+        effectiveStart,
+        effectiveEnd,
+        sourceDuration,
+        isReversed,
+        renderWindow: filmstripRenderWindow,
+        tileWidth: thumbnailWidth,
+        sampleWidth,
+      }),
+    [
+      isVisible,
+      height,
+      renderPixelsPerSecond,
+      speed,
+      effectiveStart,
+      effectiveEnd,
+      sourceDuration,
+      isReversed,
+      filmstripRenderWindow,
+      thumbnailWidth,
+      sampleWidth,
+    ],
+  )
+  const [coarseFramesLoaded, setCoarseFramesLoaded] = useState(false)
+  const targetFrameIndices = pickFilmstripTargetFrames(frameTargets, coarseFramesLoaded)
 
   // Load blob URL lazily when visible, and retry after global invalidation.
   useEffect(() => {
@@ -226,6 +245,10 @@ export const ClipFilmstrip = memo(function ClipFilmstrip({
     targetFrameCount,
     targetFrameIndices,
   })
+  // Derived during render (no effect round trip): step up to per-tile frames as
+  // soon as the coarse set is loaded, and back when a zoom or scroll needs new ones.
+  const coarseLoadedNow = isFilmstripCoarsePassLoaded(frameTargets, frames)
+  if (coarseLoadedNow !== coarseFramesLoaded) setCoarseFramesLoaded(coarseLoadedNow)
   const [stableFrames, setStableFrames] = useState<FilmstripFrame[] | null>(null)
 
   useEffect(() => {

@@ -4,6 +4,8 @@ import { useMediaBlobUrl } from '../../hooks/use-media-blob-url'
 import { resolveMediaUrl } from '@/features/timeline/deps/media-library-resolver'
 import { createLogger } from '@/shared/logging/logger'
 import { computeFilmstripRenderWindow } from './render-window'
+import { useMediaLibraryStore } from '@/features/timeline/deps/media-library-store'
+import { getFilmstripTileAspect, getFilmstripTileWidth } from '../../utils/filmstrip-tile-aspect'
 
 const logger = createLogger('ImageFilmstrip')
 
@@ -155,8 +157,12 @@ export const ImageFilmstrip = memo(function ImageFilmstrip({
     format: animationFormat,
   })
 
-  // Calculate thumbnail tile width based on height (maintain source aspect ratio roughly as 16:9)
-  const tileWidth = Math.round(height * (16 / 9)) || 80
+  // Tiles take the image's own shape (clamped), so it is never stretched or cropped.
+  const tileAspect = useMediaLibraryStore((s) => {
+    const media = s.mediaById[mediaId]
+    return getFilmstripTileAspect(media?.width, media?.height)
+  })
+  const tileWidth = getFilmstripTileWidth(height, tileAspect) || 80
   const renderClipWidth = Math.max(clipWidth, renderWidth ?? clipWidth)
 
   // Resolve the URL to use: prefer freshly resolved blobUrl. Only use the
