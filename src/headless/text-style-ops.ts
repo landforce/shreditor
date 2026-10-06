@@ -53,7 +53,7 @@ export interface TextStyleEditInput {
   /** Library styles the ops may name (the Node side reads app/text-styles.json). */
   library?: TextStyleDefinition[]
   /** Built-in transcripts by media id, for addCaptions. */
-  transcripts?: Array<{ mediaId: string; segments: MediaTranscriptSegment[] }>
+  transcripts?: Array<{ mediaId: string; segments: MediaTranscriptSegment[]; language?: string }>
 }
 
 let input: TextStyleEditInput = { canvas: { width: 1920, height: 1080 } }
@@ -263,14 +263,14 @@ function requireCaptionClip(clipId: string | undefined): CaptionClip {
   return clip
 }
 
-function transcriptOf(mediaId: string): MediaTranscriptSegment[] {
+function transcriptOf(mediaId: string): { segments: MediaTranscriptSegment[]; language?: string } {
   const transcript = input.transcripts?.find((entry) => entry.mediaId === mediaId)
   if (!transcript) {
     throw new Error(
       `addCaptions: media "${mediaId}" has no transcript yet (shred transcribe ${mediaId}, then retry)`,
     )
   }
-  return transcript.segments
+  return transcript
 }
 
 /** `replace: true`: remove the captions made from this clip's transcript before. */
@@ -285,7 +285,7 @@ function removePreviousCaptions(clipId: string): void {
 
 function addCaptionsOp(op: Op, context: OverlapContext): unknown {
   const clip = requireCaptionClip(str(op.clipId))
-  const segments = transcriptOf(clip.mediaId!)
+  const { segments, language } = transcriptOf(clip.mediaId!)
   const style = resolveStyle(op.styleId)
   ensureInProject(style)
   if (op.replace === true) removePreviousCaptions(clip.id)
@@ -297,6 +297,7 @@ function addCaptionsOp(op: Op, context: OverlapContext): unknown {
     trackId,
     timelineFps: useTimelineSettingsStore.getState().fps || 30,
     canvas: input.canvas,
+    ...(language ? { language } : {}),
   })
   if (items.length === 0) {
     throw new Error(

@@ -92,6 +92,7 @@ async function addStyledCaptions(
     trackId: '',
     timelineFps: useTimelineSettingsStore.getState().fps,
     canvas: projectCanvas(),
+    ...(transcript.language ? { language: transcript.language } : {}),
   })
   if (built.length === 0) return 0
   const replaced = previousStyledCaptions(useItemsStore.getState().items, clip.id)

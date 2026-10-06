@@ -84,11 +84,13 @@ const layoutSchema = z
 const captionRulesSchema = z
   .object({
     maxWordsPerChunk: z.number().int().min(1).max(40),
+    minWordsPerChunk: z.number().int().min(1).max(40).optional(),
     maxCharsPerLine: z.number().int().min(4).max(200),
     maxLines: z.number().int().min(1).max(6),
     minChunkFrames: z.number().int().min(0).max(600),
     case: z.enum(['as-is', 'upper', 'lower']).optional(),
     punctuation: z.enum(['keep', 'strip']).optional(),
+    breakOn: z.enum(['phrase', 'words']).optional(),
   })
   .strict()
 

@@ -15,6 +15,10 @@ describe('transcript text formatting', () => {
     expect(joinTranscriptWords(['Hello', ',', 'world', '!'])).toBe('Hello, world!')
   })
 
+  it('keeps a space before a currency sign', () => {
+    expect(joinTranscriptWords(['it', 'cost', 'me', '$40,000.'])).toBe('it cost me $40,000.')
+  })
+
   it('preserves Korean word separators', () => {
     expect(needsTranscriptWordSeparator('안녕하세요', '세계')).toBe(true)
   })

@@ -59,11 +59,13 @@ const look = z
 const captionRulesSchema = z
   .object({
     maxWordsPerChunk: z.number().int().min(1).max(40),
+    minWordsPerChunk: z.number().int().min(1).max(40).optional(),
     maxCharsPerLine: z.number().int().min(4).max(200),
     maxLines: z.number().int().min(1).max(6),
     minChunkFrames: z.number().int().min(0).max(600),
     case: z.enum(['as-is', 'upper', 'lower']).optional(),
     punctuation: z.enum(['keep', 'strip']).optional(),
+    breakOn: z.enum(['phrase', 'words']).optional(),
   })
   .strict()
 
@@ -317,23 +319,23 @@ function captionMediaIds(project, ops) {
 const MEDIA_ID = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/
 
 /**
- * The built-in transcript's segments (media/<id>/cache/ai/transcript.json, see
- * server/transcription.mjs; the older cache/transcript.json too), or null.
+ * The built-in transcript's segments and language (media/<id>/cache/ai/transcript.json,
+ * see server/transcription.mjs; the older cache/transcript.json too), or null.
  */
-function readTranscriptSegments(workspace, mediaId) {
+function readTranscript(workspace, mediaId) {
   if (!MEDIA_ID.test(mediaId)) return null
   const dir = path.join(workspace, 'media', mediaId, 'cache')
   const found = [path.join(dir, 'ai', 'transcript.json'), path.join(dir, 'transcript.json')]
-    .map(segmentsIn)
-    .find(Array.isArray)
+    .map(transcriptIn)
+    .find((transcript) => Array.isArray(transcript?.segments))
   return found ?? null
 }
 
-/** `segments` of a stored transcript file (an envelope's `data`, or a legacy bare one). */
-function segmentsIn(file) {
+/** A stored transcript file's data (an envelope's `data`, or a legacy bare one). */
+function transcriptIn(file) {
   try {
     const stored = JSON.parse(fs.readFileSync(file, 'utf8'))
-    return (stored.data ?? stored).segments
+    return stored.data ?? stored
   } catch {
     return undefined
   }
@@ -343,8 +345,10 @@ function segmentsIn(file) {
 export function collectTextStyleInput(workspace, project, ops) {
   const textStyleLibrary = libraryStylesFor(workspace, project, ops)
   const transcripts = captionMediaIds(project, ops).flatMap((mediaId) => {
-    const segments = readTranscriptSegments(workspace, mediaId)
-    return segments ? [{ mediaId, segments }] : []
+    const transcript = readTranscript(workspace, mediaId)
+    if (!transcript) return []
+    const { segments, language } = transcript
+    return [{ mediaId, segments, ...(typeof language === 'string' && language ? { language } : {}) }]
   })
   return {
     ...(textStyleLibrary.length ? { textStyleLibrary } : {}),

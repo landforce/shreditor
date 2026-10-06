@@ -4,7 +4,7 @@
  * variant for the canvas and written as caption text items that use the style.
  */
 
-import type { MediaTranscriptSegment } from '@/types/storage'
+import type { MediaTranscriptSegment, MediaTranscriptWord } from '@/types/storage'
 import type { AudioItem, TextItem, VideoItem } from '@/types/timeline'
 import type { CaptionChunkRules, TextStyleDefinition } from '@/types/text-style'
 import {
@@ -14,10 +14,12 @@ import {
 import { buildCaptionTextItems, getClipSourceBounds } from './caption-items'
 import {
   DEFAULT_CAPTION_CHUNK_LIMITS,
+  breakCaptionLines,
   chunkTranscriptForCaptions,
   wrapCaptionLines,
   type CaptionChunkLimits,
 } from './caption-chunking'
+import { usesEnglishPhraseRules } from './caption-phrase-boundaries'
 
 /** Rules for a caption style that has none of its own. */
 const DEFAULT_CAPTION_RULES: CaptionChunkRules = {
@@ -27,15 +29,26 @@ const DEFAULT_CAPTION_RULES: CaptionChunkRules = {
   minChunkFrames: 12,
 }
 
-function limitsFor(rules: CaptionChunkRules): CaptionChunkLimits {
+interface ChunkContext {
+  language?: string
+  /** Source seconds a timeline frame shows (speed / fps). */
+  sourceSecondsPerFrame: number
+}
+
+function limitsFor(rules: CaptionChunkRules, context: ChunkContext): CaptionChunkLimits {
+  const minWords = rules.minWordsPerChunk ?? DEFAULT_CAPTION_CHUNK_LIMITS.minWords
   return {
     ...DEFAULT_CAPTION_CHUNK_LIMITS,
     maxWords: rules.maxWordsPerChunk,
     maxCharsPerLine: rules.maxCharsPerLine,
     maxLines: rules.maxLines,
-    minWords: Math.min(DEFAULT_CAPTION_CHUNK_LIMITS.minWords, rules.maxWordsPerChunk),
+    minWords: Math.min(minWords, rules.maxWordsPerChunk),
     // More room on screen holds a chunk longer.
     maxSeconds: DEFAULT_CAPTION_CHUNK_LIMITS.maxSeconds * Math.max(1, rules.maxLines),
+    // The style's hold, in the source seconds the chunker works in.
+    minSeconds: rules.minChunkFrames * context.sourceSecondsPerFrame,
+    breakOn: rules.breakOn ?? 'phrase',
+    ...(context.language ? { language: context.language } : {}),
   }
 }
 
@@ -48,11 +61,27 @@ function styleWord(text: string, rules: CaptionChunkRules): string {
   return stripped
 }
 
-function chunkText(chunk: MediaTranscriptSegment, rules: CaptionChunkRules): string {
-  const words = (chunk.words?.map((word) => word.text) ?? chunk.text.split(/\s+/))
-    .map((word) => styleWord(word, rules))
-    .filter(Boolean)
-  return wrapCaptionLines(words, rules.maxCharsPerLine).join('\n')
+function spokenWords(chunk: MediaTranscriptSegment): MediaTranscriptWord[] {
+  if (chunk.words) return chunk.words
+  return chunk.text.split(/\s+/).map((text) => ({ text, start: chunk.start, end: chunk.end }))
+}
+
+/** The chunk's words as shown, in lines: at the best phrase boundary, or greedily by words. */
+function chunkText(chunk: MediaTranscriptSegment, rules: CaptionChunkRules, english: boolean) {
+  const shown = spokenWords(chunk)
+    .map((word) => ({ word, text: styleWord(word.text, rules) }))
+    .filter((entry) => entry.text.length > 0)
+  const texts = shown.map((entry) => entry.text)
+  const lines =
+    rules.breakOn === 'words'
+      ? wrapCaptionLines(texts, rules.maxCharsPerLine)
+      : breakCaptionLines(
+          shown.map((entry) => entry.word),
+          texts,
+          rules.maxCharsPerLine,
+          english,
+        )
+  return lines.join('\n')
 }
 
 /** Only the words spoken inside the clip's source window (by their midpoint). */
@@ -94,6 +123,8 @@ interface BuildStyledCaptionItemsOptions {
   trackId: string
   timelineFps: number
   canvas: { width: number; height: number }
+  /** The transcript's language; without it, English is detected from the words. */
+  language?: string
 }
 
 export function buildStyledCaptionItems({
@@ -103,6 +134,7 @@ export function buildStyledCaptionItems({
   trackId,
   timelineFps,
   canvas,
+  language,
 }: BuildStyledCaptionItemsOptions): TextItem[] {
   const rules = requireTextStyleVariant(style, canvas).caption ?? DEFAULT_CAPTION_RULES
   const bounds = getClipSourceBounds(clip, timelineFps)
@@ -111,8 +143,16 @@ export function buildStyledCaptionItems({
     bounds.sourceStart / bounds.sourceFps,
     bounds.sourceEnd / bounds.sourceFps,
   )
-  const chunks = chunkTranscriptForCaptions(spoken, limitsFor(rules))
-    .map((chunk) => ({ ...chunk, text: chunkText(chunk, rules) }))
+  const limits = limitsFor(rules, {
+    language,
+    sourceSecondsPerFrame: (clip.speed || 1) / timelineFps,
+  })
+  const english = usesEnglishPhraseRules(
+    spoken.flatMap((segment) => segment.words ?? []),
+    language,
+  )
+  const chunks = chunkTranscriptForCaptions(spoken, limits)
+    .map((chunk) => ({ ...chunk, text: chunkText(chunk, rules, english) }))
     .filter((chunk) => chunk.text.length > 0)
   const items = buildCaptionTextItems({
     mediaId: clip.mediaId ?? '',

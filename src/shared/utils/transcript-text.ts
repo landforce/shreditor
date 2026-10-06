@@ -1,5 +1,6 @@
 const CJK_CHARACTER = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}]/u
-const NO_SPACE_BEFORE = /^[\p{P}\p{S}]/u
+/** Punctuation and symbols hug the word before, except a currency sign ("cost me $40"). */
+const NO_SPACE_BEFORE = /^(?!\p{Sc})[\p{P}\p{S}]/u
 const NO_SPACE_AFTER = /[\p{Ps}\p{Pi}]$/u
 
 function lastCharacter(value: string): string {

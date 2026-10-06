@@ -51,14 +51,24 @@ export type CaptionTextCase = 'as-is' | 'upper' | 'lower'
 export type CaptionPunctuation = 'keep' | 'strip'
 
 /** How a caption style splits a transcript into on-screen chunks. */
+export type CaptionBreakOn = 'phrase' | 'words'
+
 export interface CaptionChunkRules {
   maxWordsPerChunk: number
+  /** Fewest words a chunk should have (default 2); a punch word set off by pauses may stand alone. */
+  minWordsPerChunk?: number
   maxCharsPerLine: number
   maxLines: number
   /** Shortest a chunk stays on screen, in project frames. */
   minChunkFrames: number
   case?: CaptionTextCase
   punctuation?: CaptionPunctuation
+  /**
+   * `phrase` (default): break where an editor would, by phrase, and wrap lines
+   * at the best phrase boundary. `words`: fill chunks to the word limit,
+   * breaking only at pauses and punctuation, and wrap lines greedily.
+   */
+  breakOn?: CaptionBreakOn
 }
 
 /** The parts of a style that make up its look on one canvas. */

@@ -9,7 +9,7 @@ import { useSelectionStore } from '@/shared/state/selection'
 import { createLogger } from '@/shared/logging/logger'
 import { joinTranscriptWords } from '@/shared/utils/transcript-text'
 import { DEFAULT_PROJECT_HEIGHT, DEFAULT_PROJECT_WIDTH } from '@/shared/projects/defaults'
-import type { MediaTranscript, MediaTranscriptModel, MediaTranscriptSegment } from '@/types/storage'
+import type { MediaTranscript, MediaTranscriptModel } from '@/types/storage'
 import type {
   AudioItem,
   SubtitleSegmentItem,
@@ -36,7 +36,11 @@ import {
   getCaptionTextItemTemplate,
   getCaptionRangeForClip,
 } from '../utils/caption-items'
-import { chunkTranscriptForCaptions } from '../utils/caption-chunking'
+import {
+  DEFAULT_CAPTION_CHUNK_LIMITS,
+  chunkTranscriptForCaptions,
+  type CaptionChunkLimits,
+} from '../utils/caption-chunking'
 import { buildStyledCaptionItems } from '../utils/styled-caption-items'
 import { useProjectStore } from '@/features/media-library/deps/projects'
 import {
@@ -135,16 +139,23 @@ function joinRequestOrigin(job: QueuedTranscriptionJob, origin: 'background' | u
   if (origin !== 'background') job.origin = undefined
 }
 
+/** The editor's caption limits, with the transcript's language when it has one. */
+function captionLimitsFor(language: string | undefined): CaptionChunkLimits {
+  return language ? { ...DEFAULT_CAPTION_CHUNK_LIMITS, language } : DEFAULT_CAPTION_CHUNK_LIMITS
+}
+
 function buildTimelineTranscriptCaptionCues(
   mediaId: string,
-  segments: readonly MediaTranscriptSegment[],
+  transcript: Pick<MediaTranscript, 'segments' | 'language'>,
 ): TimelineTranscriptCaptionCue[] {
-  return chunkTranscriptForCaptions(segments).map((segment, index) => ({
-    id: `transcript-${mediaId}-${index}`,
-    startSeconds: segment.start,
-    endSeconds: segment.end,
-    text: segment.text,
-  }))
+  return chunkTranscriptForCaptions(transcript.segments, captionLimitsFor(transcript.language)).map(
+    (segment, index) => ({
+      id: `transcript-${mediaId}-${index}`,
+      startSeconds: segment.start,
+      endSeconds: segment.end,
+      text: segment.text,
+    }),
+  )
 }
 
 function buildSyncedTranscriptCaptionItem(
@@ -458,7 +469,7 @@ class MediaTranscriptionService {
       language: job.language,
       quantization: job.quantization,
       text: joinTranscriptWords(segments.map((segment) => segment.text)),
-      segments: chunkTranscriptForCaptions(segments),
+      segments: chunkTranscriptForCaptions(segments, captionLimitsFor(job.language)),
       ...(job.origin ? { origin: job.origin } : {}),
       createdAt: Date.now(),
       updatedAt: Date.now(),
@@ -481,7 +492,7 @@ class MediaTranscriptionService {
    */
   syncExistingTranscriptCaptions(mediaId: string, transcript: MediaTranscript): number {
     const timeline = useTimelineStore.getState()
-    const sourceCues = buildTimelineTranscriptCaptionCues(mediaId, transcript.segments)
+    const sourceCues = buildTimelineTranscriptCaptionCues(mediaId, transcript)
     let updatedClipCount = 0
 
     for (const item of timeline.items ?? []) {
@@ -626,7 +637,7 @@ class MediaTranscriptionService {
 
       const clipCaptionItem = buildSubtitleSegmentForClip({
         trackId: targetTrack.id,
-        cues: buildTimelineTranscriptCaptionCues(clip.id, transcript.segments),
+        cues: buildTimelineTranscriptCaptionCues(clip.id, transcript),
         clip,
         timelineFps: timeline.fps,
         canvasWidth,
@@ -702,7 +713,7 @@ class MediaTranscriptionService {
       canvasWidth,
       canvasHeight,
     )
-    const sourceCues = buildTimelineTranscriptCaptionCues(mediaId, transcript.segments)
+    const sourceCues = buildTimelineTranscriptCaptionCues(mediaId, transcript)
     const generatedCaptionIdsToRemove = options.replaceExisting
       ? new Set(
           targetClips.flatMap((clip) =>

@@ -100,7 +100,8 @@ describe('buildStyledCaptionItems', () => {
       expect(lines.length).toBeLessThanOrEqual(2)
       for (const line of lines) expect(line.length).toBeLessThanOrEqual(10)
     }
-    expect(items[0]?.text).toBe('one two\nthree four')
+    // 4 + 4 + 4 words would leave "nine ten eleven twelve." needing 3 lines: 3 a chunk.
+    expect(items[0]?.text).toBe('one two\nthree')
   })
 
   it('applies case and punctuation rules', () => {
