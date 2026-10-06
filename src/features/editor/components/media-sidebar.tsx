@@ -26,6 +26,7 @@ import { motion, useReducedMotion } from 'motion/react'
 import { Button } from '@/components/ui/button'
 import { useEditorStore } from '@/shared/state/editor'
 import {
+  executeTimelineCommand,
   useCompositionNavigationStore,
   useCompositionsStore,
   useTimelineStore,
@@ -423,8 +424,11 @@ export const MediaSidebar = memo(function MediaSidebar() {
       const fitted = fitTextStyleToCanvas(style, canvas)
       const styledItem = withTextStyle(textItem, fitted, canvas)
 
-      addItemOnNewTrack(styledItem, newTrack.tracks)
-      ensureTextStyleInProject(fitted, canvas)
+      // The text and the project's copy of its style land as one undo step.
+      executeTimelineCommand('ADD_TEXT', () => {
+        addItemOnNewTrack(styledItem, newTrack.tracks)
+        ensureTextStyleInProject(fitted, canvas)
+      })
       setActiveTrack(newTrack.trackId)
       selectItems([textItem.id])
     },
@@ -509,7 +513,14 @@ export const MediaSidebar = memo(function MediaSidebar() {
           gpuEffectType: gpuEffectId,
           params: defaults,
         }
-        visualIds.forEach((id) => addEffect(id, effect))
+        // Every selected clip gets it in one undo step.
+        executeTimelineCommand(
+          'ADD_EFFECT',
+          () => visualIds.forEach((id) => addEffect(id, effect)),
+          {
+            count: visualIds.length,
+          },
+        )
       } else {
         // No visual selection ââ‚¬” create adjustment layer with this effect
         const defaults = getGpuEffectDefaultParams(gpuEffectId)
@@ -800,7 +811,7 @@ export const MediaSidebar = memo(function MediaSidebar() {
                     onDragStart={(style) => {
                       // The drop links the new text to the project's copy, so put it there first.
                       const fitted = fitTextStyleToCanvas(style, textStyleCanvas)
-                      ensureTextStyleInProject(fitted, textStyleCanvas)
+                      ensureTextStyleInProject(fitted, textStyleCanvas, { beforeDrop: true })
                       return handleTemplateDragStart({
                         itemType: 'text',
                         label: style.name,

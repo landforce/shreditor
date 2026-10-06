@@ -44,9 +44,14 @@ export function withTextStyle(
 export function ensureTextStyleInProject(
   style: TextStyleDefinition | undefined,
   canvas: Canvas,
+  { beforeDrop = false }: { beforeDrop?: boolean } = {},
 ): void {
   if (!style) return
-  const own = useProjectTextStylesStore.getState().styles.find((entry) => entry.id === style.id)
+  const { styles, setStyles } = useProjectTextStylesStore.getState()
+  const own = styles.find((entry) => entry.id === style.id)
   if (own && textStyleVariantForCanvas(own, canvas)) return
+  // Dragging a style that isn't in the project yet: copy it in without an undo
+  // step (nothing uses it), so the drop is the gesture's one step.
+  if (beforeDrop && !own) return setStyles([...styles, style])
   upsertProjectTextStyle(style, canvas)
 }

@@ -4,6 +4,10 @@ import { useTranslation } from 'react-i18next'
 
 // Stores and selectors
 import { useTimelineStore } from '../stores/timeline-store'
+import { useMarkersStore } from '../stores/markers-store'
+import { useTimelineCommandStore } from '../stores/timeline-command-store'
+import { useTimelineSettingsStore } from '../stores/timeline-settings-store'
+import { captureSnapshot } from '../stores/commands/snapshot'
 import { useSelectionStore } from '@/shared/state/selection'
 
 // Utilities and hooks
@@ -26,7 +30,6 @@ import type { ProjectMarker } from '@/types/timeline'
 export const TimelineProjectMarkers = memo(function TimelineProjectMarkers() {
   const { t } = useTranslation()
   const markers = useTimelineStore((s) => s.markers)
-  const updateMarker = useTimelineStore((s) => s.updateMarker)
   const selectedMarkerId = useSelectionStore((s) => s.selectedMarkerId)
   const selectMarker = useSelectionStore((s) => s.selectMarker)
   const { frameToPixels } = useTimelineCommittedZoomContext()
@@ -41,12 +44,8 @@ export const TimelineProjectMarkers = memo(function TimelineProjectMarkers() {
 
   // Use refs to avoid stale closures
   const pixelsToFrameRef = useRef(pixelsToFrameNow)
-  const updateMarkerRef = useRef(updateMarker)
-
-  // Update refs when functions change
-  useEffect(() => {
-    updateMarkerRef.current = updateMarker
-  }, [updateMarker])
+  // The timeline as it was when the drag started: the whole drag is one undo step.
+  const dragStartRef = useRef<ReturnType<typeof captureSnapshot> | null>(null)
 
   // Handle drag start and selection
   const handleMouseDown = useCallback(
@@ -55,6 +54,7 @@ export const TimelineProjectMarkers = memo(function TimelineProjectMarkers() {
       e.stopPropagation()
       // Select the marker (clears any clip selection)
       selectMarker(markerId)
+      dragStartRef.current = captureSnapshot()
       setDraggingId(markerId)
     },
     [selectMarker],
@@ -67,6 +67,7 @@ export const TimelineProjectMarkers = memo(function TimelineProjectMarkers() {
     const originalCursor = document.body.style.cursor
     document.body.style.cursor = 'grabbing'
 
+    // Moves are live (no history); release records one step.
     const handleMouseMove = (e: MouseEvent) => {
       const container = containerRef.current?.closest('.timeline-ruler')
       if (!container) return
@@ -75,19 +76,25 @@ export const TimelineProjectMarkers = memo(function TimelineProjectMarkers() {
       const x = e.clientX - rect.left
       const frame = Math.max(0, pixelsToFrameRef.current(x))
 
-      updateMarkerRef.current(draggingId, { frame })
+      useMarkersStore.getState().updateMarker(draggingId, { frame })
     }
 
     const handleMouseUp = () => {
+      const before = dragStartRef.current
+      dragStartRef.current = null
       setDraggingId(null)
+      if (!before) return
+      useTimelineSettingsStore.getState().markDirty()
+      useTimelineCommandStore.getState().addUndoEntry({ type: 'MOVE_MARKER' }, before)
     }
 
-    document.addEventListener('mousemove', handleMouseMove)
-    document.addEventListener('mouseup', handleMouseUp)
+    // Capture phase: the ruler stops its own hover mousemove from bubbling.
+    window.addEventListener('mousemove', handleMouseMove, true)
+    window.addEventListener('mouseup', handleMouseUp, true)
 
     return () => {
-      document.removeEventListener('mousemove', handleMouseMove)
-      document.removeEventListener('mouseup', handleMouseUp)
+      window.removeEventListener('mousemove', handleMouseMove, true)
+      window.removeEventListener('mouseup', handleMouseUp, true)
       document.body.style.cursor = originalCursor
     }
   }, [draggingId])

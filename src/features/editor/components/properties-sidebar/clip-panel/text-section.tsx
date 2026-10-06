@@ -25,7 +25,7 @@ import {
 } from '@/components/ui/select'
 import type { TextItem, TextSpan, TimelineItem } from '@/types/timeline'
 import type { CanvasSettings } from '@/types/transform'
-import { useTimelineStore } from '@/features/editor/deps/timeline-store'
+import { executeTimelineCommand, useTimelineStore } from '@/features/editor/deps/timeline-store'
 import { useGizmoStore, type ItemPropertiesPreview } from '@/features/editor/deps/preview'
 import { KeyframeToggle } from '@/features/editor/deps/keyframes'
 import { TextMotionSlotRows } from '../../text-motion/text-motion-slot-rows'
@@ -37,6 +37,7 @@ import {
   ColorPicker,
   SliderInput,
 } from '../components'
+import { useEditSession } from '../utils'
 import { FontPicker } from './font-picker'
 import { TextPaddingControl } from './text-padding-control'
 import { useBrandSwatches } from './brand-swatches'
@@ -531,18 +532,25 @@ function TextSectionComposer({ items, canvas, slots }: TextSectionComposerProps)
   )
 
   // Handlers
+  // Typing is one undo step per visit to the field, not one per key.
+  const textEditSession = useEditSession()
   const handleTextChange = useCallback(
     (e: React.ChangeEvent<HTMLTextAreaElement>) => {
       const newText = e.target.value
-      textItems.forEach((item) => {
-        updateItem(item.id, {
-          text: newText,
-          textSpans: undefined,
-          label: buildTextItemLabelFromText(newText),
-        })
-      })
+      executeTimelineCommand(
+        'EDIT_TEXT',
+        () =>
+          textItems.forEach((item) => {
+            updateItem(item.id, {
+              text: newText,
+              textSpans: undefined,
+              label: buildTextItemLabelFromText(newText),
+            })
+          }),
+        { coalesce: textEditSession.current() },
+      )
     },
-    [textItems, updateItem],
+    [textEditSession, textItems, updateItem],
   )
 
   const handleApplySpanLayout = useCallback(
@@ -599,9 +607,11 @@ function TextSectionComposer({ items, canvas, slots }: TextSectionComposerProps)
         ...(nextSpans[index] ?? { text: '' }),
         text: value,
       }
-      updateTextItemsFromSpans(nextSpans)
+      executeTimelineCommand('EDIT_TEXT', () => updateTextItemsFromSpans(nextSpans), {
+        coalesce: textEditSession.current(),
+      })
     },
-    [activeEditorSpans, updateTextItemsFromSpans],
+    [activeEditorSpans, textEditSession, updateTextItemsFromSpans],
   )
 
   const handleSpanFontSizeChange = useCallback(
@@ -1206,6 +1216,7 @@ function TextSectionComposer({ items, canvas, slots }: TextSectionComposerProps)
                           <Textarea
                             value={span.text}
                             onChange={(e) => handleSpanTextChange(index, e.target.value)}
+                            onBlur={textEditSession.end}
                             placeholder={config.placeholder}
                             className="min-h-[52px] text-xs"
                             rows={config.rows}
@@ -1315,6 +1326,7 @@ function TextSectionComposer({ items, canvas, slots }: TextSectionComposerProps)
               <Textarea
                 value={sharedValues.text ?? ''}
                 onChange={handleTextChange}
+                onBlur={textEditSession.end}
                 placeholder={
                   sharedValues.text === undefined
                     ? t('editor.textSection.mixed')

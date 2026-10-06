@@ -110,4 +110,44 @@ describe('timeline-command-store per-context history', () => {
     cmd.getState().undo()
     expect(useItemsStore.getState().items).toEqual([])
   })
+
+  it('an update that writes what was already there adds no undo step', () => {
+    recordChange('same-1')
+    const cmd = useTimelineCommandStore
+    cmd.getState().execute({ type: 'NO_OP' }, () => {
+      useItemsStore.getState().setItems(useItemsStore.getState().items.map((item) => ({ ...item })))
+    })
+    expect(cmd.getState().undoStack.map((e) => e.command.type)).toEqual(['TEST_ADD'])
+  })
+
+  it('changes of one edit session (typing) are one undo step', () => {
+    const cmd = useTimelineCommandStore
+    for (const id of ['t-1', 't-2', 't-3']) {
+      cmd
+        .getState()
+        .execute({ type: 'EDIT_TEXT', payload: { coalesce: 'session-a' } }, () =>
+          useItemsStore
+            .getState()
+            .setItems([
+              ...useItemsStore.getState().items,
+              makeVideoItem({ id, trackId: 'track-v1' }),
+            ]),
+        )
+    }
+    cmd
+      .getState()
+      .execute({ type: 'EDIT_TEXT', payload: { coalesce: 'session-b' } }, () =>
+        useItemsStore
+          .getState()
+          .setItems([
+            ...useItemsStore.getState().items,
+            makeVideoItem({ id: 't-4', trackId: 'track-v1' }),
+          ]),
+      )
+    expect(cmd.getState().undoStack).toHaveLength(2)
+    cmd.getState().undo()
+    expect(useItemsStore.getState().items.map((i) => i.id)).toEqual(['t-1', 't-2', 't-3'])
+    cmd.getState().undo()
+    expect(useItemsStore.getState().items).toEqual([])
+  })
 })

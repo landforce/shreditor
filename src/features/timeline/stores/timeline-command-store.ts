@@ -33,11 +33,25 @@ interface HistoryStacks {
 /** Depth of `execute` calls in progress; nested commands join the outermost one. */
 let executeDepth = 0
 
-/** A new undo entry on top of the active stack, within the history limit; redo is dropped. */
+/** The edit session a command belongs to (`payload.coalesce`), if any. */
+function coalesceKey(command: TimelineCommand): unknown {
+  return command.payload?.coalesce ?? null
+}
+
+/**
+ * A new undo entry on top of the active stack, within the history limit; redo
+ * is dropped. Commands of one edit session (same `payload.coalesce`, such as
+ * typing in a text field) fold into the session's entry: one step per session.
+ */
 function pushUndoEntry(undoStack: CommandEntry[], entry: CommandEntry) {
   const maxHistory = useSettingsStore.getState().maxUndoHistory
+  const top = undoStack[undoStack.length - 1]
+  const key = coalesceKey(entry.command)
+  const sameSession = key !== null && top !== undefined && coalesceKey(top.command) === key
   return {
-    undoStack: [...undoStack.slice(-(maxHistory - 1)), entry],
+    undoStack: sameSession
+      ? [...undoStack.slice(0, -1), { ...top, command: entry.command }]
+      : [...undoStack.slice(-(maxHistory - 1)), entry],
     redoStack: [],
     canUndo: true,
     canRedo: false,

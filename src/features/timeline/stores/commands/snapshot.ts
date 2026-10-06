@@ -172,9 +172,20 @@ export function restoreSnapshot(snapshot: TimelineSnapshot): void {
  * Uses reference equality for most fields; busAudioEq uses JSON.stringify
  * for deep comparison because it may be structurally equal across restores.
  */
+/**
+ * Same items: by reference, or (for the few that were replaced) by value, so an
+ * update that writes what was already there (softness on an uncropped clip)
+ * doesn't leave an undo step that does nothing.
+ */
+function sameItems(a: TimelineSnapshot['items'], b: TimelineSnapshot['items']): boolean {
+  if (a === b) return true
+  if (a.length !== b.length) return false
+  return a.every((item, i) => item === b[i] || JSON.stringify(item) === JSON.stringify(b[i]))
+}
+
 export function snapshotsEqual(a: TimelineSnapshot, b: TimelineSnapshot): boolean {
   return (
-    a.items === b.items &&
+    sameItems(a.items, b.items) &&
     a.tracks === b.tracks &&
     a.transitions === b.transitions &&
     a.keyframes === b.keyframes &&
