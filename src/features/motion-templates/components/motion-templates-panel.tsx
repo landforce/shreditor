@@ -13,12 +13,13 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { cn } from '@/shared/ui/cn'
+import { cappedAspectBoxStyle } from '@/shared/ui/aspect-box'
 import {
   MOTION_TEMPLATE_CATEGORIES,
   templateAspects,
   type MotionTemplate,
 } from '@/shared/motion-templates/template-core.mjs'
-import { aspectKey, closestAspect } from '@/shared/projects/aspect.mjs'
+import { aspectKey, aspectRatio, closestAspect } from '@/shared/projects/aspect.mjs'
 import { DEFAULT_PROJECT_HEIGHT, DEFAULT_PROJECT_WIDTH } from '@/shared/projects/defaults'
 import { useCompositionsStore, updateMotionTemplate } from '../deps/timeline'
 import { useProjectStore } from '../deps/projects'
@@ -50,6 +51,9 @@ const CHECKERBOARD = {
   backgroundSize: '12px 12px',
   backgroundPosition: '0 0, 0 6px, 6px -6px, -6px 0',
 }
+
+/** A tall (9:16) thumbnail is capped at this height and narrows instead. */
+const TEMPLATE_THUMB_MAX_HEIGHT_PX = 160
 
 const errorText = (error: unknown) => (error instanceof Error ? error.message : String(error))
 
@@ -216,7 +220,8 @@ const TemplateCard = memo(function TemplateCard({
 }) {
   const { t } = useTranslation()
   const { template, missingMedia } = entry
-  const variant = template.variants[shownAspect(template, aspect)]
+  const shown = shownAspect(template, aspect)
+  const variant = template.variants[shown]
   const hasVariant = Boolean(template.variants[aspect])
   const thumbnail = useTemplateThumbnail(template.id, variant?.thumbnail, epoch)
   const outdated =
@@ -236,8 +241,11 @@ const TemplateCard = memo(function TemplateCard({
         onDragStart={onDragStart}
         onDragEnd={endTemplateDrag}
         onClick={() => void runInsert(t, template)}
-        className="relative flex aspect-video w-full items-center justify-center overflow-hidden rounded-sm"
-        style={CHECKERBOARD}
+        className="relative mx-auto flex items-center justify-center overflow-hidden rounded-sm"
+        style={{
+          ...CHECKERBOARD,
+          ...cappedAspectBoxStyle(aspectRatio(shown), TEMPLATE_THUMB_MAX_HEIGHT_PX),
+        }}
         title={t('motionTemplates.insertHint')}
         aria-label={t('motionTemplates.insert', { name: template.name })}
       >
