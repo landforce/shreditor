@@ -271,3 +271,27 @@ describe('clampToAdjacentItems', () => {
     })
   })
 })
+
+describe('held template instances', () => {
+  it('trim past the template length (a hold maps any length) and keep their source window', () => {
+    const instance = {
+      id: 'i',
+      type: 'composition',
+      trackId: 't',
+      from: 0,
+      durationInFrames: 60,
+      label: 'Lower third',
+      compositionId: 'no-such-composition',
+      compositionWidth: 1920,
+      compositionHeight: 1080,
+      sourceStart: 0,
+      sourceEnd: 60,
+      sourceDuration: 60,
+      templateHold: { start: 20, end: 20 },
+    } as TimelineItem
+    expect(clampTrimAmount(instance, 'end', 90, 30).clampedAmount).toBe(90)
+    expect(calculateTrimSourceUpdate(instance, 'end', 90, 150, 30)).toBeNull()
+    const { templateHold: _hold, ...plain } = instance
+    expect(clampTrimAmount(plain as TimelineItem, 'end', 90, 30).clampedAmount).toBe(0)
+  })
+})

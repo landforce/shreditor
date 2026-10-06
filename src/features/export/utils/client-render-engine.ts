@@ -488,6 +488,8 @@ export function collectPriorityMediaItemIds({
         currentFrame,
         currentFps,
         subComposition.fps,
+        undefined,
+        subComposition.durationInFrames,
       )
       if (subFrame < 0 || subFrame >= subComposition.durationInFrames) continue
 

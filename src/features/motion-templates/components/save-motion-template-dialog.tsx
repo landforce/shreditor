@@ -23,14 +23,20 @@ import {
 } from '@/components/ui/select'
 import { FORMAT_ROLES, type FormatRole } from '@formats/registry.mjs'
 import {
+  formatTemplateHold,
   MOTION_TEMPLATE_CATEGORIES,
+  parseTemplateHold,
+  templateHoldProblem,
   type MotionTemplate,
   type MotionTemplateCategory,
   type MotionTemplateControlInput,
+  type MotionTemplateHold,
 } from '@/shared/motion-templates/template-core.mjs'
+import { aspectKey } from '@/shared/projects/aspect.mjs'
 import { getCompositionControlCandidates } from '@/shared/utils/composition-controls'
 import { useMotionTemplateSaveStore } from '@/shared/state/motion-template-save'
 import {
+  findSourceTemplate,
   findTemplateByName,
   getLiveComposition,
   saveCompositionAsTemplate,
@@ -100,6 +106,23 @@ function ControlRowEditor({
   )
 }
 
+/** The library template the composition was copied from (a save updates its variant). */
+function useSourceTemplate(compositionId: string | null): MotionTemplate | null {
+  const [source, setSource] = useState<MotionTemplate | null>(null)
+  useEffect(() => {
+    setSource(null)
+    if (!compositionId) return
+    let cancelled = false
+    void findSourceTemplate(compositionId)
+      .then((template) => !cancelled && setSource(template))
+      .catch(() => undefined)
+    return () => {
+      cancelled = true
+    }
+  }, [compositionId])
+  return source
+}
+
 function useExistingTemplate(name: string, open: boolean): MotionTemplate | null {
   const [existing, setExisting] = useState<MotionTemplate | null>(null)
   useEffect(() => {
@@ -115,6 +138,74 @@ function useExistingTemplate(name: string, open: boolean): MotionTemplate | null
   return existing
 }
 
+/** The hold field's value read as a hold, or the problem with it. */
+function readHold(
+  text: string,
+  durationInFrames: number,
+): { hold: MotionTemplateHold | null; problem: string | null } {
+  try {
+    const hold = parseTemplateHold(text)
+    return { hold, problem: templateHoldProblem(hold, durationInFrames) }
+  } catch (error) {
+    return { hold: null, problem: error instanceof Error ? error.message : String(error) }
+  }
+}
+
+function HoldField({
+  value,
+  onChange,
+  problem,
+  durationInFrames,
+}: {
+  value: string
+  onChange: (value: string) => void
+  problem: string | null
+  durationInFrames: number
+}) {
+  const { t } = useTranslation()
+  return (
+    <div className="space-y-1">
+      <Label htmlFor="motion-template-hold">{t('motionTemplates.hold')}</Label>
+      <Input
+        id="motion-template-hold"
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        placeholder={t('motionTemplates.holdPlaceholder')}
+        className="h-8 text-xs"
+        aria-invalid={problem ? true : undefined}
+      />
+      <p className={problem ? 'text-[11px] text-destructive' : 'text-[11px] text-muted-foreground'}>
+        {problem ?? t('motionTemplates.holdHint', { last: Math.max(0, durationInFrames - 1) })}
+      </p>
+    </div>
+  )
+}
+
+/** Which template (and which version of it) the save writes, in words. */
+function SaveTargetHint({
+  source,
+  existing,
+  aspect,
+}: {
+  source: MotionTemplate | null
+  existing: MotionTemplate | null
+  aspect: string
+}) {
+  const { t } = useTranslation()
+  const target = source ?? existing
+  if (!target) return null
+  const key = !target.variants[aspect]
+    ? 'motionTemplates.addsVariant'
+    : source
+      ? 'motionTemplates.updatesVariant'
+      : 'motionTemplates.newVersionHint'
+  return (
+    <p className="text-[11px] text-muted-foreground">
+      {t(key, { name: target.name, version: target.version + 1, aspect })}
+    </p>
+  )
+}
+
 /** "Save as template": name, category, role and which fields stay editable per instance. */
 export function SaveMotionTemplateDialog({ onSaved }: { onSaved: () => void }) {
   const { t } = useTranslation()
@@ -124,14 +215,30 @@ export function SaveMotionTemplateDialog({ onSaved }: { onSaved: () => void }) {
   const [category, setCategory] = useState<MotionTemplateCategory>('lower-third')
   const [role, setRole] = useState<string>(NO_ROLE)
   const [rows, setRows] = useState<ControlRow[]>([])
+  const [holdText, setHoldText] = useState('')
   const [saving, setSaving] = useState(false)
+  const source = useSourceTemplate(compositionId)
   const existing = useExistingTemplate(name, compositionId !== null)
+  const composition = compositionId ? getLiveComposition(compositionId) : undefined
+  const aspect = composition ? aspectKey(composition.width, composition.height) : ''
+  const durationInFrames = composition?.durationInFrames ?? 1
+  const { hold, problem: holdProblem } = readHold(holdText, durationInFrames)
 
   useEffect(() => {
     if (!compositionId) return
     setName(getLiveComposition(compositionId)?.name ?? '')
     setRows(initialRows(compositionId))
+    setHoldText('')
   }, [compositionId])
+
+  // A copy of a library template saves back into it: start from its settings.
+  useEffect(() => {
+    if (!source) return
+    setName(source.name)
+    setCategory(source.category)
+    setRole(source.role ?? NO_ROLE)
+    setHoldText(formatTemplateHold(source.variants[aspect]?.hold))
+  }, [source, aspect])
 
   const controls = useMemo(() => rows.filter((row) => row.enabled), [rows])
 
@@ -144,6 +251,7 @@ export function SaveMotionTemplateDialog({ onSaved }: { onSaved: () => void }) {
         name,
         category,
         role: role === NO_ROLE ? undefined : (role as FormatRole),
+        hold,
         controls: controls.map(({ id, name: controlName, targetItemId, property }) => ({
           id,
           name: controlName,
@@ -177,14 +285,7 @@ export function SaveMotionTemplateDialog({ onSaved }: { onSaved: () => void }) {
               onChange={(event) => setName(event.target.value)}
               maxLength={100}
             />
-            {existing && (
-              <p className="text-[11px] text-muted-foreground">
-                {t('motionTemplates.newVersionHint', {
-                  name: existing.name,
-                  version: existing.version + 1,
-                })}
-              </p>
-            )}
+            <SaveTargetHint source={source} existing={existing} aspect={aspect} />
           </div>
           <div className="grid grid-cols-2 gap-2">
             <div className="space-y-1">
@@ -224,6 +325,12 @@ export function SaveMotionTemplateDialog({ onSaved }: { onSaved: () => void }) {
               </Select>
             </div>
           </div>
+          <HoldField
+            value={holdText}
+            onChange={setHoldText}
+            problem={holdProblem}
+            durationInFrames={durationInFrames}
+          />
           <div className="space-y-1">
             <Label>{t('motionTemplates.controls')}</Label>
             <p className="text-[11px] text-muted-foreground">{t('motionTemplates.controlsHint')}</p>
@@ -251,8 +358,11 @@ export function SaveMotionTemplateDialog({ onSaved }: { onSaved: () => void }) {
           <Button variant="ghost" onClick={close} disabled={saving}>
             {t('motionTemplates.cancel')}
           </Button>
-          <Button onClick={() => void save()} disabled={saving || !name.trim()}>
-            {existing ? t('motionTemplates.saveNewVersion') : t('motionTemplates.save')}
+          <Button
+            onClick={() => void save()}
+            disabled={saving || !name.trim() || Boolean(holdProblem)}
+          >
+            {(source ?? existing) ? t('motionTemplates.saveNewVersion') : t('motionTemplates.save')}
           </Button>
         </DialogFooter>
       </DialogContent>

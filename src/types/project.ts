@@ -172,6 +172,7 @@ export interface ProjectTimeline {
       compositionWidth?: number
       compositionHeight?: number
       compositionControlOverrides?: CompositionControlOverrides
+      templateHold?: { start: number; end: number }
       // Source dimensions (for video/image items)
       sourceWidth?: number
       sourceHeight?: number
@@ -294,6 +295,10 @@ export interface ProjectTimeline {
     /** Set when the composition is a copy of a library motion template. */
     templateId?: string
     templateVersion?: number
+    /** The template variant (aspect ratio) the copy came from. */
+    templateAspect?: string
+    /** The variant's hold; instances carry it as `templateHold`. */
+    templateHold?: { start: number; end: number }
     busAudioEq?: AudioEqSettings
     markers?: ProjectTimeline['markers']
     inPoint?: number

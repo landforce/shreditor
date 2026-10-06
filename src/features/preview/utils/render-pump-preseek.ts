@@ -3,6 +3,7 @@ import {
   resolveTrackRenderState,
 } from '@/features/preview/deps/composition-runtime'
 import { timelineToSourceFrames } from '@/features/preview/deps/timeline-utils'
+import { resolveHeldInstanceFrame } from '@/shared/motion-templates/instance-time'
 import type { CompositionItem, TimelineItem, TimelineTrack, VideoItem } from '@/types/timeline'
 
 /** Minimal sub-composition shape preseek needs to see inside compound clips. */
@@ -125,7 +126,8 @@ export function getVideoItemSourceTimeSeconds(
 
 /**
  * Map a parent-timeline frame into a compound clip's sub-composition frame
- * space, honoring the wrapper's trim (sourceStart) and speed. Mirrors
+ * space, honoring the wrapper's trim (sourceStart) and speed, or a template
+ * instance's hold (shared/motion-templates/instance-time). Mirrors
  * CompositionContent's subCompFrame math (composition-content.tsx) so preseek
  * targets land on the same frames the renderer requests. Returns null when
  * the frame falls outside the compound clip.
@@ -139,6 +141,8 @@ export function mapTimelineFrameToSubCompositionFrame(
   const relativeFrame = timelineFrame - item.from
   if (relativeFrame < 0 || relativeFrame >= item.durationInFrames) return null
 
+  const held = resolveHeldInstanceFrame(item, relativeFrame, timelineFps, subCompFps)
+  if (held !== null) return held
   const sourceOffset = item.sourceStart ?? item.trimStart ?? 0
   return (
     sourceOffset +

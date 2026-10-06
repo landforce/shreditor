@@ -8,6 +8,7 @@ import {
 } from './source-calculations'
 import { useCompositionsStore } from '../stores/compositions-store'
 import { isCompositionAudioItem } from '@/shared/utils/linked-media'
+import { isHeldTemplateInstance } from '@/shared/motion-templates/instance-time'
 
 export type TrimHandle = 'start' | 'end'
 
@@ -61,7 +62,8 @@ export function clampTrimAmount(
   let clampedAmount = trimAmount
   let maxExtend: number | null = null
 
-  if (isMediaItem(item)) {
+  // A held template instance maps any length onto its template: no source edges.
+  if (isMediaItem(item) && !isHeldTemplateInstance(item)) {
     const { sourceStart, sourceEnd, sourceFps, speed } = getSourceProperties(item)
     const sourceDuration = getEffectiveSourceDuration(item)
     const effectiveSourceFps = sourceFps ?? timelineFps
@@ -216,7 +218,7 @@ export function calculateTrimSourceUpdate(
   newDuration: number,
   timelineFps: number = 30,
 ): TrimSourceUpdate | null {
-  if (!isMediaItem(item)) return null
+  if (!isMediaItem(item) || isHeldTemplateInstance(item)) return null
 
   const { sourceStart, sourceEnd, sourceFps, speed } = getSourceProperties(item)
   const sourceDuration = getEffectiveSourceDuration(item)

@@ -69,6 +69,12 @@ type BaseTimelineItem = {
    */
   formatRole?: FormatRole
   compositionId?: string // Reference to a sub-composition for compound wrappers
+  /**
+   * On a motion template instance and its audio companion: the template's hold
+   * (template frames). The instance may then be any length; the renderers map its
+   * time onto the template (src/shared/motion-templates/instance-time.ts).
+   */
+  templateHold?: { start: number; end: number }
   originId?: string // Tracks lineage - items from same split share this for stable React keys
   linkedGroupId?: string // Links paired timeline items like synced video/audio companions
   // Trim properties for media items

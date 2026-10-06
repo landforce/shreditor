@@ -1,17 +1,24 @@
 import { describe, expect, it } from 'vite-plus/test'
-import type { MotionTemplate } from '@/shared/motion-templates/template-core.mjs'
+import type { MotionTemplateVariantView } from '@/shared/motion-templates/template-core.mjs'
 import {
   chooseTemplateTrack,
   cloneTemplateCompositions,
+  findTemplateComposition,
   fitTemplateToCanvas,
+  planTemplateUpdate,
+  resolveInstanceDuration,
   resolveTemplateControlOverrides,
 } from './motion-template-instances'
+import type { SubComposition } from '../stores/compositions-store'
 import type { TimelineItem, TimelineTrack } from '@/types/timeline'
 
 const template = {
   id: 'tpl',
   name: 'Callout',
   version: 2,
+  templateVersion: 2,
+  aspect: '9:16',
+  hold: { start: 10, end: 12 },
   width: 1080,
   height: 1920,
   fps: 30,
@@ -88,7 +95,7 @@ const template = {
   ],
   controls: [],
   media: [],
-} as unknown as MotionTemplate
+} as unknown as MotionTemplateVariantView
 
 describe('motion template instances', () => {
   it('copies compositions with fresh ids and every reference rewritten', () => {
@@ -97,6 +104,8 @@ describe('motion template instances', () => {
     const [root, sub] = copy.compositions
     expect(root!.templateId).toBe('tpl')
     expect(root!.templateVersion).toBe(2)
+    expect(root!.templateAspect).toBe('9:16')
+    expect(root!.templateHold).toEqual({ start: 10, end: 12 })
     expect(root!.id).not.toBe('root')
     const [text, nested] = root!.items
     expect(text!.id).not.toBe('a')
@@ -110,15 +119,58 @@ describe('motion template instances', () => {
     })
   })
 
-  it('fits the project width keeping the aspect ratio', () => {
-    expect(fitTemplateToCanvas({ width: 1920, height: 1080 }, { width: 1080 })).toEqual({
+  it('a same-aspect variant fills the canvas: 1:1, or scaled uniformly at another resolution', () => {
+    expect(fitTemplateToCanvas({ width: 1080, height: 1920 }, { width: 1080 })).toEqual({
       width: 1080,
-      height: 608,
+      height: 1920,
     })
-    expect(fitTemplateToCanvas({ width: 1080, height: 1920 }, { width: 1920 })).toEqual({
-      width: 1920,
-      height: 3413,
+    expect(fitTemplateToCanvas({ width: 1080, height: 1920 }, { width: 720 })).toEqual({
+      width: 720,
+      height: 1280,
     })
+  })
+
+  it('an instance longer than its template needs a hold', () => {
+    const plain = { name: 'Callout', durationInFrames: 30 }
+    expect(resolveInstanceDuration(plain, undefined)).toBe(30)
+    expect(resolveInstanceDuration(plain, 20)).toBe(20)
+    expect(() => resolveInstanceDuration(plain, 31)).toThrow(/has no hold.*--hold/)
+    expect(resolveInstanceDuration({ ...plain, templateHold: { start: 5, end: 5 } }, 90)).toBe(90)
+  })
+
+  it('finds the project copy of one variant; update keeps held lengths and refreshes the hold', () => {
+    const { compositions } = cloneTemplateCompositions(template, () => crypto.randomUUID())
+    const copy = compositions[0]!
+    expect(findTemplateComposition(compositions, 'tpl', '9:16')).toBe(copy)
+    expect(findTemplateComposition(compositions, 'tpl', '16:9')).toBeUndefined()
+    const instance = {
+      id: 'i',
+      type: 'composition',
+      compositionId: copy.id,
+      trackId: 'v1',
+      from: 0,
+      durationInFrames: 90,
+      label: 'Callout',
+      templateHold: { start: 10, end: 12 },
+    } as unknown as TimelineItem
+    const next = { ...template, version: 3, hold: { start: 14, end: 14 } }
+    const plan = planTemplateUpdate({
+      template: next as MotionTemplateVariantView,
+      compositions: compositions as SubComposition[],
+      rootItems: [instance],
+    })!
+    expect(plan.rootItems[0]).toMatchObject({
+      durationInFrames: 90,
+      templateHold: { start: 14, end: 14 },
+    })
+    // Without a hold the instance is cut back to the template's length.
+    const unheld = planTemplateUpdate({
+      template: { ...template, version: 3, hold: undefined } as MotionTemplateVariantView,
+      compositions: compositions as SubComposition[],
+      rootItems: [instance],
+    })!
+    expect(unheld.rootItems[0]!.durationInFrames).toBe(30)
+    expect(unheld.rootItems[0]).not.toHaveProperty('templateHold')
   })
 
   it('resolves values by control name; the source value clears an override', () => {

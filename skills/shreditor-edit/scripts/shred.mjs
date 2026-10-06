@@ -73,8 +73,14 @@
 //                                        category, size, duration, controls (with defaults)
 //   shred templates show <name|id>       one template: controls, media, folder, thumbnail
 //   shred templates save <projectId> <compositionItemId|compositionId> --name "..." --category <c> [--role r]
-//                                        save a composition to the library (same name = new version)
-//   shred templates export <name|id> --out <dir|file.zip>   a template pack (template, thumbnail, media)
+//                     [--hold <frame|start-end|none>]
+//                                        save a composition as the template variant for its aspect ratio
+//                                        (a copy of a template, or the same name = new version); --hold is
+//                                        where a longer instance freezes between its in and out animation
+//   shred templates clone <name|id> --aspect 16:9 [--from 9:16] [--size WxH]
+//                                        make another aspect ratio's version from an existing one (items
+//                                        keep their nearest edge, sizes follow the short side) to adjust
+//   shred templates export <name|id> --out <dir|file.zip>   a template pack (template, thumbnails, media)
 //   shred templates import <dir|file.zip>   add a pack's templates; media comes in through import
 //   shred export <id> [--native|--browser] [--codec h264|hevc|prores] [--quality low|medium|high|ultra] [--out name]
 //                                        final export to <workspace>/projects/<id>/exports/; default: native
@@ -156,6 +162,9 @@ const { values: opt, positionals } = parseArgs({
     quality: { type: 'string' },
     role: { type: 'string' },
     preset: { type: 'string' },
+    aspect: { type: 'string' },
+    from: { type: 'string' },
+    hold: { type: 'string' },
   },
 })
 const [command, ...args] = positionals

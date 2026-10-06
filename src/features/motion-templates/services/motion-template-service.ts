@@ -5,21 +5,27 @@
 import {
   buildMotionTemplate,
   findMotionTemplate,
+  templateVariant,
   type MotionTemplate,
   type MotionTemplateCategory,
   type MotionTemplateControlInput,
+  type MotionTemplateHold,
   type MotionTemplateMediaRef,
   type StoredComposition,
 } from '@/shared/motion-templates/template-core.mjs'
+import { cloneTemplateVariant } from '@/shared/motion-templates/template-variants.mjs'
+import { aspectKey } from '@/shared/projects/aspect.mjs'
 import type { FormatRole } from '@formats/registry.mjs'
 import { associateMediaWithProject, getMedia } from '@/infrastructure/storage'
 import {
   listMotionTemplates,
+  readMotionTemplate,
   saveMotionTemplate,
+  writeMotionTemplateThumbnail,
 } from '@/infrastructure/storage/workspace-fs/motion-templates'
 import { usePlaybackStore } from '@/shared/state/playback'
 import { useSelectionStore } from '@/shared/state/selection'
-import { DEFAULT_PROJECT_WIDTH } from '@/shared/projects/defaults'
+import { DEFAULT_PROJECT_HEIGHT, DEFAULT_PROJECT_WIDTH } from '@/shared/projects/defaults'
 import {
   buildSubCompositionInput,
   discardUnusedTemplateCompositions,
@@ -30,6 +36,8 @@ import {
   insertMotionTemplate,
   resolveMediaUrl,
   resolveMediaUrls,
+  syncSavedTemplateComposition,
+  useCompositionNavigationStore,
   type InsertMotionTemplateResult,
   type SubComposition,
 } from '../deps/timeline'
@@ -37,6 +45,29 @@ import { useProjectStore } from '../deps/projects'
 import { clearMediaDragData, setMediaDragData, useMediaLibraryStore } from '../deps/media-library'
 
 const THUMBNAIL_EDGE = 480
+
+/** The open project's canvas (templates pick the variant with its aspect ratio). */
+export function projectCanvas(): { width: number; height: number } {
+  const metadata = useProjectStore.getState().currentProject?.metadata
+  return {
+    width: metadata?.width ?? DEFAULT_PROJECT_WIDTH,
+    height: metadata?.height ?? DEFAULT_PROJECT_HEIGHT,
+  }
+}
+
+/** The open project's aspect ratio key ("9:16", "16:9", ...). */
+export const projectAspect = (): string => {
+  const canvas = projectCanvas()
+  return aspectKey(canvas.width, canvas.height)
+}
+
+/** Thrown when a template has no variant for the project's aspect ratio. */
+export class MissingTemplateVariantError extends Error {
+  constructor(readonly aspect: string) {
+    super(`No ${aspect} version`)
+    this.name = 'MissingTemplateVariantError'
+  }
+}
 
 /** Thrown when a template uses media this workspace does not have. */
 export class MissingTemplateMediaError extends Error {
@@ -63,17 +94,23 @@ async function linkTemplateMedia(template: MotionTemplate, projectId: string): P
   await useMediaLibraryStore.getState().refreshMediaItems()
 }
 
-/** Insert an instance at the playhead; refuses (MissingTemplateMediaError) when media is missing. */
+/**
+ * Insert an instance at the playhead: the variant for the project's aspect ratio
+ * (MissingTemplateVariantError when there is none), placed 1:1. Refuses
+ * (MissingTemplateMediaError) when media is missing.
+ */
 export async function insertTemplateAtPlayhead(
   template: MotionTemplate,
 ): Promise<InsertMotionTemplateResult> {
+  const aspect = projectAspect()
+  if (!template.variants[aspect]) throw new MissingTemplateVariantError(aspect)
   const missing = await findMissingTemplateMedia(template)
   if (missing.length > 0) throw new MissingTemplateMediaError(missing)
   const project = useProjectStore.getState().currentProject
   if (project) await linkTemplateMedia(template, project.id)
   const result = insertMotionTemplate(template, {
     from: Math.max(0, usePlaybackStore.getState().currentFrame),
-    canvas: { width: project?.metadata.width ?? DEFAULT_PROJECT_WIDTH },
+    canvas: projectCanvas(),
   })
   useSelectionStore.getState().selectItems([result.itemId])
   return result
@@ -97,8 +134,14 @@ function thumbnailSize(composition: Pick<SubComposition, 'width' | 'height'>) {
   }
 }
 
-/** A frame from the middle of the composition (when a lower third is fully in). */
-async function renderThumbnail(composition: SubComposition): Promise<Blob | null> {
+/**
+ * A transparent WebP (the panel shows it on a checkerboard) of the hold frame,
+ * else the middle frame (when a lower third is fully in).
+ */
+async function renderThumbnail(
+  composition: SubComposition,
+  hold?: MotionTemplateHold | null,
+): Promise<Blob | null> {
   if (typeof OffscreenCanvas !== 'function') return null
   const mediaIds = [...new Set(composition.items.flatMap((item) => item.mediaId ?? []))]
   await Promise.all(mediaIds.map((mediaId) => resolveMediaUrl(mediaId)))
@@ -106,11 +149,11 @@ async function renderThumbnail(composition: SubComposition): Promise<Blob | null
   const tracks = await resolveMediaUrls(input.tracks, { useProxy: false })
   const { renderSingleFrame } = await importCanvasRenderOrchestrator()
   return renderSingleFrame({
-    composition: { ...input, tracks },
-    frame: Math.floor(composition.durationInFrames / 2),
+    composition: { ...input, tracks, backgroundColor: 'rgba(0, 0, 0, 0)' },
+    frame: hold ? hold.start : Math.floor(composition.durationInFrames / 2),
     ...thumbnailSize(composition),
     quality: 0.85,
-    format: 'image/jpeg',
+    format: 'image/webp',
   })
 }
 
@@ -120,6 +163,8 @@ export interface SaveTemplateInput {
   category: MotionTemplateCategory
   role?: FormatRole
   controls: MotionTemplateControlInput[]
+  /** Where a longer instance freezes (null: none). */
+  hold: MotionTemplateHold | null
 }
 
 /** The library template a save with this name would update (same name = new version). */
@@ -127,11 +172,24 @@ export async function findTemplateByName(name: string): Promise<MotionTemplate |
   return findMotionTemplate(await listMotionTemplates(), name.trim())
 }
 
+/** What saving a composition updates: the template it was copied from (that variant). */
+export async function findSourceTemplate(compositionId: string): Promise<MotionTemplate | null> {
+  const templateId = getLiveComposition(compositionId)?.templateId
+  return templateId ? readMotionTemplate(templateId) : null
+}
+
+/**
+ * Save a composition as the template variant for its aspect ratio. A copy of a
+ * library template updates that template's variant (and the copy is tagged as
+ * its new version); otherwise a template with the same name gets a new version;
+ * otherwise it is a new template.
+ */
 export async function saveCompositionAsTemplate(input: SaveTemplateInput): Promise<MotionTemplate> {
   const compositions = liveCompositions()
   const root = compositions.find((composition) => composition.id === input.compositionId)
   if (!root) throw new Error('The composition no longer exists')
-  const previous = await findTemplateByName(input.name)
+  const previous =
+    (await findSourceTemplate(input.compositionId)) ?? (await findTemplateByName(input.name))
   const mediaById = useMediaLibraryStore.getState().mediaById
   const template = buildMotionTemplate({
     rootCompositionId: input.compositionId,
@@ -140,12 +198,41 @@ export async function saveCompositionAsTemplate(input: SaveTemplateInput): Promi
     category: input.category,
     role: input.role,
     controls: input.controls,
+    hold: input.hold,
     previous,
     mediaFileName: (mediaId) => mediaById[mediaId]?.fileName ?? mediaId,
   })
-  const thumbnail = await renderThumbnail(root).catch(() => null)
-  await saveMotionTemplate(template, previous?.version ?? 0, thumbnail)
+  const aspect = aspectKey(root.width, root.height)
+  const thumbnail = await renderThumbnail(root, input.hold).catch(() => null)
+  await saveMotionTemplate(template, previous?.version ?? 0, { [aspect]: thumbnail })
+  if (root.templateId === template.id)
+    syncSavedTemplateComposition(root.id, templateVariant(template, aspect)!)
   return template
+}
+
+/**
+ * "Make a 16:9 version": a variant for the project's aspect ratio copied from the
+ * closest one and re-laid for the canvas, saved to the library, inserted at the
+ * playhead and opened for editing (Save as Template on it updates that variant).
+ */
+export async function makeTemplateVariantForProject(
+  template: MotionTemplate,
+): Promise<InsertMotionTemplateResult> {
+  const canvas = projectCanvas()
+  const aspect = aspectKey(canvas.width, canvas.height)
+  const { template: next } = cloneTemplateVariant(template, { aspect, canvas })
+  await saveMotionTemplate(next, template.version)
+  const result = await insertTemplateAtPlayhead(next)
+  const composition = getLiveComposition(result.compositionId)
+  const variant = next.variants[aspect]!
+  if (composition)
+    void renderThumbnail(composition, variant.hold)
+      .then((blob) => blob && writeMotionTemplateThumbnail(next.id, variant.thumbnail, blob))
+      .catch(() => undefined)
+  useCompositionNavigationStore
+    .getState()
+    .enterComposition(result.compositionId, `${next.name} (${aspect})`, result.itemId)
+  return result
 }
 
 let dragAddedIds: string[] = []
@@ -156,7 +243,7 @@ let dragAddedIds: string[] = []
  * own composition drop places it. Media must already be known to be present.
  */
 export function startTemplateDrag(template: MotionTemplate, dataTransfer: DataTransfer): void {
-  const { composition, addedIds } = ensureMotionTemplateComposition(template)
+  const { composition, addedIds } = ensureMotionTemplateComposition(template, projectCanvas())
   dragAddedIds = addedIds
   const data = {
     type: 'composition' as const,

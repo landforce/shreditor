@@ -90,6 +90,26 @@ describe('render-span', () => {
     expect(resolveCompositionSourceFrame(compound, 115, 30, 60)).toBe(70)
   })
 
+  it('maps a held template instance through in, hold and out over its own length', () => {
+    const instance = {
+      id: 'instance-1',
+      type: 'composition',
+      trackId: 'track-1',
+      compositionId: 'template-copy',
+      compositionWidth: 1920,
+      compositionHeight: 1080,
+      from: 100,
+      durationInFrames: 120,
+      sourceStart: 0,
+      sourceDuration: 60,
+      templateHold: { start: 20, end: 20 },
+    } as CompositionItem
+
+    expect(resolveCompositionSourceFrame(instance, 110, 30, 30, undefined, 60)).toBe(10)
+    expect(resolveCompositionSourceFrame(instance, 160, 30, 30, undefined, 60)).toBe(20)
+    expect(resolveCompositionSourceFrame(instance, 219, 30, 30, undefined, 60)).toBe(59)
+  })
+
   describe('A-A continuous-split ramps', () => {
     // Continuous split at frame 60 of an originally-single clip with mediaId
     // 'm1'. Source frames 0..60 went to left, 60..120 to right. Centered

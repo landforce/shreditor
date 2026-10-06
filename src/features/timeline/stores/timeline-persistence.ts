@@ -115,10 +115,19 @@ async function scaleCanvasToBlob(
 }
 
 /** The library motion template a composition was copied from (absent on most). */
-function templateTags(composition: { templateId?: string; templateVersion?: number }) {
-  return composition.templateId
-    ? { templateId: composition.templateId, templateVersion: composition.templateVersion }
-    : {}
+function templateTags(composition: {
+  templateId?: string
+  templateVersion?: number
+  templateAspect?: string
+  templateHold?: { start: number; end: number }
+}) {
+  if (!composition.templateId) return {}
+  return {
+    templateId: composition.templateId,
+    templateVersion: composition.templateVersion,
+    ...(composition.templateAspect ? { templateAspect: composition.templateAspect } : {}),
+    ...(composition.templateHold ? { templateHold: composition.templateHold } : {}),
+  }
 }
 
 function collectVideoMediaIds(project: Project): string[] {

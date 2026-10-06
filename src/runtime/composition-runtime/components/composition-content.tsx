@@ -2,6 +2,7 @@ import React, { useMemo, useCallback } from 'react'
 import {
   AbsoluteFill,
   Sequence,
+  SequenceFrameRemapContext,
   useSequenceContext,
 } from '@/runtime/composition-runtime/deps/player'
 import type {
@@ -25,6 +26,7 @@ import { KeyframesProvider } from '../contexts/keyframes-context'
 import { KeyframesContext } from '../contexts/keyframes-context-core'
 import { useRuntimeItemKeyframes } from './hooks/use-runtime-item-keyframes'
 import { useVisualFreezeFrame } from './hooks/use-visual-freeze-frame'
+import { heldTemplateWindow, useHeldTemplateFrameRemap } from './hooks/use-held-template-timing'
 import {
   CompositionSpaceProvider,
   useCompositionSpace,
@@ -47,6 +49,7 @@ import { getLinkedVideoIdsWithAudio, hasLinkedAudioCompanion } from '@/shared/ut
 import { resolveProxyUrl } from '@/runtime/composition-runtime/deps/media-library'
 import { loadFonts } from '../utils/fonts'
 import { applyCompositionControlOverrides } from '@/shared/utils/composition-controls'
+import { resolveHeldInstanceFrame } from '@/shared/motion-templates/instance-time'
 
 const EMPTY_AUDIO_EQ_STAGES: ResolvedAudioEqSettings[] = []
 type TrackRenderState = ReturnType<typeof resolveTrackRenderState>
@@ -204,16 +207,22 @@ export const CompositionContent = React.memo<CompositionContentProps>(
     const projectHeight = compositionSpace?.projectHeight ?? renderHeight
     const renderScaleX = compositionSpace?.scaleX ?? 1
     const renderScaleY = compositionSpace?.scaleY ?? 1
+    const heldWindow = useMemo(
+      () => heldTemplateWindow(item, subComp, mainFps),
+      [item, mainFps, subComp],
+    )
     const wrapperWindow = useMemo<CompositionWindow>(
-      () => ({
-        durationInFrames: item.durationInFrames,
-        speed: item.speed,
-        sourceFps: item.sourceFps,
-        sourceStart: item.sourceStart,
-        sourceEnd: item.sourceEnd,
-        trimStart: item.trimStart,
-      }),
+      () =>
+        heldWindow ?? {
+          durationInFrames: item.durationInFrames,
+          speed: item.speed,
+          sourceFps: item.sourceFps,
+          sourceStart: item.sourceStart,
+          sourceEnd: item.sourceEnd,
+          trimStart: item.trimStart,
+        },
       [
+        heldWindow,
         item.durationInFrames,
         item.sourceEnd,
         item.sourceFps,
@@ -285,18 +294,22 @@ export const CompositionContent = React.memo<CompositionContentProps>(
 
     const sequenceContext = useSequenceContext()
     const frame = sequenceContext?.localFrame ?? 0
-    const relativeFrame =
-      frame - ((item as TimelineItem & { _sequenceFrameOffset?: number })._sequenceFrameOffset ?? 0)
+    const frameOffset =
+      (item as TimelineItem & { _sequenceFrameOffset?: number })._sequenceFrameOffset ?? 0
+    const relativeFrame = frame - frameOffset
     const visualFrame = useVisualFreezeFrame(relativeFrame)
-    const sourceOffset = item.sourceStart ?? item.trimStart ?? 0
+    const subCompFps = item.sourceFps ?? subComp?.fps ?? mainFps
     const subCompFrame =
-      sourceOffset +
-      timelineToSourceFrames(
+      resolveHeldInstanceFrame(
+        item,
         relativeFrame,
-        item.speed ?? 1,
         mainFps,
-        item.sourceFps ?? subComp?.fps ?? mainFps,
-      )
+        subCompFps,
+        subComp?.durationInFrames,
+      ) ??
+      (item.sourceStart ?? item.trimStart ?? 0) +
+        timelineToSourceFrames(relativeFrame, item.speed ?? 1, mainFps, subCompFps)
+    const frameRemap = useHeldTemplateFrameRemap(item, subComp, mainFps, frameOffset)
 
     // Only include relativeFrame as a dependency when keyframes are actually animated.
     // This prevents per-frame recomputation during playback for non-animated sub-comps.
@@ -567,70 +580,72 @@ export const CompositionContent = React.memo<CompositionContentProps>(
           visibility: parentVisible ? 'visible' : 'hidden',
         }}
       >
-        <CompositionSpaceProvider
-          projectWidth={subComp.width}
-          projectHeight={subComp.height}
-          renderWidth={subComp.width}
-          renderHeight={subComp.height}
-        >
-          <VideoConfigProvider
-            width={subComp.width}
-            height={subComp.height}
-            fps={subComp.fps}
-            durationInFrames={subComp.durationInFrames}
+        <SequenceFrameRemapContext.Provider value={frameRemap}>
+          <CompositionSpaceProvider
+            projectWidth={subComp.width}
+            projectHeight={subComp.height}
+            renderWidth={subComp.width}
+            renderHeight={subComp.height}
           >
-            <KeyframesProvider
-              keyframes={subComp.keyframes}
-              items={resolvedItems}
-              canvas={expressionCanvas}
+            <VideoConfigProvider
+              width={subComp.width}
+              height={subComp.height}
+              fps={subComp.fps}
+              durationInFrames={subComp.durationInFrames}
             >
-              <AbsoluteFill>
-                <StableVideoSequence
-                  items={videoItems}
-                  renderItem={renderVideoItem}
-                  premountFor={Math.round(subComp.fps)}
-                />
+              <KeyframesProvider
+                keyframes={subComp.keyframes}
+                items={resolvedItems}
+                canvas={expressionCanvas}
+              >
+                <AbsoluteFill>
+                  <StableVideoSequence
+                    items={videoItems}
+                    renderItem={renderVideoItem}
+                    premountFor={Math.round(subComp.fps)}
+                  />
 
-                {nonVideoTrackItems.map((track) => (
-                  <AbsoluteFill
-                    key={track.trackId}
-                    style={{
-                      zIndex: (maxTrackOrder - track.trackOrder) * 1000 + 100,
-                      visibility: track.trackVisible ? 'visible' : 'hidden',
-                    }}
-                  >
-                    {track.items.map((subItem) => (
-                      <Sequence
-                        key={subItem.id}
-                        from={subItem.from}
-                        durationInFrames={subItem.durationInFrames}
-                      >
-                        <ItemContent
-                          item={subItem}
-                          muted={track.muted || linkedVideoIdsWithOwnedAudio.has(subItem.id)}
-                          visible={track.trackVisible}
-                          masks={getMasksForTrackOrder(activeMaskInfos, track.trackOrder)}
-                          renderDepth={renderDepth}
-                          renderCompositionContent={renderCompositionContent}
-                          compositionRenderMode={
-                            subItem.type === 'composition' &&
-                            hasLinkedAudioCompanion(resolvedItems, subItem)
-                              ? 'visual-only'
-                              : 'full'
-                          }
-                          audioGainMultiplier={effectiveAudioGainMultiplier}
-                          audioGainLiveItemIds={effectiveAudioGainLiveItemIds}
-                          audioEqStages={trackMergedEqStages.get(track.trackId) ?? audioEqStages}
-                          audioPitchShiftSemitones={audioPitchShiftSemitones}
-                        />
-                      </Sequence>
-                    ))}
-                  </AbsoluteFill>
-                ))}
-              </AbsoluteFill>
-            </KeyframesProvider>
-          </VideoConfigProvider>
-        </CompositionSpaceProvider>
+                  {nonVideoTrackItems.map((track) => (
+                    <AbsoluteFill
+                      key={track.trackId}
+                      style={{
+                        zIndex: (maxTrackOrder - track.trackOrder) * 1000 + 100,
+                        visibility: track.trackVisible ? 'visible' : 'hidden',
+                      }}
+                    >
+                      {track.items.map((subItem) => (
+                        <Sequence
+                          key={subItem.id}
+                          from={subItem.from}
+                          durationInFrames={subItem.durationInFrames}
+                        >
+                          <ItemContent
+                            item={subItem}
+                            muted={track.muted || linkedVideoIdsWithOwnedAudio.has(subItem.id)}
+                            visible={track.trackVisible}
+                            masks={getMasksForTrackOrder(activeMaskInfos, track.trackOrder)}
+                            renderDepth={renderDepth}
+                            renderCompositionContent={renderCompositionContent}
+                            compositionRenderMode={
+                              subItem.type === 'composition' &&
+                              hasLinkedAudioCompanion(resolvedItems, subItem)
+                                ? 'visual-only'
+                                : 'full'
+                            }
+                            audioGainMultiplier={effectiveAudioGainMultiplier}
+                            audioGainLiveItemIds={effectiveAudioGainLiveItemIds}
+                            audioEqStages={trackMergedEqStages.get(track.trackId) ?? audioEqStages}
+                            audioPitchShiftSemitones={audioPitchShiftSemitones}
+                          />
+                        </Sequence>
+                      ))}
+                    </AbsoluteFill>
+                  ))}
+                </AbsoluteFill>
+              </KeyframesProvider>
+            </VideoConfigProvider>
+          </CompositionSpaceProvider>
+        </SequenceFrameRemapContext.Provider>
       </div>
     )
   },

@@ -16,6 +16,8 @@ import {
 } from './lib/templates.mjs'
 import { collectEditResources } from './lib/workspace.mjs'
 import { createTemplateRoutes } from '../server/template-bridge.mjs'
+import { templateVariant } from '../src/shared/motion-templates/template-core.mjs'
+import { cloneTemplateVariant } from '../src/shared/motion-templates/template-variants.mjs'
 
 const fails = (code) => (error) => error.code === code
 
@@ -103,8 +105,15 @@ function savedWorkspace() {
     { category: 'lower-third' },
     (id) => (id === 'm1' ? 'logo.png' : id),
   )
-  writeTemplate(root, template, Buffer.from('jpg'))
+  writeTemplate(root, template, { '16:9': Buffer.from('webp') })
   return { root, template }
+}
+
+/** The source project with its composition re-sized (another aspect ratio) and tagged. */
+function projectWith(compositionPatch) {
+  const project = structuredClone(projectWithComposition)
+  Object.assign(project.timeline.compositions[0], compositionPatch)
+  return project
 }
 
 test('save builds from a composition item and writes template.json + thumbnail atomically', () => {
@@ -113,7 +122,10 @@ test('save builds from a composition item and writes template.json + thumbnail a
     assert.equal(template.name, 'Lower third')
     assert.deepEqual(template.media, [{ mediaId: 'm1', fileName: 'logo.png' }])
     const dir = path.join(root, 'app', 'templates', template.id)
-    assert.deepEqual(fs.readdirSync(dir).sort(), ['template.json', 'thumbnail.jpg'])
+    assert.deepEqual(fs.readdirSync(dir).sort(), ['template.json', 'thumbnail-16x9.webp'])
+    assert.deepEqual(listTemplates(root).entries[0].thumbnails, {
+      '16:9': path.join(dir, 'thumbnail-16x9.webp'),
+    })
     const { entries } = listTemplates(root)
     assert.deepEqual(entries[0].template, JSON.parse(JSON.stringify({ ...template })))
   } finally {
@@ -131,6 +143,93 @@ test('saving the same name again is a new version of the same template', () => {
     assert.equal(next.id, template.id)
     assert.equal(next.version, 2)
     assert.equal(next.createdAt, template.createdAt)
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true })
+  }
+})
+
+test('saving a copy of a template updates that template: its variant for the copy aspect', () => {
+  const { root, template } = savedWorkspace()
+  try {
+    // A 9:16 copy (renamed in the project) adds the 9:16 variant to the same template.
+    const portrait = buildTemplateFromProject(
+      root,
+      projectWith({ templateId: template.id, name: 'LT tall', width: 1080, height: 1920 }),
+      'comp',
+      { hold: { start: 30, end: 30 } },
+    )
+    assert.equal(portrait.id, template.id)
+    assert.equal(portrait.name, 'Lower third')
+    assert.equal(portrait.category, 'lower-third')
+    assert.deepEqual(Object.keys(portrait.variants).sort(), ['16:9', '9:16'])
+    assert.deepEqual(portrait.variants['9:16'].hold, { start: 30, end: 30 })
+    assert.equal(portrait.variants['16:9'].version, 1)
+    writeTemplate(root, portrait, { '9:16': Buffer.from('tall') })
+    // Saving the 9:16 copy again replaces that variant and keeps its hold.
+    const again = buildTemplateFromProject(
+      root,
+      projectWith({ templateId: template.id, width: 1080, height: 1920 }),
+      'comp',
+      {},
+    )
+    assert.equal(again.version, 3)
+    assert.deepEqual(again.variants['9:16'].hold, { start: 30, end: 30 })
+    assert.equal(again.variants['16:9'].version, 1)
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true })
+  }
+})
+
+test('a format 1 template on disk loads as one variant; rewriting it tidies the old thumbnail', () => {
+  const root = workspace()
+  try {
+    const dir = path.join(root, 'app', 'templates', 'old')
+    fs.mkdirSync(dir, { recursive: true })
+    const composition = projectWithComposition.timeline.compositions[0]
+    fs.writeFileSync(
+      path.join(dir, 'template.json'),
+      JSON.stringify({
+        formatVersion: 1,
+        id: 'old',
+        name: 'Old lower third',
+        category: 'lower-third',
+        version: 4,
+        createdAt: 1,
+        updatedAt: 2,
+        width: 1920,
+        height: 1080,
+        fps: 30,
+        durationInFrames: 60,
+        composition,
+        subCompositions: [],
+        controls: [],
+        media: [],
+      }),
+    )
+    fs.writeFileSync(path.join(dir, 'thumbnail.jpg'), 'jpg')
+    const [entry] = listTemplates(root).entries
+    assert.deepEqual(Object.keys(entry.template.variants), ['16:9'])
+    assert.equal(entry.template.variants['16:9'].version, 4)
+    assert.equal(entry.thumbnails['16:9'], path.join(dir, 'thumbnail.jpg'))
+    // A clone keeps the old variant's thumbnail; a re-save of 16:9 replaces it.
+    const { template: cloned } = cloneTemplateVariant(entry.template, {
+      aspect: '9:16',
+      canvas: { width: 1080, height: 1920 },
+    })
+    writeTemplate(root, cloned, { '9:16': Buffer.from('tall') })
+    assert.deepEqual(fs.readdirSync(dir).sort(), [
+      'template.json',
+      'thumbnail-9x16.webp',
+      'thumbnail.jpg',
+    ])
+    const resaved = buildTemplateFromProject(root, projectWith({ templateId: 'old' }), 'comp', {})
+    writeTemplate(root, resaved, { '16:9': Buffer.from('wide') })
+    assert.deepEqual(fs.readdirSync(dir).sort(), [
+      'template.json',
+      'thumbnail-16x9.webp',
+      'thumbnail-9x16.webp',
+    ])
+    assert.equal(JSON.parse(fs.readFileSync(path.join(dir, 'template.json'))).formatVersion, 2)
   } finally {
     fs.rmSync(root, { recursive: true, force: true })
   }
@@ -204,7 +303,7 @@ test('the library stamp changes when a template is rewritten; the bridge serves 
   const { root, template } = savedWorkspace()
   try {
     const before = templateLibraryStamp(root)
-    writeTemplate(root, { ...template, version: 2, name: 'Renamed lower third' }, null)
+    writeTemplate(root, { ...template, version: 2, name: 'Renamed lower third' })
     const after = templateLibraryStamp(root)
     assert.notEqual(before, after)
     let sent
@@ -226,11 +325,18 @@ test('imported packs remap media ids; the preview project shows the template alo
   const { root, template } = savedWorkspace()
   try {
     const remapped = remapTemplateMedia(template, new Map([['m1', 'm2']]))
-    assert.equal(remapped.composition.items.find((item) => item.id === 'logo').mediaId, 'm2')
+    const variant = remapped.variants['16:9']
+    assert.equal(variant.composition.items.find((item) => item.id === 'logo').mediaId, 'm2')
+    assert.deepEqual(variant.media, [{ mediaId: 'm2', fileName: 'logo.png' }])
     assert.deepEqual(remapped.media, [{ mediaId: 'm2', fileName: 'logo.png' }])
-    const preview = templatePreviewProject(template)
-    assert.deepEqual(preview.metadata, { width: 1920, height: 1080, fps: 30 })
-    assert.equal(preview.timeline.items[0].compositionId, template.composition.id)
+    const preview = templatePreviewProject(templateVariant(template, '16:9'))
+    assert.deepEqual(preview.metadata, {
+      width: 1920,
+      height: 1080,
+      fps: 30,
+      backgroundColor: 'rgba(0, 0, 0, 0)',
+    })
+    assert.equal(preview.timeline.items[0].compositionId, template.variants['16:9'].composition.id)
   } finally {
     fs.rmSync(root, { recursive: true, force: true })
   }

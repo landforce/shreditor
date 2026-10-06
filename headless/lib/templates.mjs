@@ -1,7 +1,8 @@
 // The motion template library on disk: <workspace>/app/templates/<id>/template.json
-// (+ thumbnail.jpg). Read by the edit service (addTemplate/updateTemplate ops get
-// the templates they name in their edit input) and written by `shred templates`.
-// The file format and the build logic live in src/shared/motion-templates.
+// (+ one thumbnail per aspect ratio variant). Read by the edit service
+// (addTemplate/updateTemplate ops get the templates they name in their edit
+// input) and written by `shred templates`. The file format and the build logic
+// live in src/shared/motion-templates.
 import crypto from 'node:crypto'
 import fs from 'node:fs'
 import path from 'node:path'
@@ -9,9 +10,9 @@ import {
   buildMotionTemplate,
   findMotionTemplate,
   MOTION_TEMPLATE_FILE,
-  MOTION_TEMPLATE_THUMBNAIL,
   MOTION_TEMPLATES_DIR,
   parseMotionTemplate,
+  templateAspects,
 } from '../../src/shared/motion-templates/template-core.mjs'
 import { assertSinglePathComponent, HttpError, resolveContained } from './http-security.mjs'
 
@@ -24,11 +25,22 @@ function templateDir(workspace, id) {
   return resolveContained(templatesRoot(workspace), id)
 }
 
+/** Each variant's thumbnail file (null when it has none on disk), by aspect. */
+function variantThumbnails(dir, template) {
+  return Object.fromEntries(
+    templateAspects(template).map((aspect) => {
+      const name = template.variants[aspect].thumbnail
+      const file = name ? path.join(dir, path.basename(name)) : null
+      return [aspect, file && fs.existsSync(file) ? file : null]
+    }),
+  )
+}
+
 function readTemplateDir(dir) {
   const file = path.join(dir, MOTION_TEMPLATE_FILE)
   const template = parseMotionTemplate(JSON.parse(fs.readFileSync(file, 'utf8')))
-  const thumbnail = path.join(dir, MOTION_TEMPLATE_THUMBNAIL)
-  return { template, dir, thumbnail: fs.existsSync(thumbnail) ? thumbnail : null }
+  const thumbnails = variantThumbnails(dir, template)
+  return { template, dir, thumbnails }
 }
 
 /** Template folder names in the library (dot-folders are temporaries). */
@@ -124,11 +136,27 @@ function writeFileAtomic(target, bytes) {
   }
 }
 
-/** Write a template (and its thumbnail) into the library; each file lands atomically. */
-export function writeTemplate(workspace, template, thumbnail) {
+const isThumbnailFile = (name) => /^thumbnail(-[0-9]+x[0-9]+)?\.(jpg|webp)$/.test(name)
+
+/** Thumbnails no variant names any more (a re-rendered format 1 thumbnail.jpg). */
+function pruneThumbnails(dir, template) {
+  const kept = new Set(Object.values(template.variants).map((variant) => variant.thumbnail))
+  for (const name of fs.existsSync(dir) ? fs.readdirSync(dir) : [])
+    if (isThumbnailFile(name) && !kept.has(name)) fs.rmSync(path.join(dir, name), { force: true })
+}
+
+/**
+ * Write a template into the library, with new thumbnails by aspect
+ * (`{ "16:9": bytes }`); each file lands atomically.
+ */
+export function writeTemplate(workspace, template, thumbnails = {}) {
   const dir = templateDir(workspace, template.id)
-  if (thumbnail) writeFileAtomic(path.join(dir, MOTION_TEMPLATE_THUMBNAIL), thumbnail)
+  for (const [aspect, bytes] of Object.entries(thumbnails ?? {})) {
+    const name = template.variants[aspect]?.thumbnail
+    if (bytes && name) writeFileAtomic(path.join(dir, path.basename(name)), bytes)
+  }
   writeFileAtomic(path.join(dir, MOTION_TEMPLATE_FILE), `${JSON.stringify(template, null, 2)}\n`)
+  pruneThumbnails(dir, template)
   return dir
 }
 
@@ -159,37 +187,48 @@ function findProjectComposition(project, ref) {
 }
 
 /**
- * Build a template from a project's composition. A library template with the same
- * name gets a new version (same id); otherwise it is a new template.
+ * The library template a save updates: the one the composition was copied from
+ * (its variant for the composition's aspect is replaced), else one with the same
+ * name; null makes a new template.
+ */
+function previousTemplate(templates, composition, name) {
+  const source = composition.templateId
+    ? templates.find((template) => template.id === composition.templateId)
+    : undefined
+  return source ?? (name ? findMotionTemplate(templates, name) : null)
+}
+
+/**
+ * Build a template from a project's composition: the variant for its aspect
+ * ratio. A copy of a library template updates that template (new version, same
+ * id, other variants kept); otherwise a library template with the same name does;
+ * otherwise it is a new template. `hold` undefined keeps the variant's hold.
  */
 export function buildTemplateFromProject(
   workspace,
   project,
   ref,
-  { name, category, role },
+  { name, category, role, hold },
   mediaFileName = (mediaId) => mediaId,
 ) {
   const composition = findProjectComposition(project, ref)
-  const templateName = name ?? composition.name
-  const { entries } = listTemplates(workspace)
-  const previous = findMotionTemplate(
-    entries.map((entry) => entry.template),
-    templateName,
-  )
+  const templates = listTemplates(workspace).entries.map((entry) => entry.template)
+  const previous = previousTemplate(templates, composition, name)
   return buildMotionTemplate({
     rootCompositionId: composition.id,
     compositions: project.timeline.compositions,
-    name: templateName,
-    category,
-    role,
+    name: name ?? previous?.name ?? composition.name,
+    category: category ?? previous?.category ?? 'other',
+    role: role ?? previous?.role,
+    hold,
     previous,
     mediaFileName,
   })
 }
 
 /**
- * A one-item project showing the template on its own canvas, for rendering its
- * thumbnail with the frame renderer.
+ * A one-item project showing a template variant (templateVariant()) on its own
+ * transparent canvas, for rendering its thumbnail with the frame renderer.
  */
 export function templatePreviewProject(template) {
   const trackId = 'template-preview-track'
@@ -200,7 +239,12 @@ export function templatePreviewProject(template) {
     createdAt: template.updatedAt,
     updatedAt: template.updatedAt,
     duration: template.durationInFrames / template.fps,
-    metadata: { width: template.width, height: template.height, fps: template.fps },
+    metadata: {
+      width: template.width,
+      height: template.height,
+      fps: template.fps,
+      backgroundColor: 'rgba(0, 0, 0, 0)',
+    },
     timeline: {
       tracks: [
         {
@@ -249,14 +293,16 @@ export function templateLibraryStamp(workspace) {
   const root = templatesRoot(workspace)
   if (!fs.existsSync(root)) return 'empty'
   const parts = templateDirNames(root).flatMap((name) =>
-    [MOTION_TEMPLATE_FILE, MOTION_TEMPLATE_THUMBNAIL].map(
-      (file) => `${name}/${file}:${fileStamp(path.join(root, name, file))}`,
-    ),
+    fs
+      .readdirSync(path.join(root, name))
+      .filter((file) => file === MOTION_TEMPLATE_FILE || isThumbnailFile(file))
+      .sort()
+      .map((file) => `${name}/${file}:${fileStamp(path.join(root, name, file))}`),
   )
   return crypto.createHash('sha1').update(parts.join('|')).digest('hex')
 }
 
-/** Every media id in a template, for rewriting after import. */
+/** Every media id in a template (all variants), for rewriting after import. */
 export function remapTemplateMedia(template, idMap) {
   const swap = (composition) => ({
     ...composition,
@@ -266,13 +312,18 @@ export function remapTemplateMedia(template, idMap) {
         : item,
     ),
   })
-  return {
-    ...template,
-    composition: swap(template.composition),
-    subCompositions: template.subCompositions.map(swap),
-    media: template.media.map((ref) => ({
-      ...ref,
-      mediaId: idMap.get(ref.mediaId) ?? ref.mediaId,
-    })),
-  }
+  const refs = (media) =>
+    media.map((ref) => ({ ...ref, mediaId: idMap.get(ref.mediaId) ?? ref.mediaId }))
+  const variants = Object.fromEntries(
+    Object.entries(template.variants).map(([aspect, variant]) => [
+      aspect,
+      {
+        ...variant,
+        composition: swap(variant.composition),
+        subCompositions: variant.subCompositions.map(swap),
+        media: refs(variant.media),
+      },
+    ]),
+  )
+  return { ...template, variants, media: refs(template.media) }
 }

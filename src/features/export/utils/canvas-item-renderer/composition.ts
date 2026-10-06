@@ -67,6 +67,7 @@ export async function renderCompositionItem(
     rctx.fps,
     subData.fps,
     effectiveRenderSpan,
+    subData.durationInFrames,
   )
   if (localFrame < 0 || localFrame >= subData.durationInFrames) {
     if (frame < 5) {
