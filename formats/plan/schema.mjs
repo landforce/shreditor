@@ -37,57 +37,81 @@ function frameRange(value) {
   return isInt(start) && isInt(end) && start >= 0 && end > start ? { start, end } : null
 }
 
-function readHeader(raw, version, issues, projectFps) {
+const trimmed = (value) => (isText(value) ? value.trim() : '')
+const plain = (value) => (typeof value === 'string' ? value : '')
+const isObject = (value) => Boolean(value) && typeof value === 'object' && !Array.isArray(value)
+
+/** The first message whose rule is broken: `[[broken, message], ...]`, else null. */
+const firstProblem = (rules) => rules.find(([broken]) => broken)?.[1] ?? null
+
+function checkTiming(raw, projectFps, issues) {
   const fps = raw.fps
-  if (!(typeof fps === 'number' && fps > 0)) issues.error('plan', '`fps` must be a number above 0')
-  else if (projectFps && fps !== projectFps)
-    issues.error(
-      'plan',
+  const problem = firstProblem([
+    [!(typeof fps === 'number' && fps > 0), '`fps` must be a number above 0'],
+    [
+      Boolean(projectFps) && fps !== projectFps,
       `fps ${fps} is not the project's ${projectFps}: write frames at the project's fps`,
-    )
+    ],
+  ])
+  if (problem) issues.error('plan', problem)
   if (!(isInt(raw.durationFrames) && raw.durationFrames > 0))
     issues.error('plan', '`durationFrames` must be a whole number of frames above 0')
-  const story = raw.story && typeof raw.story === 'object' ? raw.story : {}
+}
+
+function checkStory(raw, story, version, issues) {
   if (version === 1) {
     issues.error(
       'plan',
       'schemaVersion 1 has no story: rewrite it as v2 (request, story.arc, a role and a why per beat) before building',
     )
-  } else {
-    if (!isText(raw.request))
-      issues.error('plan', "`request` is missing: start with the user's ask, in their words")
-    if (!isText(story.arc))
-      issues.error('plan', '`story.arc` is missing: say the order of the story and why')
+    return
   }
+  if (!isText(raw.request))
+    issues.error('plan', "`request` is missing: start with the user's ask, in their words")
+  if (!isText(story.arc))
+    issues.error('plan', '`story.arc` is missing: say the order of the story and why')
+}
+
+function readHeader(raw, version, issues, projectFps) {
+  const story = isObject(raw.story) ? raw.story : {}
+  checkTiming(raw, projectFps, issues)
+  checkStory(raw, story, version, issues)
   return {
     version,
-    fps: typeof fps === 'number' ? fps : 0,
+    fps: typeof raw.fps === 'number' ? raw.fps : 0,
     durationFrames: isInt(raw.durationFrames) ? raw.durationFrames : 0,
-    request: isText(raw.request) ? raw.request.trim() : '',
+    request: trimmed(raw.request),
     story: {
-      arc: isText(story.arc) ? story.arc.trim() : '',
+      arc: trimmed(story.arc),
       structure: Array.isArray(story.structure) ? story.structure.map(String) : [],
     },
     sources: Array.isArray(raw.sources) ? raw.sources : [],
   }
 }
 
+const hasIn = (source) => source.in !== undefined && source.in !== null
+
+function sourceProblem(source, unit) {
+  if (!isObject(source) || !(isText(source.mediaId) || isText(source.asset)))
+    return '`source` needs a `mediaId` (imported) or an `asset` (a catalogued file)'
+  if (!hasIn(source)) return null
+  return firstProblem([
+    [!(typeof source.in === 'number' && source.in >= 0), '`source.in` must be a number, 0 or more'],
+    [
+      unit !== 's' && unit !== 'frames',
+      "`source.unit` says what `in` counts: 's' (seconds) or 'frames' (plan fps)",
+    ],
+  ])
+}
+
 function readSource(source, version, fps, where, issues) {
-  if (!source || typeof source !== 'object' || !(isText(source.mediaId) || isText(source.asset))) {
-    issues.error(where, '`source` needs a `mediaId` (imported) or an `asset` (a catalogued file)')
+  const unit = source?.unit ?? (version === 1 ? 'frames' : undefined)
+  const problem = sourceProblem(source, unit)
+  if (problem) {
+    issues.error(where, problem)
     return null
   }
-  const unit = source.unit ?? (version === 1 ? 'frames' : undefined)
-  const given = source.in !== undefined && source.in !== null
-  if (given && !(typeof source.in === 'number' && source.in >= 0)) {
-    issues.error(where, '`source.in` must be a number, 0 or more')
-    return null
-  }
-  if (given && unit !== 's' && unit !== 'frames') {
-    issues.error(where, "`source.unit` says what `in` counts: 's' (seconds) or 'frames' (plan fps)")
-    return null
-  }
-  const at = given ? source.in : 0
+  const at = hasIn(source) ? source.in : 0
   return {
     ...(isText(source.mediaId) ? { mediaId: source.mediaId.trim() } : {}),
     ...(isText(source.asset) ? { asset: source.asset.trim() } : {}),
@@ -97,27 +121,21 @@ function readSource(source, version, fps, where, issues) {
 
 function readText(text, beat, where, issues) {
   if (text === undefined || text === null || text === '') return null
-  const spec = typeof text === 'string' ? { text } : text
-  if (!spec || typeof spec !== 'object' || !isText(spec.text)) {
-    issues.error(where, '`text` is a string or { text, role?, edit?, style? }')
-    return null
-  }
+  const spec = typeof text === 'string' ? { text } : isObject(text) ? text : {}
   const role = spec.role ?? (beat.role === 'hook' ? 'title' : 'labels')
-  if (!TEXT_ROLES.has(role)) {
-    issues.error(where, `text role "${role}" is not title or labels`)
-    return null
-  }
   const span =
     spec.edit === undefined ? { start: beat.start, end: beat.end } : frameRange(spec.edit)
-  if (!span) {
-    issues.error(where, '`text.edit` must be [start, end) in whole frames, start < end')
+  const problem = firstProblem([
+    [!isText(spec.text), '`text` is a string or { text, role?, edit?, style? }'],
+    [!TEXT_ROLES.has(role), `text role "${role}" is not title or labels`],
+    [!span, '`text.edit` must be [start, end) in whole frames, start < end'],
+  ])
+  if (problem) {
+    issues.error(where, problem)
     return null
   }
   return { text: spec.text, role, ...span, ...(isText(spec.style) ? { style: spec.style } : {}) }
 }
-
-const trimmed = (value) => (isText(value) ? value.trim() : '')
-const plain = (value) => (typeof value === 'string' ? value : '')
 
 /** What a beat says beyond its timing and source. */
 const beatWords = (raw) => ({

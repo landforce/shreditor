@@ -31,20 +31,23 @@ export function beatTrackRole(beat, media, format) {
   return format.defaultRoles[media.kind] ?? format.defaultRoles.video
 }
 
-function checkRoles(plan, format, issues) {
+function checkRoleNames(plan, format, issues) {
   const roles = format.structure.map((part) => part.role)
   const known = `${format.name} uses ${roles.join(', ')}`
-  for (const role of plan.story.structure)
-    if (!roles.includes(role)) issues.error('plan', `story.structure has "${role}": ${known}`)
-  for (const beat of plan.beats)
-    if (beat.role && !roles.includes(beat.role))
-      issues.error(beat.id, `role "${beat.role}" is not in the format's structure: ${known}`)
-  if (plan.version >= 2 && !plan.beats.some((beat) => beat.role === 'hook' && beat.start === 0))
+  for (const role of plan.story.structure.filter((r) => !roles.includes(r)))
+    issues.error('plan', `story.structure has "${role}": ${known}`)
+  for (const beat of plan.beats.filter((b) => b.role && !roles.includes(b.role)))
+    issues.error(beat.id, `role "${beat.role}" is not in the format's structure: ${known}`)
+}
+
+/** v2 only (v1 beats have no roles): the hook opens the video; required sections are there. */
+function checkStoryShape(plan, format, issues) {
+  if (plan.version < 2) return
+  if (!plan.beats.some((beat) => beat.role === 'hook' && beat.start === 0))
     issues.error('plan', 'no hook beat at frame 0: the video opens on its hook')
   const used = new Set(plan.beats.map((beat) => beat.role))
-  for (const part of format.structure)
-    if (part.required && plan.version >= 2 && !used.has(part.role))
-      issues.warn('plan', `no ${part.role} beat (${format.name}'s ${part.name}: ${part.note})`)
+  for (const part of format.structure.filter((p) => p.required && !used.has(p.role)))
+    issues.warn('plan', `no ${part.role} beat (${format.name}'s ${part.name}: ${part.note})`)
 }
 
 function checkStoryOrder(beats, format, issues) {
@@ -144,7 +147,8 @@ function checkTiming(plan, pictures, briefTargetSec, issues) {
  */
 export function validatePlan(plan, { format, resolveMedia, briefTargetSec } = {}) {
   const issues = issueList()
-  checkRoles(plan, format, issues)
+  checkRoleNames(plan, format, issues)
+  checkStoryShape(plan, format, issues)
   checkStoryOrder(plan.beats, format, issues)
   const beats = plan.beats.map((beat) => {
     const media = resolveMedia(beat.source)
