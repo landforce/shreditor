@@ -1,0 +1,204 @@
+{
+  "formats": {
+    "picker": {
+      "title": "Elige un formato",
+      "subtitle": "El formato es la primera decisión de cada edición. Define el lienzo, la disposición de pistas y la evaluación con la que se mide la edición, tanto para ti como para el agente.",
+      "useWhen": "Úsalo cuando",
+      "variant": "Variante",
+      "anyVariant": "Sin definir",
+      "anyVariantHint": "Objetivos comunes a todas las variantes; elige una cuando sepas el ritmo.",
+      "noFormat": "Sin formato",
+      "noFormatDescription": "Lienzo personalizado y pistas V1 / A1 simples. Puedes definir un formato más tarde.",
+      "chooseFirst": "Elige un formato arriba, o Sin formato.",
+      "canvasFromFormat": "Lienzo de {{format}}",
+      "canvasSummary": "{{width}} × {{height}} · {{fps}} fps · {{tracks}} pistas con nombre"
+    },
+    "roles": {
+      "speaker": "Orador",
+      "images": "Imágenes",
+      "plates": "Fondos",
+      "broll": "B-roll",
+      "shots": "Planos",
+      "title": "Título",
+      "captions": "Subtítulos",
+      "labels": "Rótulos",
+      "voice": "Voz en off",
+      "music": "Música",
+      "sfx": "SFX"
+    },
+    "rules": {
+      "title": "Reglas",
+      "titleHook": "Gancho de título",
+      "captions": "Subtítulos",
+      "voiceover": "Voz en off",
+      "music": "Música",
+      "sfx": "SFX",
+      "transitions": "Transiciones",
+      "transitionsNone": "Ninguna: solo cortes secos",
+      "hookFrom": "Obligatorio desde {{from}} s",
+      "hookHoldMin": "en pantalla {{min}} s o más",
+      "hookHoldMax": "en pantalla hasta {{max}} s",
+      "hookHoldRange": "en pantalla de {{min}} a {{max}} s",
+      "hookOrAll": "o todo el vídeo",
+      "presence": {
+        "required": "Obligatorio",
+        "default": "Activado por defecto",
+        "optional": "Opcional",
+        "none": "Ninguno"
+      }
+    },
+    "panel": {
+      "tab": "Formato",
+      "canvasTab": "Lienzo",
+      "noFormatTitle": "Aún sin formato",
+      "noFormatBody": "Elige un formato para obtener su disposición de pistas, sus reglas y una evaluación en vivo de esta línea de tiempo. El agente también lo lee.",
+      "setFormat": "Definir formato",
+      "changeFormat": "Cambiar formato",
+      "readGuide": "Leer la guía",
+      "variant": "Variante",
+      "scorecard": "Evaluación",
+      "scoring": "Evaluando la línea de tiempo…",
+      "scoringMain": "Se evalúa la principal: ábrela para volver a evaluar.",
+      "empty": "Añade clips a la línea de tiempo para evaluar la edición.",
+      "summary": "{{pass}} bien, {{warn}} aviso, {{fail}} fallo",
+      "count": {
+        "fail": "{{count}} fallo",
+        "warn": "{{count}} aviso",
+        "pass": "{{count}} bien"
+      },
+      "duration": "{{seconds}} s",
+      "present": "sí",
+      "absent": "no",
+      "jump_one": "Ir ahí",
+      "jump_other": "Recorrer {{count}} puntos",
+      "jumpedTo": "En {{index}} de {{count}}: haz clic para el siguiente",
+      "showRanges": "Marcar los tramos con fallos en la línea de tiempo",
+      "saveFailed": "No se pudo guardar el formato"
+    },
+    "change": {
+      "title": "Cambiar formato",
+      "setTitle": "Definir formato",
+      "description": "La evaluación pasa a medirse con el nuevo formato. No se mueve ni se borra nada de la línea de tiempo.",
+      "addTracks": "Añadir las pistas que faltan: {{tracks}}",
+      "addTracksHint": "Pistas nuevas y vacías, colocadas según la disposición del formato. Las pistas y clips existentes se quedan donde están.",
+      "mainOnly": "Abre la línea de tiempo principal para añadir pistas.",
+      "noMissing": "Todas las pistas que necesita este formato ya están en la línea de tiempo.",
+      "audioTrack": "{{role}} (audio)",
+      "confirm": "Cambiar formato",
+      "confirmSet": "Definir formato",
+      "done": "Formato: {{format}}",
+      "tracksAdded_one": "Se añadió {{count}} pista",
+      "tracksAdded_other": "Se añadieron {{count}} pistas"
+    },
+    "chip": {
+      "none": "Sin formato",
+      "open": "Formato y evaluación",
+      "fail": "{{count}} fallo",
+      "warn": "{{count}} aviso",
+      "pass": "✓"
+    },
+    "guide": {
+      "title": "Guía de {{format}}",
+      "description": "Cómo se edita este formato, según su investigación. La evaluación comprueba las cifras.",
+      "loading": "Cargando la guía…",
+      "failed": "No se pudo cargar la guía."
+    },
+    "timeline": {
+      "roleBadge": "Función en el formato: {{role}}"
+    },
+    "catalog": {
+      "graphic-yap": {
+        "tagline": "Una persona hablando en un lugar real con un flujo constante de imágenes.",
+        "useWhen": "Persona hablando a cámara en un lugar real, nombrando cosas que se pueden mostrar con imágenes."
+      },
+      "greenscreen": {
+        "tagline": "Un orador recortado sobre fondos a pantalla completa que cambian con cada idea.",
+        "useWhen": "Persona hablando a cámara grabada sobre croma, o pensada para recortarse."
+      },
+      "vlog": {
+        "tagline": "Voz en off narrando sobre b-roll, abierta con un gancho de texto muy potente.",
+        "useWhen": "B-roll con una voz en off que lo narra (grabada, o que el usuario grabará)."
+      },
+      "ten-shot": {
+        "tagline": "Un montaje musical de unos 12 a 16 clips con un único título dominante.",
+        "useWhen": "Clips de un lugar, una cosa o una experiencia. Nadie habla. Música."
+      }
+    },
+    "variants": {
+      "graphic-yap": {
+        "standard": {
+          "name": "Estándar",
+          "description": "Unas 17 a 22 imágenes por minuto; el gancho de título es el único texto grande."
+        },
+        "intense": {
+          "name": "Intenso",
+          "description": "Unas 27 imágenes y 43 cambios visuales por minuto, y frases grandes sobre los planos del orador."
+        }
+      },
+      "vlog": {
+        "fast": {
+          "name": "Rápido",
+          "description": "Proceso, receta, lista, ensayo: unos 60 planos, mediana de 0,9 s, 53 cortes por minuto."
+        },
+        "slow": {
+          "name": "Lento",
+          "description": "Recorrido, avance de obra, presentación: unos 33 planos, mediana de 2 s, 24 cortes por minuto, la revelación es la más larga."
+        }
+      },
+      "ten-shot": {
+        "even": {
+          "name": "Uniforme",
+          "description": "Todos los planos de duración parecida (contenido de ambiente): 0,4 a 0,7 s, o 0,9 a 1,4 s."
+        },
+        "beat": {
+          "name": "Pulso / doble pulso",
+          "description": "Los planos alternan entre uno y dos pulsos (recorridos)."
+        },
+        "shaped": {
+          "name": "Con forma",
+          "description": "Apertura larga, parte central más rápida y final más lento (viajes)."
+        }
+      }
+    },
+    "checks": {
+      "titleHook": "Gancho de título desde {{from}} s",
+      "titleHold": "Duración del gancho de título",
+      "captions": "Subtítulos",
+      "speech": "Habla",
+      "voiceover": "Voz en off",
+      "music": "Música",
+      "sfx": "SFX",
+      "syncSound": "Sonido directo del b-roll",
+      "transitions": "Transiciones",
+      "lengthSec": "Duración",
+      "imagesPerMin": "Imágenes por minuto",
+      "imageOnScreenSec": "Tiempo de cada imagen (mediana)",
+      "imageGapSec": "Separación entre imágenes (mediana)",
+      "firstImageSec": "Primera imagen",
+      "longestNoNewImageSec": "Tramo más largo sin imagen nueva",
+      "speechWpm": "Ritmo del habla",
+      "pauseMaxSec": "Pausa más larga al hablar",
+      "visualChangesPerMin": "Cambios visuales por minuto",
+      "plateChangesPerMin": "Cambios de fondo por minuto",
+      "medianChangeGapSec": "Separación mediana entre cambios",
+      "plateCoveragePct": "Parte del vídeo sobre croma",
+      "firstPlateSec": "Primer fondo",
+      "firstPlateChangeSec": "Cambio de fondo tras el gancho",
+      "longestNoChangeSec": "Tramo más largo sin cambio visual",
+      "labelCount": "Texto aparte del título y subtítulos",
+      "shotCount": "Planos",
+      "cutsPerMin": "Cortes por minuto",
+      "longestShotSec": "Plano más largo",
+      "firstCutSec": "Primer corte",
+      "voStartSec": "Inicio de la voz en off",
+      "voCoveragePct": "Cobertura de la voz en off",
+      "medianShotSec": "Plano mediano",
+      "finalShotSec": "Plano final",
+      "shotCountMin": "Al menos 8 planos",
+      "openerRatio": "Apertura frente al plano mediano",
+      "finalShotRatio": "Plano final frente al mediano",
+      "titleWords": "Palabras del título",
+      "graphicsCount": "Gráficos"
+    }
+  }
+}

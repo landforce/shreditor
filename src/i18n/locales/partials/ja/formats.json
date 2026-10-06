@@ -1,0 +1,204 @@
+{
+  "formats": {
+    "picker": {
+      "title": "フォーマットを選ぶ",
+      "subtitle": "フォーマットはすべての編集で最初に決めることです。キャンバス、トラック構成、そしてあなたとエージェントが編集をチェックするスコアカードを決めます。",
+      "useWhen": "向いている素材",
+      "variant": "バリエーション",
+      "anyVariant": "未設定",
+      "anyVariantHint": "全バリエーション共通の目標値です。テンポが決まったら選んでください。",
+      "noFormat": "フォーマットなし",
+      "noFormatDescription": "カスタムキャンバスとシンプルな V1 / A1 トラック。フォーマットは後から設定できます。",
+      "chooseFirst": "上でフォーマットか「フォーマットなし」を選んでください。",
+      "canvasFromFormat": "{{format}} のキャンバス",
+      "canvasSummary": "{{width}} × {{height}} · {{fps}} fps · 名前付きトラック {{tracks}} 本"
+    },
+    "roles": {
+      "speaker": "話者",
+      "images": "画像",
+      "plates": "背景",
+      "broll": "Bロール",
+      "shots": "ショット",
+      "title": "タイトル",
+      "captions": "字幕",
+      "labels": "ラベル",
+      "voice": "ナレーション",
+      "music": "音楽",
+      "sfx": "効果音"
+    },
+    "rules": {
+      "title": "ルール",
+      "titleHook": "タイトルフック",
+      "captions": "字幕",
+      "voiceover": "ナレーション",
+      "music": "音楽",
+      "sfx": "効果音",
+      "transitions": "トランジション",
+      "transitionsNone": "なし:カットのみ",
+      "hookFrom": "{{from}} 秒から必須",
+      "hookHoldMin": "{{min}} 秒以上表示",
+      "hookHoldMax": "最大 {{max}} 秒表示",
+      "hookHoldRange": "{{min}}〜{{max}} 秒表示",
+      "hookOrAll": "または動画全体",
+      "presence": {
+        "required": "必須",
+        "default": "既定でオン",
+        "optional": "任意",
+        "none": "なし"
+      }
+    },
+    "panel": {
+      "tab": "フォーマット",
+      "canvasTab": "キャンバス",
+      "noFormatTitle": "フォーマット未設定",
+      "noFormatBody": "フォーマットを選ぶと、トラック構成、ルール、このタイムラインのライブスコアカードが使えます。エージェントもこれを読みます。",
+      "setFormat": "フォーマットを設定",
+      "changeFormat": "フォーマットを変更",
+      "readGuide": "ガイドを読む",
+      "variant": "バリエーション",
+      "scorecard": "スコアカード",
+      "scoring": "タイムラインを採点中…",
+      "scoringMain": "メインを採点しています。開くと再採点します。",
+      "empty": "タイムラインにクリップを追加すると採点されます。",
+      "summary": "合格 {{pass}}・警告 {{warn}}・不合格 {{fail}}",
+      "count": {
+        "fail": "不合格 {{count}}",
+        "warn": "警告 {{count}}",
+        "pass": "合格 {{count}}"
+      },
+      "duration": "{{seconds}} 秒",
+      "present": "あり",
+      "absent": "なし",
+      "jump_one": "その位置へ",
+      "jump_other": "{{count}} か所を順に見る",
+      "jumpedTo": "{{count}} か所中 {{index}} か所目:クリックで次へ",
+      "showRanges": "不合格の範囲をタイムラインに表示",
+      "saveFailed": "フォーマットを保存できませんでした"
+    },
+    "change": {
+      "title": "フォーマットを変更",
+      "setTitle": "フォーマットを設定",
+      "description": "スコアカードは新しいフォーマット基準になります。タイムライン上のものは移動も削除もされません。",
+      "addTracks": "足りないトラックを追加:{{tracks}}",
+      "addTracksHint": "フォーマットの構成どおりに空のトラックを追加します。既存のトラックとクリップはそのままです。",
+      "mainOnly": "トラックを追加するにはメインタイムラインを開いてください。",
+      "noMissing": "このフォーマットに必要なトラックはすべてそろっています。",
+      "audioTrack": "{{role}}(オーディオ)",
+      "confirm": "フォーマットを変更",
+      "confirmSet": "フォーマットを設定",
+      "done": "フォーマット:{{format}}",
+      "tracksAdded_one": "トラックを {{count}} 本追加しました",
+      "tracksAdded_other": "トラックを {{count}} 本追加しました"
+    },
+    "chip": {
+      "none": "フォーマットなし",
+      "open": "フォーマットとスコアカード",
+      "fail": "不合格 {{count}}",
+      "warn": "警告 {{count}}",
+      "pass": "✓"
+    },
+    "guide": {
+      "title": "{{format}} ガイド",
+      "description": "リサーチに基づくこのフォーマットの編集方法です。数値はスコアカードがチェックします。",
+      "loading": "ガイドを読み込み中…",
+      "failed": "ガイドを読み込めませんでした。"
+    },
+    "timeline": {
+      "roleBadge": "フォーマット上の役割:{{role}}"
+    },
+    "catalog": {
+      "graphic-yap": {
+        "tagline": "実際の場所で話す人に、画像が次々と重なります。",
+        "useWhen": "実際の場所で話すトーキングヘッドで、画像で見せられるものに触れているとき。"
+      },
+      "greenscreen": {
+        "tagline": "切り抜いた話者の背後で、話題ごとに全画面の背景が切り替わります。",
+        "useWhen": "グリーンバックで撮った、または切り抜く前提のトーキングヘッド。"
+      },
+      "vlog": {
+        "tagline": "Bロールにナレーションをのせ、非常に強いテキストフックで始めます。",
+        "useWhen": "Bロールにナレーションが付くとき(録音済み、またはこれから録音)。"
+      },
+      "ten-shot": {
+        "tagline": "約12〜16本のクリップを音楽でつなぎ、ひとつの大きなタイトルを見せます。",
+        "useWhen": "場所、モノ、体験のクリップ。話す人はいない。音楽。"
+      }
+    },
+    "variants": {
+      "graphic-yap": {
+        "standard": {
+          "name": "標準",
+          "description": "1分あたり約17〜22枚の画像。大きなテキストはタイトルフックだけ。"
+        },
+        "intense": {
+          "name": "ハイテンポ",
+          "description": "1分あたり約27枚の画像と43回の画面変化。話者のショットに大きなパンチラインも。"
+        }
+      },
+      "vlog": {
+        "fast": {
+          "name": "速い",
+          "description": "手順、レシピ、リスト、エッセイ:約60ショット、中央値0.9秒、1分あたり53カット。"
+        },
+        "slow": {
+          "name": "ゆっくり",
+          "description": "ルームツアー、制作の近況、紹介:約33ショット、中央値2秒、1分あたり24カット、見せ場を最も長く。"
+        }
+      },
+      "ten-shot": {
+        "even": {
+          "name": "均等",
+          "description": "どのショットもほぼ同じ長さ(雰囲気系):0.4〜0.7秒、または0.9〜1.4秒。"
+        },
+        "beat": {
+          "name": "1拍 / 2拍",
+          "description": "ショットが1拍と2拍を交互に繰り返します(ツアー)。"
+        },
+        "shaped": {
+          "name": "緩急",
+          "description": "長めの導入、速い中盤、ゆっくりした終わり(旅行)。"
+        }
+      }
+    },
+    "checks": {
+      "titleHook": "{{from}} 秒からのタイトルフック",
+      "titleHold": "タイトルフックの表示時間",
+      "captions": "字幕",
+      "speech": "話し声",
+      "voiceover": "ナレーション",
+      "music": "音楽",
+      "sfx": "効果音",
+      "syncSound": "Bロールの同録音",
+      "transitions": "トランジション",
+      "lengthSec": "長さ",
+      "imagesPerMin": "1分あたりの画像数",
+      "imageOnScreenSec": "画像1枚の表示時間(中央値)",
+      "imageGapSec": "画像の開始間隔(中央値)",
+      "firstImageSec": "最初の画像",
+      "longestNoNewImageSec": "新しい画像がない最長区間",
+      "speechWpm": "話す速さ",
+      "pauseMaxSec": "話の最長の間",
+      "visualChangesPerMin": "1分あたりの画面変化",
+      "plateChangesPerMin": "1分あたりの背景切り替え",
+      "medianChangeGapSec": "変化の間隔(中央値)",
+      "plateCoveragePct": "グリーンバック部分の割合",
+      "firstPlateSec": "最初の背景",
+      "firstPlateChangeSec": "フック後の背景切り替え",
+      "longestNoChangeSec": "画面変化がない最長区間",
+      "labelCount": "タイトルと字幕以外のテキスト",
+      "shotCount": "ショット数",
+      "cutsPerMin": "1分あたりのカット数",
+      "longestShotSec": "最長ショット",
+      "firstCutSec": "最初のカット",
+      "voStartSec": "ナレーション開始",
+      "voCoveragePct": "ナレーションの占める割合",
+      "medianShotSec": "ショット長の中央値",
+      "finalShotSec": "最後のショット",
+      "shotCountMin": "8ショット以上",
+      "openerRatio": "導入と中央値の比",
+      "finalShotRatio": "最後のショットと中央値の比",
+      "titleWords": "タイトルの語数",
+      "graphicsCount": "グラフィック"
+    }
+  }
+}

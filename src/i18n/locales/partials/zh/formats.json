@@ -1,0 +1,204 @@
+{
+  "formats": {
+    "picker": {
+      "title": "选择格式",
+      "subtitle": "格式是每次剪辑的第一个决定。它设定画布、轨道布局,以及你和智能体用来检查剪辑的评分卡。",
+      "useWhen": "适用场景",
+      "variant": "变体",
+      "anyVariant": "未设置",
+      "anyVariantHint": "各变体的综合目标;确定节奏后再选一个。",
+      "noFormat": "不使用格式",
+      "noFormatDescription": "自定义画布和普通的 V1 / A1 轨道。之后也可以设置格式。",
+      "chooseFirst": "请在上方选择一种格式,或选择不使用格式。",
+      "canvasFromFormat": "{{format}} 画布",
+      "canvasSummary": "{{width}} × {{height}} · {{fps}} fps · {{tracks}} 条命名轨道"
+    },
+    "roles": {
+      "speaker": "讲者",
+      "images": "图片",
+      "plates": "背景",
+      "broll": "空镜",
+      "shots": "镜头",
+      "title": "标题",
+      "captions": "字幕",
+      "labels": "标签",
+      "voice": "旁白",
+      "music": "音乐",
+      "sfx": "音效"
+    },
+    "rules": {
+      "title": "规则",
+      "titleHook": "标题钩子",
+      "captions": "字幕",
+      "voiceover": "旁白",
+      "music": "音乐",
+      "sfx": "音效",
+      "transitions": "转场",
+      "transitionsNone": "无:只用硬切",
+      "hookFrom": "从 {{from}} 秒起必须出现",
+      "hookHoldMin": "停留 {{min}} 秒以上",
+      "hookHoldMax": "最多停留 {{max}} 秒",
+      "hookHoldRange": "停留 {{min}}–{{max}} 秒",
+      "hookOrAll": "或贯穿全片",
+      "presence": {
+        "required": "必需",
+        "default": "默认开启",
+        "optional": "可选",
+        "none": "无"
+      }
+    },
+    "panel": {
+      "tab": "格式",
+      "canvasTab": "画布",
+      "noFormatTitle": "尚未设置格式",
+      "noFormatBody": "选择一种格式,即可获得它的轨道布局、规则以及这条时间线的实时评分卡。智能体也会读取它。",
+      "setFormat": "设置格式",
+      "changeFormat": "更改格式",
+      "readGuide": "阅读指南",
+      "variant": "变体",
+      "scorecard": "评分卡",
+      "scoring": "正在为时间线评分…",
+      "scoringMain": "正在为主时间线评分:打开它以重新评分。",
+      "empty": "向时间线添加片段后即可评分。",
+      "summary": "通过 {{pass}},警告 {{warn}},失败 {{fail}}",
+      "count": {
+        "fail": "失败 {{count}}",
+        "warn": "警告 {{count}}",
+        "pass": "通过 {{count}}"
+      },
+      "duration": "{{seconds}} 秒",
+      "present": "有",
+      "absent": "无",
+      "jump_one": "跳转到该处",
+      "jump_other": "依次查看 {{count}} 处",
+      "jumpedTo": "第 {{index}} 处,共 {{count}} 处:点击查看下一处",
+      "showRanges": "在时间线上标出未通过的区间",
+      "saveFailed": "无法保存格式"
+    },
+    "change": {
+      "title": "更改格式",
+      "setTitle": "设置格式",
+      "description": "评分卡将按新格式计算。时间线上的任何内容都不会被移动或删除。",
+      "addTracks": "添加缺少的轨道:{{tracks}}",
+      "addTracksHint": "按格式布局放入新的空轨道。现有轨道和片段保持原位。",
+      "mainOnly": "请打开主时间线来添加轨道。",
+      "noMissing": "此格式需要的轨道都已在时间线上。",
+      "audioTrack": "{{role}}(音频)",
+      "confirm": "更改格式",
+      "confirmSet": "设置格式",
+      "done": "格式:{{format}}",
+      "tracksAdded_one": "已添加 {{count}} 条轨道",
+      "tracksAdded_other": "已添加 {{count}} 条轨道"
+    },
+    "chip": {
+      "none": "无格式",
+      "open": "格式与评分卡",
+      "fail": "失败 {{count}}",
+      "warn": "警告 {{count}}",
+      "pass": "✓"
+    },
+    "guide": {
+      "title": "{{format}} 指南",
+      "description": "基于调研的此格式剪辑方法。评分卡负责检查数字。",
+      "loading": "正在加载指南…",
+      "failed": "无法加载指南。"
+    },
+    "timeline": {
+      "roleBadge": "格式中的角色:{{role}}"
+    },
+    "catalog": {
+      "graphic-yap": {
+        "tagline": "真实场景中的讲者,配上源源不断的图片。",
+        "useWhen": "真实场景中的口播,提到的东西可以用图片展示。"
+      },
+      "greenscreen": {
+        "tagline": "抠像后的讲者叠在全屏背景上,每讲一个要点就换一次背景。",
+        "useWhen": "在绿幕前拍摄或准备抠像的口播。"
+      },
+      "vlog": {
+        "tagline": "旁白讲述配合空镜,以极强的文字钩子开场。",
+        "useWhen": "有旁白讲述的空镜素材(已录好,或之后会录)。"
+      },
+      "ten-shot": {
+        "tagline": "约 12 到 16 个片段随音乐剪成的蒙太奇,配一个醒目的标题。",
+        "useWhen": "某个地方、物品或体验的片段。没有人说话。有音乐。"
+      }
+    },
+    "variants": {
+      "graphic-yap": {
+        "standard": {
+          "name": "标准",
+          "description": "每分钟约 17 到 22 张图片;标题钩子是唯一的大字。"
+        },
+        "intense": {
+          "name": "高强度",
+          "description": "每分钟约 27 张图片和 43 次画面变化,讲者镜头上还有醒目的大字金句。"
+        }
+      },
+      "vlog": {
+        "fast": {
+          "name": "快节奏",
+          "description": "流程、食谱、清单、随笔:约 60 个镜头,中位数 0.9 秒,每分钟 53 刀。"
+        },
+        "slow": {
+          "name": "慢节奏",
+          "description": "漫游、进度更新、展示:约 33 个镜头,中位数 2 秒,每分钟 24 刀,揭晓镜头停留最久。"
+        }
+      },
+      "ten-shot": {
+        "even": {
+          "name": "均匀",
+          "description": "每个镜头长度大致相同(氛围内容):0.4–0.7 秒或 0.9–1.4 秒。"
+        },
+        "beat": {
+          "name": "单拍 / 双拍",
+          "description": "镜头在一拍和两拍之间交替(探店、导览)。"
+        },
+        "shaped": {
+          "name": "有起伏",
+          "description": "开场较长,中段更快,结尾放慢(旅行)。"
+        }
+      }
+    },
+    "checks": {
+      "titleHook": "从 {{from}} 秒起的标题钩子",
+      "titleHold": "标题钩子停留时长",
+      "captions": "字幕",
+      "speech": "人声",
+      "voiceover": "旁白",
+      "music": "音乐",
+      "sfx": "音效",
+      "syncSound": "空镜的现场声",
+      "transitions": "转场",
+      "lengthSec": "时长",
+      "imagesPerMin": "每分钟图片数",
+      "imageOnScreenSec": "每张图片停留时长(中位数)",
+      "imageGapSec": "图片出现间隔(中位数)",
+      "firstImageSec": "第一张图片",
+      "longestNoNewImageSec": "最长无新图片段落",
+      "speechWpm": "语速",
+      "pauseMaxSec": "最长说话停顿",
+      "visualChangesPerMin": "每分钟画面变化",
+      "plateChangesPerMin": "每分钟背景切换",
+      "medianChangeGapSec": "变化间隔中位数",
+      "plateCoveragePct": "绿幕部分占比",
+      "firstPlateSec": "第一个背景",
+      "firstPlateChangeSec": "钩子之后的背景切换",
+      "longestNoChangeSec": "最长无画面变化段落",
+      "labelCount": "标题和字幕以外的文字",
+      "shotCount": "镜头数",
+      "cutsPerMin": "每分钟剪切数",
+      "longestShotSec": "最长镜头",
+      "firstCutSec": "第一刀",
+      "voStartSec": "旁白开始",
+      "voCoveragePct": "旁白覆盖率",
+      "medianShotSec": "镜头时长中位数",
+      "finalShotSec": "最后一个镜头",
+      "shotCountMin": "至少 8 个镜头",
+      "openerRatio": "开场与中位镜头之比",
+      "finalShotRatio": "结尾与中位镜头之比",
+      "titleWords": "标题字数",
+      "graphicsCount": "图形"
+    }
+  }
+}

@@ -1,0 +1,110 @@
+{
+  "formats": {
+    "picker": {
+      "title": "Choose a format",
+      "subtitle": "The format is the first decision of every edit. It sets the canvas, the track layout and the scorecard the edit is checked against, by you and by the agent.",
+      "useWhen": "Use when",
+      "variant": "Variant",
+      "anyVariant": "Not set",
+      "anyVariantHint": "Pooled targets across the variants; pick one when you know the pace.",
+      "noFormat": "No format",
+      "noFormatDescription": "Custom canvas and plain V1 / A1 tracks. You can set a format later.",
+      "chooseFirst": "Choose a format above, or No format.",
+      "canvasFromFormat": "Canvas from {{format}}",
+      "canvasSummary": "{{width}} × {{height}} · {{fps}} fps · {{tracks}} named tracks"
+    },
+    "roles": {
+      "speaker": "Speaker",
+      "images": "Images",
+      "plates": "Plates",
+      "broll": "B-roll",
+      "shots": "Shots",
+      "title": "Title",
+      "captions": "Captions",
+      "labels": "Labels",
+      "voice": "Voiceover",
+      "music": "Music",
+      "sfx": "SFX"
+    },
+    "rules": {
+      "title": "Rules",
+      "titleHook": "Title hook",
+      "captions": "Captions",
+      "voiceover": "Voiceover",
+      "music": "Music",
+      "sfx": "SFX",
+      "transitions": "Transitions",
+      "transitionsNone": "None: hard cuts only",
+      "hookFrom": "Required from {{from}} s",
+      "hookHoldMin": "held {{min}} s or more",
+      "hookHoldMax": "held up to {{max}} s",
+      "hookHoldRange": "held {{min}} to {{max}} s",
+      "hookOrAll": "or all video",
+      "presence": {
+        "required": "Required",
+        "default": "On by default",
+        "optional": "Optional",
+        "none": "None"
+      }
+    },
+    "panel": {
+      "tab": "Format",
+      "canvasTab": "Canvas",
+      "noFormatTitle": "No format yet",
+      "noFormatBody": "Choose a format to get its track layout, its rules and a live scorecard of this timeline. The agent reads it too.",
+      "setFormat": "Set format",
+      "changeFormat": "Change format",
+      "readGuide": "Read the guide",
+      "variant": "Variant",
+      "scorecard": "Scorecard",
+      "scoring": "Scoring the timeline…",
+      "scoringMain": "Scoring Main: open it to rescore.",
+      "empty": "Add clips to the timeline to score the edit.",
+      "summary": "{{pass}} pass, {{warn}} warn, {{fail}} fail",
+      "count": {
+        "fail": "{{count}} fail",
+        "warn": "{{count}} warn",
+        "pass": "{{count}} pass"
+      },
+      "duration": "{{seconds}} s",
+      "present": "yes",
+      "absent": "no",
+      "jump_one": "Jump to it",
+      "jump_other": "Jump through {{count}} spots",
+      "jumpedTo": "At {{index}} of {{count}}: click for the next",
+      "showRanges": "Mark failing ranges on the timeline",
+      "saveFailed": "Could not save the format"
+    },
+    "change": {
+      "title": "Change format",
+      "setTitle": "Set format",
+      "description": "The scorecard is re-targeted at the new format. Nothing on the timeline is moved or deleted.",
+      "addTracks": "Add the missing tracks: {{tracks}}",
+      "addTracksHint": "New empty tracks, placed by the format's layout. Existing tracks and clips stay where they are.",
+      "mainOnly": "Open the main timeline to add tracks.",
+      "noMissing": "Every track this format needs is already on the timeline.",
+      "audioTrack": "{{role}} audio",
+      "confirm": "Change format",
+      "confirmSet": "Set format",
+      "done": "Format set to {{format}}",
+      "tracksAdded_one": "Added {{count}} track",
+      "tracksAdded_other": "Added {{count}} tracks"
+    },
+    "chip": {
+      "none": "No format",
+      "open": "Format and scorecard",
+      "fail": "{{count}} fail",
+      "warn": "{{count}} warn",
+      "pass": "✓"
+    },
+    "guide": {
+      "title": "{{format}} guide",
+      "description": "How this format is cut, from its research. The scorecard checks the numbers.",
+      "loading": "Loading the guide…",
+      "failed": "Could not load the guide."
+    },
+    "timeline": {
+      "roleBadge": "Format role: {{role}}"
+    }
+  }
+}

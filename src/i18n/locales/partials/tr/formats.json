@@ -1,0 +1,204 @@
+{
+  "formats": {
+    "picker": {
+      "title": "Bir format seçin",
+      "subtitle": "Format her kurgunun ilk kararıdır. Tuvali, iz düzenini ve kurgunun hem sizin hem de ajanın kontrol ettiği puan kartını belirler.",
+      "useWhen": "Ne zaman",
+      "variant": "Varyant",
+      "anyVariant": "Belirlenmedi",
+      "anyVariantHint": "Tüm varyantların ortak hedefleri; tempoyu bildiğinizde birini seçin.",
+      "noFormat": "Format yok",
+      "noFormatDescription": "Özel tuval ve sade V1 / A1 izleri. Formatı sonra da seçebilirsiniz.",
+      "chooseFirst": "Yukarıdan bir format ya da Format yok seçin.",
+      "canvasFromFormat": "{{format}} tuvali",
+      "canvasSummary": "{{width}} × {{height}} · {{fps}} fps · {{tracks}} adlandırılmış iz"
+    },
+    "roles": {
+      "speaker": "Konuşmacı",
+      "images": "Görseller",
+      "plates": "Arka planlar",
+      "broll": "B-roll",
+      "shots": "Çekimler",
+      "title": "Başlık",
+      "captions": "Altyazılar",
+      "labels": "Etiketler",
+      "voice": "Dış ses",
+      "music": "Müzik",
+      "sfx": "SFX"
+    },
+    "rules": {
+      "title": "Kurallar",
+      "titleHook": "Başlık kancası",
+      "captions": "Altyazılar",
+      "voiceover": "Dış ses",
+      "music": "Müzik",
+      "sfx": "SFX",
+      "transitions": "Geçişler",
+      "transitionsNone": "Yok: yalnızca düz kesmeler",
+      "hookFrom": "{{from}} sn'den itibaren zorunlu",
+      "hookHoldMin": "en az {{min}} sn ekranda",
+      "hookHoldMax": "en fazla {{max}} sn ekranda",
+      "hookHoldRange": "{{min}}–{{max}} sn ekranda",
+      "hookOrAll": "ya da tüm video boyunca",
+      "presence": {
+        "required": "Zorunlu",
+        "default": "Varsayılan olarak açık",
+        "optional": "İsteğe bağlı",
+        "none": "Yok"
+      }
+    },
+    "panel": {
+      "tab": "Format",
+      "canvasTab": "Tuval",
+      "noFormatTitle": "Henüz format yok",
+      "noFormatBody": "İz düzenini, kurallarını ve bu zaman çizelgesinin canlı puan kartını almak için bir format seçin. Ajan da bunu okur.",
+      "setFormat": "Format belirle",
+      "changeFormat": "Formatı değiştir",
+      "readGuide": "Kılavuzu oku",
+      "variant": "Varyant",
+      "scorecard": "Puan kartı",
+      "scoring": "Zaman çizelgesi puanlanıyor…",
+      "scoringMain": "Ana zaman çizelgesi puanlanıyor: yeniden puanlamak için açın.",
+      "empty": "Kurguyu puanlamak için zaman çizelgesine klip ekleyin.",
+      "summary": "{{pass}} geçti, {{warn}} uyarı, {{fail}} hata",
+      "count": {
+        "fail": "{{count}} hata",
+        "warn": "{{count}} uyarı",
+        "pass": "{{count}} geçti"
+      },
+      "duration": "{{seconds}} sn",
+      "present": "var",
+      "absent": "yok",
+      "jump_one": "Oraya git",
+      "jump_other": "{{count}} noktayı gez",
+      "jumpedTo": "{{count}} noktadan {{index}}.: sonraki için tıklayın",
+      "showRanges": "Hatalı aralıkları zaman çizelgesinde işaretle",
+      "saveFailed": "Format kaydedilemedi"
+    },
+    "change": {
+      "title": "Formatı değiştir",
+      "setTitle": "Format belirle",
+      "description": "Puan kartı yeni formata göre hesaplanır. Zaman çizelgesinde hiçbir şey taşınmaz ya da silinmez.",
+      "addTracks": "Eksik izleri ekle: {{tracks}}",
+      "addTracksHint": "Formatın düzenine göre yerleştirilen yeni, boş izler. Mevcut izler ve klipler yerinde kalır.",
+      "mainOnly": "İz eklemek için ana zaman çizelgesini açın.",
+      "noMissing": "Bu formatın ihtiyaç duyduğu tüm izler zaten zaman çizelgesinde.",
+      "audioTrack": "{{role}} (ses)",
+      "confirm": "Formatı değiştir",
+      "confirmSet": "Format belirle",
+      "done": "Format: {{format}}",
+      "tracksAdded_one": "{{count}} iz eklendi",
+      "tracksAdded_other": "{{count}} iz eklendi"
+    },
+    "chip": {
+      "none": "Format yok",
+      "open": "Format ve puan kartı",
+      "fail": "{{count}} hata",
+      "warn": "{{count}} uyarı",
+      "pass": "✓"
+    },
+    "guide": {
+      "title": "{{format}} kılavuzu",
+      "description": "Bu formatın araştırmaya dayalı kurgu yöntemi. Puan kartı sayıları kontrol eder.",
+      "loading": "Kılavuz yükleniyor…",
+      "failed": "Kılavuz yüklenemedi."
+    },
+    "timeline": {
+      "roleBadge": "Formattaki rolü: {{role}}"
+    },
+    "catalog": {
+      "graphic-yap": {
+        "tagline": "Gerçek bir ortamda konuşan biri ve sürekli akan görseller.",
+        "useWhen": "Gerçek bir ortamda kameraya konuşan, görselle gösterilebilecek şeylerden bahseden kişi."
+      },
+      "greenscreen": {
+        "tagline": "Her noktada değişen tam ekran arka planlar üzerinde dekupe edilmiş bir konuşmacı.",
+        "useWhen": "Yeşil perde önünde çekilmiş ya da dekupe edilecek konuşma videosu."
+      },
+      "vlog": {
+        "tagline": "B-roll üzerine anlatan dış ses, son derece güçlü bir metin kancasıyla açılır.",
+        "useWhen": "Üzerinde anlatım yapan dış sesli b-roll (kaydedilmiş ya da kaydedilecek)."
+      },
+      "ten-shot": {
+        "tagline": "Tek bir baskın başlıkla yaklaşık 12–16 klipten oluşan müzikli bir montaj.",
+        "useWhen": "Bir yer, bir nesne ya da bir deneyimden klipler. Kimse konuşmuyor. Müzik."
+      }
+    },
+    "variants": {
+      "graphic-yap": {
+        "standard": {
+          "name": "Standart",
+          "description": "Dakikada yaklaşık 17–22 görsel; tek büyük metin başlık kancası."
+        },
+        "intense": {
+          "name": "Yoğun",
+          "description": "Dakikada yaklaşık 27 görsel ve 43 görsel değişim, ayrıca konuşmacı çekimlerinde büyük vurgu cümleleri."
+        }
+      },
+      "vlog": {
+        "fast": {
+          "name": "Hızlı",
+          "description": "Süreç, tarif, liste, deneme: yaklaşık 60 çekim, medyan 0,9 sn, dakikada 53 kesme."
+        },
+        "slow": {
+          "name": "Yavaş",
+          "description": "Gezinti, yapım güncellemesi, tanıtım: yaklaşık 33 çekim, medyan 2 sn, dakikada 24 kesme, en uzun sahne final."
+        }
+      },
+      "ten-shot": {
+        "even": {
+          "name": "Eşit",
+          "description": "Her çekim yaklaşık aynı uzunlukta (atmosfer içeriği): 0,4–0,7 sn ya da 0,9–1,4 sn."
+        },
+        "beat": {
+          "name": "Vuruş / çift vuruş",
+          "description": "Çekimler bir ve iki vuruş arasında gidip gelir (turlar)."
+        },
+        "shaped": {
+          "name": "Biçimli",
+          "description": "Uzun açılış, daha hızlı orta bölüm, daha yavaş kapanış (seyahat)."
+        }
+      }
+    },
+    "checks": {
+      "titleHook": "{{from}} sn'den itibaren başlık kancası",
+      "titleHold": "Başlık kancasının süresi",
+      "captions": "Altyazılar",
+      "speech": "Konuşma",
+      "voiceover": "Dış ses",
+      "music": "Müzik",
+      "sfx": "SFX",
+      "syncSound": "B-roll'dan doğal ses",
+      "transitions": "Geçişler",
+      "lengthSec": "Uzunluk",
+      "imagesPerMin": "Dakikada görsel",
+      "imageOnScreenSec": "Görsel başına ekran süresi (medyan)",
+      "imageGapSec": "Görsel başlangıçları arası (medyan)",
+      "firstImageSec": "İlk görsel",
+      "longestNoNewImageSec": "Yeni görsel olmayan en uzun bölüm",
+      "speechWpm": "Konuşma hızı",
+      "pauseMaxSec": "Konuşmadaki en uzun duraklama",
+      "visualChangesPerMin": "Dakikada görsel değişim",
+      "plateChangesPerMin": "Dakikada arka plan değişimi",
+      "medianChangeGapSec": "Değişimler arası medyan süre",
+      "plateCoveragePct": "Yeşil perdedeki süre oranı",
+      "firstPlateSec": "İlk arka plan",
+      "firstPlateChangeSec": "Kancadan sonra arka plan değişimi",
+      "longestNoChangeSec": "Görsel değişim olmayan en uzun bölüm",
+      "labelCount": "Başlık ve altyazı dışındaki metin",
+      "shotCount": "Çekimler",
+      "cutsPerMin": "Dakikada kesme",
+      "longestShotSec": "En uzun çekim",
+      "firstCutSec": "İlk kesme",
+      "voStartSec": "Dış ses başlangıcı",
+      "voCoveragePct": "Dış sesin süreyi kaplaması",
+      "medianShotSec": "Medyan çekim",
+      "finalShotSec": "Son çekim",
+      "shotCountMin": "En az 8 çekim",
+      "openerRatio": "Açılış / medyan çekim",
+      "finalShotRatio": "Son çekim / medyan çekim",
+      "titleWords": "Başlıktaki kelimeler",
+      "graphicsCount": "Grafikler"
+    }
+  }
+}

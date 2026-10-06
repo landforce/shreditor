@@ -1,0 +1,204 @@
+{
+  "formats": {
+    "picker": {
+      "title": "포맷 선택",
+      "subtitle": "포맷은 모든 편집의 첫 번째 결정입니다. 캔버스, 트랙 구성, 그리고 나와 에이전트가 편집을 확인하는 스코어카드를 정합니다.",
+      "useWhen": "이럴 때 사용",
+      "variant": "변형",
+      "anyVariant": "설정 안 함",
+      "anyVariantHint": "모든 변형의 공통 목표값입니다. 템포를 알면 하나를 고르세요.",
+      "noFormat": "포맷 없음",
+      "noFormatDescription": "사용자 지정 캔버스와 기본 V1 / A1 트랙. 포맷은 나중에 정할 수 있습니다.",
+      "chooseFirst": "위에서 포맷 또는 포맷 없음을 고르세요.",
+      "canvasFromFormat": "{{format}} 캔버스",
+      "canvasSummary": "{{width}} × {{height}} · {{fps}} fps · 이름 있는 트랙 {{tracks}}개"
+    },
+    "roles": {
+      "speaker": "화자",
+      "images": "이미지",
+      "plates": "배경",
+      "broll": "B롤",
+      "shots": "샷",
+      "title": "타이틀",
+      "captions": "자막",
+      "labels": "라벨",
+      "voice": "내레이션",
+      "music": "음악",
+      "sfx": "효과음"
+    },
+    "rules": {
+      "title": "규칙",
+      "titleHook": "타이틀 훅",
+      "captions": "자막",
+      "voiceover": "내레이션",
+      "music": "음악",
+      "sfx": "효과음",
+      "transitions": "전환",
+      "transitionsNone": "없음: 하드 컷만",
+      "hookFrom": "{{from}}초부터 필수",
+      "hookHoldMin": "{{min}}초 이상 표시",
+      "hookHoldMax": "최대 {{max}}초 표시",
+      "hookHoldRange": "{{min}}~{{max}}초 표시",
+      "hookOrAll": "또는 영상 전체",
+      "presence": {
+        "required": "필수",
+        "default": "기본 사용",
+        "optional": "선택",
+        "none": "없음"
+      }
+    },
+    "panel": {
+      "tab": "포맷",
+      "canvasTab": "캔버스",
+      "noFormatTitle": "아직 포맷이 없습니다",
+      "noFormatBody": "포맷을 고르면 트랙 구성, 규칙, 이 타임라인의 실시간 스코어카드를 쓸 수 있습니다. 에이전트도 이 포맷을 읽습니다.",
+      "setFormat": "포맷 지정",
+      "changeFormat": "포맷 변경",
+      "readGuide": "가이드 읽기",
+      "variant": "변형",
+      "scorecard": "스코어카드",
+      "scoring": "타임라인 채점 중…",
+      "scoringMain": "메인을 채점 중입니다. 열면 다시 채점합니다.",
+      "empty": "타임라인에 클립을 추가하면 편집을 채점합니다.",
+      "summary": "통과 {{pass}}, 경고 {{warn}}, 실패 {{fail}}",
+      "count": {
+        "fail": "실패 {{count}}",
+        "warn": "경고 {{count}}",
+        "pass": "통과 {{count}}"
+      },
+      "duration": "{{seconds}}초",
+      "present": "있음",
+      "absent": "없음",
+      "jump_one": "해당 위치로",
+      "jump_other": "{{count}}곳 차례로 보기",
+      "jumpedTo": "{{count}}곳 중 {{index}}번째: 클릭하면 다음",
+      "showRanges": "실패 구간을 타임라인에 표시",
+      "saveFailed": "포맷을 저장하지 못했습니다"
+    },
+    "change": {
+      "title": "포맷 변경",
+      "setTitle": "포맷 지정",
+      "description": "스코어카드가 새 포맷 기준으로 바뀝니다. 타임라인의 어떤 것도 옮기거나 삭제하지 않습니다.",
+      "addTracks": "없는 트랙 추가: {{tracks}}",
+      "addTracksHint": "포맷 구성에 맞춰 빈 트랙을 새로 놓습니다. 기존 트랙과 클립은 그대로 둡니다.",
+      "mainOnly": "트랙을 추가하려면 메인 타임라인을 여세요.",
+      "noMissing": "이 포맷에 필요한 트랙이 이미 모두 있습니다.",
+      "audioTrack": "{{role}} (오디오)",
+      "confirm": "포맷 변경",
+      "confirmSet": "포맷 지정",
+      "done": "포맷: {{format}}",
+      "tracksAdded_one": "트랙 {{count}}개 추가됨",
+      "tracksAdded_other": "트랙 {{count}}개 추가됨"
+    },
+    "chip": {
+      "none": "포맷 없음",
+      "open": "포맷과 스코어카드",
+      "fail": "실패 {{count}}",
+      "warn": "경고 {{count}}",
+      "pass": "✓"
+    },
+    "guide": {
+      "title": "{{format}} 가이드",
+      "description": "리서치를 바탕으로 한 이 포맷의 편집 방법입니다. 수치는 스코어카드가 확인합니다.",
+      "loading": "가이드를 불러오는 중…",
+      "failed": "가이드를 불러오지 못했습니다."
+    },
+    "timeline": {
+      "roleBadge": "포맷 역할: {{role}}"
+    },
+    "catalog": {
+      "graphic-yap": {
+        "tagline": "실제 공간에서 말하는 사람 위로 이미지가 끊임없이 이어집니다.",
+        "useWhen": "실제 공간의 토킹 헤드가 이미지로 보여줄 수 있는 것들을 말할 때."
+      },
+      "greenscreen": {
+        "tagline": "누끼 딴 화자 뒤로 말하는 요점마다 전체 화면 배경이 바뀝니다.",
+        "useWhen": "그린 스크린에서 찍었거나 누끼를 딸 토킹 헤드."
+      },
+      "vlog": {
+        "tagline": "B롤 위로 내레이션이 흐르고, 아주 강한 텍스트 훅으로 시작합니다.",
+        "useWhen": "내레이션이 덧입혀지는 B롤(녹음했거나 녹음할 예정)."
+      },
+      "ten-shot": {
+        "tagline": "하나의 강한 타이틀과 함께 약 12~16개 클립을 음악에 맞춘 몽타주.",
+        "useWhen": "장소, 물건, 경험을 담은 클립. 말하는 사람 없음. 음악."
+      }
+    },
+    "variants": {
+      "graphic-yap": {
+        "standard": {
+          "name": "기본",
+          "description": "분당 약 17~22개 이미지. 큰 텍스트는 타이틀 훅뿐입니다."
+        },
+        "intense": {
+          "name": "강렬",
+          "description": "분당 약 27개 이미지와 43번의 화면 변화, 화자 샷 위의 큰 펀치라인."
+        }
+      },
+      "vlog": {
+        "fast": {
+          "name": "빠르게",
+          "description": "과정, 레시피, 리스트, 에세이: 약 60샷, 중앙값 0.9초, 분당 53컷."
+        },
+        "slow": {
+          "name": "느리게",
+          "description": "공간 투어, 제작 근황, 쇼케이스: 약 33샷, 중앙값 2초, 분당 24컷, 공개 장면을 가장 길게."
+        }
+      },
+      "ten-shot": {
+        "even": {
+          "name": "균일",
+          "description": "모든 샷이 거의 같은 길이(분위기 콘텐츠): 0.4~0.7초 또는 0.9~1.4초."
+        },
+        "beat": {
+          "name": "1박 / 2박",
+          "description": "샷이 1박과 2박을 번갈아 갑니다(투어)."
+        },
+        "shaped": {
+          "name": "완급",
+          "description": "긴 오프닝, 빠른 중반, 느린 마무리(여행)."
+        }
+      }
+    },
+    "checks": {
+      "titleHook": "{{from}}초부터 타이틀 훅",
+      "titleHold": "타이틀 훅 표시 시간",
+      "captions": "자막",
+      "speech": "말소리",
+      "voiceover": "내레이션",
+      "music": "음악",
+      "sfx": "효과음",
+      "syncSound": "B롤 현장음",
+      "transitions": "전환",
+      "lengthSec": "길이",
+      "imagesPerMin": "분당 이미지 수",
+      "imageOnScreenSec": "이미지별 표시 시간(중앙값)",
+      "imageGapSec": "이미지 시작 간격(중앙값)",
+      "firstImageSec": "첫 이미지",
+      "longestNoNewImageSec": "새 이미지 없는 최장 구간",
+      "speechWpm": "말 속도",
+      "pauseMaxSec": "가장 긴 말 공백",
+      "visualChangesPerMin": "분당 화면 변화",
+      "plateChangesPerMin": "분당 배경 전환",
+      "medianChangeGapSec": "변화 간격(중앙값)",
+      "plateCoveragePct": "그린 스크린 구간 비율",
+      "firstPlateSec": "첫 배경",
+      "firstPlateChangeSec": "훅 이후 배경 전환",
+      "longestNoChangeSec": "화면 변화 없는 최장 구간",
+      "labelCount": "타이틀·자막 외 텍스트",
+      "shotCount": "샷 수",
+      "cutsPerMin": "분당 컷 수",
+      "longestShotSec": "가장 긴 샷",
+      "firstCutSec": "첫 컷",
+      "voStartSec": "내레이션 시작",
+      "voCoveragePct": "내레이션 비율",
+      "medianShotSec": "샷 길이 중앙값",
+      "finalShotSec": "마지막 샷",
+      "shotCountMin": "최소 8샷",
+      "openerRatio": "오프닝 대 중앙값",
+      "finalShotRatio": "마지막 샷 대 중앙값",
+      "titleWords": "타이틀 단어 수",
+      "graphicsCount": "그래픽"
+    }
+  }
+}

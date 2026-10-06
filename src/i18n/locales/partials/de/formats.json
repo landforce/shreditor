@@ -1,0 +1,204 @@
+{
+  "formats": {
+    "picker": {
+      "title": "Format wählen",
+      "subtitle": "Das Format ist die erste Entscheidung jedes Schnitts. Es legt die Leinwand, das Spurlayout und die Bewertung fest, an der der Schnitt gemessen wird – von dir und vom Agenten.",
+      "useWhen": "Passt, wenn",
+      "variant": "Variante",
+      "anyVariant": "Nicht festgelegt",
+      "anyVariantHint": "Gemeinsame Zielwerte aller Varianten; wähle eine, sobald das Tempo feststeht.",
+      "noFormat": "Kein Format",
+      "noFormatDescription": "Eigene Leinwand und einfache V1-/A1-Spuren. Ein Format kannst du später festlegen.",
+      "chooseFirst": "Wähle oben ein Format oder „Kein Format“.",
+      "canvasFromFormat": "Leinwand von {{format}}",
+      "canvasSummary": "{{width}} × {{height}} · {{fps}} fps · {{tracks}} benannte Spuren"
+    },
+    "roles": {
+      "speaker": "Sprecher",
+      "images": "Bilder",
+      "plates": "Hintergründe",
+      "broll": "B-Roll",
+      "shots": "Shots",
+      "title": "Titel",
+      "captions": "Untertitel",
+      "labels": "Labels",
+      "voice": "Voiceover",
+      "music": "Musik",
+      "sfx": "SFX"
+    },
+    "rules": {
+      "title": "Regeln",
+      "titleHook": "Titel-Hook",
+      "captions": "Untertitel",
+      "voiceover": "Voiceover",
+      "music": "Musik",
+      "sfx": "SFX",
+      "transitions": "Übergänge",
+      "transitionsNone": "Keine: nur harte Schnitte",
+      "hookFrom": "Pflicht ab {{from}} s",
+      "hookHoldMin": "mindestens {{min}} s stehen lassen",
+      "hookHoldMax": "bis zu {{max}} s stehen lassen",
+      "hookHoldRange": "{{min}} bis {{max}} s stehen lassen",
+      "hookOrAll": "oder das ganze Video",
+      "presence": {
+        "required": "Pflicht",
+        "default": "Standardmäßig an",
+        "optional": "Optional",
+        "none": "Keine"
+      }
+    },
+    "panel": {
+      "tab": "Format",
+      "canvasTab": "Leinwand",
+      "noFormatTitle": "Noch kein Format",
+      "noFormatBody": "Wähle ein Format, um sein Spurlayout, seine Regeln und eine Live-Bewertung dieser Timeline zu bekommen. Der Agent liest es ebenfalls.",
+      "setFormat": "Format festlegen",
+      "changeFormat": "Format ändern",
+      "readGuide": "Leitfaden lesen",
+      "variant": "Variante",
+      "scorecard": "Bewertung",
+      "scoring": "Timeline wird bewertet…",
+      "scoringMain": "Bewertet wird Main: öffne sie, um neu zu bewerten.",
+      "empty": "Füge Clips zur Timeline hinzu, um den Schnitt zu bewerten.",
+      "summary": "{{pass}} ok, {{warn}} Warnung, {{fail}} Fehler",
+      "count": {
+        "fail": "{{count}} Fehler",
+        "warn": "{{count}} Warnung",
+        "pass": "{{count}} ok"
+      },
+      "duration": "{{seconds}} s",
+      "present": "ja",
+      "absent": "nein",
+      "jump_one": "Hinspringen",
+      "jump_other": "Durch {{count}} Stellen springen",
+      "jumpedTo": "Bei {{index}} von {{count}}: klicken für die nächste",
+      "showRanges": "Fehlerbereiche in der Timeline markieren",
+      "saveFailed": "Format konnte nicht gespeichert werden"
+    },
+    "change": {
+      "title": "Format ändern",
+      "setTitle": "Format festlegen",
+      "description": "Die Bewertung richtet sich nach dem neuen Format. In der Timeline wird nichts verschoben oder gelöscht.",
+      "addTracks": "Fehlende Spuren hinzufügen: {{tracks}}",
+      "addTracksHint": "Neue leere Spuren nach dem Layout des Formats. Vorhandene Spuren und Clips bleiben, wo sie sind.",
+      "mainOnly": "Öffne die Haupt-Timeline, um Spuren hinzuzufügen.",
+      "noMissing": "Alle Spuren, die dieses Format braucht, sind schon in der Timeline.",
+      "audioTrack": "{{role}} (Audio)",
+      "confirm": "Format ändern",
+      "confirmSet": "Format festlegen",
+      "done": "Format: {{format}}",
+      "tracksAdded_one": "{{count}} Spur hinzugefügt",
+      "tracksAdded_other": "{{count}} Spuren hinzugefügt"
+    },
+    "chip": {
+      "none": "Kein Format",
+      "open": "Format und Bewertung",
+      "fail": "{{count}} Fehler",
+      "warn": "{{count}} Warn.",
+      "pass": "✓"
+    },
+    "guide": {
+      "title": "Leitfaden: {{format}}",
+      "description": "Wie dieses Format geschnitten wird, aus seiner Recherche. Die Bewertung prüft die Zahlen.",
+      "loading": "Leitfaden wird geladen…",
+      "failed": "Der Leitfaden konnte nicht geladen werden."
+    },
+    "timeline": {
+      "roleBadge": "Rolle im Format: {{role}}"
+    },
+    "catalog": {
+      "graphic-yap": {
+        "tagline": "Ein Sprecher in echter Umgebung mit einem stetigen Strom von Bildern.",
+        "useWhen": "Talking Head in echter Umgebung, der Dinge nennt, die sich als Bilder zeigen lassen."
+      },
+      "greenscreen": {
+        "tagline": "Ein freigestellter Sprecher vor bildfüllenden Hintergründen, die mit jedem Punkt wechseln.",
+        "useWhen": "Talking Head vor einem Greenscreen gedreht oder zum Freistellen gedacht."
+      },
+      "vlog": {
+        "tagline": "Voiceover über B-Roll, eröffnet von einem extrem starken Text-Hook.",
+        "useWhen": "B-Roll mit erzählendem Voiceover darüber (aufgenommen oder noch aufzunehmen)."
+      },
+      "ten-shot": {
+        "tagline": "Eine Musikmontage aus etwa 12 bis 16 Clips mit einem dominanten Titel.",
+        "useWhen": "Clips von einem Ort, einer Sache oder einem Erlebnis. Niemand spricht. Musik."
+      }
+    },
+    "variants": {
+      "graphic-yap": {
+        "standard": {
+          "name": "Standard",
+          "description": "Etwa 17 bis 22 Bilder pro Minute; der Titel-Hook ist der einzige große Text."
+        },
+        "intense": {
+          "name": "Intensiv",
+          "description": "Etwa 27 Bilder und 43 Bildwechsel pro Minute, dazu große Pointen auf den Sprecher-Shots."
+        }
+      },
+      "vlog": {
+        "fast": {
+          "name": "Schnell",
+          "description": "Prozess, Rezept, Liste, Essay: etwa 60 Shots, Median 0,9 s, 53 Schnitte pro Minute."
+        },
+        "slow": {
+          "name": "Langsam",
+          "description": "Rundgang, Bau-Update, Showcase: etwa 33 Shots, Median 2 s, 24 Schnitte pro Minute, die Enthüllung am längsten."
+        }
+      },
+      "ten-shot": {
+        "even": {
+          "name": "Gleichmäßig",
+          "description": "Alle Shots etwa gleich lang (Vibe-Content): 0,4 bis 0,7 s oder 0,9 bis 1,4 s."
+        },
+        "beat": {
+          "name": "Beat / Doppel-Beat",
+          "description": "Shots wechseln zwischen einem und zwei Beats (Touren)."
+        },
+        "shaped": {
+          "name": "Geformt",
+          "description": "Langer Einstieg, schnellere Mitte, langsameres Ende (Reisen)."
+        }
+      }
+    },
+    "checks": {
+      "titleHook": "Titel-Hook ab {{from}} s",
+      "titleHold": "Stehzeit des Titel-Hooks",
+      "captions": "Untertitel",
+      "speech": "Sprache",
+      "voiceover": "Voiceover",
+      "music": "Musik",
+      "sfx": "SFX",
+      "syncSound": "O-Ton aus der B-Roll",
+      "transitions": "Übergänge",
+      "lengthSec": "Länge",
+      "imagesPerMin": "Bilder pro Minute",
+      "imageOnScreenSec": "Standzeit je Bild (Median)",
+      "imageGapSec": "Abstand zwischen Bildstarts (Median)",
+      "firstImageSec": "Erstes Bild",
+      "longestNoNewImageSec": "Längste Strecke ohne neues Bild",
+      "speechWpm": "Sprechtempo",
+      "pauseMaxSec": "Längste Sprechpause",
+      "visualChangesPerMin": "Bildwechsel pro Minute",
+      "plateChangesPerMin": "Hintergrundwechsel pro Minute",
+      "medianChangeGapSec": "Median-Abstand zwischen Wechseln",
+      "plateCoveragePct": "Anteil der Laufzeit vor Greenscreen",
+      "firstPlateSec": "Erster Hintergrund",
+      "firstPlateChangeSec": "Hintergrundwechsel nach dem Hook",
+      "longestNoChangeSec": "Längste Strecke ohne Bildwechsel",
+      "labelCount": "Text außer Titel und Untertiteln",
+      "shotCount": "Shots",
+      "cutsPerMin": "Schnitte pro Minute",
+      "longestShotSec": "Längster Shot",
+      "firstCutSec": "Erster Schnitt",
+      "voStartSec": "VO-Beginn",
+      "voCoveragePct": "VO-Anteil an der Laufzeit",
+      "medianShotSec": "Median-Shot",
+      "finalShotSec": "Letzter Shot",
+      "shotCountMin": "Mindestens 8 Shots",
+      "openerRatio": "Einstieg vs. Median-Shot",
+      "finalShotRatio": "Letzter Shot vs. Median-Shot",
+      "titleWords": "Wörter im Titel",
+      "graphicsCount": "Grafiken"
+    }
+  }
+}
