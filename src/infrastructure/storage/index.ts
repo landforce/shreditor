@@ -18,7 +18,6 @@ export {
 export {
   ProjectRevisionConflictError,
   getTrackedRevision,
-  onTrackedRevisionChange,
   readProjectStamp,
   setTrackedRevision,
   type ProjectFileStamp,

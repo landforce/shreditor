@@ -75,7 +75,33 @@ abstract class BridgeHandle {
   }
 }
 
-export class BridgeWritable {
+const isWriteParams = (
+  data: unknown,
+): data is { type: 'write'; data: unknown; position?: number | null } =>
+  Boolean(data) && typeof data === 'object' && (data as { type?: unknown }).type === 'write'
+
+const isBlobPart = (data: unknown): data is BlobPart =>
+  typeof data === 'string' ||
+  data instanceof Blob ||
+  data instanceof ArrayBuffer ||
+  ArrayBuffer.isView(data)
+
+/** The chunk a FileSystemWritableFileStream.write() call appends. */
+function toBlobPart(data: unknown): BlobPart {
+  if (isWriteParams(data)) {
+    if (data.position !== undefined && data.position !== null) {
+      throw new DOMException(
+        'Positioned writes are not supported by the workspace bridge',
+        'NotSupportedError',
+      )
+    }
+    return toBlobPart(data.data)
+  }
+  if (isBlobPart(data)) return data
+  throw new TypeError('Unsupported write() data')
+}
+
+class BridgeWritable {
   private parts: BlobPart[] = []
   private closed = false
 
@@ -88,31 +114,7 @@ export class BridgeWritable {
 
   async write(data: unknown): Promise<void> {
     if (this.closed) throw new DOMException('Stream is closed', 'InvalidStateError')
-    if (
-      data &&
-      typeof data === 'object' &&
-      'type' in data &&
-      (data as { type: string }).type === 'write'
-    ) {
-      const params = data as unknown as { data: unknown; position?: number }
-      if (params.position !== undefined && params.position !== null) {
-        throw new DOMException(
-          'Positioned writes are not supported by the workspace bridge',
-          'NotSupportedError',
-        )
-      }
-      return this.write(params.data)
-    }
-    if (
-      typeof data === 'string' ||
-      data instanceof Blob ||
-      data instanceof ArrayBuffer ||
-      ArrayBuffer.isView(data)
-    ) {
-      this.parts.push(data as BlobPart)
-      return
-    }
-    throw new TypeError('Unsupported write() data')
+    this.parts.push(toBlobPart(data))
   }
 
   async truncate(size: number): Promise<void> {
@@ -171,7 +173,7 @@ export class BridgeFileHandle extends BridgeHandle {
   }
 }
 
-export class BridgeDirectoryHandle extends BridgeHandle {
+class BridgeDirectoryHandle extends BridgeHandle {
   readonly kind = 'directory' as const
 
   async getDirectoryHandle(

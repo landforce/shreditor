@@ -7,7 +7,7 @@ import { create } from 'zustand'
  * editor held unsaved edits, or a save was refused for the same reason. The
  * user picks a side; nothing is merged automatically.
  */
-export type ProjectSyncStatus = 'synced' | 'reloading' | 'conflict'
+type ProjectSyncStatus = 'synced' | 'reloading' | 'conflict'
 
 interface ProjectSyncState {
   status: ProjectSyncStatus

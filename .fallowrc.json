@@ -6,7 +6,11 @@
     "src/test/setup.ts",
     "headless/probe.mjs",
     "headless/smoke.mjs",
-    "headless/media-smoke.mjs"
+    "headless/media-smoke.mjs",
+    // Shreditor command-line tools and the dev-server workspace bridge.
+    "bin/shreditor.mjs",
+    "server/*.mjs",
+    "skills/*/scripts/*.mjs"
   ],
   "ignorePatterns": [
     // Static reachability cannot see URL-loaded assets such as /sw.js
@@ -36,6 +40,10 @@
       "**/*.test.ts",
       "**/*.test.tsx",
       "scripts/check-fallow-*.mjs",
+      // Local Node tooling (CLI, workspace bridge, agent skill scripts), like scripts/ above.
+      "bin/**",
+      "server/**",
+      "skills/**",
       "headless/test.mjs",
       "src/runtime/composition-runtime/components/item-content.tsx",
       "src/features/preview/components/video-preview.tsx",
@@ -52,7 +60,13 @@
       "src/features/timeline/services/reverse-conform-service.ts"
     ]
   },
-  "usedClassMembers": ["addEventListener", "removeEventListener"],
+  "usedClassMembers": [
+    "addEventListener",
+    "removeEventListener",
+    // File System Access methods the bridge handles implement for storage code.
+    "createWritable",
+    "move"
+  ],
   "rules": {},
   "ignoreExports": [
     {

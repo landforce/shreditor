@@ -67,7 +67,6 @@ export async function readProjectStamp(
 // Revision each open editor last loaded or wrote, keyed by project id. Only
 // projects open in an editor are tracked; other writes are not guarded.
 const tracked = new Map<string, string>()
-const listeners = new Set<(projectId: string, revision: string | null) => void>()
 
 export function getTrackedRevision(id: string): string | null {
   return tracked.get(id) ?? null
@@ -76,12 +75,4 @@ export function getTrackedRevision(id: string): string | null {
 export function setTrackedRevision(id: string, revision: string | null): void {
   if (revision) tracked.set(id, revision)
   else tracked.delete(id)
-  for (const listener of listeners) listener(id, revision)
-}
-
-export function onTrackedRevisionChange(
-  listener: (projectId: string, revision: string | null) => void,
-): () => void {
-  listeners.add(listener)
-  return () => listeners.delete(listener)
 }

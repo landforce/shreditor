@@ -290,6 +290,35 @@ function showImportNotifications(
   get().showNotification({ type, message })
 }
 
+/**
+ * Where an import's files come from. With the workspace bridge, the server
+ * shows a Finder chooser and places the files in the workspace itself (clone
+ * or link, no upload); `inPlace: null` means use the browser picker. Returns
+ * null after reporting an error.
+ */
+async function pickImportSource(
+  set: Set,
+): Promise<{ inPlace: FileSystemFileHandle[] | null } | null> {
+  if (canImportMediaInPlace()) {
+    try {
+      const inPlace = await chooseMediaInPlace()
+      if (inPlace) return { inPlace }
+    } catch (error) {
+      set({ error: error instanceof Error ? error.message : String(error), errorLink: null })
+      return null
+    }
+  }
+  if (hasMediaFilePickerSupport()) return { inPlace: null }
+  const isBrave = 'brave' in navigator
+  set({
+    error: isBrave
+      ? 'File System Access API is disabled in Brave. Copy the URL below, paste it in your address bar, set the flag to Enabled, and relaunch.'
+      : 'File picker not supported in this browser. Use Chrome or Edge.',
+    errorLink: isBrave ? 'brave://flags/#file-system-access-api' : null,
+  })
+  return null
+}
+
 export function createImportActions(
   set: Set,
   get: Get,
@@ -442,30 +471,9 @@ export function createImportActions(
         return []
       }
 
-      // With the workspace bridge, the server shows a Finder chooser and
-      // places the files in the workspace itself (clone or link, no upload).
-      // null means this bridge can't, so use the browser picker below.
-      let inPlaceHandles: FileSystemFileHandle[] | null = null
-      if (canImportMediaInPlace()) {
-        try {
-          inPlaceHandles = await chooseMediaInPlace()
-        } catch (error) {
-          set({ error: error instanceof Error ? error.message : String(error), errorLink: null })
-          return []
-        }
-      }
-
-      // Check if File System Access API is supported
-      if (!inPlaceHandles && !hasMediaFilePickerSupport()) {
-        const isBrave = 'brave' in navigator
-        set({
-          error: isBrave
-            ? 'File System Access API is disabled in Brave. Copy the URL below, paste it in your address bar, set the flag to Enabled, and relaunch.'
-            : 'File picker not supported in this browser. Use Chrome or Edge.',
-          errorLink: isBrave ? 'brave://flags/#file-system-access-api' : null,
-        })
-        return []
-      }
+      const source = await pickImportSource(set)
+      if (!source) return []
+      const inPlaceHandles = source.inPlace
 
       const opId = createOperationId()
       const event = logger.startEvent('import', opId)

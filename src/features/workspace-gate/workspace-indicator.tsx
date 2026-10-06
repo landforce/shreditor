@@ -43,18 +43,12 @@ interface WorkspaceEntry {
   isActive: boolean
 }
 
-export function WorkspaceIndicator() {
+function KnownWorkspacesIndicator() {
   const { t } = useTranslation()
   const [entries, setEntries] = useState<WorkspaceEntry[] | null>(null)
   const [activeName, setActiveName] = useState<string | null>(null)
   const [popoverOpen, setPopoverOpen] = useState(false)
   const [confirmRemoveId, setConfirmRemoveId] = useState<string | null>(null)
-  // undefined while checking; null when not served with the workspace bridge.
-  const [bridge, setBridge] = useState<BridgeInfo | null | undefined>(undefined)
-
-  useEffect(() => {
-    void connectWorkspaceBridge().then((b) => setBridge(b?.info ?? null))
-  }, [])
 
   const loadEntries = useCallback(async () => {
     try {
@@ -138,9 +132,6 @@ export function WorkspaceIndicator() {
     },
     [loadEntries],
   )
-
-  if (bridge) return <BridgeWorkspaceIndicator info={bridge} />
-  if (bridge === undefined) return null
 
   // Don't render anything until we've finished loading.
   if (entries === null) return null
@@ -252,4 +243,20 @@ export function WorkspaceIndicator() {
       </PopoverContent>
     </Popover>
   )
+}
+
+/**
+ * Served with the local workspace bridge, folders are chosen on the machine;
+ * otherwise the browser's known-workspace handles are listed.
+ */
+export function WorkspaceIndicator() {
+  // undefined while checking; null when not served with the workspace bridge.
+  const [bridge, setBridge] = useState<BridgeInfo | null | undefined>(undefined)
+
+  useEffect(() => {
+    void connectWorkspaceBridge().then((b) => setBridge(b?.info ?? null))
+  }, [])
+
+  if (bridge === undefined) return null
+  return bridge ? <BridgeWorkspaceIndicator info={bridge} /> : <KnownWorkspacesIndicator />
 }

@@ -26,7 +26,7 @@ class HttpError extends Error {
   }
 }
 
-export function readConfig() {
+function readConfig() {
   try {
     return JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf8'))
   } catch {

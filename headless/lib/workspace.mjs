@@ -148,19 +148,22 @@ export function collectAddClipMedia(workspaceDir, ops) {
  * server/media-bridge.mjs). Returns the original's absolute path when it is
  * still a regular file, else null.
  */
+const readJsonOrNull = (file) => {
+  try {
+    return JSON.parse(fs.readFileSync(file, 'utf8'))
+  } catch {
+    return null
+  }
+}
+
+const isAbsoluteFile = (file) =>
+  typeof file === 'string' &&
+  path.isAbsolute(file) &&
+  fs.statSync(file, { throwIfNoEntry: false })?.isFile() === true
+
 function resolveSourceLink(mediaDir) {
-  let link
-  try {
-    link = JSON.parse(fs.readFileSync(path.join(mediaDir, 'source.link.json'), 'utf8'))
-  } catch {
-    return null
-  }
-  if (typeof link?.path !== 'string' || !path.isAbsolute(link.path)) return null
-  try {
-    return fs.statSync(link.path).isFile() ? link.path : null
-  } catch {
-    return null
-  }
+  const target = readJsonOrNull(path.join(mediaDir, 'source.link.json'))?.path
+  return isAbsoluteFile(target) ? target : null
 }
 
 /**

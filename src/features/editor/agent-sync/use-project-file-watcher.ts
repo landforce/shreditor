@@ -19,6 +19,28 @@ const POLL_MS = 1000
  * applying an agent pass). A clean editor reloads in place; a dirty one is
  * put into `conflict` so the user chooses.
  */
+/** Skip checks while this tab writes or loads, and for untracked projects. */
+function canCheck(projectId: string): boolean {
+  const sync = useProjectSyncStore.getState()
+  if (sync.writing || sync.status === 'reloading') return false
+  if (useTimelineSettingsStore.getState().isTimelineLoading) return false
+  return getTrackedRevision(projectId) !== null
+}
+
+/** A clean editor reloads in place; a dirty one waits for the user to choose. */
+async function onExternalChange(projectId: string): Promise<void> {
+  if (useTimelineStore.getState().isDirty) {
+    const sync = useProjectSyncStore.getState()
+    if (sync.status !== 'conflict') {
+      sync.setStatus('conflict')
+      logger.info('project.json changed on disk while the editor has unsaved edits')
+    }
+    return
+  }
+  await reloadProjectFromDisk(projectId)
+  toast.info('Loaded the latest changes from disk')
+}
+
 export function useProjectFileWatcher(projectId: string): void {
   useEffect(() => {
     let stamp: ProjectFileStamp | null = null
@@ -26,29 +48,13 @@ export function useProjectFileWatcher(projectId: string): void {
     let stopped = false
 
     const tick = async () => {
-      const sync = useProjectSyncStore.getState()
-      if (
-        busy ||
-        sync.writing ||
-        sync.status === 'reloading' ||
-        useTimelineSettingsStore.getState().isTimelineLoading
-      )
-        return
-      const tracked = getTrackedRevision(projectId)
-      if (!tracked) return
+      if (busy || !canCheck(projectId)) return
       busy = true
       try {
         stamp = await readProjectStamp(projectId, stamp)
-        if (stopped || !stamp || stamp.revision === getTrackedRevision(projectId)) return
-        if (useTimelineStore.getState().isDirty) {
-          if (sync.status !== 'conflict') {
-            sync.setStatus('conflict')
-            logger.info('project.json changed on disk while the editor has unsaved edits')
-          }
-          return
+        if (!stopped && stamp && stamp.revision !== getTrackedRevision(projectId)) {
+          await onExternalChange(projectId)
         }
-        await reloadProjectFromDisk(projectId)
-        toast.info('Loaded the latest changes from disk')
       } catch (error) {
         logger.warn('Project file check failed', error)
       } finally {
