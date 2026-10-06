@@ -20,18 +20,18 @@ export function useProjectThumbnail(project: Project): string | undefined {
     let cancelled = false
 
     async function loadThumbnail() {
-      // Try to load the workspace-backed project thumbnail blob.
-      if (project.thumbnailId) {
-        try {
-          const blob = await loadProjectThumbnail(project.id)
-          if (blob && !cancelled) {
-            objectUrl = URL.createObjectURL(blob)
-            setThumbnailUrl(objectUrl)
-            return
-          }
-        } catch (error) {
-          logger.warn('Failed to load thumbnail from workspace storage:', error)
+      // The workspace-backed cover (projects/{id}/thumbnail.jpg). Look for the
+      // file even without a thumbnailId: the agent writes covers for the
+      // projects it builds without touching project.json.
+      try {
+        const blob = await loadProjectThumbnail(project.id)
+        if (blob && !cancelled) {
+          objectUrl = URL.createObjectURL(blob)
+          setThumbnailUrl(objectUrl)
+          return
         }
+      } catch (error) {
+        logger.warn('Failed to load thumbnail from workspace storage:', error)
       }
 
       // Fall back to deprecated base64 thumbnail
@@ -49,7 +49,7 @@ export function useProjectThumbnail(project: Project): string | undefined {
         URL.revokeObjectURL(objectUrl)
       }
     }
-  }, [project.id, project.thumbnailId, project.thumbnail, project.updatedAt])
+  }, [project.id, project.thumbnail, project.updatedAt])
 
   return thumbnailUrl
 }
