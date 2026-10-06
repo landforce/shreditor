@@ -8,6 +8,8 @@ import {
   createTimelineTemplateItem,
   getTemplateEffectsForDirectApplication,
 } from './generated-layer-items'
+import { useProjectTextStylesStore } from '@/shared/state/text-styles'
+import type { TextStyleDefinition } from '@/types/text-style'
 
 describe('getTemplateEffectsForDirectApplication', () => {
   it('returns effects for adjustment templates with effects', () => {
@@ -41,6 +43,46 @@ describe('getTemplateEffectsForDirectApplication', () => {
 })
 
 describe('createTimelineTemplateItem', () => {
+  it("links a dropped text to a saved project style, with that aspect's look", () => {
+    const style: TextStyleDefinition = {
+      id: 'kit-title',
+      name: 'Kit title',
+      role: 'title',
+      variants: [
+        { aspect: '9:16', style: { fontSize: 150, color: '#ffcc00', fontWeight: 'bold' } },
+        { aspect: '16:9', style: { fontSize: 90, color: '#ffcc00', fontWeight: 'bold' } },
+      ],
+      defaultDurationFrames: 75,
+      version: 1,
+      updatedAt: 1,
+    }
+    useProjectTextStylesStore.getState().setStyles([style])
+    const item = createTimelineTemplateItem({
+      template: {
+        type: 'timeline-template',
+        itemType: 'text',
+        label: 'Kit title',
+        textStyleId: 'kit-title',
+      },
+      placement: {
+        trackId: 't',
+        from: 0,
+        durationInFrames: 120,
+        canvasWidth: 1080,
+        canvasHeight: 1920,
+        fps: 30,
+      },
+    })
+    expect(item).toMatchObject({
+      textStyleId: 'kit-title',
+      fontSize: 150,
+      color: '#ffcc00',
+      label: 'Kit title',
+      durationInFrames: 75,
+    })
+    useProjectTextStylesStore.getState().setStyles([])
+  })
+
   it('creates a styled text item for text templates with presets', () => {
     const item = createTimelineTemplateItem({
       template: {

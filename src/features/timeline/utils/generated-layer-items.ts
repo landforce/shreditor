@@ -11,6 +11,11 @@ import {
   buildTextStylePresetTemplate,
   type TextStylePresetId,
 } from '@/shared/typography/text-style-presets'
+import { useProjectTextStylesStore } from '@/shared/state/text-styles'
+import {
+  buildApplyTextStyleUpdates,
+  textStyleVariantForCanvas,
+} from '@/shared/typography/text-styles/text-style-resolve'
 
 export const DEFAULT_GENERATED_LAYER_DURATION_SECONDS = 60
 
@@ -19,6 +24,8 @@ export interface TimelineTemplateDragData {
   itemType: 'text' | 'shape' | 'adjustment'
   label: string
   textStylePresetId?: TextStylePresetId
+  /** A saved text style, already in the project (the drag source puts it there). */
+  textStyleId?: string
   shapeType?: ShapeType
   shapePreset?: 'solid' | 'gradient'
   effects?: VisualEffect[]
@@ -36,43 +43,50 @@ interface VisualLayerPlacement extends LayerPlacement {
   fps?: number
 }
 
+const TEMPLATE_ITEM_TYPES = new Set(['text', 'shape', 'adjustment'])
+const SHAPE_PRESETS = new Set(['solid', 'gradient'])
+const SHAPE_TYPES = new Set([
+  'rectangle',
+  'circle',
+  'triangle',
+  'ellipse',
+  'star',
+  'polygon',
+  'heart',
+  'path',
+])
+
+const isOptional = (value: unknown, valid: (value: unknown) => boolean) =>
+  value === undefined || valid(value)
+
+/** Text fields: a known built-in preset, a saved style id. */
+function hasValidTextFields(candidate: Partial<TimelineTemplateDragData>): boolean {
+  return (
+    isOptional(candidate.textStylePresetId, (id) =>
+      TEXT_STYLE_PRESETS.some((preset) => preset.id === id),
+    ) && isOptional(candidate.textStyleId, (id) => typeof id === 'string')
+  )
+}
+
+/** Shape and adjustment fields: effects list, preset, and a shape type for shapes. */
+function hasValidLayerFields(candidate: Partial<TimelineTemplateDragData>): boolean {
+  return (
+    isOptional(candidate.effects, Array.isArray) &&
+    isOptional(candidate.shapePreset, (preset) => SHAPE_PRESETS.has(preset as string)) &&
+    (candidate.itemType !== 'shape' || SHAPE_TYPES.has(candidate.shapeType as string))
+  )
+}
+
 export function isTimelineTemplateDragData(value: unknown): value is TimelineTemplateDragData {
   if (!value || typeof value !== 'object') return false
-
   const candidate = value as Partial<TimelineTemplateDragData>
-  if (candidate.type !== 'timeline-template') return false
-  if (
-    candidate.itemType !== 'text' &&
-    candidate.itemType !== 'shape' &&
-    candidate.itemType !== 'adjustment'
-  )
-    return false
-  if (typeof candidate.label !== 'string' || candidate.label.trim().length === 0) return false
-  if (
-    candidate.textStylePresetId !== undefined &&
-    !TEXT_STYLE_PRESETS.some((preset) => preset.id === candidate.textStylePresetId)
-  ) {
-    return false
-  }
-  if (candidate.effects !== undefined && !Array.isArray(candidate.effects)) return false
-  if (
-    candidate.shapePreset !== undefined &&
-    candidate.shapePreset !== 'solid' &&
-    candidate.shapePreset !== 'gradient'
-  ) {
-    return false
-  }
-
   return (
-    candidate.itemType !== 'shape' ||
-    candidate.shapeType === 'rectangle' ||
-    candidate.shapeType === 'circle' ||
-    candidate.shapeType === 'triangle' ||
-    candidate.shapeType === 'ellipse' ||
-    candidate.shapeType === 'star' ||
-    candidate.shapeType === 'polygon' ||
-    candidate.shapeType === 'heart' ||
-    candidate.shapeType === 'path'
+    candidate.type === 'timeline-template' &&
+    TEMPLATE_ITEM_TYPES.has(candidate.itemType as string) &&
+    typeof candidate.label === 'string' &&
+    candidate.label.trim().length > 0 &&
+    hasValidTextFields(candidate) &&
+    hasValidLayerFields(candidate)
   )
 }
 
@@ -277,6 +291,23 @@ export function createDefaultControllerItem(params: VisualLayerPlacement): Contr
   }
 }
 
+/** A new text item linked to a project text style: its look, layout, motion and length. */
+function withProjectTextStyle(
+  item: TextItem,
+  styleId: string,
+  placement: VisualLayerPlacement,
+): TextItem {
+  const style = useProjectTextStylesStore.getState().styles.find((entry) => entry.id === styleId)
+  const canvas = { width: placement.canvasWidth, height: placement.canvasHeight }
+  if (!style || !textStyleVariantForCanvas(style, canvas)) return item
+  return {
+    ...item,
+    ...buildApplyTextStyleUpdates(item, style, canvas),
+    label: style.name,
+    durationInFrames: style.defaultDurationFrames ?? item.durationInFrames,
+  }
+}
+
 export function createTimelineTemplateItem(params: {
   template: TimelineTemplateDragData
   placement: VisualLayerPlacement
@@ -284,11 +315,12 @@ export function createTimelineTemplateItem(params: {
   const { template, placement } = params
 
   if (template.itemType === 'text') {
-    return createTextTemplateItem({
+    const item = createTextTemplateItem({
       placement,
       label: template.label,
       textStylePresetId: template.textStylePresetId,
     })
+    return template.textStyleId ? withProjectTextStyle(item, template.textStyleId, placement) : item
   }
 
   if (template.itemType === 'adjustment') {

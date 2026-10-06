@@ -73,6 +73,12 @@ Homebrew, download the transcription model (1.6 GB), and build the editor;
 answer `y` (or pass `--yes`). It never installs Homebrew, Chrome or Node for
 you.
 
+Using Shreditor through an agent (Claude Code with the `shreditor-edit` skill)?
+The agent runs this step for you the first time, and tells you if Homebrew,
+Chrome or Node needs installing. Run it from inside the `shreditor` folder:
+from anywhere else `npx` looks for a published package and fails with E404
+(`node /path/to/shreditor/bin/shreditor.mjs install` works from anywhere).
+
 Then it sets up two macOS login items, the editor and the agent service, and
 from then on Shreditor is always on at **http://localhost:5273**. They start
 when you log in and restart on their own if they stop. The agent service
