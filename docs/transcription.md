@@ -31,6 +31,25 @@ updatedAt, reason?, words?, error?, hint? }`, status `queued | running | done |
 none | failed | unavailable`. Missing whisper-cli or model gives `unavailable`
 with a hint; the import itself never fails, and in-app transcription still works.
 
+## In-app fallback
+
+With a project open, the editor's background analysis (Settings > AI, "Analyze
+media when a project opens") makes sure every video has a transcript so it can
+suggest a Speaker or B-roll category. Native transcription is preferred and
+nothing is transcribed twice (`planBackgroundTranscription` in
+`src/features/media-library/utils/background-transcription.ts`):
+
+- a transcript already exists (made in the app, by the background pass or
+  natively), or status is `queued`, `running`, `done` or `none`: skipped
+- no status yet and the bridge's engine is available: the bridge is asked to
+  transcribe it (`POST media/transcribe`)
+- status `unavailable` or `failed`, no bridge, or no engine: transcribed in the
+  app; that transcript is marked `origin: 'background'` and, being an app save,
+  is never replaced by the bridge
+
+Neither background transcripts nor native ones turn on captions for timeline
+clips by themselves.
+
 ## Transcript format
 
 Same `AiOutput<'transcript'>` envelope the app writes

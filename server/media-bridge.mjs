@@ -47,12 +47,23 @@
 //   POST media/retry  { mediaId }
 //     Starts a failed preparation again. Returns { state }.
 //
-//   POST media/category  { items: [{ mediaId, category }] }
+//   POST media/category  { items: [{ mediaId, category }], source? }
 //     Sets each media's category in media/{id}/metadata.json: 'speaker',
 //     'b-roll', 'graphics', 'overlay', 'voiceover', 'music', 'sfx', 'other',
-//     or null to clear it. All items are checked before anything is written.
-//     Returns { changed: [{ mediaId, from, to }], unchanged: [{ mediaId, category }] }.
+//     or null to clear it, with categorySource = source: 'agent' (default),
+//     'user', or 'auto' (a suggestion from the editor's background analysis).
+//     An 'auto' write never replaces an explicit category (user, agent, or
+//     one with no source) and never clears; those media are reported as kept.
+//     All items are checked before anything is written. Returns
+//     { changed: [{ mediaId, from, fromSource, to, source }],
+//       unchanged: [{ mediaId, category, source }], kept: [{ mediaId, category, source }] }.
 //     Also available as `shreditor categorize <mediaId>=<category>...`.
+//
+//   GET media/categories?projectId=<id>
+//     Every media of a project with its category, categorySource and native
+//     transcription state, so an agent can confirm or correct suggestions:
+//     { media: [{ mediaId, fileName, mimeType, category, categorySource, transcription }] }.
+//     Also available as `shreditor media --project <id>`.
 //
 //   GET media/version?projectId=<id>
 //     A cheap change stamp for a project's media (media-links.json plus each
@@ -121,9 +132,22 @@ const MIME_BY_EXT = {
 
 const MODES = new Set(['auto', 'clone', 'link'])
 
-// Mirrors MediaCategory in src/types/storage.ts.
+// Mirrors MediaCategory and MediaCategorySource in src/types/storage.ts.
 export const MEDIA_CATEGORIES = ['speaker', 'b-roll', 'graphics', 'overlay', 'voiceover', 'music', 'sfx', 'other']
 const CATEGORY_SET = new Set(MEDIA_CATEGORIES)
+export const CATEGORY_SOURCES = ['auto', 'user', 'agent']
+
+/**
+ * Set by the user or the agent, so automatic suggestions must leave it:
+ * a 'user' / 'agent' source (also with no category: cleared on purpose), or
+ * a category with no source (written before sources existed). Mirrors
+ * hasExplicitCategory in src/features/media-library/utils/media-categories.ts.
+ */
+export function hasExplicitCategory(metadata) {
+  const source = metadata?.categorySource
+  if (source === 'user' || source === 'agent') return true
+  return source !== 'auto' && CATEGORY_SET.has(metadata?.category)
+}
 
 const ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/
 
@@ -429,9 +453,9 @@ export async function importMediaByPath(root, paths, { projectId, mode = 'auto',
       )
       if (duplicate) {
         if (projectId) associateWithProject(root, projectId, duplicate.id, inside)
-        if (category && duplicate.category !== category) {
-          setMediaCategories(root, [{ mediaId: duplicate.id, category }], { resolveInside: inside })
-          duplicate.category = category
+        if (category) {
+          const { changed } = setMediaCategories(root, [{ mediaId: duplicate.id, category }], { resolveInside: inside })
+          if (changed.length) Object.assign(duplicate, { category, categorySource: 'agent' })
         }
         results.push({ id: duplicate.id, fileName: duplicate.fileName, duplicate: true, sourcePath: source.real, metadata: duplicate })
         continue
@@ -505,7 +529,7 @@ async function writeImportMetadata(readable, dir, { id, fileName, fileSize, file
     ...(plan ? { videoCodecSupported: false, compatibility: preparingRecord(plan, probed, mimeType) } : {}),
     ...(hasThumbnail ? { thumbnailId: crypto.randomUUID() } : {}),
     tags: [],
-    ...(category ? { category } : {}),
+    ...(category ? { category, categorySource: 'agent' } : {}),
     createdAt: now,
     updatedAt: now,
   }
@@ -514,13 +538,18 @@ async function writeImportMetadata(readable, dir, { id, fileName, fileSize, file
 }
 
 /**
- * Set (or clear, with null) the category of each media. Every item is
+ * Set (or clear, with null) the category of each media, as `source`: the
+ * agent by default, 'user', or 'auto' for a suggestion. Every item is
  * validated, and every media must exist, before any metadata.json is
- * written. Used by the HTTP route and by `shreditor categorize`.
+ * written. An 'auto' write keeps an explicit category (see
+ * hasExplicitCategory). Used by the HTTP route and by `shreditor categorize`.
  * @param {Array<{ mediaId: string, category: string | null }>} items
  */
-export function setMediaCategories(root, items, { resolveInside } = {}) {
+export function setMediaCategories(root, items, { resolveInside, source = 'agent' } = {}) {
   if (!Array.isArray(items) || items.length === 0) throw new MediaBridgeError(400, 'TypeError', 'items must be a non-empty array')
+  if (!CATEGORY_SOURCES.includes(source)) {
+    throw new MediaBridgeError(400, 'TypeError', `source must be one of ${CATEGORY_SOURCES.join(', ')}`)
+  }
   const inside = resolveInside ?? defaultResolveInside
   const planned = new Map()
   items.forEach((item, index) => {
@@ -532,26 +561,75 @@ export function setMediaCategories(root, items, { resolveInside } = {}) {
     if (category !== null && !CATEGORY_SET.has(category)) {
       throw new MediaBridgeError(400, 'TypeError', `items[${index}].category must be one of ${MEDIA_CATEGORIES.join(', ')} (or null to clear)`)
     }
+    if (category === null && source === 'auto') {
+      throw new MediaBridgeError(400, 'TypeError', `items[${index}]: an automatic suggestion cannot clear a category`)
+    }
     const file = path.join(inside(root, `media/${mediaId}`), 'metadata.json')
     if (!fs.existsSync(file)) throw new MediaBridgeError(404, 'NotFoundError', `Media not found: ${mediaId}`)
     planned.set(mediaId, { category, file })
   })
   const changed = []
   const unchanged = []
+  const kept = []
   for (const [mediaId, { category, file }] of planned) {
+    // Read just before writing: the precedence check is on the file itself.
     const metadata = JSON.parse(fs.readFileSync(file, 'utf8'))
     const from = metadata.category ?? null
-    if (from === category) {
-      unchanged.push({ mediaId, category })
+    const fromSource = metadata.categorySource ?? null
+    if (source === 'auto' && hasExplicitCategory(metadata)) {
+      kept.push({ mediaId, category: from, source: fromSource })
       continue
     }
-    const next = { ...metadata, updatedAt: Date.now() }
+    // An explicit category with no source is already explicit.
+    const sameSource = fromSource === source || (fromSource === null && from !== null && source !== 'auto')
+    if (from === category && sameSource) {
+      unchanged.push({ mediaId, category, source: fromSource })
+      continue
+    }
+    const next = { ...metadata, categorySource: source, updatedAt: Date.now() }
     if (category) next.category = category
     else delete next.category
     writeJsonAtomic(file, next)
-    changed.push({ mediaId, from, to: category })
+    changed.push({ mediaId, from, fromSource, to: category, source })
   }
-  return { changed, unchanged }
+  return { changed, unchanged, kept }
+}
+
+function projectMediaIds(root, projectId, inside) {
+  const projectDir = inside(root, `projects/${projectId}`)
+  if (!fs.existsSync(path.join(projectDir, 'project.json'))) {
+    throw new MediaBridgeError(404, 'NotFoundError', `Project not found: ${projectId}`)
+  }
+  const linksFile = path.join(projectDir, 'media-links.json')
+  try {
+    const links = JSON.parse(fs.readFileSync(linksFile, 'utf8'))
+    if (Array.isArray(links?.mediaIds)) {
+      return { linksFile, ids: links.mediaIds.map((entry) => (typeof entry === 'string' ? entry : entry?.id)) }
+    }
+  } catch {
+    // no media yet
+  }
+  return { linksFile, ids: [] }
+}
+
+/**
+ * A project's media with category, its source and native transcription
+ * state: what the agent reads to confirm or correct automatic suggestions.
+ */
+export function projectMediaCategories(root, projectId, { resolveInside } = {}) {
+  const { ids } = projectMediaIds(root, projectId, resolveInside ?? defaultResolveInside)
+  return ids
+    .filter((id) => typeof id === 'string' && ID_PATTERN.test(id))
+    .map((id) => [id, readMetadata(root, id)])
+    .filter(([, metadata]) => metadata)
+    .map(([id, m]) => ({
+      mediaId: id,
+      fileName: m.fileName,
+      mimeType: m.mimeType,
+      category: m.category ?? null,
+      categorySource: m.categorySource ?? (m.category ? 'explicit' : null),
+      transcription: m.transcription?.status ?? null,
+    }))
 }
 
 /**
@@ -560,20 +638,8 @@ export function setMediaCategories(root, items, { resolveInside } = {}) {
  * metadata write (a category change) moves it.
  */
 export function projectMediaVersion(root, projectId, { resolveInside } = {}) {
-  const inside = resolveInside ?? defaultResolveInside
-  const projectDir = inside(root, `projects/${projectId}`)
-  if (!fs.existsSync(path.join(projectDir, 'project.json'))) {
-    throw new MediaBridgeError(404, 'NotFoundError', `Project not found: ${projectId}`)
-  }
+  const { linksFile, ids } = projectMediaIds(root, projectId, resolveInside ?? defaultResolveInside)
   const mtime = (file) => fs.statSync(file, { throwIfNoEntry: false })?.mtimeMs ?? 0
-  const linksFile = path.join(projectDir, 'media-links.json')
-  let ids = []
-  try {
-    const links = JSON.parse(fs.readFileSync(linksFile, 'utf8'))
-    if (Array.isArray(links?.mediaIds)) ids = links.mediaIds.map((entry) => (typeof entry === 'string' ? entry : entry?.id))
-  } catch {
-    // no media yet
-  }
   let newest = mtime(linksFile)
   let present = 0
   for (const id of ids) {
@@ -712,7 +778,13 @@ export function createMediaRoutes({ resolveInside, sendJson, readBody, serveFile
       }
       case 'POST media/category': {
         const body = await readJson(req)
-        sendJson(res, 200, setMediaCategories(root, body.items, { resolveInside }))
+        sendJson(res, 200, setMediaCategories(root, body.items, { resolveInside, source: body.source ?? 'agent' }))
+        return true
+      }
+      case 'GET media/categories': {
+        const projectId = projectIdOf(query?.get('projectId'))
+        if (!projectId) throw new MediaBridgeError(400, 'TypeError', 'projectId is required')
+        sendJson(res, 200, { media: projectMediaCategories(root, projectId, { resolveInside }) })
         return true
       }
       case 'GET media/version': {

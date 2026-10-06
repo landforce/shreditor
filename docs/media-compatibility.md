@@ -17,6 +17,7 @@ path (mediabunny + WebCodecs), headless.
 | H.264 8/10-bit 4:2:0/4:2:2/4:4:4, HEVC 8/10-bit (incl. PQ/HLG, 4:2:2, 4:4:4), VP8, VP9 (incl. alpha, 4:4:4, 10-bit), AV1 8/10-bit in MOV/MP4/MKV/WebM with AAC/MP3/Opus/Vorbis/FLAC/PCM | kept |
 | ProRes (any) | kept, decoded by the editor's ProRes WASM decoder (never `<video>`) |
 | Playable video in AVI, MPEG-TS/PS, MXF, ... or with AC-3/E-AC-3/ALAC/DTS/MP2 audio | `rewrap`: video stream copied, audio copied or decoded to PCM (same rate, channels, sample precision). MOV, or MKV for VP8/VP9/AV1 |
+| H.264/HEVC in MP4/MOV whose BT.470BG or FCC matrix is only in the bitstream (no complete `colr` box; phone footage) | `rewrap` (reason `colour`): video stream copied into MP4 with an nclx `colr` giving its matrix and range, audio copied |
 | Other video, 10-bit or HDR/BT.2020 (DNxHR HQX, 10-bit MPEG-2, ...) | `hevc`: HEVC Main10 CRF 12, chroma layout and colour tags kept; HDR stays HDR |
 | Other video, 8-bit (PNG/QTRLE `.mov`, MJPEG, MPEG-4 Part 2, DNxHD, ...) | `h264`: H.264 CRF 12, chroma kept (4:4:4 for RGB, converted with BT.709 and tagged) |
 | Other video with alpha (PNG/QTRLE with alpha, ...) | `prores-alpha`: ProRes 4444 (10-bit, 16-bit alpha) + PCM, decoded by the WASM decoder |
@@ -34,6 +35,25 @@ matrices), primaries/transfer carried and never invented, odd sizes padded by
 one pixel only where chroma needs it (noted). A stream copy whose timestamps
 come out in decode order (packed B-frames in AVI) is re-encoded instead (noted).
 Only the first video and first audio stream are prepared.
+
+Colour: ffprobe merges container and bitstream colour tags, so the policy reads
+the first video track's `colr` boxes itself (`server/isobmff-colour.mjs`).
+Chrome 154's `<video>` on macOS (hardware decode, so 720p and up) reads the
+range and the BT.709, SMPTE 170M and 240M matrices from an H.264/HEVC
+bitstream, but decodes a BT.470BG or FCC matrix there as BT.709; it also
+ignores an nclx/nclc box with unspecified primaries or transfer. Such files
+get a stream-copy working copy whose MP4 nclx box (MOV's nclc has no range
+flag) carries the stream's matrix and range; primaries and transfer the
+stream leaves unspecified are tagged BT.709, which Chrome assumes anyway. Any
+rewrap or H.264/HEVC transcode of such a source carries the same tags. A file
+with a complete `colr` box, or a matrix Chrome reads, is kept. An ICC `colr`
+box (`prof`) is not carried over (noted). Measured in `<video>` against the
+source decoded by its tags: full-range BT.470BG bars (1080x1920) RGB PSNR 29.2
+dB before, 36.5 dB after (worst bar 35 levels off, then 3; HEVC the same); the
+full-range BT.601 phone clip 35.1 dB before, 48.5 dB after; an MJPEG
+full-range transcode's worst bar 25 levels off before, 1 after. Video packets
+and timestamps are bit-identical (ffmpeg `streamhash`). Media imported before
+this keep their original until prepared again (re-import).
 
 ## State, UI and CLI
 
@@ -108,4 +128,5 @@ clip and a ProRes 4444 alpha clip are kept (their forced fallbacks measure
 Use Node 22 or 24. `npm run headless:test:node` and
 `npm run headless:test:compatibility` (needs a build and Chrome; runs
 headless): every class through native import, export-path frames, `<video>`,
-composite and export; VFR frames around a timestamp gap in both paths.
+composite and export; VFR frames around a timestamp gap in both paths; the
+colour rewrap's `<video>` and export colours against the source.

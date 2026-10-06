@@ -135,6 +135,40 @@ try {
     console.log(`PASS ${spec.name} (${spec.action}): native import, frame requests, <video>, composite, export pixels`)
   }
 
+  // Colour: full-range BT.470BG H.264 with no colr box (phone footage). Chrome's
+  // <video> (hardware decode, so 720p) ignores that matrix in the bitstream and
+  // shows the file as BT.709; the working copy declares it in an nclx colr with
+  // the video packets copied. A BT.709 full-range file is read right and kept.
+  await freshPage()
+  const bars = (file, matrix, colorspace) =>
+    ffmpeg('-f', 'lavfi', '-i', 'smptehdbars=s=1280x720:r=10:d=0.5', '-f', 'lavfi', '-i', 'sine=d=0.5',
+      '-vf', `scale=out_color_matrix=${matrix}:out_range=full,format=yuvj420p`, '-c:v', 'libx264', '-crf', '10',
+      '-colorspace', colorspace, '-color_range', 'pc', '-c:a', 'aac', '-shortest', path.join(root, file))
+  bars('phone.mp4', 'bt601', 'bt470bg')
+  bars('bt709-full.mp4', 'bt709', 'bt709')
+  const [phone, control] = await importMediaByPath(root, [path.join(root, 'phone.mp4'), path.join(root, 'bt709-full.mp4')], { mode: 'link', prepare: 'wait' })
+  assert.equal(control.metadata.compatibility, undefined, 'BT.709 full range plays as is')
+  assert.equal(phone.metadata.compatibility.status, 'ready', JSON.stringify(phone.metadata.compatibility))
+  assert.equal(phone.metadata.compatibility.reason, 'colour')
+  const packets = (file) => String(ffmpeg('-i', file, '-map', '0:v', '-c', 'copy', '-f', 'streamhash', '-hash', 'sha256', '-'))
+  assert.equal(packets(resolveMediaFile(root, phone.id)), packets(path.join(root, 'phone.mp4')), 'stream copy')
+  const reference = path.join(root, 'phone-ref.png')
+  ffmpeg('-i', path.join(root, 'phone.mp4'), '-vf', 'select=eq(n\\,2)', '-frames:v', '1', reference)
+  const { project: colourProject } = project('colour', phone.id, { width: 1280, height: 720 })
+  const colourMedia = [{ mediaId: phone.id, url: server.mediaUrl(phone.id), metadata: phone.metadata }]
+  const exported = await renderFrame({ project: colourProject, media: colourMedia, atSeconds: 0.2 }, path.join(root, 'phone-export.png'))
+  const pixelAt = (file, x, y) => [...ffmpeg('-i', file, '-frames:v', '1', '-vf', `crop=1:1:${x}:${y}`, '-f', 'rawvideo', '-pix_fmt', 'rgb24', '-')]
+  // Top bars: grey, yellow, cyan, green, magenta, red, blue.
+  for (const fraction of [0.063, 0.285, 0.393, 0.502, 0.61, 0.715, 0.823]) {
+    const x = Math.round(fraction * 1280)
+    const expected = pixelAt(reference, x, 180)
+    const previewed = await videoPixel(server.mediaUrl(phone.id), 0.2, x, 180)
+    const rendered = pixelAt(exported, x, 180)
+    for (const [what, got] of [['<video>', previewed], ['export frame', rendered]])
+      assert.ok(got.every((v, c) => Math.abs(v - expected[c]) <= 8), `${what} bar at ${fraction}: ${got}, source decoded by its tags ${expected}`)
+  }
+  console.log('PASS colour: full-range BT.470BG H.264 rewrapped with an nclx colr (packets copied); <video> and export match the source')
+
   // VFR: 10 fps for frames 0-4, then one frame every 0.4 s (0.8, 1.2, 1.6; ends at 1.7). Each frame has its
   // own grey level; frames rendered around the gap must be the ones the source
   // shows at those times (what ffmpeg decodes from the original).

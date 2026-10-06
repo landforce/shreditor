@@ -5,6 +5,7 @@ import {
   type AudioPrimingEdit,
   type IsoBmffFileAccess,
 } from './isobmff-audio-priming'
+import { MATROSKA_HEADER_READ_BYTES, type MatroskaPatch } from './matroska-opus-codec-delay'
 
 type MediabunnyModule = typeof import('mediabunny')
 
@@ -28,6 +29,12 @@ export interface ExportOutputTarget {
    * MP4/MOV (isobmff-audio-priming.ts). Resolves whether the file changed.
    */
   applyAudioPrimingEdit: (edit: AudioPrimingEdit) => Promise<boolean>
+  /**
+   * After `output.finalize()`: overwrite bytes in the file's header in place,
+   * same length (matroska-opus-codec-delay.ts). `compute` gets the first
+   * MATROSKA_HEADER_READ_BYTES. Resolves whether the file changed.
+   */
+  patchHeader: (compute: (head: Uint8Array) => MatroskaPatch | null) => Promise<boolean>
   complete: () => Promise<{
     blob: Blob
     temporaryOutput?: TemporaryExportOutput
@@ -100,6 +107,37 @@ async function patchOpfsFile(
   }
 }
 
+/** Same-length overwrite of the finished OPFS file's header. */
+async function patchOpfsHeader(
+  fileHandle: FileSystemFileHandle,
+  compute: (head: Uint8Array) => MatroskaPatch | null,
+): Promise<boolean> {
+  const file = await fileHandle.getFile()
+  const patch = compute(await readFileRange(file, 0, MATROSKA_HEADER_READ_BYTES))
+  if (!patch) return false
+  const inWorker =
+    typeof WorkerGlobalScope !== 'undefined' && globalThis instanceof WorkerGlobalScope
+  if (inWorker && typeof fileHandle.createSyncAccessHandle === 'function') {
+    const handle = await fileHandle.createSyncAccessHandle()
+    try {
+      handle.write(patch.bytes, { at: patch.offset })
+      handle.flush()
+    } finally {
+      handle.close()
+    }
+    return true
+  }
+  const writable = await fileHandle.createWritable({ keepExistingData: true })
+  try {
+    await writable.write({ type: 'write', position: patch.offset, data: patch.bytes })
+    await writable.close()
+  } catch (error) {
+    await writable.abort().catch(() => undefined)
+    throw error
+  }
+  return true
+}
+
 async function createFileBackedTarget(
   mediabunny: MediabunnyModule,
   container: ClientContainer,
@@ -145,6 +183,7 @@ async function createFileBackedTarget(
     }),
     kind: 'file',
     applyAudioPrimingEdit: (edit) => patchOpfsFile(fileHandle, edit),
+    patchHeader: (compute) => patchOpfsHeader(fileHandle, compute),
     complete: async () => {
       settled = true
       const file = await fileHandle.getFile()
@@ -190,6 +229,14 @@ export async function createExportOutputTarget(
       const patched = addAudioPrimingEditListToBuffer(new Uint8Array(target.buffer), edit)
       if (!patched) return false
       target.buffer = patched.buffer
+      return true
+    },
+    patchHeader: async (compute) => {
+      if (!target.buffer) return false
+      const bytes = new Uint8Array(target.buffer)
+      const patch = compute(bytes.subarray(0, MATROSKA_HEADER_READ_BYTES))
+      if (!patch) return false
+      bytes.set(patch.bytes, patch.offset)
       return true
     },
     complete: async () => {

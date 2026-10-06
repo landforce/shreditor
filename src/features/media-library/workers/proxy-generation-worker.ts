@@ -12,6 +12,7 @@
  */
 
 import { ensureProResDecoderRegistered } from '@/infrastructure/browser/register-prores-decoder'
+import { applyBitstreamColorSpace } from '@/infrastructure/browser/mediabunny-video-color-space'
 import { PROXY_DIR, PROXY_SCHEMA_VERSION } from '../proxy-constants'
 
 /**
@@ -255,6 +256,10 @@ async function generateProxy(request: ProxyGenerateRequest): Promise<void> {
   let writable: FileSystemWritableFileStream | undefined
 
   try {
+    // Conversion decodes this same track instance (Input caches its tracks), so
+    // the proxy keeps the matrix and range the H.264 stream declares.
+    const sourceVideoTrack = await input.getPrimaryVideoTrack()
+    if (sourceVideoTrack) applyBitstreamColorSpace(sourceVideoTrack)
     const buildJob = async (
       outputTarget: InstanceType<typeof StreamTarget> | InstanceType<typeof BufferTarget>,
       useInMemoryFastStart: boolean,

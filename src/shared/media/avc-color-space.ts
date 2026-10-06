@@ -172,16 +172,23 @@ function isHdrSignalType(signal: AvcVideoSignalType): boolean {
   )
 }
 
+const isCompleteColorSpace = (space: VideoColorSpaceInit): boolean =>
+  space.matrix != null &&
+  space.fullRange != null &&
+  space.primaries != null &&
+  space.transfer != null
+
 /**
  * The decoder config with the colour space the H.264 bitstream declares filled
- * in where the container gave none. Fields the config already has win. HDR
+ * in where the container gave none or only part of one (a `colr` box with
+ * unspecified primaries and transfer). Fields the config already has win. HDR
  * signals and non-H.264 configs are returned unchanged (HDR keeps the
  * browser's existing handling).
  */
 export function withAvcBitstreamColorSpace(config: VideoDecoderConfig): VideoDecoderConfig {
   if (!/^avc[13]\./.test(config.codec) || !config.description) return config
   const existing = config.colorSpace ?? {}
-  if (existing.matrix != null && existing.fullRange != null) return config
+  if (isCompleteColorSpace(existing)) return config
   const description = ArrayBuffer.isView(config.description)
     ? new Uint8Array(
         config.description.buffer,

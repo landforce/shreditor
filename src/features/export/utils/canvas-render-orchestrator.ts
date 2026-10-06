@@ -26,6 +26,7 @@ import {
 } from './embedded-subtitle-export'
 import { createExportOutputTarget } from './export-output-target'
 import { measureAudioEncoderDelay } from './audio-encoder-delay'
+import { opusCodecDelayPatch } from './matroska-opus-codec-delay'
 
 // Subsystems
 import { createCompositionRenderer } from './client-render-engine'
@@ -162,6 +163,21 @@ async function markAudioEncoderDelay(
     return false
   })
   getLog().info('Audio encoder delay', { ...edit, marked })
+}
+
+/**
+ * Give the finished WebM/MKV's Opus track a CodecDelay equal to its encoder
+ * pre-skip; Mediabunny writes 0, so players kept the 6.5 ms lead-in and the
+ * audio played late by it (matroska-opus-codec-delay.ts).
+ */
+async function markOpusCodecDelay(
+  outputTarget: Awaited<ReturnType<typeof createExportOutputTarget>>,
+): Promise<void> {
+  const marked = await outputTarget.patchHeader(opusCodecDelayPatch).catch((error: unknown) => {
+    getLog().warn('Could not mark the Opus codec delay', { error })
+    return false
+  })
+  getLog().info('Opus codec delay', { marked })
 }
 
 async function prepareAudioPacketCopy(params: {
@@ -671,6 +687,8 @@ export async function renderComposition(options: RenderEngineOptions): Promise<C
   // finalize so the audio is not late by it (isobmff-audio-priming.ts).
   let audioEncoderDelay: Promise<number | null> | null = null
   let encodedAudioFrames = 0
+  // Opus we encode into WebM/MKV: its pre-skip goes in CodecDelay after finalize.
+  let encodedOpus = false
 
   if (packetAudio) {
     output.addAudioTrack(packetAudio.source)
@@ -707,6 +725,7 @@ export async function renderComposition(options: RenderEngineOptions): Promise<C
           ) {
             audioEncoderDelay = measureAudioEncoderDelay(config)
           }
+          encodedOpus = audioCodec === 'opus'
         },
       })
 
@@ -870,6 +889,7 @@ export async function renderComposition(options: RenderEngineOptions): Promise<C
     // Finalize output
     await output.finalize()
     await markAudioEncoderDelay(outputTarget, audioEncoderDelay, encodedAudioFrames)
+    if (encodedOpus) await markOpusCodecDelay(outputTarget)
 
     const completed = await outputTarget.complete()
     const { blob } = completed

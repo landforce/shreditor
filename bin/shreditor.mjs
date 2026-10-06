@@ -12,13 +12,17 @@
 //                                              worker); import waits for it, printing progress,
 //                                              unless --no-wait. Same as
 //                                              POST /__shreditor/media/import (server/media-bridge.mjs).
-//   shreditor media <mediaId...> [--wait] [--retry] [--json]
+//   shreditor media <mediaId...> | --project <id> [--wait] [--retry] [--json]
 //                                              working-copy state: ready (and from -> to), preparing
 //                                              NN%, or failed (why); --wait until none is preparing,
-//                                              --retry a failed one.
+//                                              --retry a failed one. Also each media's category with
+//                                              who set it ([speaker auto] = suggested by the editor's
+//                                              background analysis, unconfirmed) and transcript state.
 //   shreditor categorize <mediaId>=<category>... | --category <category> <mediaId>...
 //                                              set what each media is for (speaker, b-roll, graphics,
-//                                              overlay, voiceover, music, sfx, other; "none" clears).
+//                                              overlay, voiceover, music, sfx, other; "none" clears),
+//                                              as the agent: explicit, so the editor never changes it.
+//                                              Re-setting an auto suggestion confirms it.
 //                                              Same as POST /__shreditor/media/category.
 //   shreditor transcribe <mediaId...> | --project <id> [--force]
 //                                              transcribe now with whisper.cpp, locally, into the
@@ -33,7 +37,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { parseArgs } from 'node:util'
-import { importMediaByPath, MEDIA_CATEGORIES, setMediaCategories } from '../server/media-bridge.mjs'
+import { importMediaByPath, MEDIA_CATEGORIES, projectMediaCategories, setMediaCategories } from '../server/media-bridge.mjs'
 import { preparationStates, readMetadata, retryPreparation, waitForPreparation } from '../server/media-preparation.mjs'
 import { currentWorkspace, DEFAULT_WORKSPACE, setWorkspace } from '../server/workspace-bridge.mjs'
 import { enableAutoTranscription, readTranscriptionStatus, settleHandoffs, transcribeMedia } from '../server/transcription.mjs'
@@ -73,8 +77,17 @@ function workingCopyLine(root, id) {
   return `  working copy: ${side(c.original)} -> ${side(c.derivative)} [${c.action}; frames ${v.frames?.join('/') ?? '?'}; duration delta ${v.durationDelta ?? '?'}s]${c.notes?.length ? ` (${c.notes.join('; ')})` : ''}`
 }
 
-const stateLine = (root, s) =>
-  `${s.status.padEnd(9)} ${s.id}  ${s.fileName ?? ''}${s.status === 'ready' ? workingCopyLine(root, s.id) || '  plays as is' : `  ${describe(s)}`}`
+/** "[speaker auto]" (a suggestion), "[b-roll agent]", "[graphics]" (explicit, older metadata), "" when none. */
+const categoryTag = (m) => (m?.category ? `  [${m.category}${m.categorySource ? ` ${m.categorySource}` : ''}]` : '')
+const transcriptTag = (m) => (m?.transcription?.status ? `  transcript: ${m.transcription.status}` : '')
+
+const stateLine = (root, s) => {
+  const m = readMetadata(root, s.id)
+  return `${s.status.padEnd(9)} ${s.id}  ${s.fileName ?? ''}${categoryTag(m)}${s.status === 'ready' ? workingCopyLine(root, s.id) || '  plays as is' : `  ${describe(s)}`}${transcriptTag(m)}`
+}
+
+/** "speaker (auto)" / "none" for categorize output. */
+const categoryLabel = (category, source) => (category ? `${category}${source ? ` (${source})` : ''}` : `none${source ? ` (${source})` : ''}`)
 
 /** Wait for working copies, one line per state change or 10% step. */
 async function waitAndPrint(root, ids) {
@@ -151,10 +164,23 @@ try {
     case 'media': {
       const root = currentWorkspace()
       const ids = [folder, ...rest].filter(Boolean)
-      if (!ids.length) throw new Error('Usage: shreditor media <mediaId...> [--wait] [--retry] [--json]')
+      if (opt.project) ids.push(...projectMediaCategories(root, opt.project).map((m) => m.mediaId))
+      if (!ids.length) throw new Error('Usage: shreditor media <mediaId...> | --project <id> [--wait] [--retry] [--json]')
       if (opt.retry) for (const id of ids) await retryPreparation(root, id, { detached: true })
       const states = opt.wait || opt.retry ? await waitAndPrint(root, ids) : preparationStates(root, ids)
-      if (opt.json) say(JSON.stringify(ids.map((id) => ({ ...states.find((s) => s.id === id), compatibility: readMetadata(root, id)?.compatibility ?? null })), null, 2))
+      if (opt.json) {
+        say(JSON.stringify(ids.map((id) => {
+          const m = readMetadata(root, id)
+          return {
+            ...states.find((s) => s.id === id),
+            category: m?.category ?? null,
+            // auto = suggested by the editor's analysis; explicit = set before sources were recorded
+            categorySource: m?.categorySource ?? (m?.category ? 'explicit' : null),
+            transcription: m?.transcription ?? null,
+            compatibility: m?.compatibility ?? null,
+          }
+        }), null, 2))
+      }
       else if (!opt.wait && !opt.retry) for (const s of states) say(stateLine(root, s))
       if (states.some((s) => s.status === 'failed' || s.status === 'missing')) process.exitCode = 1
       break
@@ -172,9 +198,9 @@ try {
       if (!items.length) {
         throw new Error(`Usage: shreditor categorize <mediaId>=<category>... | --category <category> <mediaId>...\nCategories: ${MEDIA_CATEGORIES.join(', ')}, none`)
       }
-      const { changed, unchanged } = setMediaCategories(currentWorkspace(), items)
-      for (const c of changed) say(`set     ${c.mediaId}  ${c.from ?? 'none'} -> ${c.to ?? 'none'}`)
-      for (const u of unchanged) say(`same    ${u.mediaId}  ${u.category ?? 'none'}`)
+      const { changed, unchanged } = setMediaCategories(currentWorkspace(), items, { source: 'agent' })
+      for (const c of changed) say(`set     ${c.mediaId}  ${categoryLabel(c.from, c.fromSource)} -> ${categoryLabel(c.to, c.source)}`)
+      for (const u of unchanged) say(`same    ${u.mediaId}  ${categoryLabel(u.category, u.source)}`)
       break
     }
     case 'transcribe': {
@@ -201,7 +227,7 @@ try {
       break
     }
     default:
-      say('Usage: shreditor open [folder] [--project <id>] | shreditor where | shreditor choose | shreditor import <file...> [--project <id>] [--link] [--category <c>] [--no-wait] | shreditor media <mediaId...> [--wait] [--retry] [--json] | shreditor categorize <mediaId>=<category>... | shreditor transcribe <mediaId...> | --project <id> [--force] | shreditor setup whisper [--yes]')
+      say('Usage: shreditor open [folder] [--project <id>] | shreditor where | shreditor choose | shreditor import <file...> [--project <id>] [--link] [--category <c>] [--no-wait] | shreditor media <mediaId...> | --project <id> [--wait] [--retry] [--json] | shreditor categorize <mediaId>=<category>... | shreditor transcribe <mediaId...> | --project <id> [--force] | shreditor setup whisper [--yes]')
       process.exit(command ? 1 : 0)
   }
 } catch (error) {

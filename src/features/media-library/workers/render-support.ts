@@ -8,6 +8,7 @@
 
 import { createLogger } from '@/shared/logging/logger'
 import { clampPacketToTimeline } from '../utils/audio-packet-timeline'
+import { applyBitstreamColorSpace } from '@/infrastructure/browser/mediabunny-video-color-space'
 
 const logger = createLogger('RenderSupport')
 
@@ -392,7 +393,13 @@ export async function openVideoSource(
       throw new Error(`Source reported an unusable frame size of ${width}x${height}`)
     }
 
-    return { input, sink: new mb.VideoSampleSink(videoTrack), totalSeconds, width, height }
+    return {
+      input,
+      sink: new mb.VideoSampleSink(applyBitstreamColorSpace(videoTrack)),
+      totalSeconds,
+      width,
+      height,
+    }
   } catch (error) {
     input.dispose()
     throw error
