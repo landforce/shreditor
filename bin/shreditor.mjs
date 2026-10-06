@@ -31,6 +31,17 @@
 //                                              made in the app). See server/transcription.mjs.
 //   shreditor setup whisper [--yes] [--verify] check ffmpeg, whisper-cli and the model; --yes downloads
 //                                              the model (1.6 GB) and verifies its sha256
+//   shreditor install [--yes]                  check and fix what Shreditor needs (Chrome, Homebrew,
+//                                              ffmpeg, whisper-cli and model, npm ci, a build), then
+//                                              run the editor (5273) and the agent service (8787) as
+//                                              macOS login items: on at login, restarted if they stop
+//   shreditor update [--force]                 git pull --ff-only, npm ci if the lockfile moved, build,
+//                                              restart; refuses while a project has unsaved changes
+//   shreditor restart [--force]                restart both (same safety check)
+//   shreditor status                           login items, URLs, workspace, build vs HEAD, logs
+//   shreditor uninstall                        remove the login items (keeps logs, workspace, config)
+//                                              These take --label-prefix, --editor-port, --service-port,
+//                                              --workspace, --config, --log-dir (see server/install/).
 //
 // The editor (npm run dev) reads the workspace from ~/.shreditor/config.json
 // on every request, so switching takes effect on the next page load.
@@ -41,6 +52,17 @@ import { importMediaByPath, MEDIA_CATEGORIES, projectMediaCategories, setMediaCa
 import { preparationStates, readMetadata, retryPreparation, waitForPreparation } from '../server/media-preparation.mjs'
 import { currentWorkspace, DEFAULT_WORKSPACE, setWorkspace } from '../server/workspace-bridge.mjs'
 import { enableAutoTranscription, readTranscriptionStatus, settleHandoffs, transcribeMedia } from '../server/transcription.mjs'
+import { INSTALL_COMMANDS, runInstallCommand } from '../server/install/commands.mjs'
+
+// install, update, restart, status and uninstall take their own options.
+if (INSTALL_COMMANDS.includes(process.argv[2])) {
+  try {
+    process.exit(await runInstallCommand(process.argv[2], process.argv.slice(3)))
+  } catch (error) {
+    console.error(`shreditor: ${error.message}`)
+    process.exit(1)
+  }
+}
 
 const { values: opt, positionals } = parseArgs({
   allowPositionals: true,
@@ -227,7 +249,7 @@ try {
       break
     }
     default:
-      say('Usage: shreditor open [folder] [--project <id>] | shreditor where | shreditor choose | shreditor import <file...> [--project <id>] [--link] [--category <c>] [--no-wait] | shreditor media <mediaId...> | --project <id> [--wait] [--retry] [--json] | shreditor categorize <mediaId>=<category>... | shreditor transcribe <mediaId...> | --project <id> [--force] | shreditor setup whisper [--yes]')
+      say('Usage: shreditor open [folder] [--project <id>] | shreditor where | shreditor choose | shreditor import <file...> [--project <id>] [--link] [--category <c>] [--no-wait] | shreditor media <mediaId...> | --project <id> [--wait] [--retry] [--json] | shreditor categorize <mediaId>=<category>... | shreditor transcribe <mediaId...> | --project <id> [--force] | shreditor setup whisper [--yes] | shreditor install [--yes] | shreditor update [--force] | shreditor restart | shreditor status | shreditor uninstall')
       process.exit(command ? 1 : 0)
   }
 } catch (error) {

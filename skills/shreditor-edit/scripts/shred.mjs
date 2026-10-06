@@ -83,7 +83,12 @@
 // Service: 127.0.0.1:8787 (SHRED_SERVICE to override). Workspace: SHRED_WORKSPACE,
 // else ~/.shreditor/config.json, else ~/Movies/Shreditor. Times are frames at the
 // project fps. Ops reference earlier results with {"$ref":"<callerId>#/detail/..."}.
-import { execFileSync, spawn, spawnSync } from 'node:child_process'
+//
+// Commands start what they need: a command that talks to the agent service (or
+// reads the editor's unsaved state) starts it when it isn't answering, through
+// the login item when `shreditor install` set one up for that port, else like
+// `shred up`, and says so in one line on stderr. SHRED_AUTOSTART=0 turns it off.
+import { execFileSync, spawnSync } from 'node:child_process'
 import crypto from 'node:crypto'
 import fs from 'node:fs'
 import os from 'node:os'
@@ -110,6 +115,10 @@ import {
   readCubeFileHeader,
 } from '../../../headless/lib/luts.mjs'
 import { templatesCommand } from './templates.mjs'
+import { runBuild, gitHead, staleBuild } from '../../../server/install/build-state.mjs'
+import { DEFAULT_LABEL_PREFIX, jobLabel, jobStatus } from '../../../server/install/launchd.mjs'
+import { logFile, spawnEditor, spawnService } from '../../../server/install/processes.mjs'
+import { createAutostart } from '../../../server/install/self-start.mjs'
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..')
 const SERVICE = process.env.SHRED_SERVICE || 'http://127.0.0.1:8787'
@@ -172,6 +181,11 @@ function workspace() {
 }
 
 async function call(method, route, body, headers = {}) {
+  await autostart.ensure('service')
+  return request(method, route, body, headers)
+}
+
+async function request(method, route, body, headers = {}) {
   const res = await fetch(`${SERVICE}${route}`, {
     method,
     headers: { 'content-type': 'application/json', ...headers },
@@ -242,46 +256,62 @@ const portAnswers = async () => {
     return false
   }
 }
-const gitHead = () => {
-  try {
-    const [sha, time] = execFileSync('git', ['log', '-1', '--format=%h %ct', 'HEAD'], {
-      cwd: REPO,
-      encoding: 'utf8',
-    })
-      .trim()
-      .split(' ')
-    return { sha, time: Number(time) }
-  } catch {
-    return null
-  }
-}
 let built = false
 function build(reason) {
-  const log = path.join(os.tmpdir(), 'shreditor-build.log')
-  say(`Building Shreditor (${reason})…`)
-  try {
-    execFileSync('npm', ['run', 'build'], {
-      cwd: REPO,
-      stdio: ['ignore', fs.openSync(log, 'w'), fs.openSync(log, 'a')],
-    })
-  } catch {
-    throw new Error(`Build failed; see ${log}`)
-  }
+  runBuild(REPO, { reason, say })
   built = true
 }
-// The built editor is stale when missing or older than the checked-out commit.
-function staleBuild() {
-  const index = path.join(REPO, 'dist', 'index.html')
-  if (!fs.existsSync(index)) return 'no build yet'
-  const head = gitHead()
-  if (head && fs.statSync(index).mtimeMs / 1000 < head.time)
-    return `build is older than ${head.sha}`
-  return null
+
+// Login items (`shreditor install`) for these ports: launchd keeps them running.
+const LABEL_PREFIX = process.env.SHREDITOR_LABEL_PREFIX || DEFAULT_LABEL_PREFIX
+function loginItem(kind, url) {
+  const job = jobStatus(jobLabel(LABEL_PREFIX, kind))
+  return job.loaded && job.port === Number(new URL(url).port) ? job : null
 }
+
+/** Start the editor like `shred up` (a built preview, built first when stale; --dev the dev server). */
+async function startEditor() {
+  if (!opt.dev) {
+    const reason = opt.build ? 'requested' : staleBuild(REPO)
+    if (reason) build(reason)
+  }
+  return spawnEditor({
+    repo: REPO,
+    port: new URL(EDITOR).port,
+    dev: opt.dev,
+    // An overridden workspace is pinned for the editor too; otherwise it follows the config.
+    workspace: process.env.SHRED_WORKSPACE,
+  })
+}
+
+/** Start the service like `shred start` (it renders through the built app). */
+function startService() {
+  if (!built && (opt.build || !fs.existsSync(path.join(REPO, 'dist', 'headless.html'))))
+    build(opt.build ? 'requested' : 'no build yet')
+  return spawnService({ repo: REPO, port: new URL(SERVICE).port, workspace: workspace() })
+}
+
+const autostart = createAutostart({
+  targets: {
+    service: {
+      name: 'the agent service',
+      port: new URL(SERVICE).port,
+      up: async () => Boolean(await health()),
+      spawn: startService,
+    },
+    editor: {
+      name: 'the editor',
+      port: new URL(EDITOR).port,
+      up: editorUp,
+      spawn: startEditor,
+    },
+  },
+})
 
 // What the open editor has not saved yet (see server/editor-state.mjs).
 // null when no editor answers, or it predates the heartbeat.
 async function editorState(id) {
+  await autostart.ensure('editor')
   try {
     const res = await fetch(`${EDITOR}/__shreditor/editor-state?project=${encodeURIComponent(id)}`)
     return res.ok ? await res.json() : null
@@ -414,7 +444,7 @@ const getProject = (id) => call('GET', `/v1/projects/${encodeURIComponent(id)}`)
 
 async function health() {
   try {
-    return await call('GET', '/health')
+    return await request('GET', '/health')
   } catch {
     return null
   }
@@ -643,14 +673,17 @@ async function applyBatch(id, batch, revision) {
   return res
 }
 
-const SERVICE_LOG = path.join(os.tmpdir(), 'shreditor-service.log')
-const serviceLogSize = () => fs.statSync(SERVICE_LOG, { throwIfNoEntry: false })?.size ?? 0
+// The login item's log when launchd runs the service, else `shred start`'s.
+let serviceLogPath
+const serviceLog = () =>
+  (serviceLogPath ??= loginItem('service', SERVICE)?.log ?? logFile('service'))
+const serviceLogSize = () => fs.statSync(serviceLog(), { throwIfNoEntry: false })?.size ?? 0
 
 /** Error lines the service logged since `from` (bytes), so another run's errors never show. */
 function serviceLogTail(from) {
   const size = serviceLogSize()
   if (size <= from) return ''
-  const fd = fs.openSync(SERVICE_LOG, 'r')
+  const fd = fs.openSync(serviceLog(), 'r')
   const buffer = Buffer.alloc(Math.min(size - from, 256 * 1024))
   fs.readSync(fd, buffer, 0, buffer.length, size - buffer.length)
   fs.closeSync(fd)
@@ -666,7 +699,10 @@ function serviceLogTail(from) {
 const commands = {
   async up() {
     const info = await editorInfo()
-    if (info) {
+    const managed = loginItem('editor', EDITOR)
+    if (info && managed) {
+      say(`Editor   ${EDITOR}  managed by the login item (${managed.label}); left as is`)
+    } else if (info) {
       // Never kill or replace a running editor: the user may be mid-edit in it.
       const kind = await editorKind(info)
       const what =
@@ -682,35 +718,13 @@ const commands = {
         `Something other than the Shreditor editor is serving ${EDITOR}. Stop it, or set SHRED_EDITOR to a free port.`,
       )
     } else {
-      const port = new URL(EDITOR).port
-      if (!opt.dev) {
-        const reason = opt.build ? 'requested' : staleBuild()
-        if (reason) build(reason)
-      }
-      const log = path.join(os.tmpdir(), 'shreditor-editor.log')
-      const child = spawn(
-        'npm',
-        ['run', opt.dev ? 'dev' : 'preview', '--', '--port', port, '--strictPort'],
-        {
-          cwd: REPO,
-          // An overridden workspace is pinned for the editor too; otherwise it follows the config.
-          env: {
-            ...process.env,
-            ...(process.env.SHRED_WORKSPACE
-              ? { SHREDITOR_WORKSPACE: process.env.SHRED_WORKSPACE }
-              : {}),
-          },
-          detached: true,
-          stdio: ['ignore', fs.openSync(log, 'a'), fs.openSync(log, 'a')],
-        },
-      )
-      child.unref()
-      for (let i = 0; i < 120 && !(await editorUp()); i++)
-        await new Promise((r) => setTimeout(r, 1000))
-      if (!(await editorUp())) throw new Error(`Editor did not start; see ${log}`)
-      say(
-        `Editor   ${EDITOR}  ${opt.dev ? 'dev server (reloads on source edits)' : `built preview of ${gitHead()?.sha ?? 'this checkout'}`}`,
-      )
+      await autostart.ensure('editor', { explicit: true })
+      const what = managed
+        ? `started by its login item (${managed.label})`
+        : opt.dev
+          ? 'dev server (reloads on source edits)'
+          : `built preview of ${gitHead(REPO)?.sha ?? 'this checkout'}`
+      say(`Editor   ${EDITOR}  ${what}`)
     }
     await commands.start()
   },
@@ -1101,27 +1115,16 @@ const commands = {
   },
 
   async start() {
-    if (await health()) return say(`Service already running at ${SERVICE}`)
-    const ws = workspace()
-    const log = path.join(os.tmpdir(), 'shreditor-service.log')
-    // The service renders and edits through the built app; rebuild after code changes.
-    if (!built && (opt.build || !fs.existsSync(path.join(REPO, 'dist', 'headless.html'))))
-      build(opt.build ? 'requested' : 'no build yet')
-    const child = spawn(
-      process.execPath,
-      [path.join(REPO, 'headless/serve.mjs'), '--workspace', ws, '--port', new URL(SERVICE).port],
-      {
-        cwd: REPO,
-        detached: true,
-        stdio: ['ignore', fs.openSync(log, 'a'), fs.openSync(log, 'a')],
-      },
+    const managed = loginItem('service', SERVICE)
+    const running = await health()
+    if (running && managed)
+      return say(`Service  ${SERVICE}  managed by the login item (${managed.label}); left as is`)
+    if (running) return say(`Service already running at ${SERVICE}`)
+    await autostart.ensure('service', { explicit: true })
+    const log = managed?.log ?? logFile('service')
+    say(
+      `Service running at ${SERVICE} on ${(await health())?.workspace ?? workspace()} (log: ${log})`,
     )
-    child.unref()
-    for (let i = 0; i < 240; i++) {
-      await new Promise((r) => setTimeout(r, 1000))
-      if (await health()) return say(`Service running at ${SERVICE} on ${ws} (log: ${log})`)
-    }
-    throw new Error(`Service did not start; see ${log}`)
   },
 
   async status() {
@@ -1135,6 +1138,10 @@ const commands = {
     const lock = path.join(ws, '.freecut-headless', 'writer.lock')
     say(
       `writer     ${fs.existsSync(lock) ? 'locked by the service (imports go through `shred import`)' : 'free'}`,
+    )
+    const items = [loginItem('editor', EDITOR), loginItem('service', SERVICE)].filter(Boolean)
+    say(
+      `login      ${items.length ? items.map((j) => `${j.label} ${j.state}${j.pid ? ` pid ${j.pid}` : ''}`).join(', ') : 'none (npx shreditor install keeps both running)'}`,
     )
   },
 
