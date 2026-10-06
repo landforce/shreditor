@@ -22,7 +22,7 @@ What `shred apply` accepts and how the project behaves. Verified against the Shr
 ] }
 ```
 
-- **New projects already have V1 (`track-1`, video) and A1 (`track-2`, audio)**; `shred new` prints them. Build on those. `addTrack` only for an extra layer (text over footage, a second audio bed), never to "set up" a project.
+- **New projects already have their tracks**: a format's named layout (`shred new --format`, e.g. `track-title`, `track-images`, `track-speaker`, `track-speaker-audio`), or V1 (`track-1`) and A1 (`track-2`) without a format. `shred new` prints them. Build on those. `addTrack` only for an extra layer, never to "set up" a project.
 
 - `callerId` names an op so later ops can reference its result. `shred` fills missing ones, but name the ones you reference.
 - References: `{"$ref": "<callerId>#/detail/<path>"}`, allowed only in id fields (`id`, `ids`, `itemId`, `trackId`, `mediaId`, `leftClipId`, `rightClipId`, `effectId`). `addTrack` → `detail/trackId`; `addClip` → `detail/created/<n>/id` (video with audio creates two: video first, linked audio second); `addText` → `detail/id`.
@@ -49,9 +49,18 @@ What `shred apply` accepts and how the project behaves. Verified against the Shr
 
 `GET /v1/capabilities` (on the service) lists the exact ops and limits for the running version.
 
+## Formats
+
+A project's `format` (`{ id, variant, reviewedHash }`, set by `shred new --format` or `shred format set`) picks one of the four definitions in `<repo>/formats/registry.mjs`; `shred format <projectId>` prints its rules, targets and guide.
+
+- **Roles.** Each item plays a role in the format: `speaker`, `images`, `plates`, `broll`, `shots`, `title`, `captions`, `labels`, `voice`, `music`, `sfx`. The scorecard resolves it in this order: the item's `formatRole`, caption markers (`textRole: "caption"`, subtitle items), the media's category (mapped per format: `graphics` is `images` in a Graphic Yap, `plates` in a Greenscreen), the track's role (`formatRole` on the track, which format tracks carry, or a track named like the layout), then the item type (text from frame 0, at least 2 s, top or middle is the title; other text is a label).
+- **Set a role** when placement and category don't say it: `{ "op": "updateItem", "id": "<id>", "updates": { "formatRole": "title" } }`. A PNG title lockup on the Title track is already `title`; text on a picture track is never a picture.
+- **Sync sound.** Linked audio from b-roll counts as sync sound, not speech (category `b-roll`); a 10 Shot fails on it, so remove it (`removeItems`) or mute it (`volume: -60`).
+- **`shred check <id> [--json]`** scores the saved timeline: rules (title hook from frame 0 and its hold, captions, speech, voiceover, music, SFX, sync sound, transitions) and numeric targets (length, change rates, first image or cut, longest stretch, shot lengths, speech rate, pauses). Each check is `pass`, `warn`, `fail`, `info` (measured, no band) or `n/a` (can't measure), with frame ranges to look at. Pauses and speech rate come from the built-in transcripts mapped through each clip's source window; without one they are `n/a`. Exit code 1 means a fail-severity check failed.
+
 ## Media categories
 
-Each media's `category` (in `media/<id>/metadata.json`) says what it is for: `speaker`, `b-roll`, `graphics`, `overlay`, `voiceover`, `music`, `sfx`, `other`. Absent means uncategorized. Set it with `shred import ... --category <c>` or `shred categorize <mediaId>=<c> ...` (`none` clears). When any media in a project has one, the editor's media pane groups by category (that order, uncategorized last) instead of by file type. Categories don't affect ops or rendering.
+Each media's `category` (in `media/<id>/metadata.json`) says what it is for: `speaker`, `b-roll`, `graphics`, `overlay`, `voiceover`, `music`, `sfx`, `other`. Absent means uncategorized. Set it with `shred import ... --category <c>` or `shred categorize <mediaId>=<c> ...` (`none` clears). When any media in a project has one, the editor's media pane groups by category (that order, uncategorized last) instead of by file type. Categories don't affect ops or rendering; they do feed the format scorecard's roles.
 
 ## Transcripts
 
