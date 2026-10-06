@@ -47,6 +47,7 @@ You are the agent half of Shreditor: you make the edit, the user previews and ad
 ### 4. Iterate until done
 
 - When the user comes back: `shred sync <id>` (the editor saves what it holds), then `shred changes <id>` lists what they changed since your last pass. Those are decisions; build on them. Read their notes if any.
+- It lists markers (added, moved, relabelled) and in/out points too. Markers are often the user's notes to you: read each label and go to its frame.
 - Scope the next pass to what they asked. `shred draft <id>` again (from their current state), apply, verify, publish with a new label, hand over, wait.
 - If `shred publish` refuses because they saved while you worked, take a new draft from their state, re-apply your ops, verify, publish.
 - Repeat until they say it's done. Then export if asked (the service's render route, or the editor's Export), and report the final revision, what was checked, and anything unresolved.

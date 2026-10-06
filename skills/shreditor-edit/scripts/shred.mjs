@@ -235,30 +235,8 @@ function summarize(project) {
   return { fps, end, tracks: t.tracks, items: t.items }
 }
 
-// Items keyed by id: added, removed, changed (timing, source, text, transform, other).
-function diffTimelines(before, after) {
-  const b = new Map((before?.items ?? []).map((i) => [i.id, i]))
-  const a = new Map((after?.items ?? []).map((i) => [i.id, i]))
-  const out = []
-  const name = (i) => i.label || i.text || `${i.type} ${i.id}`
-  for (const [id, item] of a) {
-    const old = b.get(id)
-    if (!old) {
-      out.push({ id, kind: 'added', name: name(item), type: item.type, from: item.from, frames: item.durationInFrames })
-      continue
-    }
-    const fields = []
-    if (old.from !== item.from || old.durationInFrames !== item.durationInFrames || old.trackId !== item.trackId) fields.push('timing')
-    if (old.sourceStart !== item.sourceStart || old.sourceEnd !== item.sourceEnd) fields.push('source')
-    if (old.text !== item.text) fields.push('text')
-    if (JSON.stringify(old.transform) !== JSON.stringify(item.transform)) fields.push('frame')
-    const rest = (i) => JSON.stringify({ ...i, from: 0, durationInFrames: 0, trackId: 0, sourceStart: 0, sourceEnd: 0, text: 0, transform: 0 })
-    if (rest(old) !== rest(item)) fields.push('other')
-    if (fields.length) out.push({ id, kind: 'changed', name: name(item), type: item.type, from: item.from, frames: item.durationInFrames, fields })
-  }
-  for (const [id, item] of b) if (!a.has(id)) out.push({ id, kind: 'removed', name: name(item), type: item.type, from: item.from, frames: item.durationInFrames })
-  return out.sort((x, y) => x.from - y.from)
-}
+// Items, markers and in/out points; the logic and its tests live beside this file.
+const { diffTimelines, describeChange, countChanges } = await import('./timeline-diff.mjs')
 
 const commands = {
   async up() {
@@ -434,8 +412,8 @@ const commands = {
     if (revision === last.resultRevision) return say(`No changes since pass #${Number(last.id)} "${last.label}".`)
     const diff = diffTimelines(last.timeline, project.timeline)
     if (opt.json) return say(JSON.stringify({ since: last.id, revision, diff, ...(editor ? { editor } : {}) }, null, 2))
-    say(`Since pass #${Number(last.id)} "${last.label}" the user changed ${diff.length} item(s). Treat these as decisions:`)
-    for (const d of diff) say(`  ${d.kind.padEnd(7)} ${String(d.from).padStart(5)}  ${d.name}${d.fields ? `  (${d.fields.join(', ')})` : ''}`)
+    say(`Since pass #${Number(last.id)} "${last.label}" the user changed ${countChanges(diff)}. Treat these as decisions:`)
+    for (const d of diff) say(`  ${describeChange(d)}`)
     const notes = path.join(workspace(), 'projects', id, 'agent', 'notes.json')
     if (fs.existsSync(notes)) say(`Notes from the user: ${notes}`)
   },
