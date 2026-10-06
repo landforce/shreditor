@@ -878,6 +878,73 @@ export async function renderComposition(options: RenderEngineOptions): Promise<C
 }
 
 // ---------------------------------------------------------------------------
+// renderCompositionFrames
+// ---------------------------------------------------------------------------
+
+interface CompositionFramesOptions {
+  composition: CompositionInputProps
+  /** Half-open project-frame spans to render, in order. */
+  spans: ReadonlyArray<readonly [number, number]>
+  /**
+   * Receives each rendered frame. It must take its copy of the canvas
+   * synchronously (getImageData, or the snapshot convertToBlob takes when
+   * called): the next frame renders while the returned promise is pending. At
+   * most `maxInFlight` deliveries run at once.
+   */
+  onFrame: (frame: number, canvas: OffscreenCanvas) => Promise<void>
+  maxInFlight?: number
+  signal?: AbortSignal
+}
+
+/**
+ * Render composition frames with the export renderer, keeping the canvas alpha
+ * (no encode). A composition with a transparent background gives transparent
+ * overlay layers for the native exporter.
+ */
+// Frame loop driven by the headless harness; exercised end to end by the native export checks
+// fallow-ignore-next-line complexity
+export async function renderCompositionFrames(options: CompositionFramesOptions): Promise<number> {
+  const { composition, spans, onFrame, signal } = options
+  const canvas = new OffscreenCanvas(
+    composition.width || DEFAULT_PROJECT_WIDTH,
+    composition.height || DEFAULT_PROJECT_HEIGHT,
+  )
+  // Default context settings, as the export uses (willReadFrequently would
+  // switch to a CPU raster path that can antialias differently).
+  const ctx = canvas.getContext('2d')
+  if (!ctx) throw new Error('Failed to create OffscreenCanvas 2D context')
+  ctx.imageSmoothingEnabled = true
+  ctx.imageSmoothingQuality = 'high'
+
+  const renderer = await createCompositionRenderer(composition, canvas, ctx)
+  const inFlight = new Set<Promise<void>>()
+  const maxInFlight = Math.max(1, options.maxInFlight ?? 2)
+  let rendered = 0
+  try {
+    await renderer.preload()
+    for (const [start, end] of spans) {
+      for (let frame = start; frame < end; frame++) {
+        if (signal?.aborted) throw new DOMException('Frame render cancelled', 'AbortError')
+        await renderer.renderFrame(frame)
+        const delivery = onFrame(frame, canvas)
+        inFlight.add(delivery)
+        void delivery.finally(() => inFlight.delete(delivery)).catch(() => {})
+        if (inFlight.size >= maxInFlight) await Promise.race(inFlight)
+        rendered++
+      }
+    }
+    await Promise.all(inFlight)
+    return rendered
+  } finally {
+    try {
+      renderer.dispose()
+    } catch (error) {
+      getLog().warn('Failed to dispose frame-sequence renderer', { error })
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
 // renderSingleFrame
 // ---------------------------------------------------------------------------
 

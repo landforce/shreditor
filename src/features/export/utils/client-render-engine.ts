@@ -2051,7 +2051,10 @@ export async function createCompositionRenderer(
         }
       }
 
-      // Clear canvas
+      // Clear canvas. clearRect first so a transparent background (overlay
+      // renders for the native exporter) starts each frame empty; an opaque
+      // fill covers it either way.
+      ctx.clearRect(0, 0, canvas.width, canvas.height)
       ctx.fillStyle = backgroundColor
       ctx.fillRect(0, 0, canvas.width, canvas.height)
 
