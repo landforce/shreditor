@@ -90,7 +90,7 @@ function StyleTile({
     <button
       type="button"
       draggable={Boolean(onDragStart)}
-      onDragStart={onDragStart?.(style)}
+      onDragStart={(event) => onDragStart?.(style)(event)}
       onDragEnd={onDragEnd}
       onClick={() => onAdd(style)}
       className={`group flex flex-col items-center gap-1 rounded-md border border-border bg-secondary/30 p-1.5 transition-[transform,background-color,border-color,color] duration-150 hover:border-primary/50 hover:bg-secondary/50 active:scale-[0.98] ${dashed}`}
