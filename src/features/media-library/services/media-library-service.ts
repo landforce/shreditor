@@ -1,4 +1,3 @@
-import { prepareImportedVideo } from '@/infrastructure/browser/native-media-fallback'
 import type { MediaAttribution, MediaMetadata, ThumbnailData } from '@/types/storage'
 import { createLogger } from '@/shared/logging/logger'
 import { mapWithConcurrency } from '@/shared/utils/async-utils'
@@ -68,6 +67,8 @@ import {
   hasMediaSource,
   readMediaSource,
   writeMediaSource,
+  checkPlacedMediaPreparation,
+  startPlacedMediaPreparation,
 } from '@/features/media-library/deps/storage'
 import {
   importFilmstripCache,
@@ -1181,8 +1182,11 @@ class MediaLibraryService {
     projectId: string,
     mediaId: string,
   ): Promise<MediaMetadata & { isDuplicate?: boolean; hasUnsupportedCodec?: boolean }> {
-    const prepared = await prepareImportedVideo(file, mediaId)
-    if (!prepared) return this.importMediaFileToOpfs(file, projectId, { mediaId })
+    // Files Chrome can't decode as they are get a working copy from the bridge,
+    // made in the background; the bridge writes their metadata.
+    if (!(await checkPlacedMediaPreparation(mediaId, file.name))) {
+      return this.importMediaFileToOpfs(file, projectId, { mediaId })
+    }
     const existing = (await getMediaForProjectDB(projectId)).find(
       (m) =>
         m.fileName === file.name &&
@@ -1190,12 +1194,7 @@ class MediaLibraryService {
         m.fileLastModified === file.lastModified,
     )
     if (existing) return { ...existing, isDuplicate: true }
-    const imported = await this.importMediaFileToOpfs(prepared, projectId, { mediaId })
-    const saved = await updateMediaDB(imported.id, {
-      fileSize: file.size,
-      fileLastModified: file.lastModified,
-    })
-    return { ...imported, ...saved }
+    return startPlacedMediaPreparation(mediaId, file.name, projectId)
   }
 
   /**
