@@ -24,7 +24,11 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 
-import { GRID_GAP_BY_SIZE, GRID_ROW_HEIGHT_PX, getMediaCardAspect } from './media-grid-constants'
+import {
+  getJustifiedCardCellStyle,
+  getJustifiedRowsClass,
+  getMediaCardAspect,
+} from './media-grid-constants'
 import {
   showMediaFilePicker,
   getSupportedMediaFormatLabels,
@@ -50,30 +54,18 @@ export const ListMediaGrid = memo(function ListMediaGrid(props: MediaGridProps) 
   return <MediaGridBase {...props} layout="list" />
 })
 
-/**
- * Justified rows: each cell grows in proportion to its aspect so every card in
- * a row lands on the same height while keeping its own shape.
- */
 function getJustifiedCellStyle(
   layout: MediaGridBaseProps['layout'],
   media: MediaMetadata,
   itemSize: number,
 ): CSSProperties | undefined {
-  if (layout !== 'grid') return undefined
-  const aspect = getMediaCardAspect(media)
-  const rowHeight = GRID_ROW_HEIGHT_PX[itemSize] ?? GRID_ROW_HEIGHT_PX[3]!
-  return {
-    flex: `${aspect} 1 ${aspect * rowHeight}px`,
-    minWidth: 0,
-    // A row holding one wide card must not balloon to the panel width
-    maxWidth: `${aspect * rowHeight * 1.4}px`,
-  }
+  return layout === 'grid'
+    ? getJustifiedCardCellStyle(getMediaCardAspect(media), itemSize)
+    : undefined
 }
 
 function getGridContainerClass(layout: MediaGridBaseProps['layout'], itemSize: number): string {
-  return layout === 'grid'
-    ? `flex flex-wrap ${GRID_GAP_BY_SIZE[itemSize] ?? GRID_GAP_BY_SIZE[3]} after:content-[''] after:grow-[1000000]`
-    : 'space-y-1'
+  return layout === 'grid' ? getJustifiedRowsClass(itemSize) : 'space-y-1'
 }
 
 // Pre-existing size (cyclomatic 14 on main, 12 here); covered by media-grid.test.tsx

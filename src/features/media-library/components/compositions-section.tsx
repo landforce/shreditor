@@ -34,8 +34,12 @@ import {
 } from '@/features/media-library/deps/timeline-stores'
 import { useMediaLibraryStore } from '../stores/media-library-store'
 import { setMediaDragData, clearMediaDragData } from '../utils/drag-data-cache'
-import { GRID_MIN_SIZE_PX, GRID_GAP_BY_SIZE } from './media-grid-constants'
-import { CARD_GRID_BASE, CARD_LIST_BASE, CARD_PERF_STYLE } from './card-styles'
+import {
+  getJustifiedCardCellStyle,
+  getJustifiedRowsClass,
+  getMediaCardAspect,
+} from './media-grid-constants'
+import { CARD_GRID_FLOW_BASE, CARD_LIST_BASE, CARD_PERF_STYLE } from './card-styles'
 import { compoundClipThumbnailService } from '../services/compound-clip-thumbnail-service'
 
 function getSkimIndicatorStyle(progress: number): CSSProperties {
@@ -229,23 +233,16 @@ export function CompositionsSection() {
 
   if (compositions.length === 0) return null
 
+  // Justified rows like the media grid: each card keeps its composition's shape.
   const groupContainerClassName =
-    viewMode === 'grid'
-      ? `grid ${GRID_GAP_BY_SIZE[mediaItemSize] ?? GRID_GAP_BY_SIZE[3]}`
-      : 'space-y-1'
-  const groupContainerStyle: CSSProperties | undefined =
-    viewMode === 'grid'
-      ? {
-          gridTemplateColumns: `repeat(auto-fill, minmax(min(${GRID_MIN_SIZE_PX[mediaItemSize] ?? GRID_MIN_SIZE_PX[3]}px, 100%), 1fr))`,
-        }
-      : undefined
+    viewMode === 'grid' ? getJustifiedRowsClass(mediaItemSize) : 'space-y-1'
 
   const renderCard = (comp: SubComposition) => {
     const handlers = cardHandlersById.get(comp.id)
     if (!handlers) return null
     const Card = viewMode === 'grid' ? GridCompositionCard : ListCompositionCard
 
-    return (
+    const card = (
       <Card
         key={comp.id}
         composition={comp}
@@ -268,6 +265,12 @@ export function CompositionsSection() {
         onCommitRename={handleCommitRename}
         onCancelRename={handleCancelRename}
       />
+    )
+    if (viewMode !== 'grid') return card
+    return (
+      <div key={comp.id} style={getJustifiedCardCellStyle(getMediaCardAspect(comp), mediaItemSize)}>
+        {card}
+      </div>
     )
   }
 
@@ -298,9 +301,7 @@ export function CompositionsSection() {
                   count={sequences.length}
                 />
               )}
-              <div className={groupContainerClassName} style={groupContainerStyle}>
-                {sequences.map(renderCard)}
-              </div>
+              <div className={groupContainerClassName}>{sequences.map(renderCard)}</div>
             </div>
           )}
           {compositeCompositions.length > 0 && (
@@ -313,9 +314,7 @@ export function CompositionsSection() {
                   count={compositeCompositions.length}
                 />
               )}
-              <div className={groupContainerClassName} style={groupContainerStyle}>
-                {compositeCompositions.map(renderCard)}
-              </div>
+              <div className={groupContainerClassName}>{compositeCompositions.map(renderCard)}</div>
             </div>
           )}
           {compoundClips.length > 0 && (
@@ -326,9 +325,7 @@ export function CompositionsSection() {
                   count={compoundClips.length}
                 />
               )}
-              <div className={groupContainerClassName} style={groupContainerStyle}>
-                {compoundClips.map(renderCard)}
-              </div>
+              <div className={groupContainerClassName}>{compoundClips.map(renderCard)}</div>
             </div>
           )}
         </CollapsibleContent>
@@ -638,7 +635,7 @@ const CompositionCardInternal = memo(function CompositionCardInternal({
             onDoubleClick={handleDoubleClick}
             style={CARD_PERF_STYLE}
             className={cn(
-              CARD_GRID_BASE,
+              CARD_GRID_FLOW_BASE,
               dragDisabled
                 ? 'opacity-50 cursor-not-allowed border-border'
                 : cn(
@@ -651,7 +648,8 @@ const CompositionCardInternal = memo(function CompositionCardInternal({
           >
             <div
               ref={thumbnailContainerRef}
-              className="flex-1 bg-secondary relative overflow-hidden min-h-0 flex items-center justify-center bg-gradient-to-br from-violet-500/10 to-violet-600/20"
+              className="bg-secondary relative overflow-hidden flex items-center justify-center bg-gradient-to-br from-violet-500/10 to-violet-600/20"
+              style={{ aspectRatio: getMediaCardAspect(composition) }}
               onPointerEnter={handleThumbnailPointerEnter}
               onPointerMove={handleThumbnailPointerMove}
               onPointerLeave={handleThumbnailPointerLeave}
