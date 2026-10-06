@@ -35,7 +35,7 @@ What `shred apply` accepts and how the project behaves. Verified against the Shr
 | `addTrack` | `kind` video/audio, `order?` | Returns `trackId`. Only for extra layers; V1/A1 exist already. |
 | `removeTrack` | `trackId`, `removeItems?` | Fails if the track has items unless `removeItems: true` (linked companions on other tracks go too; `detail/removedItems` lists them). The last track can't be removed. |
 | `addClip` | `mediaId`, `trackId?`, `from?`, `durationInFrames?` | Images default to 150 frames. Video adds a linked audio clip only if the file has audio; it goes on the first audio track free for that range (a new one if none is), so it stays in sync. `detail/created/<n>/trackId` says where. Set the source window after with `updateItem`. |
-| `addText` | `text`, `from`, `durationInFrames`, `trackId?`, `label?`, `color?`, `fontSize?`, `fontFamily?`, `fontWeight?` medium/semibold/bold, `textAlign?`, `verticalAlign?` | Stroke, shadow, letter spacing, line height and position go in a following `updateItem` / `setTransform`. |
+| `addText` | `text`, `from`, `durationInFrames?`, `trackId?`, `label?`, `color?`, `fontSize?`, `fontFamily?`, `fontWeight?` medium/semibold/bold, `textAlign?`, `verticalAlign?`, `styleId?` | With `styleId` (a project or library style, by id or name) the text takes the style's look, position, motion and default length; the other fields given win and are recorded as overrides. Without one, stroke, shadow, letter spacing, line height and position go in a following `updateItem` / `setTransform`. See Text styles and captions. |
 | `updateItem` | `id`, `updates` | Any item field: `label`, `sourceStart`, `sourceEnd`, `volume`, text style fields (`stroke {width,color}`, `textShadow {offsetX,offsetY,blur,color}`, `letterSpacing`, `lineHeight`, `backgroundColor`), `transform`. Don't use it to move items between tracks; use `moveItem`. |
 | `setTransform` | `id`, `transform` | Merges into the transform (creates it on clips that have none). After pulling Shreditor code changes, restart with `shred start --build`. |
 | `moveItem` | `id`, `from`, `trackId?` | |
@@ -49,6 +49,9 @@ What `shred apply` accepts and how the project behaves. Verified against the Shr
 | `removeEffect` | `itemId`, `effectId` | |
 | `addLut` | `itemId`, `lut`, `intensity?` (0..1, default 1) | Adds a `gpu-lut` effect from `<workspace>/luts/<lut>` (a file name there, e.g. `"Warm.cube"`; `shred lut list`). The LUT is embedded in the effect as the editor's LUT panel does (resampled to 33³), so later changes to the file don't touch the clip. Returns `detail.effectId`. An unknown name fails and lists what `luts/` has. |
 | `setTransformParent` | | Parent one item's transform to another. |
+| `applyTextStyle` | `ids`, `styleId` | Links text items to a style (project or library, id or name; a library style is copied into the project) and gives them its full look; their overrides are cleared. Sets `formatRole` from the style's role when the item has none. |
+| `upsertTextStyle` | `style` \| `fromItemId`, `name`, `role`, `id?`, `description?`, `caption?` | Adds or replaces a project style (matched by `id`, else `name`) and restyles every item using it, skipping each item's overrides, in one undo step. `fromItemId` saves that text item's look as the style and links the item. Returns `detail.styleId`, `detail.version`, `detail.style`, `detail.updatedItems`. |
+| `addCaptions` | `clipId`, `styleId`, `trackId?`, `replace?` | Captions a video/audio clip from its built-in transcript, mapped through the clip's source window and speed, chunked by the style's `caption` rules, on the format's Captions track (else `trackId`, else a new captions track above the clip). Returns `detail.created` (ids) and `detail.trackId`. `replace: true` first removes captions made for that clip. Fails if the media has no transcript yet or nobody speaks in the clip's range. |
 
 `GET /v1/capabilities` (on the service) lists the exact ops and limits for the running version.
 
@@ -77,6 +80,35 @@ Categories don't affect ops or rendering; they do feed the format scorecard's ro
 ## Transcripts
 
 Imported audio/video is transcribed in the background by whisper.cpp (`ggml-large-v3-turbo`, local) into `media/<id>/cache/ai/transcript.json`, the editor's own transcript store. Status is `transcription` in `media/<id>/metadata.json`: `queued`, `running`, `done`, `none` (`reason`: `no-audio`, `silent`, `no-speech`), `failed`, `unavailable` (whisper.cpp or the model missing; `hint` says what to run). Words are in source seconds (`start`, `end`, `confidence`); `sourceStart` for a word is `round(word.start * sourceFps)` (the project fps for audio with no fps). Times come from whisper's DTW alignment, typically within about 0.1 s of the spoken onset; check a tight cut with `shred frames` or by ear. Phantom lines Whisper invents on music, typing or silence ("Thank you.", "See you next time") are dropped. A transcript made or edited in the app is never replaced unless `shred transcribe <id> --force`.
+
+## Text styles and captions
+
+A text style is a named, reusable look: titles, labels, lower thirds, captions. Use styles instead of styling each item by hand; the user edits a style in the editor and every item using it follows.
+
+- **Where they live.** The library is `<workspace>/app/text-styles.json` (all projects, the user and you). A project keeps its own copies in `timeline.textStyles`; items point at one with `textStyleId`. Using a library style copies it in, so a project never changes when the library does. `shred styles use <projectId> <name>` again takes the library's newer look into the project (and restyles its items).
+- **Live link.** Changing a project style (`upsertTextStyle`, or the editor's Style picker) rewrites the styled fields of every item using it, in one undo step. A field changed on one item directly is listed in its `textStyleOverrides` and kept; the editor's Reset to style clears them. Text content is never part of a style.
+- **What a style holds** (`shred styles show <name>` prints one):
+  - `id`, `name`, `role` (`title`, `caption`, `label`, `lower-third`, `other`), `description?`, `version`, `updatedAt`.
+  - `style`: every text look field (`fontFamily`, `fontWeight`, `fontStyle`, `underline`, `fontSize`, `color`, `letterSpacing`, `lineHeight`, `textAlign`, `verticalAlign`, `backgroundColor`, `backgroundMode`, `backgroundRadius`, `textPadding`, `textShadow`, `stroke` incl. `join`). A field left out is cleared on the items (no background, no stroke).
+  - Lengths (`fontSize`, `letterSpacing`, `textPadding`, `backgroundRadius`, shadow offsets and blur, stroke width) are **pixels on a canvas whose short side is 1080**: the same on 1080x1920 and 1920x1080, scaled with the short side elsewhere (x0.667 at 720p, x2 at 4K).
+  - `layout?`: `xRatio`, `yRatio` (box centre from the canvas centre, +y below), `widthRatio`, `heightRatio`, as fractions of the canvas width/height. Only the axes given are styled.
+  - `textMotion?` (`{in, out, loop}`, as on items), `spanStyles?` (per-line looks of a multi-span item, by index; the last repeats), `defaultDurationFrames?` (length of a new `addText`).
+  - `caption?`: `maxWordsPerChunk`, `maxCharsPerLine`, `maxLines`, `minChunkFrames`, `case?` (`as-is`/`upper`/`lower`), `punctuation?` (`keep`/`strip`). A chunk also breaks at a pause of 0.18 s or more, after a sentence end once it is 1.4 s long, and before it would last over 2.2 s per line; lines are broken with `\n` at `maxCharsPerLine`. A chunk shorter than `minChunkFrames` is held longer, never into the next caption or past the clip.
+- **Captions.** `addCaptions` makes one text item per chunk with `textRole: "caption"`, `formatRole: "captions"`, `textStyleId` and `captionSource {type: "transcript", clipId, mediaId}`. Only words whose middle falls inside the clip's source window are used, so a trimmed clip is captioned from its own range, and a sped-up clip's captions run at its speed.
+- **Style packs.** A brand kit ships its styles as one file, `{ "kind": "shreditor-text-styles", "version": 1, "name"?, "styles": [...] }`: `shred styles import kit.json` merges it into the library (a style with the same id or name is replaced and keeps its id, so linked projects stay linked); `shred styles export [names] [--project id] --out kit.json` writes one.
+
+```sh
+shred styles list [--project <id>]          # library, or a project's copies (items using each, library state)
+shred styles use <projectId> "Kit Title" "Kit Captions"
+shred styles save <projectId> <itemId> --name "Hook" --role title   # an item's look, into project and library
+```
+
+```json
+[
+  { "op": "addText", "text": "Three things nobody tells you", "from": 0, "trackId": "<title track>", "styleId": "Kit Title", "callerId": "hook" },
+  { "op": "addCaptions", "clipId": "<speaker clip>", "styleId": "Kit Captions", "callerId": "caps" }
+]
+```
 
 ## Same-track overlaps are errors
 
