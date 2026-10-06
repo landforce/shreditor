@@ -62,6 +62,13 @@ export interface TranscriptPayload {
   modelVariant: MediaTranscriptModel
   text: string
   segments: Array<{ text: string; start: number; end: number }>
+  /**
+   * `'whisper.cpp'` when the local bridge transcribed the media on import
+   * (`server/transcription.mjs`, envelope service `whisper.cpp`, `params.auto`).
+   * Absent for transcripts made or edited in the app, which the bridge never
+   * replaces automatically.
+   */
+  source?: 'whisper.cpp'
 }
 
 export type CaptionsPayload = {
@@ -117,6 +124,10 @@ export interface ScenesPayload {
  * Adapter: build a transcript envelope from the legacy {@link MediaTranscript}
  * record shape. Keeps callers that already construct `MediaTranscript` working
  * unchanged during the migration.
+ *
+ * Every save from the app goes through here with service `whisper` and no
+ * `source`, so a transcript the user generated or edited is never mistaken
+ * for a native auto transcript (see `TranscriptPayload.source`).
  */
 export function transcriptFromLegacy(record: MediaTranscript): AiOutput<'transcript'> {
   return {

@@ -46,6 +46,7 @@ import { importMediaLibraryService } from '../services/media-library-service-loa
 import { importMediaAnalysisService } from '../services/media-analysis-service-loader'
 import { getMediaType, formatDuration } from '../utils/validation'
 import { MediaInfoPopover } from './media-info-popover'
+import { NativeTranscriptionBadge } from './native-transcription-badge'
 import { getSharedProxyKey } from '../utils/proxy-key'
 import { useMediaLibraryStore } from '../stores/media-library-store'
 import { useMediaPreparationStore } from '../stores/media-preparation-store'
@@ -1704,6 +1705,9 @@ const MediaCardInternal = memo(function MediaCardInternal({
                     <Loader2 className="w-2.5 h-2.5 animate-spin" />
                   </div>
                 )}
+                {!isBroken && !isPreparingMedia && (
+                  <NativeTranscriptionBadge media={media} className="absolute top-0.5 left-0.5" />
+                )}
                 {!isBroken && !isPreparingMedia && isTagging && (
                   <div
                     className="absolute bottom-0.5 left-0.5 p-0.5 rounded bg-purple-500/90 text-white"
@@ -1891,6 +1895,7 @@ const MediaCardInternal = memo(function MediaCardInternal({
                       <Sparkles className="w-2.5 h-2.5" />
                     </div>
                   )}
+                  {!isBroken && <NativeTranscriptionBadge media={media} />}
                   <div className="opacity-0 group-hover:opacity-100 transition-opacity">
                     <MediaInfoPopover media={media} onSeekToCaption={handleSeekToCaption} />
                   </div>

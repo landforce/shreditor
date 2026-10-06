@@ -51,7 +51,12 @@
         "threeD": "3D Rendered"
       },
       "menuCategory": "Category",
-      "clearCategory": "Clear category"
+      "clearCategory": "Clear category",
+      "nativeTranscriptQueued": "Queued for transcription (local whisper.cpp)",
+      "nativeTranscribing": "Transcribing locally with whisper.cpp",
+      "nativeNoSpeech": "No speech found",
+      "nativeTranscriptFailed": "Transcription failed: {{error}}. Click to retry.",
+      "nativeTranscriptRetry": "Retry transcription"
     },
     "category": {
       "speaker": "Speaker",
