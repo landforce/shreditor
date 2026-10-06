@@ -393,7 +393,7 @@ describe('canvas-item-renderer composition masks', () => {
       from: 0,
       durationInFrames: 60,
       label: 'Full cover',
-      src: 'cover.png',
+      src: 'cover.jpg',
       transform: { x: 0, y: 0, width: 640, height: 360, rotation: 0, opacity: 1 },
     }
     const compositionItem: CompositionItem = {
@@ -452,7 +452,7 @@ describe('canvas-item-renderer composition masks', () => {
       from: 0,
       durationInFrames: 60,
       label: 'Full cover',
-      src: 'cover.png',
+      src: 'cover.jpg',
       transform: { x: 0, y: 0, width: 640, height: 360, rotation: 0, opacity: 1 },
     }
     const lowerMask: ShapeItem = {
@@ -526,7 +526,7 @@ describe('canvas-item-renderer composition masks', () => {
       from: 0,
       durationInFrames: 60,
       label: 'Masked cover',
-      src: 'cover.png',
+      src: 'cover.jpg',
       transform: { x: 0, y: 0, width: 640, height: 360, rotation: 0, opacity: 1 },
     }
     const topMask: ShapeItem = {
