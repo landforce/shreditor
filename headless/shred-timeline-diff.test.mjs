@@ -1,8 +1,10 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {
+  changesSincePass,
   countChanges,
   describeChange,
+  describeChangesSincePass,
   diffTimelines,
 } from '../skills/shreditor-edit/scripts/timeline-diff.mjs'
 
@@ -102,4 +104,86 @@ test('items still diff as before, sorted by frame with markers', () => {
 test('timelines without markers or points diff cleanly', () => {
   assert.deepEqual(diffTimelines({ items: [text] }, { items: [text] }), [])
   assert.deepEqual(diffTimelines(undefined, undefined), [])
+})
+
+// A pass that trims the hook, adds a clip and a marker, published over `base`.
+const passBase = timeline({ markers: [marker('m-user', 5, 'mine')] })
+const passResult = timeline({
+  items: [
+    { ...text, durationInFrames: 40 },
+    { id: 'v1', type: 'video', trackId: 'track-1', from: 60, durationInFrames: 30, label: 'Clip' },
+  ],
+  markers: [marker('m-user', 5, 'mine'), marker('m-agent', 70, 'check')],
+})
+const pass = (extra = {}) => ({
+  id: '002',
+  label: 'Tighten the hook',
+  baseRevision: 'sha256:base',
+  resultRevision: 'sha256:result',
+  changes: diffTimelines(passBase, passResult),
+  timeline: passResult,
+  baseTimeline: passBase,
+  ...extra,
+})
+
+test('a pass the user undid (Cmd+Z) is reported as undone, not as edits', () => {
+  const since = changesSincePass(pass(), null, passBase)
+  assert.equal(since.undone.all, true)
+  assert.equal(since.undone.total, 3)
+  assert.deepEqual(since.diff, [])
+  assert.deepEqual(describeChangesSincePass(pass(), since), [
+    'The user undid pass #2 "Tighten the hook" in the editor (Cmd+Z): all 3 of its changes are reverted, so the project is back to how it was before that pass. That is a decision: don\'t reapply the pass unless the user asks for it.',
+    'No other changes since.',
+  ])
+})
+
+test('edits after undoing a pass are measured from the state before it', () => {
+  const after = timeline({
+    markers: [marker('m-user', 5, 'mine'), marker('m-new', 30, 'redo this')],
+  })
+  const since = changesSincePass(pass(), null, after)
+  assert.equal(since.undone.all, true)
+  const lines = describeChangesSincePass(pass(), since)
+  assert.equal(
+    lines[1],
+    'After that the user changed 0 item(s), 1 marker(s). Treat these as decisions:',
+  )
+  assert.equal(lines[2], '  added      30  marker "redo this"')
+})
+
+test('older pass records without a base use the pass before them', () => {
+  const previous = { id: '001', resultRevision: 'sha256:base', timeline: passBase }
+  const since = changesSincePass(pass({ baseTimeline: undefined }), previous, passBase)
+  assert.equal(since.undone.all, true)
+  const unrelated = { ...previous, resultRevision: 'sha256:other' }
+  assert.equal(
+    changesSincePass(pass({ baseTimeline: undefined }), unrelated, passBase).undone,
+    null,
+  )
+})
+
+test('a partly reverted pass lists the user changes and names what was put back', () => {
+  const current = timeline({
+    items: passResult.items,
+    markers: [marker('m-user', 5, 'mine')],
+  })
+  const since = changesSincePass(pass(), null, current)
+  assert.equal(since.undone.all, false)
+  const lines = describeChangesSincePass(pass(), since)
+  assert.equal(
+    lines[0],
+    'Since pass #2 "Tighten the hook" the user changed 0 item(s), 1 marker(s). Treat these as decisions:',
+  )
+  assert.equal(
+    lines.at(-1),
+    "1 of the pass's 3 changes are back to how they were before it (the user undid them): check.",
+  )
+})
+
+test('undo then redo of a pass, saved again, is no change', () => {
+  const since = changesSincePass(pass(), null, passResult)
+  assert.equal(since.undone, null)
+  assert.deepEqual(describeChangesSincePass(pass(), since), [
+    'No changes since pass #2 "Tighten the hook".',
+  ])
 })

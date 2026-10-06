@@ -523,7 +523,8 @@ function summarize(project) {
 }
 
 // Items, markers and in/out points; the logic and its tests live beside this file.
-const { diffTimelines, describeChange, countChanges } = await import('./timeline-diff.mjs')
+const { diffTimelines, changesSincePass, describeChangesSincePass } =
+  await import('./timeline-diff.mjs')
 
 // ---------------------------------------------------------------------------
 // Formats (formats/registry.mjs) and the scorecard (formats/scorecard.mjs)
@@ -682,6 +683,36 @@ async function scoringInputs(project) {
 }
 
 const TAG = { pass: 'pass', warn: 'WARN', fail: 'FAIL', info: 'info', na: 'n/a' }
+
+/** Write JSON so a reader (the editor) never sees half a file. */
+function writeJsonAtomic(file, value) {
+  const tmp = `${file}.${process.pid}.tmp`
+  fs.writeFileSync(tmp, `${JSON.stringify(value, null, 2)}\n`)
+  fs.renameSync(tmp, file)
+}
+
+/**
+ * A published pass as kept in `agent/passes/NNN.json`. `baseTimeline` is what
+ * the pass started from, so `shred changes` can tell when the user undid it.
+ */
+function passRecord({ n, draftId, target, saved, changes, draft, scorecard, kit }) {
+  return {
+    id: n,
+    label: opt.label,
+    summary: opt.summary ? fs.readFileSync(opt.summary, 'utf8').trim() : '',
+    by: 'agent',
+    status: 'review',
+    createdAt: new Date().toISOString(),
+    draftId,
+    baseRevision: target.revision,
+    resultRevision: saved.revision,
+    changes,
+    ...(scorecard ? { scorecard } : {}),
+    ...(kit ? { kit } : {}),
+    timeline: draft.project.timeline,
+    baseTimeline: target.project.timeline,
+  }
+}
 
 function printScorecard(card, project) {
   const fps = project.metadata?.fps ?? 30
@@ -1230,19 +1261,24 @@ const commands = {
           .sort()
       : []
     if (!passes.length) return say('No published passes yet.')
-    const last = JSON.parse(fs.readFileSync(path.join(dir, passes.at(-1)), 'utf8'))
+    const readPass = (file) => JSON.parse(fs.readFileSync(path.join(dir, file), 'utf8'))
+    const last = readPass(passes.at(-1))
     const { revision, project } = await getProject(id)
     if (revision === last.resultRevision)
       return say(`No changes since pass #${Number(last.id)} "${last.label}".`)
-    const diff = diffTimelines(last.timeline, project.timeline)
-    if (opt.json)
-      return say(
-        JSON.stringify({ since: last.id, revision, diff, ...(editor ? { editor } : {}) }, null, 2),
-      )
-    say(
-      `Since pass #${Number(last.id)} "${last.label}" the user changed ${countChanges(diff)}. Treat these as decisions:`,
-    )
-    for (const d of diff) say(`  ${describeChange(d)}`)
+    const previous = passes.length > 1 ? readPass(passes.at(-2)) : null
+    const since = changesSincePass(last, previous, project.timeline)
+    if (opt.json) {
+      const undone = since.undone && {
+        pass: last.id,
+        all: since.undone.all,
+        reverted: since.undone.reverted.map((d) => d.id),
+        total: since.undone.total,
+      }
+      const report = { since: last.id, revision, diff: since.diff, ...(undone ? { undone } : {}) }
+      return say(JSON.stringify({ ...report, ...(editor ? { editor } : {}) }, null, 2))
+    }
+    for (const line of describeChangesSincePass(last, since)) say(line)
     const notes = path.join(workspace(), 'projects', id, 'agent', 'notes.json')
     if (fs.existsSync(notes)) say(`Notes from the user: ${notes}`)
   },
@@ -1527,7 +1563,6 @@ const commands = {
 
   async publish([draftId, targetId]) {
     if (!opt.label) throw new Error('--label is required (one line naming the pass)')
-    const summary = opt.summary ? fs.readFileSync(opt.summary, 'utf8').trim() : ''
     const draft = await getProject(draftId)
     const target = await getProject(targetId)
     const origin = readDrafts()[draftId]
@@ -1541,21 +1576,39 @@ const commands = {
       )
     }
     const changes = diffTimelines(target.project.timeline, draft.project.timeline)
-    const saved = await call(
-      'PUT',
-      `/v1/projects/${targetId}`,
-      {
-        project: { ...target.project, timeline: draft.project.timeline },
-        expectedRevision: target.revision,
-      },
-      { 'Idempotency-Key': key('publish') },
-    )
-    const dir = path.join(workspace(), 'projects', targetId, 'agent', 'passes')
+    const agentDir = path.join(workspace(), 'projects', targetId, 'agent')
+    const dir = path.join(agentDir, 'passes')
     fs.mkdirSync(dir, { recursive: true })
+    // The open editor turns the pass into one undo step named by its label; it
+    // may reload before the record below exists, so say what is coming first.
+    const publishing = path.join(agentDir, 'publishing.json')
+    const intent = { label: opt.label, draftId, baseRevision: target.revision }
+    writeJsonAtomic(publishing, intent)
     const n = String(fs.readdirSync(dir).filter((f) => f.endsWith('.json')).length + 1).padStart(
       3,
       '0',
     )
+    const recordPath = path.join(dir, `${n}.json`)
+    let saved
+    const writeRecord = (extra = {}) =>
+      writeJsonAtomic(
+        recordPath,
+        passRecord({ n, draftId, target, saved, changes, draft, ...extra }),
+      )
+    try {
+      saved = await call(
+        'PUT',
+        `/v1/projects/${targetId}`,
+        {
+          project: { ...target.project, timeline: draft.project.timeline },
+          expectedRevision: target.revision,
+        },
+        { 'Idempotency-Key': key('publish') },
+      )
+      writeRecord()
+    } finally {
+      fs.rmSync(publishing, { force: true })
+    }
     // The format scorecard of what was published, kept with the pass.
     const published = { ...target.project, timeline: draft.project.timeline }
     const inputs = await scoringInputs(published)
@@ -1564,22 +1617,7 @@ const commands = {
       ? scoreProject(published, { ...inputs, targetOverrides: kitResult?.overrides })
       : null
     const kit = kitResult?.card ? { ...kitResult.card, note: kitResult.note } : null
-    const record = {
-      id: n,
-      label: opt.label,
-      summary,
-      by: 'agent',
-      status: 'review',
-      createdAt: new Date().toISOString(),
-      draftId,
-      baseRevision: target.revision,
-      resultRevision: saved.revision,
-      changes,
-      ...(scorecard ? { scorecard } : {}),
-      ...(kit ? { kit } : {}),
-      timeline: draft.project.timeline,
-    }
-    fs.writeFileSync(path.join(dir, `${n}.json`), `${JSON.stringify(record, null, 2)}\n`)
+    writeRecord({ scorecard, kit })
     await writeThumbnail(targetId, published)
     say(
       `Pass #${Number(n)} "${opt.label}" published to ${targetId}: ${changes.length} changes, revision ${saved.revision}`,
@@ -1590,11 +1628,11 @@ const commands = {
     if (scorecard) {
       say('')
       printScorecard(scorecard, published)
-      say(`(saved in ${path.join(dir, `${n}.json`)} as "scorecard")`)
+      say(`(saved in ${recordPath} as "scorecard")`)
     } else say('No format on this project, so no scorecard (shred format set).')
     if (kitResult) {
       printKitCheck(say, kitResult, published.metadata?.fps ?? 30)
-      say(`(saved in ${path.join(dir, `${n}.json`)} as "kit")`)
+      say(`(saved in ${recordPath} as "kit")`)
     }
   },
 

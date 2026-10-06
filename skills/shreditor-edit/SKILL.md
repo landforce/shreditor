@@ -69,6 +69,7 @@ Every edit starts here; nothing is planned or cut until the format is agreed. A 
 
 - When the user comes back: `shred sync <id>` (the editor saves what it holds), then `shred changes <id>` lists what they changed since your last pass. Those are decisions; build on them. Read their notes if any.
 - It lists markers (added, moved, relabelled) and in/out points too. Markers are often the user's notes to you: read each label and go to its frame.
+- The user may undo a whole pass with Cmd+Z: each pass is one undo step in the editor, named by its label. `shred changes` then says the pass was undone (its changes reverted) and lists anything they did after. Respect it: don't reapply that pass unless they ask; the next draft starts from the undone state.
 - Scope the next pass to what they asked. `shred draft <id>` again (from their current state), apply, verify, `shred check`, publish with a new label, hand over, wait.
 - If `shred publish` refuses because they saved while you worked, take a new draft from their state, re-apply your ops, verify, publish.
 - Repeat until they say it's done. Then export if asked: `shred sync <id>`, then `shred export <id>` (native ffmpeg render from the original media when possible, else the browser render; it prints which items went native and which the browser drew; `--codec prores|hevc` for 10-bit masters). The file lands in `<workspace>/projects/<id>/exports/`. Report the final revision, the export path and engine, the last scorecard, what was checked, and anything unresolved.
