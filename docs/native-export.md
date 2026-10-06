@@ -184,7 +184,14 @@ were measured before two browser-export fixes:
   range by sample timestamp (`decoded-audio-range.ts`). Re-measured on an
   8 s, three-cut fixture (H.264+AAC and ProRes+PCM): click minus flash 44, 44,
   57, 57, 60, 60 ms before, 0 ms on all six after, for MP4 and MOV; the audio
-  is now as long as the video. WebM/Opus exports are still about 7 ms late.
+  is now as long as the video. WebM/MKV with Opus were 7 ms late for the
+  same reason: Chrome's Opus encoder has 312 samples (6.5 ms) of pre-skip,
+  which the OpusHead states but Mediabunny writes CodecDelay 0, and players
+  drop the lead-in by CodecDelay. The export now rewrites the Opus TrackEntry
+  in place after finalize with CodecDelay = pre-skip and SeekPreRoll = 80 ms,
+  same byte length (`matroska-opus-codec-delay.ts`). Click minus flash on the
+  fidelity fixture: 7.00 ms on all three before, 0.00 after; Chrome's own
+  decode of the file was already exact and is unchanged.
 - **Colour.** Mediabunny takes a track's colour space only from a `colr` box,
   and Chrome's decoder ignores the H.264 VUI, so full-range BT.601 footage
   without `colr` decoded as BT.709. The decoder config now carries the matrix
@@ -194,8 +201,13 @@ were measured before two browser-export fixes:
   the phone clip 32.7 dB before, 37.1 dB after (native 38.1); BT.709 limited
   bars unchanged at 41.0 dB. The few levels left come from the hardware
   decoder's full-to-limited range step. The editor preview's paused and
-  scrubbed frames use the same decode and are fixed too; playback through the
-  `<video>` element still shows such a file as BT.709.
+  scrubbed frames use the same decode and are fixed too, and so are
+  thumbnails, filmstrips, freeze frames, scene detection, proxies and the
+  upscale and frame-interpolation workers, which wrap their Mediabunny track
+  the same way (`applyBitstreamColorSpace`): CanvasSink/VideoSampleSink decode
+  of the bars 29.2 dB before, 36.5 dB after; the phone clip 35.1 dB before,
+  48.5 dB after. Playback through `<video>` needs the colour in the container:
+  see the colour rewrap in [media-compatibility.md](media-compatibility.md).
 
 `npm run headless:test:fidelity` checks both against ffmpeg-made fixtures.
 

@@ -9,6 +9,7 @@ import { blobUrlManager } from '@/infrastructure/browser/blob-url-manager'
 import { execute, applyTransitionRepairs, getLogger } from '../shared'
 import { timelineToSourceFrames } from '../../../utils/source-calculations'
 import { isInTransitionOverlap } from './shared'
+import { applyBitstreamColorSpace } from '@/infrastructure/browser/mediabunny-video-color-space'
 
 /**
  * Insert a freeze frame at the playhead position.
@@ -81,7 +82,7 @@ export async function insertFreezeFrame(itemId: string, playheadFrame: number): 
     const frameWidth = videoTrack.displayWidth
     const frameHeight = videoTrack.displayHeight
 
-    const sink = new CanvasSink(videoTrack, {
+    const sink = new CanvasSink(applyBitstreamColorSpace(videoTrack), {
       width: frameWidth,
       height: frameHeight,
       fit: 'fill',

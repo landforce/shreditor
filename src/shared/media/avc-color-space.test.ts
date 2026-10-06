@@ -81,10 +81,21 @@ describe('withAvcBitstreamColorSpace', () => {
       config(AVCC.hdr),
       config(AVCC.noSignalType),
       config(AVCC.bt601Full, { codec: 'hvc1.1.6.L93.B0' }),
-      config(AVCC.bt601Full, { colorSpace: { matrix: 'bt709', fullRange: false } }),
+      config(AVCC.bt601Full, {
+        colorSpace: { matrix: 'bt709', fullRange: false, primaries: 'bt709', transfer: 'bt709' },
+      }),
     ]) {
       expect(withAvcBitstreamColorSpace(unchanged)).toBe(unchanged)
     }
+  })
+
+  it('completes a container colour space that leaves primaries and transfer unspecified', () => {
+    // An nclx colr with primaries/transfer 2: Mediabunny gives only matrix and range.
+    expect(
+      withAvcBitstreamColorSpace(
+        config(AVCC.bt601Full, { colorSpace: { matrix: 'bt470bg', fullRange: true } }),
+      ).colorSpace,
+    ).toEqual({ fullRange: true, matrix: 'bt470bg', primaries: 'bt709', transfer: 'bt709' })
   })
 
   it('keeps fields the container gave and fills the rest from the bitstream', () => {

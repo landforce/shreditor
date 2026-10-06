@@ -8,6 +8,7 @@
 
 import { ensureProResDecoderRegistered } from '@/infrastructure/browser/register-prores-decoder'
 import { getMimeType } from './validation'
+import { applyBitstreamColorSpace } from '@/infrastructure/browser/mediabunny-video-color-space'
 
 interface ThumbnailOptions {
   maxSize?: number // Max dimension (width or height) - aspect ratio preserved
@@ -59,7 +60,7 @@ async function generateVideoThumbnail(file: File, options: ThumbnailOptions = {}
 
     // ProRes decodes through the registered @mediabunny/prores decoder like any other
     // codec, so CanvasSink handles it directly.
-    sink = new CanvasSink(videoTrack, {
+    sink = new CanvasSink(applyBitstreamColorSpace(videoTrack), {
       width,
       height,
       fit: 'fill',

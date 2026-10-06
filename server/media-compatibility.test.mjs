@@ -12,6 +12,7 @@ import {
   probeCompatibility,
 } from './media-compatibility.mjs'
 import { importMediaByPath } from './media-bridge.mjs'
+import { readContainerColour } from './isobmff-colour.mjs'
 import { resolveMediaFile } from '../headless/lib/workspace.mjs'
 
 const ffmpeg = (...args) =>
@@ -91,6 +92,63 @@ test('conversion arguments carry colour faithfully and never invent tags', () =>
   assert.match(rewrap, /-c:v copy/)
   assert.match(rewrap, /-c:a pcm_f32le/)
   assert.doesNotMatch(rewrap, /-vf/)
+})
+
+test('H.264/HEVC with a BT.470BG matrix only in the bitstream gets container colour tags', () => {
+  const MP4 = 'mov,mp4,m4a,3gp,3g2,mj2'
+  const phone = probeOf('h264', 'yuvj420p', { color_space: 'bt470bg', color_range: 'pc', time_base: '1/30000' }, MP4, 'aac')
+  const policy = (probed, containerColour = []) => compatibilityPolicy(probed, false, { platform: 'darwin', containerColour })
+  const plan = policy(phone)
+  assert.equal(plan.action, 'rewrap')
+  assert.equal(plan.reason, 'colour')
+  assert.equal(plan.format, 'mp4', 'nclx (MP4) carries the full-range flag; MOV nclc does not')
+  assert.deepEqual(plan.video, { copy: true, codec: 'h264', colour: { primaries: 'bt709', transfer: 'bt709', matrix: 'bt470bg', range: 'pc' } })
+  assert.deepEqual(plan.audio, { codec: 'aac', copy: true })
+  assert.match(plan.notes.join(' '), /primaries\/transfer unspecified in the source, tagged BT.709/)
+  const args = compatibilityArgs(plan, phone, 'in.mp4', 'out.mp4').join(' ')
+  assert.match(args, /-c:v copy -color_primaries bt709 -color_trc bt709 -colorspace bt470bg -color_range pc/)
+  assert.doesNotMatch(args, /-vf|libx26/)
+  // Primaries and transfer the stream declares are kept.
+  assert.deepEqual(policy(probeOf('hevc', 'yuv420p', { color_space: 'bt470bg', color_primaries: 'bt470bg', color_transfer: 'smpte170m' }, MP4)).video.colour, {
+    primaries: 'bt470bg', transfer: 'smpte170m', matrix: 'bt470bg', range: 'tv',
+  })
+  const complete = [{ type: 'nclx', primaries: 1, transfer: 1, matrix: 5, fullRange: true }]
+  assert.equal(policy(phone, complete), null, 'a complete colr box already tells Chrome')
+  assert.equal(policy(phone, [{ type: 'nclx', primaries: 2, transfer: 2, matrix: 5, fullRange: true }]).reason, 'colour', 'Chrome ignores a colr with unspecified fields')
+  assert.match(policy(phone, [{ type: 'prof' }]).notes.join(' '), /ICC profile/)
+  for (const extra of [{ color_space: 'bt709', color_range: 'pc' }, { color_space: 'smpte170m', color_range: 'pc' }, {}])
+    assert.equal(policy(probeOf('h264', 'yuv420p', extra, MP4)), null, `Chrome reads ${JSON.stringify(extra)} from the bitstream`)
+  assert.equal(policy(probeOf('h264', 'yuvj420p', { color_space: 'bt470bg', color_range: 'pc' }, 'matroska,webm')), null, 'Matroska is not rewrapped')
+  // A rewrap for another reason carries the tags too.
+  const avi = policy(probeOf('h264', 'yuvj420p', { color_space: 'bt470bg', color_range: 'pc' }, 'avi', 'ac3'))
+  assert.equal(avi.reason, 'audio-codec')
+  assert.equal(avi.format, 'mp4')
+  assert.equal(avi.video.colour.matrix, 'bt470bg')
+  // So does a transcode that keeps the matrix (MJPEG is BT.601 full range).
+  const mjpeg = probeOf('mjpeg', 'yuvj422p', { color_space: 'bt470bg', color_range: 'pc' }, MP4)
+  const transcode = policy(mjpeg)
+  assert.equal(transcode.action, 'h264')
+  assert.equal(transcode.format, 'mp4')
+  assert.match(compatibilityArgs(transcode, mjpeg, 'i', 'o.mp4').join(' '), /-color_primaries bt709 -color_trc bt709 -colorspace bt470bg -color_range pc/)
+})
+
+test('colour rewrap copies the video packets and writes a complete nclx colr', async (t) => {
+  const { mediaDir } = setup(t)
+  const source = path.join(mediaDir, 'phone.mp4')
+  ffmpeg(
+    '-f', 'lavfi', '-i', 'testsrc2=s=64x48:r=10:d=0.5', '-f', 'lavfi', '-i', 'sine=d=0.5',
+    '-vf', 'scale=out_color_matrix=bt601:out_range=full,format=yuvj420p',
+    '-c:v', 'libx264', '-colorspace', 'bt470bg', '-color_range', 'pc', '-c:a', 'aac', '-shortest', source,
+  )
+  assert.deepEqual(readContainerColour(source), [], 'ffmpeg writes no colr without primaries/transfer')
+  const result = await prepareCompatibleMedia(source, mediaDir)
+  assert.equal(result.manifest.policy.reason, 'colour')
+  assert.match(result.file, /\.mp4$/)
+  assert.deepEqual(readContainerColour(result.file), [{ type: 'nclx', primaries: 1, transfer: 1, matrix: 5, fullRange: true }])
+  const hash = (file) => String(ffmpeg('-i', file, '-map', '0:v', '-c', 'copy', '-f', 'streamhash', '-hash', 'sha256', '-'))
+  assert.equal(hash(result.file), hash(source), 'video packets bit-identical')
+  assert.equal(result.manifest.verification.framesMatch, true)
+  assert.equal(compatibilityPolicy(await probeCompatibility(result.file), false, { platform: 'darwin' }), null, 'the working copy needs nothing more')
 })
 
 test('opaque derivative is decodable, cached, shared by headless export, and invalidated by source changes', async (t) => {
