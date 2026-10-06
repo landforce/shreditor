@@ -2,14 +2,18 @@
   "name": "Shreditor",
   "short_name": "Shreditor",
   "id": "/",
-  "description": "A browser-based video editor.",
+  "description": "The video editor your agent edits in, running on this Mac.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
   "background_color": "#f2f3f5",
   "theme_color": "#1d2129",
   "orientation": "any",
-  "categories": ["video", "productivity", "utilities"],
+  "categories": [
+    "video",
+    "productivity",
+    "utilities"
+  ],
   "icons": [
     {
       "src": "/icons/icon-192.png",
@@ -28,15 +32,6 @@
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"
-    }
-  ],
-  "screenshots": [
-    {
-      "src": "/assets/landing/timeline.png",
-      "sizes": "2048x1536",
-      "type": "image/png",
-      "form_factor": "wide",
-      "label": "Shreditor video editor timeline"
     }
   ]
 }
