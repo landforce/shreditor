@@ -260,7 +260,8 @@ describe('headless text style ops', () => {
     const captions = detail.created.map((id) => byId(result.project, id))
     // Source starts at 1.0 s, so "so" (0.5-0.9 s) is outside the window.
     // The window ends at 4.0 s, so "that" (4.0-4.4 s) is outside it too.
-    expect(captions.map((c) => c.text)).toEqual(['HERE IS THE', 'THING ABOUT STYLES'])
+    // Broken by phrase: never after "the".
+    expect(captions.map((c) => c.text)).toEqual(['HERE IS', 'THE THING', 'ABOUT STYLES'])
     expect(captions[0]).toMatchObject({
       textRole: 'caption',
       formatRole: 'captions',

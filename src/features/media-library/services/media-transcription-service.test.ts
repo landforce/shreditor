@@ -905,8 +905,10 @@ describe('mediaTranscriptionService.transcribeMedia', () => {
     expect(saved.segments.every((segment) => (segment.words?.length ?? 0) > 0)).toBe(true)
     expect(saved.segments.map((segment) => segment.text)).toEqual([
       'my sentences.',
-      "So once again, I'm going to talk about",
-      'the Netherlands in this video.',
+      // By phrase: at the comma, and never after "about".
+      'So once again,',
+      "I'm going to talk",
+      'about the Netherlands in this video.',
     ])
   })
 
