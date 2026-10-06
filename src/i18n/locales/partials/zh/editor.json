@@ -833,50 +833,19 @@
       "runsLocally": "{{runtime}} 会在浏览器中通过 {{backend}} 本地运行。",
       "history": "历史记录 ({{count}}) - {{size}}",
       "clearAll": "全部清除",
-      "musicGeneration": "音乐生成",
-      "collapseMusicGeneration": "折叠音乐生成",
-      "expandMusicGeneration": "展开音乐生成",
-      "musicGenerationInfo": "音乐生成信息",
-      "musicgenDescription": "通过 Transformers.js 使用 Xenova 的浏览器版 MusicGen 模型。首次下载较大，之后会缓存在本地。",
-      "musicgenPromptHint": "请描述流派、情绪、速度和乐器。较短的片段会完成得更快。",
-      "musicgenUnsupported": "此浏览器不支持 WebGPU. MusicGen 需要 Chrome 113+, Edge 113+ 或 Safari 26+.",
-      "prompt": "提示词",
-      "presets": "预设",
-      "musicPromptPlaceholder": "描述你想生成的音乐类型...",
-      "length": "长度",
-      "generateMusic": "生成音乐",
-      "musicHistory": "音乐历史记录 ({{count}}) - {{size}}",
       "remove": "移除",
       "saved": "已保存",
       "saving": "正在保存...",
       "saveAndInsert": "保存并插入",
       "saveToLibrary": "保存到库",
-      "progressPreparingMusic": "正在准备本地音乐生成...",
       "errors": {
-        "describeMusic": "请描述你想生成的音乐。",
-        "musicgenUnsupported": "MusicGen 需要 WebGPU. 请尝试 Chrome 113+, Edge 113+ 或 Safari 26+.",
-        "generateMusicFailed": "无法生成音乐。",
         "saveAudioFailed": "无法将音频保存到媒体库。"
       },
       "notifications": {
         "savedToLibrary": "已将\"{{fileName}}\"保存到媒体库。",
         "savedAndAdded": "已保存\"{{fileName}}\"并添加到时间线。"
       },
-      "defaultTtsPrompt": "Welcome to freecut. This voice was generated locally in the browser.",
-      "musicPresets": {
-        "lofiChillLabel": "Lo-fi 放松",
-        "lofiChillPrompt": "温暖的 lo-fi 节拍，配有复古鼓点、柔和低音和梦幻合成器主旋律",
-        "pop80sLabel": "80 年代流行",
-        "pop80sPrompt": "80 年代流行曲，配有厚重鼓点和合成器",
-        "rock90sLabel": "90 年代摇滚",
-        "rock90sPrompt": "90 年代摇滚歌曲，配有响亮的吉他和厚重鼓点",
-        "upbeatEdmLabel": "欢快 EDM",
-        "upbeatEdmPrompt": "轻快愉快的 EDM 曲目，配有切分鼓点、空灵铺底和强烈情绪 bpm: 130",
-        "countryLabel": "乡村",
-        "countryPrompt": "一首欢快的乡村歌，配有原声吉他",
-        "lofiElectroLabel": "Lo-fi 电子",
-        "lofiElectroPrompt": "低速 lo-fi 电子\f，配有有机采样"
-      }
+      "defaultTtsPrompt": "Welcome to freecut. This voice was generated locally in the browser."
     },
     "colorPanel": {
       "emptyState": "选择要调色的剪辑",

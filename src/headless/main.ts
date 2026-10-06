@@ -43,8 +43,10 @@ import { convertTimelineToComposition } from '@/features/export/utils/timeline-t
 import {
   renderComposition,
   renderAudioOnly,
+  renderCompositionFrames,
   renderSingleFrame,
 } from '@/features/export/utils/canvas-render-orchestrator'
+import { omitTranscriptSubtitleItemsForSoftSubtitleExport } from '@/features/export/utils/embedded-subtitle-export'
 import { getAnimatedTransform, buildKeyframesMap } from '@/features/export/utils/canvas-keyframes'
 import type { ClientExportSettings, RenderProgress } from '@/features/export/utils/client-renderer'
 import {
@@ -1195,6 +1197,62 @@ async function dumpLayout(input: HeadlessLayoutInput): Promise<HeadlessLayoutRes
   }
 }
 
+/** Render a subset of a project's visual items on transparent, frame by frame. */
+interface HeadlessOverlayInput {
+  project: Project
+  media?: HeadlessMediaSource[]
+  /** Top-level items to keep; every other item is left out of the render. */
+  itemIds: string[]
+  /** Half-open project-frame spans, in order. */
+  spans: Array<[number, number]>
+  /** Each frame is POSTed as a straight-alpha RGBA PNG to `${sinkUrl}?frame=<n>`. */
+  sinkUrl: string
+}
+
+interface HeadlessOverlaySummary {
+  ok: true
+  frames: number
+  width: number
+  height: number
+  warnings: HeadlessRenderWarning[]
+}
+
+/**
+ * Overlay layers for the native exporter: the same export renderer, limited to
+ * the given items, over a transparent background. Transcript subtitle items are
+ * left out exactly as the default (soft subtitle) browser export leaves them out.
+ */
+async function renderOverlayFrames(input: HeadlessOverlayInput): Promise<HeadlessOverlaySummary> {
+  const view = extractTimeline(input.project)
+  const keep = new Set(input.itemIds)
+  const items = view.items.filter((item) => keep.has(item.id))
+  const transitions = view.transitions.filter(
+    (t) => keep.has(t.leftClipId) && keep.has(t.rightClipId),
+  )
+  useCompositionsStore.getState().setCompositions(view.compositions)
+  registerMediaUrls(input.media)
+  seedMediaLibrary(input.media)
+  const composition = omitTranscriptSubtitleItemsForSoftSubtitleExport(
+    buildComposition({ ...view, items, transitions, backgroundColor: 'rgba(0, 0, 0, 0)' }),
+  )
+  const warnings = await prepareFonts(composition.tracks)
+  warnings.push(...(await assertGpuForComposition(composition, view.compositions)))
+  composition.tracks = await resolveMediaUrls(composition.tracks, { useProxy: false })
+  const frames = await renderCompositionFrames({
+    composition,
+    spans: input.spans,
+    maxInFlight: 3,
+    // PNG carries the canvas RGBA losslessly (straight alpha) and is small for sparse
+    // overlays (a text line is ~65 KB against 8 MB raw at 1080x1920).
+    onFrame: async (frame, canvas) => {
+      const png = await canvas.convertToBlob({ type: 'image/png' })
+      const response = await fetch(`${input.sinkUrl}?frame=${frame}`, { method: 'POST', body: png })
+      if (!response.ok) throw new Error(`Overlay frame ${frame} rejected: HTTP ${response.status}`)
+    },
+  })
+  return { ok: true, frames, width: view.width, height: view.height, warnings }
+}
+
 interface FreecutHeadlessApi {
   ready: true
   renderTimeline: typeof renderTimeline
@@ -1205,6 +1263,7 @@ interface FreecutHeadlessApi {
   normalizeProject: typeof normalizeProjectForHeadless
   probeMedia: typeof probeMedia
   createProject: typeof createProjectForHeadless
+  renderOverlayFrames: typeof renderOverlayFrames
 }
 
 async function createProjectForHeadless(input: {
@@ -1296,5 +1355,6 @@ window.freecut = {
   normalizeProject: normalizeProjectForHeadless,
   probeMedia,
   createProject: createProjectForHeadless,
+  renderOverlayFrames,
 }
 log.info('Headless harness ready')

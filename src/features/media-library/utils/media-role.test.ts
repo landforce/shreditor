@@ -58,6 +58,16 @@ describe('classifyMediaRole', () => {
     ).toBe('pending')
   })
 
+  it('trusts a native no-speech result', () => {
+    expect(
+      classifyMediaRole({
+        media: { ...AUDIO, transcription: { status: 'none', engine: 'whisper.cpp', updatedAt: 0 } },
+        transcriptStatus: 'idle',
+        speechCoverage: undefined,
+      }),
+    ).toBe('broll')
+  })
+
   it('treats silent clips, quiet clips and voiceover-only footage as b-roll', () => {
     expect(
       classifyMediaRole({ media: {}, transcriptStatus: 'idle', speechCoverage: undefined }),

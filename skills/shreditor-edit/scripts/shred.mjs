@@ -6,11 +6,18 @@
 //                                        and the agent service (8787)
 //   shred start                          start only the agent edit service
 //   shred status                         editor, service, workspace and writer-lock state
-//   shred catalog <folder|file...> --name <slug> [--no-transcribe] [--no-proxies]
-//                                        probe, contact-sheet, transcribe, and make playable proxies
+//   shred catalog <folder|file...> --name <slug> [--no-transcribe]
+//                                        probe, contact-sheet and transcribe (import makes working copies)
+//                                        (reuses the built-in transcript of footage already imported)
+//   shred transcript <mediaId> [--json]  the built-in transcript: words with start/end seconds
+//   shred transcribe <mediaId...> | --project <id> [--force]   transcribe now (imports do it on their own)
+//   shred setup [--yes]                  check ffmpeg, whisper-cli and the model; --yes downloads the model
 //   shred new --name "..." [--size 1080x1920] [--fps 30]   create a project; prints id and editor URL
 //   shred project <id>                   timeline summary (tracks, items, frames)
-//   shred import <file...> --project <id> [--category <c>]   bring footage in (clone/link in place)
+//   shred import <file...> --project <id> [--category <c>] [--no-wait]
+//                                        bring footage in (clone/link in place); video Chrome can't
+//                                        decode gets a playable working copy, and import waits for it
+//   shred media <mediaId...> [--wait] [--retry] [--json]   working-copy state (ready/preparing NN%/failed)
 //   shred categorize <mediaId>=<category>... | --category <c> <mediaId>...
 //                                        set what each media is for; the editor groups by it
 //   shred draft <id>                     copy a project to a private draft; prints the draft id
@@ -23,6 +30,9 @@
 //   shred master <audio|video> [--lufs -14] [--tp -1.5] [--out file.wav]
 //                                        loudness-master to a new WAV (two-pass loudnorm)
 //   shred sync <id> [--timeout 20]       make the open editor save now, so the agent sees unsaved tweaks
+//   shred export <id> [--native|--browser] [--codec h264|hevc|prores] [--quality low|medium|high|ultra] [--out name]
+//                                        final export to <workspace>/projects/<id>/exports/; default: native
+//                                        (ffmpeg from the originals) when the plan allows it, else browser
 //
 // Service: 127.0.0.1:8787 (SHRED_SERVICE to override). Workspace: SHRED_WORKSPACE,
 // else ~/.shreditor/config.json, else ~/Movies/Shreditor. Times are frames at the
@@ -33,7 +43,8 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { parseArgs } from 'node:util'
-import { fileURLToPath } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
+import { compatibilityPolicy } from '../../../server/media-compatibility.mjs'
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..')
 const SERVICE = process.env.SHRED_SERVICE || 'http://127.0.0.1:8787'
@@ -58,7 +69,9 @@ const { values: opt, positionals } = parseArgs({
     name: { type: 'string' },
     fps: { type: 'string', default: '30' },
     'no-transcribe': { type: 'boolean' },
-    'no-proxies': { type: 'boolean' },
+    'no-wait': { type: 'boolean' },
+    wait: { type: 'boolean' },
+    retry: { type: 'boolean' },
     label: { type: 'string' },
     summary: { type: 'string' },
     link: { type: 'boolean' },
@@ -67,6 +80,12 @@ const { values: opt, positionals } = parseArgs({
     dev: { type: 'boolean' },
     timeout: { type: 'string' },
     json: { type: 'boolean' },
+    yes: { type: 'boolean' },
+    force: { type: 'boolean' },
+    native: { type: 'boolean' },
+    browser: { type: 'boolean' },
+    codec: { type: 'string' },
+    quality: { type: 'string' },
   },
 })
 const [command, ...args] = positionals
@@ -217,6 +236,13 @@ const isPhantomSpeech = (text, seconds) => {
   return words <= 2 && seconds > 3
 }
 
+// Built-in transcripts (server/transcription.mjs), read straight from the workspace.
+const transcription = () => import(pathToFileURL(path.join(REPO, 'server/transcription.mjs')).href)
+const shreditorCli = (args) => {
+  const r = spawnSync(process.execPath, [path.join(REPO, 'bin/shreditor.mjs'), ...args], { stdio: 'inherit', env: { ...process.env, SHREDITOR_WORKSPACE: workspace(), SHREDITOR_PORT: new URL(EDITOR).port } })
+  if (r.status) process.exitCode = r.status
+}
+
 const key = (tag) => `${tag}-${crypto.randomUUID()}`
 const getProject = (id) => call('GET', `/v1/projects/${encodeURIComponent(id)}`)
 
@@ -235,30 +261,8 @@ function summarize(project) {
   return { fps, end, tracks: t.tracks, items: t.items }
 }
 
-// Items keyed by id: added, removed, changed (timing, source, text, transform, other).
-function diffTimelines(before, after) {
-  const b = new Map((before?.items ?? []).map((i) => [i.id, i]))
-  const a = new Map((after?.items ?? []).map((i) => [i.id, i]))
-  const out = []
-  const name = (i) => i.label || i.text || `${i.type} ${i.id}`
-  for (const [id, item] of a) {
-    const old = b.get(id)
-    if (!old) {
-      out.push({ id, kind: 'added', name: name(item), type: item.type, from: item.from, frames: item.durationInFrames })
-      continue
-    }
-    const fields = []
-    if (old.from !== item.from || old.durationInFrames !== item.durationInFrames || old.trackId !== item.trackId) fields.push('timing')
-    if (old.sourceStart !== item.sourceStart || old.sourceEnd !== item.sourceEnd) fields.push('source')
-    if (old.text !== item.text) fields.push('text')
-    if (JSON.stringify(old.transform) !== JSON.stringify(item.transform)) fields.push('frame')
-    const rest = (i) => JSON.stringify({ ...i, from: 0, durationInFrames: 0, trackId: 0, sourceStart: 0, sourceEnd: 0, text: 0, transform: 0 })
-    if (rest(old) !== rest(item)) fields.push('other')
-    if (fields.length) out.push({ id, kind: 'changed', name: name(item), type: item.type, from: item.from, frames: item.durationInFrames, fields })
-  }
-  for (const [id, item] of b) if (!a.has(id)) out.push({ id, kind: 'removed', name: name(item), type: item.type, from: item.from, frames: item.durationInFrames })
-  return out.sort((x, y) => x.from - y.from)
-}
+// Items, markers and in/out points; the logic and its tests live beside this file.
+const { diffTimelines, describeChange, countChanges } = await import('./timeline-diff.mjs')
 
 const commands = {
   async up() {
@@ -343,18 +347,19 @@ const commands = {
     const dir = path.join(workspace(), 'catalogs', name)
     fs.mkdirSync(path.join(dir, 'sheets'), { recursive: true })
     const transcribe = !opt['no-transcribe'] && which('whisper-cli') && fs.existsSync(WHISPER_MODEL)
+    const { transcriptForFile } = await transcription()
     const entries = []
     for (const file of files) {
       // Extension included: floor-plan.png and floor-plan.mov must not share a sheet.
       const base = slug(path.basename(file))
       let probe
       try {
-        probe = JSON.parse(execFileSync('ffprobe', ['-v', 'error', '-show_entries', 'format=duration:stream=codec_type,codec_name,width,height,r_frame_rate,pix_fmt', '-of', 'json', file], { encoding: 'utf8' }))
+        probe = JSON.parse(execFileSync('ffprobe', ['-v', 'error', '-show_format', '-show_streams', '-of', 'json', file], { encoding: 'utf8', maxBuffer: 16 * 1024 * 1024 }))
       } catch {
         entries.push({ file, error: 'ffprobe could not read it' })
         continue
       }
-      const v = probe.streams.find((x) => x.codec_type === 'video')
+      const v = probe.streams.find((x) => x.codec_type === 'video' && !x.disposition?.attached_pic)
       const a = probe.streams.find((x) => x.codec_type === 'audio')
       const duration = Number(probe.format?.duration ?? 0)
       const [fn, fd] = (v?.r_frame_rate ?? '0/1').split('/').map(Number)
@@ -365,7 +370,17 @@ const commands = {
         duration: Math.round(duration * 1000) / 1000,
         ...(v ? { width: v.width, height: v.height, fps: fd ? Math.round((fn / fd) * 1000) / 1000 : 0, codec: v.codec_name, alpha: /^(yuva|rgba|argb|bgra|abgr|gbrap|ya)/.test(v.pix_fmt ?? '') } : {}),
         ...(a ? { audio: a.codec_name } : {}),
-        browserPlayable: !v || isStill || ['h264', 'hevc', 'vp9', 'av1', 'vp8'].includes(v.codec_name),
+        browserPlayable: true,
+      }
+      // The decision import makes (server/media-compatibility.mjs): what Chrome
+      // can't decode as it is gets a working copy automatically when imported.
+      if (v && !isStill) {
+        try {
+          const plan = compatibilityPolicy(probe)
+          if (plan) Object.assign(entry, { browserPlayable: false, workingCopy: `${plan.action}: ${plan.detail}` })
+        } catch (error) {
+          Object.assign(entry, { browserPlayable: false, workingCopy: `none: ${error.message}` })
+        }
       }
       if (v) {
         const sheet = path.join(dir, 'sheets', `${base}.jpg`)
@@ -375,24 +390,18 @@ const commands = {
           entry.sheet = sheet
         } catch {}
       }
-      // Browsers can't decode ProRes, PNG-codec .mov and similar: make a playable copy.
-      // Transparent clips become VP9 WebM with alpha so they stay separate layers.
-      if (v && !isStill && !entry.browserPlayable && !opt['no-proxies']) {
-        const proxyDir = path.join(dir, 'proxies')
-        fs.mkdirSync(proxyDir, { recursive: true })
-        const even = 'scale=trunc(iw/2)*2:trunc(ih/2)*2'
-        const proxy = path.join(proxyDir, `${base}.${entry.alpha ? 'webm' : 'mp4'}`)
-        const args = entry.alpha
-          ? ['-c:v', 'libvpx-vp9', '-pix_fmt', 'yuva420p', '-b:v', '0', '-crf', '20', '-row-mt', '1', '-auto-alt-ref', '0', ...(a ? ['-c:a', 'libopus', '-b:a', '160k'] : ['-an'])]
-          : ['-c:v', 'libx264', '-crf', '16', '-preset', 'medium', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', ...(a ? ['-c:a', 'aac', '-b:a', '256k'] : ['-an'])]
-        try {
-          execFileSync('ffmpeg', ['-v', 'error', '-y', '-i', file, '-vf', even, ...args, proxy])
-          entry.proxy = proxy
-        } catch {
-          entry.proxyError = 'ffmpeg could not make a playable copy'
-        }
+      // Footage already imported was transcribed on import: use that.
+      const builtIn = a ? transcriptForFile(workspace(), file) : null
+      if (builtIn?.envelope) {
+        entry.mediaId = builtIn.mediaId
+        entry.transcript = builtIn.path
+        entry.speech = builtIn.envelope.data.text.slice(0, 400)
+      } else if (builtIn?.status?.status === 'none') {
+        entry.mediaId = builtIn.mediaId
+        entry.speech = null
+        entry.speechNote = `no clear speech (built-in transcription: ${builtIn.status.reason ?? 'none'})`
       }
-      if (transcribe && a && duration > 1) {
+      if (transcribe && a && duration > 1 && !builtIn?.envelope && builtIn?.status?.status !== 'none') {
         const wav = path.join(os.tmpdir(), `shred-${crypto.randomUUID()}.wav`)
         const outBase = path.join(dir, 'transcripts', base)
         fs.mkdirSync(path.dirname(outBase), { recursive: true })
@@ -415,13 +424,43 @@ const commands = {
         }
       }
       entries.push(entry)
-      say(`${entry.kind.padEnd(5)} ${String(entry.duration).padStart(7)}s  ${path.basename(file)}${entry.browserPlayable ? '' : entry.proxy ? `  → proxy ${path.basename(entry.proxy)}${entry.alpha ? ' (alpha)' : ''}` : '  (not playable; no proxy made)'}${entry.speechNote ? '  (no speech)' : ''}${entry.speech ? `  "${entry.speech.slice(0, 60)}…"` : ''}`)
+      say(`${entry.kind.padEnd(5)} ${String(entry.duration).padStart(7)}s  ${path.basename(file)}${entry.browserPlayable ? '' : `  (import makes a working copy: ${entry.workingCopy})`}${entry.speechNote ? '  (no speech)' : ''}${entry.speech ? `  "${entry.speech.slice(0, 60)}…"` : ''}`)
     }
     const out = path.join(dir, 'catalog.json')
     fs.writeFileSync(out, `${JSON.stringify({ name, createdAt: new Date().toISOString(), sources: inputs.map((p) => path.resolve(p)), entries }, null, 2)}\n`)
     say(`\n${entries.length} items → ${out}`)
     say(`Contact sheets in ${path.join(dir, 'sheets')}: open them and write what each shot shows into catalog.json ("content", "usable").`)
-    say('Import an entry\'s "proxy" instead of its file when it has one (originals are untouched).')
+    say('Import the original files: import makes a working copy automatically where browserPlayable is false (originals are untouched).')
+  },
+
+  async transcript([id]) {
+    if (!id) throw new Error('Pass a media id')
+    const { readStoredTranscript, readTranscriptionStatus } = await transcription()
+    const stored = readStoredTranscript(workspace(), id)
+    const status = readTranscriptionStatus(workspace(), id)
+    if (!stored) {
+      const why = status ? `${status.status}${status.reason ? ` (${status.reason})` : ''}${status.error ? `: ${status.error}` : ''}${status.hint ? `\n${status.hint}` : ''}` : 'never transcribed (run: shred transcribe ' + id + ')'
+      if (opt.json) return say(JSON.stringify({ mediaId: id, transcription: status, transcript: null }, null, 2))
+      say(`No transcript for ${id}: ${why}`)
+      process.exitCode = status?.status === 'none' ? 0 : 1
+      return
+    }
+    const data = stored.data
+    const source = stored.service === 'whisper.cpp' ? `whisper.cpp ${stored.model}` : `made in the app (${data.modelVariant ?? data.model ?? 'unknown model'})`
+    if (opt.json) return say(JSON.stringify({ mediaId: id, language: data.language, source, transcription: status, text: data.text, segments: data.segments }, null, 2))
+    say(`${id}  ${data.language ?? '?'}  ${source}`)
+    for (const seg of data.segments ?? []) {
+      say(`\n[${seg.start.toFixed(2)}-${seg.end.toFixed(2)}] ${seg.text}`)
+      for (const w of seg.words ?? []) say(`  ${w.start.toFixed(3).padStart(8)} ${w.end.toFixed(3).padStart(8)}  ${w.text}`)
+    }
+  },
+
+  async transcribe(ids) {
+    shreditorCli(['transcribe', ...ids, ...(opt.project ? ['--project', opt.project] : []), ...(opt.force ? ['--force'] : [])])
+  },
+
+  async setup() {
+    shreditorCli(['setup', 'whisper', ...(opt.yes ? ['--yes'] : [])])
   },
 
   async changes([id]) {
@@ -434,8 +473,8 @@ const commands = {
     if (revision === last.resultRevision) return say(`No changes since pass #${Number(last.id)} "${last.label}".`)
     const diff = diffTimelines(last.timeline, project.timeline)
     if (opt.json) return say(JSON.stringify({ since: last.id, revision, diff, ...(editor ? { editor } : {}) }, null, 2))
-    say(`Since pass #${Number(last.id)} "${last.label}" the user changed ${diff.length} item(s). Treat these as decisions:`)
-    for (const d of diff) say(`  ${d.kind.padEnd(7)} ${String(d.from).padStart(5)}  ${d.name}${d.fields ? `  (${d.fields.join(', ')})` : ''}`)
+    say(`Since pass #${Number(last.id)} "${last.label}" the user changed ${countChanges(diff)}. Treat these as decisions:`)
+    for (const d of diff) say(`  ${describeChange(d)}`)
     const notes = path.join(workspace(), 'projects', id, 'agent', 'notes.json')
     if (fs.existsSync(notes)) say(`Notes from the user: ${notes}`)
   },
@@ -488,8 +527,16 @@ const commands = {
   async import(files) {
     if (!files.length) throw new Error('Pass one or more file paths')
     const cli = path.join(REPO, 'bin/shreditor.mjs')
-    const out = execFileSync(process.execPath, [cli, 'import', ...files, ...(opt.project ? ['--project', opt.project] : []), ...(opt.link ? ['--link'] : []), ...(opt.category ? ['--category', opt.category] : [])], { encoding: 'utf8', env: { ...process.env, SHREDITOR_WORKSPACE: workspace() } })
-    say(out.trim())
+    // Streams progress while working copies are made (unless --no-wait).
+    const result = spawnSync(process.execPath, [cli, 'import', ...files, ...(opt.project ? ['--project', opt.project] : []), ...(opt.link ? ['--link'] : []), ...(opt.category ? ['--category', opt.category] : []), ...(opt['no-wait'] ? ['--no-wait'] : [])], { stdio: 'inherit', env: { ...process.env, SHREDITOR_WORKSPACE: workspace() } })
+    if (result.status) process.exitCode = result.status
+  },
+
+  async media(ids) {
+    if (!ids.length) throw new Error('Pass one or more media ids')
+    const cli = path.join(REPO, 'bin/shreditor.mjs')
+    const result = spawnSync(process.execPath, [cli, 'media', ...ids, ...(opt.wait ? ['--wait'] : []), ...(opt.retry ? ['--retry'] : []), ...(opt.json ? ['--json'] : [])], { stdio: 'inherit', env: { ...process.env, SHREDITOR_WORKSPACE: workspace() } })
+    if (result.status) process.exitCode = result.status
   },
 
   // Through the editor's bridge when it's up, else the same code in-process.
@@ -575,6 +622,51 @@ const commands = {
     fs.writeFileSync(path.join(dir, `${n}.json`), `${JSON.stringify(record, null, 2)}\n`)
     say(`Pass #${Number(n)} "${opt.label}" published to ${targetId}: ${changes.length} changes, revision ${saved.revision}`)
     say(`Editor: ${EDITOR}/editor/${targetId}  (an open editor reloads it within a second; open this link if it isn't showing)`)
+  },
+
+  // Final export. Native: ffmpeg renders from the ORIGINAL media and the browser
+  // draws only what ffmpeg can't (text, shapes, effects...) as transparent
+  // overlays; auto (default) falls back to the browser render with the reasons.
+  async export([id]) {
+    if (!id) throw new Error('Pass a project id')
+    if (opt.native && opt.browser) throw new Error('Pass --native or --browser, not both')
+    await warnUnsaved(id)
+    const codec = opt.codec ?? 'h264'
+    const quality = opt.quality ?? 'high'
+    const dir = path.join(workspace(), 'projects', id, 'exports')
+    const name = opt.out ? path.parse(opt.out).name.replace(/[^\w.-]+/g, '_') : undefined
+    let output
+    if (opt.browser) {
+      if (codec === 'prores') throw new Error('ProRes needs the native engine')
+      const { project } = await getProject(id)
+      const bytes = await call('POST', '/v1/render', { project: id, codec, quality })
+      const ext = { hevc: 'mp4', h265: 'mp4', vp9: 'webm', vp8: 'webm', av1: 'webm' }[codec] ?? 'mp4'
+      fs.mkdirSync(dir, { recursive: true })
+      output = path.join(dir, `${name ?? `${slug(project.name ?? id)}-browser`}.${ext}`)
+      fs.writeFileSync(output, bytes)
+      say('engine   browser (everything drawn in headless Chrome, media decoded by the browser)')
+    } else {
+      const res = await call('POST', '/v1/render', { project: id, engine: opt.native ? 'native' : 'auto', codec, quality, ...(name ? { out: name } : {}) })
+      output = res.output
+      if (res.engine === 'browser') {
+        say('engine   browser (native export not possible):')
+        for (const r of res.fallbackReasons ?? []) say(`  - ${r}`)
+      } else {
+        say(`engine   native (${res.codec}; ffmpeg from the original media)`)
+        for (const line of res.summary ?? []) say(`  ${line}`)
+        const v = res.verification
+        say(`checked  ${v.frames} frames, ${v.seconds.toFixed(3)}s, ${v.videoCodec} ${v.pixFmt} ${v.color.matrix}/${v.color.range}${v.audio ? `, ${v.audio.codec} ${v.audio.rate} Hz ${v.audio.seconds.toFixed(3)}s` : ', no audio'}`)
+        say(`time     ${res.timings.totalSeconds.toFixed(1)}s (overlays ${res.timings.overlaySeconds.toFixed(1)}s, encode ${res.timings.encodeSeconds.toFixed(1)}s)`)
+      }
+    }
+    if (opt.out && path.dirname(opt.out) !== '.') {
+      const copy = path.resolve(opt.out.replace(/^~(?=\/|$)/, os.homedir()))
+      const target = path.extname(copy) ? copy : `${copy}${path.extname(output)}`
+      fs.mkdirSync(path.dirname(target), { recursive: true })
+      fs.copyFileSync(output, target)
+      say(`copied   ${target}`)
+    }
+    say(output)
   },
 
   // Clip volume is plain gain with no limiter, so loudness targets are met here,

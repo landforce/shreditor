@@ -53,6 +53,10 @@ What `shred apply` accepts and how the project behaves. Verified against the Shr
 
 Each media's `category` (in `media/<id>/metadata.json`) says what it is for: `speaker`, `b-roll`, `graphics`, `overlay`, `voiceover`, `music`, `sfx`, `other`. Absent means uncategorized. Set it with `shred import ... --category <c>` or `shred categorize <mediaId>=<c> ...` (`none` clears). When any media in a project has one, the editor's media pane groups by category (that order, uncategorized last) instead of by file type. Categories don't affect ops or rendering.
 
+## Transcripts
+
+Imported audio/video is transcribed in the background by whisper.cpp (`ggml-large-v3-turbo`, local) into `media/<id>/cache/ai/transcript.json`, the editor's own transcript store. Status is `transcription` in `media/<id>/metadata.json`: `queued`, `running`, `done`, `none` (`reason`: `no-audio`, `silent`, `no-speech`), `failed`, `unavailable` (whisper.cpp or the model missing; `hint` says what to run). Words are in source seconds (`start`, `end`, `confidence`); `sourceStart` for a word is `round(word.start * sourceFps)` (the project fps for audio with no fps). Times come from whisper's DTW alignment, typically within about 0.1 s of the spoken onset; check a tight cut with `shred frames` or by ear. Phantom lines Whisper invents on music, typing or silence ("Thank you.", "See you next time") are dropped. A transcript made or edited in the app is never replaced unless `shred transcribe <id> --force`.
+
 ## Same-track overlaps are errors
 
 Two items on one track can't overlap. Any op that would make them (`addText`, `addClip`, `addItem`, `moveItem`, `updateItem` changing `from`/`durationInFrames`/`trackId`, `trimEnd` growth) fails the whole batch, nothing applied, naming the op, the track, the item in the way and both frame ranges (`[from, end)`, end exclusive):
@@ -65,7 +69,7 @@ Nothing is ever shifted to make room. Pick a free range, put the item on another
 
 ## Text that renders as intended
 
-- Fonts: any font installed on the machine works by its family name (e.g. `Helvetica Neue`, `Neue Haas Display`); unknown names fall back. Check a rendered frame; the editor can't tell you a font is missing.
+- Fonts: any font installed on the machine works by its exact family name (e.g. `Helvetica Neue`, `Avenir Next`, `Neue Haas Grotesk Display Pro`), in the weights it ships; the editor and the export draw the same installed face. Unknown names silently fall back to sans-serif in both: `Neue Haas Display` is one (the Neue Haas Display files install the family `Neue Haas Grotesk Display Pro`). Check a rendered frame; the editor can't tell you a font is missing.
 - Text items are positioned like everything else (center origin). Give them an explicit `transform` `width` wide enough for the line, or long lines wrap.
 - `stroke` is `{ width, color, join? }`. `width` is px outward from the glyph edge. `join` is `round` (default), `miter` (square die-cut corners; very sharp points past a miter limit of 3 are bevelled so they don't spike) or `bevel`. Text inside a transitioning compound clip draws through the GPU glyph path, which keeps round joins and caps the outline at about 8px.
 - `letterSpacing` is px (at project resolution) added after every character, spaces included, as in CSS. A word gap therefore shrinks by about twice the value: -6.5 on a 124px bold title leaves roughly 30px between words, versus about 44px at 0.
@@ -115,10 +119,15 @@ Clip `volume` is plain gain with no limiter, so a loudness target (e.g. -14 LUFS
 - `shred master <voiceover or final mix stem> [--lufs -14] [--tp -1.5] [--out file.wav]` writes `<name>.mastered.wav` next to the input (original untouched) with ffmpeg's two-pass `loudnorm` (measure, then normalize with the measured values; it limits true peak itself) and prints before/after integrated LUFS and true peak measured with `ebur128`. Import the mastered file.
 - Everything playing together adds up: a -14 LUFS VO plus b-roll audio lands louder. Measure the final export (render `audioOnly` WAV, or the exported video): `ffmpeg -nostats -i out.wav -filter_complex ebur128=peak=true -f null -` and read `I:` and `Peak:` in the summary. If it misses, lower the beds, or master the exported mix and use that as the only audio.
 
+## Export
+
+`shred export <id> [--native|--browser] [--codec h264|hevc|prores] [--quality low|medium|high|ultra] [--out name]` writes `<workspace>/projects/<id>/exports/<name>.mp4|mov` plus `<file>.export.json`. Default: native when the plan allows (ffmpeg renders video clips from the ORIGINAL files; text, shapes, images, effects, keyframed or transitioning clips are drawn by the browser as transparent overlays and composited in track order), else the browser render with the reasons. HDR sources refuse native and do not fall back; `--browser` is the explicit opt-in. It prints each item's route; read it. ProRes and HEVC keep 10 bits from 10-bit sources. Speed, EQ, ducking, pitch or volume keyframes make the audio come from the browser mix. Design and limits: `docs/native-export.md` in the Shreditor repo.
+
 ## Gotchas
 
-- **ProRes and other codecs browsers can't decode** will not play. `shred catalog` makes the playable copy for you (`proxy` in the catalog entry); import that. By hand: H.264 `-c:v libx264 -crf 16 -pix_fmt yuv420p`.
-- **Transparent video** (speaker cutouts, animated overlays) goes in as VP9 WebM with alpha (`-c:v libvpx-vp9 -pix_fmt yuva420p`; the catalog does this). Put it on a track above its background; it stays a separate layer. Check transparency on a rendered frame, not just in the preview.
+- **Files Chrome can't decode as they are** get a working copy on import (`shred import`, the editor's import): video copied into a playable container with PCM audio when only the container or audio is the problem, else HEVC Main10 (10-bit/HDR, same colour tags) or H.264 CRF 12 (8-bit, same chroma). ProRes is not converted (the editor decodes it itself). Never convert by hand; import the original. `metadata.json` `compatibility` records original, working copy, notes and checks.
+- **While a copy is made** the media is `preparing`: `shred import` waits (`--no-wait` returns at once), `shred media <id>` shows `making playable copy NN%`, `ready` or `failed: why` (`--wait`, `--retry`), the editor card shows it, and `addClip` with it fails with `MEDIA_NOT_READY` (409).
+- **Transparent video** (speaker cutouts, animated overlays) keeps its alpha. Put it on a track above its background; it stays a separate layer. Check transparency on a rendered frame, not just in the preview.
 - **The service holds the workspace writer lock** while it runs. Import with `shred import` (it does not need the lock). Never edit `project.json` by hand.
 - **Media imported while the editor is open** shows in its library within about a second (the editor polls the bridge). If it doesn't, reload the page; the timeline renders it either way.
 - `shred frames` renders the **saved** project. Apply first, then render.

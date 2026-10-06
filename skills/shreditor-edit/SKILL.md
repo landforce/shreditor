@@ -21,17 +21,18 @@ You are the agent half of Shreditor: you make the edit, the user previews and ad
 
 ### 1. Analyze and catalog the footage
 
-- `shred catalog <folder or files> --name <slug>` probes everything, makes a contact sheet per clip, and transcribes speech (whisper.cpp). Output: `<workspace>/catalogs/<slug>/catalog.json` plus `sheets/` and `transcripts/`.
+- `shred catalog <folder or files> --name <slug>` probes everything, makes a contact sheet per clip, and transcribes speech (whisper.cpp). Output: `<workspace>/catalogs/<slug>/catalog.json` plus `sheets/` and `transcripts/`. Footage already imported is not transcribed again: its entry carries `mediaId` and the built-in transcript.
+- Every audio/video import is transcribed in the background on its own (whisper.cpp, locally, word timings), into the same transcript the editor's transcript panel and captions use. `shred transcript <mediaId>` prints its words with start/end seconds (`--json` for segments); it says `queued`/`running` while still working and `none` when there is no speech. `shred transcribe <mediaId>` runs it now. If it says unavailable, `shred setup` (then `--yes` to download the model, with the user's OK).
 - Open every contact sheet and read every transcript. Add to each catalog entry: `content` (what it shows, in a few words), `best` (in-points worth using, seconds), `usable` (yes/no and why), `category`, and for talking heads where the face sits. Metadata does not tell you what a shot shows.
 - `category` is what the file is for: `speaker` (talking head), `b-roll`, `graphics` (screenshots, evidence, title cards), `overlay` (transparent cutouts, animated overlays), `voiceover`, `music`, `sfx` or `other`. Every entry gets one. Apply them when you import (step 2); the editor's media pane groups by them.
-- Files the browser can't decode (ProRes, PNG-codec `.mov`, ...) get a playable copy automatically in `proxies/`: H.264 for normal video, VP9 WebM with alpha for transparent video (cutouts, animated overlays), so those stay separate, movable layers. Import an entry's `proxy` instead of its `file`. Originals are never touched.
+- `browserPlayable: false` (PNG-codec `.mov`, DNx, MPEG-4 Part 2, AVI/MTS, AC-3/ALAC audio, ...) needs nothing from you: import makes a working copy automatically (`workingCopy` says how). ProRes reports `true`: the editor decodes it itself. Always import the original file. Transparent video keeps its alpha, so cutouts and overlays stay separate, movable layers. Originals are never touched.
 - Entries with `speechNote` had no real speech (Whisper's "Thank you." on music or typing is discarded). Flag duplicates.
 - Give the user a short catalog summary: what's there, what's strong, what's missing.
 
 ### 2. Understand the format the user wants
 
 - Ask what they're making, if they haven't said: format (for example VO vlog, talking-head yap, 10 shot), length, audience, the one thing the viewer should leave with, must-keep moments, music or not, and whether they want to see the plan before you build. Offer the formats their style skill defines. One round of questions, only what changes the result.
-- `shred new --name "..." --size 1080x1920 --fps 30` creates the project (or use the one they name). It prints the default tracks (`V1 track-1`, `A1 track-2`); reuse them and add tracks only for extra layers. Import the footage you'll use, one call per category: `shred import <files> --project <id> --category <category>` (clones in place, no copying). Fix or add categories later with `shred categorize <mediaId>=<category> ...`. The open editor shows imports and category changes within a second. The user can recategorize from a media card; their choice is in `media/<id>/metadata.json` and wins.
+- `shred new --name "..." --size 1080x1920 --fps 30` creates the project (or use the one they name). It prints the default tracks (`V1 track-1`, `A1 track-2`); reuse them and add tracks only for extra layers. Import the footage you'll use, one call per category: `shred import <files> --project <id> --category <category>` (clones in place, no copying; it waits while files Chrome can't decode get their working copy, printing progress). Fix or add categories later with `shred categorize <mediaId>=<category> ...`. The open editor shows imports and category changes within a second. The user can recategorize from a media card; their choice is in `media/<id>/metadata.json` and wins.
 - Write the brief (`<workspace>/projects/<id>/agent/brief.yaml`) and the beat plan (`plan.json`). Templates: `references/brief-and-plan.md`. Every beat has a viewer takeaway; the style skill decides pacing, type and placement.
 - If the brief says `review.plan: true`, show the plan and wait.
 
@@ -47,9 +48,10 @@ You are the agent half of Shreditor: you make the edit, the user previews and ad
 ### 4. Iterate until done
 
 - When the user comes back: `shred sync <id>` (the editor saves what it holds), then `shred changes <id>` lists what they changed since your last pass. Those are decisions; build on them. Read their notes if any.
+- It lists markers (added, moved, relabelled) and in/out points too. Markers are often the user's notes to you: read each label and go to its frame.
 - Scope the next pass to what they asked. `shred draft <id>` again (from their current state), apply, verify, publish with a new label, hand over, wait.
 - If `shred publish` refuses because they saved while you worked, take a new draft from their state, re-apply your ops, verify, publish.
-- Repeat until they say it's done. Then export if asked (the service's render route, or the editor's Export), and report the final revision, what was checked, and anything unresolved.
+- Repeat until they say it's done. Then export if asked: `shred sync <id>`, then `shred export <id>` (native ffmpeg render from the original media when possible, else the browser render; it prints which items went native and which the browser drew; `--codec prores|hevc` for 10-bit masters). The file lands in `<workspace>/projects/<id>/exports/`. Report the final revision, the export path and engine, what was checked, and anything unresolved.
 
 ## Report format (every pass)
 

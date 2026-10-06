@@ -8,6 +8,7 @@ import {
 import type { DroppableMediaType } from './dropped-media'
 import { isDroppableMediaType, isValidDragMediaItem, type DragMediaItem } from './drag-drop-preview'
 import { preflightFirstTimelineVideoProjectMatch } from './external-file-project-match'
+import { isMediaPreparationBlocked } from '@/shared/utils/media-compatibility'
 
 export interface DroppedMediaEntry {
   media: MediaMetadata
@@ -89,6 +90,8 @@ export function resolveDroppedMediaEntriesFromPayload(
         logger.error('Media not found:', dragItem.mediaId)
         return []
       }
+      // Still getting a playable working copy (or it failed): nothing to place yet.
+      if (isMediaPreparationBlocked(media)) return []
 
       return [
         {
@@ -107,6 +110,7 @@ export function resolveDroppedMediaEntriesFromPayload(
       logger.error('Media not found:', candidate.mediaId)
       return []
     }
+    if (isMediaPreparationBlocked(media)) return []
 
     return [
       {

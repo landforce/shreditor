@@ -61,13 +61,15 @@ export function hasAudioTrack(media: Pick<MediaMetadata, 'audioCodec'>): boolean
 }
 
 export function classifyMediaRole(input: {
-  media: Pick<MediaMetadata, 'aiCaptions' | 'audioCodec'>
+  media: Pick<MediaMetadata, 'aiCaptions' | 'audioCodec' | 'transcription'>
   transcriptStatus: MediaTranscriptStatus | undefined
   /** Undefined while the transcript is still being read. */
   speechCoverage: number | undefined
 }): MediaRole {
   const { media, transcriptStatus, speechCoverage } = input
   if (!hasAudioTrack(media)) return 'broll'
+  // The bridge's native transcriber found no speech (silent, music, typing...)
+  if (media.transcription?.status === 'none') return 'broll'
   // Not transcribed yet, or transcription failed (e.g. model download) - unknown
   if (transcriptStatus !== 'ready' || speechCoverage === undefined) return 'pending'
   if (speechCoverage < SPEAKER_SPEECH_COVERAGE) return 'broll'

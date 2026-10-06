@@ -5,6 +5,7 @@ import os from 'node:os'
 import path from 'node:path'
 import test from 'node:test'
 import {
+  compatibilityArgs,
   compatibilityPolicy,
   prepareCompatibleMedia,
   resolveCompatibleMedia,
@@ -34,19 +35,62 @@ function fixture(file, alpha = false) {
   )
 }
 
-test('policy distinguishes compatible, alpha, unsupported, and HDR inputs', () => {
-  const probe = (codec, pix_fmt = 'yuv420p', extra = {}) => ({
-    streams: [{ codec_type: 'video', codec_name: codec, pix_fmt, ...extra }],
-  })
-  assert.equal(compatibilityPolicy(probe('h264')), null)
-  assert.equal(compatibilityPolicy(probe('prores', 'yuva444p12le')), null)
-  assert.equal(compatibilityPolicy(probe('png', 'rgba')).alpha, true)
-  assert.equal(compatibilityPolicy(probe('mpeg4')).format, 'mp4')
-  assert.equal(compatibilityPolicy(probe('h264'), true).reason, 'decode-failed')
+const probeOf = (codec, pix_fmt = 'yuv420p', extra = {}, format = 'mov,mp4,m4a,3gp,3g2,mj2', audio) => ({
+  format: { format_name: format, duration: '1' },
+  streams: [
+    { index: 0, codec_type: 'video', codec_name: codec, pix_fmt, width: 64, height: 48, ...extra },
+    ...(audio ? [{ index: 1, codec_type: 'audio', codec_name: audio, sample_fmt: 'fltp', sample_rate: '48000', channels: 2 }] : []),
+  ],
+})
+
+test('policy keeps what Chrome decodes and classifies the rest', () => {
+  const plan = (...args) => compatibilityPolicy(probeOf(...args), false, { platform: 'darwin' })
+  for (const [codec, pix] of [['h264', 'yuv444p'], ['h264', 'yuv422p10le'], ['hevc', 'yuv420p10le'], ['hevc', 'yuv444p10le'], ['vp9', 'yuv444p'], ['av1', 'yuv420p10le'], ['prores', 'yuva444p12le']])
+    assert.equal(plan(codec, pix), null, `${codec} ${pix} plays as is`)
+  assert.equal(plan('hevc', 'yuv420p10le', { color_transfer: 'smpte2084', color_primaries: 'bt2020' }), null, 'HDR HEVC plays as is')
+  assert.equal(plan('png', 'rgba').action, 'prores-alpha')
+  assert.equal(plan('mpeg4').action, 'h264')
+  assert.deepEqual(plan('png', 'rgb24').video, { codec: 'h264', pixFmt: 'yuv444p', crf: 12 })
+  assert.deepEqual(plan('dnxhd', 'yuv422p10le').video, { codec: 'hevc', pixFmt: 'yuv422p10le', crf: 12 })
+  const hdr = plan('dnxhd', 'yuv422p10le', { color_transfer: 'arib-std-b67', color_primaries: 'bt2020' })
+  assert.equal(hdr.action, 'hevc', 'HDR that needs conversion stays HDR (HEVC Main10)')
+  const audio = plan('h264', 'yuv420p', {}, 'mov,mp4,m4a,3gp,3g2,mj2', 'ac3')
+  assert.equal(audio.action, 'rewrap')
+  assert.deepEqual(audio.audio, { codec: 'pcm_f32le', copy: false, from: 'ac3' })
+  assert.equal(plan('h264', 'yuv420p', {}, 'avi').action, 'rewrap')
+  assert.equal(plan('vp9', 'yuv420p', {}, 'mpegts').format, 'mkv')
+  assert.equal(plan('prores', 'yuv422p10le', {}, 'mov,mp4,m4a,3gp,3g2,mj2', 'ac3').action, 'rewrap')
+  assert.equal(compatibilityPolicy(probeOf('h264'), true, { platform: 'darwin' }).reason, 'decode-failed')
+  assert.equal(compatibilityPolicy(probeOf('prores', 'yuva444p12le'), true, { platform: 'darwin' }).action, 'vp9-alpha')
   assert.throws(
-    () => compatibilityPolicy(probe('hevc', 'yuv420p10le', { color_transfer: 'smpte2084' }), true),
+    () => compatibilityPolicy(probeOf('dnxhd', 'yuv422p10le', { color_transfer: 'smpte2084' }), false, { platform: 'linux' }),
     (e) => e.code === 'HDR_POLICY_REQUIRED',
   )
+  assert.equal(compatibilityPolicy(probeOf('hevc', 'yuv420p10le'), false, { platform: 'linux' }).action, 'h264')
+})
+
+test('conversion arguments carry colour faithfully and never invent tags', () => {
+  const rgb = probeOf('png', 'rgb24', { color_primaries: 'smpte432', color_transfer: 'iec61966-2-1', color_space: 'gbr', color_range: 'pc', time_base: '1/15360' })
+  const args = compatibilityArgs(compatibilityPolicy(rgb, false, { platform: 'darwin' }), rgb, 'in.mov', 'out.mov').join(' ')
+  assert.match(args, /out_color_matrix=bt709:out_range=tv/, 'RGB->YUV uses BT.709, not swscale BT.601')
+  assert.match(args, /-color_primaries smpte432 -color_trc iec61966-2-1 -colorspace bt709 -color_range tv/)
+  assert.match(args, /-crf 12/)
+  assert.match(args, /-fps_mode passthrough/)
+  assert.match(args, /-video_track_timescale 15360/)
+  const untagged = probeOf('mpeg4')
+  const plain = compatibilityArgs(compatibilityPolicy(untagged, false, { platform: 'darwin' }), untagged, 'in.mov', 'out.mov').join(' ')
+  assert.doesNotMatch(plain, /-color_primaries|-color_trc|-colorspace/)
+  const hlg = probeOf('dnxhd', 'yuv422p10le', { color_primaries: 'bt2020', color_transfer: 'arib-std-b67', color_space: 'bt2020nc', color_range: 'tv' })
+  const hlgArgs = compatibilityArgs(compatibilityPolicy(hlg, false, { platform: 'darwin' }), hlg, 'i', 'o.mov').join(' ')
+  assert.match(hlgArgs, /libx265.*-color_primaries bt2020 -color_trc arib-std-b67 -colorspace bt2020nc/)
+  // Frames are relabelled with the stream's tags first, so no matrix conversion happens.
+  assert.match(hlgArgs, /-vf setparams=color_primaries=bt2020:color_trc=arib-std-b67:colorspace=bt2020nc:range=tv,scale=/)
+  assert.doesNotMatch(hlgArgs, /out_color_matrix/)
+  const avi = probeOf('h264', 'yuv420p', {}, 'avi', 'ac3')
+  const rewrap = compatibilityArgs(compatibilityPolicy(avi, false, { platform: 'darwin' }), avi, 'i', 'o.mov').join(' ')
+  assert.match(rewrap, /-c:v copy/)
+  assert.match(rewrap, /-c:a pcm_f32le/)
+  assert.doesNotMatch(rewrap, /-vf/)
 })
 
 test('opaque derivative is decodable, cached, shared by headless export, and invalidated by source changes', async (t) => {
@@ -95,10 +139,15 @@ test('path import writes effective metadata and preserves original identity', as
   const { root } = setup(t)
   const source = path.join(root, 'legacy.mov')
   fixture(source)
-  const [result] = await importMediaByPath(root, [source], { mode: 'link' })
+  const [result] = await importMediaByPath(root, [source], { mode: 'link', prepare: 'wait' })
   assert.equal(result.error, undefined)
   assert.equal(result.metadata.codec, 'avc')
   assert.equal(result.metadata.compatibility.backend, 'native')
+  assert.equal(result.metadata.compatibility.status, 'ready')
+  assert.equal(result.metadata.compatibility.original.video.codec, 'mpeg4')
+  assert.equal(result.metadata.compatibility.derivative.video.codec, 'h264')
+  assert.deepEqual(result.metadata.compatibility.verification.frames, [5, 5])
+  assert.equal(result.metadata.compatibility.verification.durationDelta, 0)
   assert.equal(result.metadata.fileName, 'legacy.mov')
   assert.equal(result.metadata.fileSize, fs.statSync(source).size)
   assert.notEqual(resolveMediaFile(root, result.id), source)
@@ -144,6 +193,7 @@ test('preparation retains variable video timestamps and delayed audio timing', a
     source,
   )
   const result = await prepareCompatibleMedia(source, mediaDir)
+  assert.equal(result.manifest.verification.durationDelta, 0, 'no B-frame reordering shortens VFR clips')
   const timestamps = (file) =>
     JSON.parse(
       execFileSync('ffprobe', [

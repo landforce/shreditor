@@ -24,6 +24,7 @@ import {
   getMediaTranscriptionModelLabel,
 } from '../transcription/registry'
 import { importMediaLibraryService } from './media-library-service-loader'
+import { onExternalTranscriptChange } from './transcript-change-events'
 import {
   buildSubtitleSegmentForClip,
   getCaptionStyleTemplateFromPreset,
@@ -356,6 +357,11 @@ class MediaTranscriptionService {
   private activeJob: QueuedTranscriptionJob | null = null
   private queue: QueuedTranscriptionJob[] = []
   private readonly transcriptChangeListeners = new Set<(mediaId: string) => void>()
+
+  constructor() {
+    // Transcripts the bridge wrote in the background (see transcript-change-events).
+    onExternalTranscriptChange((mediaId) => this.emitTranscriptChanged(mediaId))
+  }
 
   getTranscript = getTranscript
   getTranscriptMediaIds = getTranscriptMediaIds

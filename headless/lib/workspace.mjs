@@ -134,13 +134,31 @@ export function readMediaMetadata(workspaceDir, mediaId) {
   }
 }
 
+/**
+ * Why a media can't be placed yet, or null: the bridge is still making its
+ * working copy (server/media-preparation.mjs), or couldn't.
+ */
+const NOT_READY = {
+  preparing: (m, c) =>
+    `${m.fileName} is still getting a playable working copy (${Math.round((c.progress ?? 0) * 100)}%). Wait for it: shred media ${m.id} --wait`,
+  failed: (m, c) =>
+    `${m.fileName} has no playable working copy: ${c.error ?? 'preparation failed'}. Retry: shred media ${m.id} --retry`,
+}
+
+function mediaNotReadyReason(metadata) {
+  const c = metadata?.compatibility
+  return c && Object.hasOwn(NOT_READY, c.status) ? NOT_READY[c.status](metadata, c) : null
+}
+
 /** Collect `{ mediaId, metadata }` for media referenced by addClip ops (deduped). */
 export function collectAddClipMedia(workspaceDir, ops) {
   const ids = [...new Set(ops.filter((o) => o.op === 'addClip' && o.mediaId).map((o) => o.mediaId))]
-  return ids.map((mediaId) => ({
-    mediaId,
-    metadata: readMediaMetadata(workspaceDir, mediaId) ?? undefined,
-  }))
+  return ids.map((mediaId) => {
+    const metadata = readMediaMetadata(workspaceDir, mediaId) ?? undefined
+    const notReady = mediaNotReadyReason(metadata)
+    if (notReady) throw new HttpError(409, 'MEDIA_NOT_READY', notReady)
+    return { mediaId, metadata }
+  })
 }
 
 /**
@@ -178,7 +196,8 @@ export function resolveMediaFile(workspaceDir, mediaId, { original = false } = {
   if (!fs.existsSync(mediaDir)) return null
   for (const entry of fs.readdirSync(mediaDir, { withFileTypes: true })) {
     if (!entry.isFile()) continue
-    if (NON_SOURCE_NAMES.has(entry.name)) continue
+    // Dotfiles are atomic-write temporaries (metadata.json progress writes).
+    if (NON_SOURCE_NAMES.has(entry.name) || entry.name.startsWith('.')) continue
     const source = resolveContained(mediaRoot, path.join(mediaId, entry.name))
     return original ? source : (resolveCompatibleMedia(source, mediaDir) ?? source)
   }

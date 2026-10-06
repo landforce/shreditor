@@ -78,6 +78,65 @@ function getFontConfig(fontName: string): FontConfig {
 
 registerFontCatalog(FONT_CATALOG)
 
+/** Families we ship as Google Fonts; every other name may be an installed font. */
+const CATALOG_FONT_KEYS: ReadonlySet<string> = new Set(FONT_CATALOG.map((font) => font.value))
+
+const LOCAL_FONT_PROBE_TEXT = 'mmmmmmmmmmlli1WQ@#'
+const LOCAL_FONT_PROBE_GENERICS = ['monospace', 'serif', 'sans-serif'] as const
+
+/**
+ * True when `family` resolves to a font installed on this machine.
+ *
+ * A family the browser can't find falls back to the generic it is stacked on,
+ * so it measures exactly like every generic; an installed one differs from at
+ * least one of them (it may coincide with one, e.g. Helvetica is the macOS
+ * sans-serif). Only meaningful before any `@font-face` for the family exists.
+ */
+export function isFontFamilyInstalled(
+  family: string,
+  measure: (cssFont: string) => number,
+): boolean {
+  return LOCAL_FONT_PROBE_GENERICS.some(
+    (generic) => measure(`72px "${family}", ${generic}`) !== measure(`72px ${generic}`),
+  )
+}
+
+/**
+ * Whether to request `fontName` from Google Fonts. Catalog fonts always are.
+ * Any other name is fetched only when it is not installed locally: Google
+ * answers some system family names (e.g. "Helvetica Neue", from a `localhost`
+ * origin only) with a single-weight stand-in registered under the same name,
+ * which shadows the installed font in every weight. The editor then drew a
+ * synthetic-bold 400 face while the export (on 127.0.0.1, where that request
+ * fails) drew the real bold, so text measured and wrapped differently.
+ */
+export function shouldFetchGoogleFont(
+  fontName: string,
+  isInstalled: (family: string) => boolean,
+): boolean {
+  return CATALOG_FONT_KEYS.has(fontName) || !isInstalled(getFontConfig(fontName).family)
+}
+
+const installedFontCache = new Map<string, boolean>()
+let probeContext: CanvasRenderingContext2D | null | undefined
+
+function isInstalledInDocument(family: string): boolean {
+  const cached = installedFontCache.get(family)
+  if (cached !== undefined) return cached
+  if (probeContext === undefined) {
+    probeContext = document.createElement('canvas').getContext('2d')
+  }
+  const ctx = probeContext
+  const installed = ctx
+    ? isFontFamilyInstalled(family, (cssFont) => {
+        ctx.font = cssFont
+        return ctx.measureText(LOCAL_FONT_PROBE_TEXT).width
+      })
+    : false
+  installedFontCache.set(family, installed)
+  return installed
+}
+
 /**
  * Build Google Fonts URL for a font
  */
@@ -111,6 +170,13 @@ async function loadGoogleFont(fontName: string): Promise<string> {
 
   const loadPromise = (async () => {
     try {
+      if (!shouldFetchGoogleFont(fontName, isInstalledInDocument)) {
+        // Installed locally: use it as is, in every weight it has.
+        const fontFamily = `"${config.family}", sans-serif`
+        loadedFontFamilies.set(fontName, fontFamily)
+        return fontFamily
+      }
+
       // Check if link already exists
       const existingLink = document.querySelector(`link[data-font="${fontName}"]`)
       if (!existingLink) {

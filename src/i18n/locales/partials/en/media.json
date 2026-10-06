@@ -15,6 +15,11 @@
       "interpolateFactor": "{{factor}}x frames",
       "interpolateFrames": "Interpolate Frames",
       "preparing": "Preparing",
+      "makingPlayableCopy": "Making playable copy… {{percent}}%",
+      "noPlayableCopy": "No playable copy",
+      "retryPlayableCopy": "Retry",
+      "notPlayableYet_one": "\"{{name}}\" is still getting a playable copy. Add it when it's ready.",
+      "notPlayableYet_other": "{{count}} clips are still getting a playable copy. Add them when they're ready.",
       "menuAi": "Menu AI",
       "menuCaptions": "Embedded captions",
       "menuFile": "File",
@@ -51,7 +56,12 @@
         "threeD": "3D Rendered"
       },
       "menuCategory": "Category",
-      "clearCategory": "Clear category"
+      "clearCategory": "Clear category",
+      "nativeTranscriptQueued": "Queued for transcription (local whisper.cpp)",
+      "nativeTranscribing": "Transcribing locally with whisper.cpp",
+      "nativeNoSpeech": "No speech found",
+      "nativeTranscriptFailed": "Transcription failed: {{error}}. Click to retry.",
+      "nativeTranscriptRetry": "Retry transcription"
     },
     "category": {
       "speaker": "Speaker",

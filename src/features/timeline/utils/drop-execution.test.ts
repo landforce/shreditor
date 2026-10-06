@@ -34,6 +34,7 @@ function createMedia(overrides: TestMediaOverrides = {}): MediaMetadata {
     bitrate: overrides.bitrate ?? 1,
     audioCodec: overrides.audioCodec,
     tags: overrides.tags ?? [],
+    ...(overrides.compatibility ? { compatibility: overrides.compatibility } : {}),
     createdAt: overrides.createdAt ?? Date.now(),
     updatedAt: overrides.updatedAt ?? overrides.modifiedAt ?? Date.now(),
   }
@@ -65,6 +66,40 @@ describe('drop-execution', () => {
     expect(entries.map((entry) => entry.mediaId)).toEqual(['video-1', 'audio-1'])
     expect(logger.warn).toHaveBeenCalledOnce()
     expect(logger.error).toHaveBeenCalledWith('Media not found:', 'missing')
+  })
+
+  it('skips media whose working copy is still being made or failed', () => {
+    const logger = { warn: vi.fn(), error: vi.fn() }
+    const mediaItems = [
+      createMedia({ id: 'ready' }),
+      createMedia({
+        id: 'preparing',
+        compatibility: { version: 2, backend: 'native', status: 'preparing', progress: 0.4 },
+      }),
+      createMedia({
+        id: 'failed',
+        compatibility: { version: 2, backend: 'native', status: 'failed' },
+      }),
+    ]
+    const items = mediaItems.map((m) => ({
+      mediaId: m.id,
+      mediaType: 'video',
+      fileName: m.fileName,
+      duration: 3,
+    }))
+    const entries = resolveDroppedMediaEntriesFromPayload(
+      { type: 'media-items', items },
+      mediaItems,
+      logger,
+    )
+    expect(entries.map((entry) => entry.mediaId)).toEqual(['ready'])
+    expect(
+      resolveDroppedMediaEntriesFromPayload(
+        { type: 'media-item', ...items[1] },
+        mediaItems,
+        logger,
+      ),
+    ).toEqual([])
   })
 
   it('filters imported media to droppable entry types', () => {

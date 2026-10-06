@@ -26,7 +26,10 @@ import {
   validateMediaHandle,
 } from '@/infrastructure/storage'
 import { scanWorkspaceMediaHealth } from '../utils/workspace-health'
+import { isMediaPreparationBlocked } from '@/shared/utils/media-compatibility'
+import { blobUrlManager } from '@/infrastructure/browser/blob-url-manager'
 import { mergeTranscriptionProgress } from '@/shared/utils/transcription-progress'
+import { announceNativeTranscripts, findNewNativeTranscripts } from './native-transcription-sync'
 
 const logger = createLogger('MediaLibraryStore')
 
@@ -59,6 +62,27 @@ function buildTranscriptStatusMap(
     nextTranscriptStatus.set(item.id, transcriptIds?.has(item.id) ? 'ready' : 'idle')
   }
   return nextTranscriptStatus
+}
+
+/** Pick up transcripts the bridge wrote in the background (see native-transcription-sync). */
+async function syncNativeTranscripts(previous: MediaMetadata[], fresh: MediaMetadata[]) {
+  const ids = findNewNativeTranscripts(previous, fresh)
+  if (ids.length === 0) return
+  try {
+    const loaded = await loadTranscriptStatusMap(fresh.filter((item) => ids.includes(item.id)))
+    useMediaLibraryStore.setState((state) => {
+      const transcriptStatus = new Map(state.transcriptStatus)
+      for (const [id, status] of loaded) {
+        const current = transcriptStatus.get(id)
+        // An in-app run for the same media owns its status until it ends.
+        if (current !== 'queued' && current !== 'transcribing') transcriptStatus.set(id, status)
+      }
+      return { transcriptStatus }
+    })
+    announceNativeTranscripts(ids)
+  } catch (error) {
+    logger.warn('[MediaLibraryStore] Native transcript refresh failed:', error)
+  }
 }
 
 async function loadTranscriptStatusMap(
@@ -293,8 +317,20 @@ const newStore: MediaLibraryStoreApi =
           const pending = state.mediaItems.filter(
             (item) => state.importingIds.includes(item.id) && !freshIds.has(item.id),
           )
-          const added = fresh.filter((item) => !knownIds.has(item.id))
+          // A working copy that just finished (server/media-preparation.mjs) gives
+          // the media a new decode source: drop cached URLs and treat it as new.
+          const wasBlocked = new Set(
+            state.mediaItems
+              .filter((item) => isMediaPreparationBlocked(item))
+              .map((item) => item.id),
+          )
+          const becameReady = fresh.filter(
+            (item) => wasBlocked.has(item.id) && !isMediaPreparationBlocked(item),
+          )
+          for (const item of becameReady) blobUrlManager.invalidate(item.id)
+          const added = [...fresh.filter((item) => !knownIds.has(item.id)), ...becameReady]
           set({ mediaItems: [...pending, ...fresh] })
+          void syncNativeTranscripts(state.mediaItems, fresh)
           if (added.length === 0) return
 
           void mediaLibraryService

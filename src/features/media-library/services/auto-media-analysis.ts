@@ -1,4 +1,5 @@
 import { createLogger } from '@/shared/logging/logger'
+import type { MediaMetadata } from '@/types/storage'
 import { getTranscriptMediaIds } from '@/infrastructure/storage'
 import { getMediaType } from '../utils/validation'
 import { hasAudioTrack } from '../utils/media-role'
@@ -8,6 +9,13 @@ import { runMediaTranscriptionJob } from './media-transcription-runner'
 import { mediaAnalysisService } from './media-analysis-service'
 
 const log = createLogger('AutoMediaAnalysis')
+
+/** Native whisper.cpp states the bridge owns; failures fall back to the browser. */
+const NATIVE_HANDLED = new Set(['queued', 'running', 'done', 'none'])
+
+function isHandledByNativeTranscription(media: MediaMetadata): boolean {
+  return NATIVE_HANDLED.has(media.transcription?.status ?? '')
+}
 
 /** Let the editor finish loading before heavy model work starts. */
 const START_DELAY_MS = 2500
@@ -52,7 +60,10 @@ async function runAutoMediaAnalysis(projectId: string): Promise<void> {
   // Ask the workspace, not the store: the store's transcript map may still be
   // loading, and re-transcribing would overwrite a user's transcript.
   // Retries earlier failures too (e.g. a model download that failed last open).
-  const withAudio = videos.filter(hasAudioTrack)
+  // Skip media the local bridge is transcribing natively (or already settled)
+  const withAudio = videos.filter(
+    (media) => hasAudioTrack(media) && !isHandledByNativeTranscription(media),
+  )
   const transcribed = await getTranscriptMediaIds(withAudio.map((media) => media.id))
   const untranscribed = withAudio.filter((media) => !transcribed.has(media.id))
   for (const media of untranscribed) {

@@ -46,6 +46,10 @@ import { importMediaLibraryService } from '../services/media-library-service-loa
 import { importMediaAnalysisService } from '../services/media-analysis-service-loader'
 import { getMediaType, formatDuration } from '../utils/validation'
 import { MediaInfoPopover } from './media-info-popover'
+import { NativeTranscriptionBadge } from './native-transcription-badge'
+import { PreparationOverlay, PreparationRetry, WorkingCopyBadge } from './media-preparation-status'
+import { placeableMedia, preparationLabel } from '../utils/media-preparation'
+import { isMediaPreparationBlocked } from '@/shared/utils/media-compatibility'
 import { getSharedProxyKey } from '../utils/proxy-key'
 import { useMediaLibraryStore } from '../stores/media-library-store'
 import { useMediaPreparationStore } from '../stores/media-preparation-store'
@@ -736,8 +740,11 @@ const MediaCardInternal = memo(function MediaCardInternal({
       [media.id],
     ),
   )
-  const isPreparingMedia = isImporting || hasActivePreparationTasks
-  const preparingLabel = t('media.card.preparing')
+  // A working copy in progress (or failed) leaves the media without a usable
+  // source: shown like an import, and it can't be dragged or opened.
+  const isPreparationBlocked = isMediaPreparationBlocked(media)
+  const isPreparingMedia = isImporting || hasActivePreparationTasks || isPreparationBlocked
+  const preparingLabel = preparationLabel(media, t('media.card.preparing'))
 
   const proxyStatus = useMediaLibraryStore((s) => s.proxyStatus.get(media.id))
   const isInterpolating = useMediaLibraryStore(
@@ -1301,15 +1308,16 @@ const MediaCardInternal = memo(function MediaCardInternal({
 
       if (isPartOfSelection && hasMultipleSelected) {
         // Build array of all selected media items in their current order
-        const selectedItems = selectedMediaIds
-          .map((id) => mediaById[id])
-          .filter((m): m is MediaMetadata => m !== undefined)
-          .map((m) => ({
-            mediaId: m.id,
-            mediaType: getMediaType(m.mimeType),
-            fileName: m.fileName,
-            duration: m.duration,
-          }))
+        const selectedItems = placeableMedia(
+          selectedMediaIds
+            .map((id) => mediaById[id])
+            .filter((m): m is MediaMetadata => m !== undefined),
+        ).map((m) => ({
+          mediaId: m.id,
+          mediaType: getMediaType(m.mimeType),
+          fileName: m.fileName,
+          duration: m.duration,
+        }))
 
         const dragData = {
           type: 'media-items' as const,
@@ -1689,10 +1697,9 @@ const MediaCardInternal = memo(function MediaCardInternal({
                 )}
                 {/* Preparing overlay for list view thumbnail */}
                 {isPreparingMedia && (
-                  <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
-                    <Loader2 className="w-4 h-4 text-white animate-spin" />
-                  </div>
+                  <PreparationOverlay media={media} label={preparingLabel} compact />
                 )}
+                {!isPreparingMedia && <WorkingCopyBadge media={media} small />}
                 {/* Broken indicator for list view */}
                 {isBroken && !isPreparingMedia && (
                   <div className="absolute top-0.5 right-0.5 p-0.5 rounded bg-destructive/90 text-destructive-foreground">
@@ -1704,6 +1711,9 @@ const MediaCardInternal = memo(function MediaCardInternal({
                   <div className="absolute bottom-0.5 right-0.5 p-0.5 rounded bg-green-500/90 text-black">
                     <Loader2 className="w-2.5 h-2.5 animate-spin" />
                   </div>
+                )}
+                {!isBroken && !isPreparingMedia && (
+                  <NativeTranscriptionBadge media={media} className="absolute top-0.5 left-0.5" />
                 )}
                 {!isBroken && !isPreparingMedia && isTagging && (
                   <div
@@ -1746,8 +1756,14 @@ const MediaCardInternal = memo(function MediaCardInternal({
 
               {/* Info — single row: icon + name + duration */}
               <div className="flex-1 min-w-0 flex items-center gap-1.5">
-                {isImporting ? (
-                  <span className="text-[10px] text-muted-foreground">{preparingLabel}</span>
+                {isImporting || isPreparationBlocked ? (
+                  <span
+                    className="text-[10px] text-muted-foreground truncate flex items-center gap-1.5"
+                    title={media.compatibility?.error ?? media.compatibility?.detail}
+                  >
+                    {preparingLabel}
+                    <PreparationRetry media={media} />
+                  </span>
                 ) : (
                   <>
                     <div className="p-0.5 rounded bg-primary/90 text-primary-foreground flex-shrink-0">
@@ -1850,14 +1866,7 @@ const MediaCardInternal = memo(function MediaCardInternal({
               )}
 
               {/* Preparing overlay */}
-              {isPreparingMedia && (
-                <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center gap-2 pointer-events-none">
-                  <Loader2 className="w-6 h-6 text-white animate-spin" />
-                  <div className="text-[9px] text-white/60 uppercase tracking-wider">
-                    {preparingLabel}
-                  </div>
-                </div>
-              )}
+              {isPreparingMedia && <PreparationOverlay media={media} label={preparingLabel} />}
 
               {/* Top-right badges & info */}
               {!isPreparingMedia && (
@@ -1885,6 +1894,7 @@ const MediaCardInternal = memo(function MediaCardInternal({
                       <Zap className="w-2.5 h-2.5" />
                     </div>
                   )}
+                  {!isBroken && <WorkingCopyBadge media={media} />}
                   {!isBroken && hasCaptions && (
                     <div
                       className="p-0.5 rounded bg-purple-500/90 text-white pointer-events-none"
@@ -1893,6 +1903,7 @@ const MediaCardInternal = memo(function MediaCardInternal({
                       <Sparkles className="w-2.5 h-2.5" />
                     </div>
                   )}
+                  {!isBroken && <NativeTranscriptionBadge media={media} />}
                   <div className="opacity-0 group-hover:opacity-100 transition-opacity">
                     <MediaInfoPopover media={media} onSeekToCaption={handleSeekToCaption} />
                   </div>

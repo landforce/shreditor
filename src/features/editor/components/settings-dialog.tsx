@@ -39,6 +39,7 @@ import {
 import {
   LocalInferenceUnloadControl,
   LocalModelCacheControl,
+  ModelsAndLicenses,
   useSettingsStore,
   CAPTIONING_INTERVAL_BOUNDS,
   DEFAULT_CAPTIONING_INTERVAL_SECONDS,
@@ -890,6 +891,8 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                             ))}
                           </div>
                         </div>
+                        <Separator className="bg-white/8" />
+                        <ModelsAndLicenses />
                       </div>
                     )}
 
