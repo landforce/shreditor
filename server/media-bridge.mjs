@@ -50,6 +50,8 @@ import crypto from 'node:crypto'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
+import { prepareCompatibleMedia } from './media-compatibility.mjs'
+import { resolveMediaFile } from '../headless/lib/workspace.mjs'
 
 const SOURCE_LINK_FILENAME = 'source.link.json'
 
@@ -443,7 +445,10 @@ export async function importMediaByPath(root, paths, { projectId, mode = 'auto',
       try {
         const readable = placed.method === 'clone' ? path.join(dir, placed.entryName) : placed.sourcePath
         const probed = await probe(readable)
-        const details = metadataFromProbe(probed, placed.mimeType)
+        const prepared = placed.mimeType.startsWith('video/') && probed
+          ? await prepareCompatibleMedia(readable, dir) : null
+        const effectiveMime = prepared ? (prepared.manifest.policy.alpha ? 'video/quicktime' : 'video/mp4') : placed.mimeType
+        const details = metadataFromProbe(prepared?.manifest.probe ?? probed, effectiveMime)
         const hasThumbnail = await writeThumbnail(readable, dir, details, placed.mimeType)
         const now = Date.now()
         const metadata = {
@@ -452,8 +457,9 @@ export async function importMediaByPath(root, paths, { projectId, mode = 'auto',
           fileName: placed.fileName,
           fileSize: placed.size,
           fileLastModified: placed.mtimeMs,
-          mimeType: placed.mimeType,
+          mimeType: effectiveMime,
           ...details,
+          ...(prepared ? { compatibility: { version: 1, backend: 'native', reason: prepared.manifest.policy.reason, alpha: prepared.manifest.policy.alpha, originalMimeType: placed.mimeType } } : {}),
           ...(hasThumbnail ? { thumbnailId: crypto.randomUUID() } : {}),
           tags: [],
           ...(category ? { category } : {}),
@@ -613,6 +619,34 @@ export function createMediaRoutes({ resolveInside, sendJson, readBody, serveFile
           resolveInside,
         })
         sendJson(res, media.some((m) => !m.error) ? 200 : 422, { media })
+        return true
+      }
+      case 'POST media/prepare': {
+        const body = await readJson(req)
+        if (typeof body.mediaId !== 'string' || !ID_PATTERN.test(body.mediaId)) throw new MediaBridgeError(400, 'TypeError', 'Invalid mediaId')
+        const source = resolveMediaFile(root, body.mediaId, { original: true })
+        if (!source) throw new MediaBridgeError(404, 'NotFoundError', 'Media source is missing')
+        const controller = new AbortController()
+        const cancel = () => { if (!res.writableEnded) controller.abort() }
+        res.once('close', cancel)
+        try {
+          const prepared = await prepareCompatibleMedia(source, path.join(root, 'media', body.mediaId), { force: body.force === true, signal: controller.signal })
+          if (prepared) {
+            const metadataPath = path.join(root, 'media', body.mediaId, 'metadata.json')
+            if (fs.existsSync(metadataPath)) {
+              const previous = JSON.parse(fs.readFileSync(metadataPath, 'utf8'))
+              const mimeType = prepared.manifest.policy.alpha ? 'video/quicktime' : 'video/mp4'
+              writeJsonAtomic(metadataPath, { ...previous, ...metadataFromProbe(prepared.manifest.probe, mimeType), mimeType,
+                compatibility: { version: 1, backend: 'native', reason: prepared.manifest.policy.reason, alpha: prepared.manifest.policy.alpha },
+                updatedAt: Date.now() })
+            }
+          }
+          sendJson(res, 200, prepared ? {
+            prepared: true, cached: prepared.cached,
+            url: `/__shreditor/fs/file?path=${encodeURIComponent(`media/${body.mediaId}/cache/compatibility/${prepared.manifest.file}`)}`,
+            alpha: prepared.manifest.policy.alpha,
+          } : { prepared: false })
+        } finally { res.off('close', cancel) }
         return true
       }
       case 'POST media/category': {

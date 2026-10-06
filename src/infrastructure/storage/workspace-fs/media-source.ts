@@ -17,7 +17,7 @@
 import { createLogger } from '@/shared/logging/logger'
 
 import { requireWorkspaceRoot } from './root'
-import { listDirectory, readBlob, writeBlob } from './fs-primitives'
+import { listDirectory, readBlob, readJson, writeBlob } from './fs-primitives'
 import { mediaDir, mediaSourceByFileName } from './paths'
 
 const logger = createLogger('WorkspaceFS:MediaSource')
@@ -60,7 +60,30 @@ export async function readMediaSource(mediaId: string): Promise<Blob | null> {
   try {
     const segments = await findSourceSegments(root, mediaId)
     if (!segments) return null
-    return await readBlob(root, segments)
+    const source = await readBlob(root, segments)
+    const manifest = await readJson<{
+      version: number
+      file: string
+      source: { size: number; mtimeMs: number }
+      outputSize: number
+    }>(root, [...mediaDir(mediaId), 'cache', 'compatibility', 'manifest.json']).catch(() => null)
+    if (
+      source &&
+      manifest?.version === 1 &&
+      /^[a-f0-9]{64}\.(mp4|mov)$/.test(manifest.file) &&
+      source.size === manifest.source?.size &&
+      source instanceof File &&
+      Math.abs(source.lastModified - manifest.source.mtimeMs) < 2
+    ) {
+      const prepared = await readBlob(root, [
+        ...mediaDir(mediaId),
+        'cache',
+        'compatibility',
+        manifest.file,
+      ])
+      if (prepared?.size === manifest.outputSize) return prepared
+    }
+    return source
   } catch (error) {
     logger.warn(`readMediaSource(${mediaId}) failed`, error)
     return null

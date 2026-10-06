@@ -53,7 +53,8 @@
     "headless:gpu:probe": "node headless/probe.mjs",
     "changelog:append": "node scripts/changelog-append.mjs",
     "changelog:rollup": "node scripts/changelog-rollup.mjs",
-    "prepare": "vp config"
+    "prepare": "vp config",
+    "headless:test:compatibility": "node --test server/media-compatibility.test.mjs && node headless/media-compatibility-browser.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "5.2.2",

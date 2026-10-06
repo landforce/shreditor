@@ -1,3 +1,4 @@
+import { prepareImportedVideo } from '@/infrastructure/browser/native-media-fallback'
 import type { MediaAttribution, MediaMetadata, ThumbnailData } from '@/types/storage'
 import { createLogger } from '@/shared/logging/logger'
 import { mapWithConcurrency } from '@/shared/utils/async-utils'
@@ -1180,7 +1181,21 @@ class MediaLibraryService {
     projectId: string,
     mediaId: string,
   ): Promise<MediaMetadata & { isDuplicate?: boolean; hasUnsupportedCodec?: boolean }> {
-    return this.importMediaFileToOpfs(file, projectId, { mediaId })
+    const prepared = await prepareImportedVideo(file, mediaId)
+    if (!prepared) return this.importMediaFileToOpfs(file, projectId, { mediaId })
+    const existing = (await getMediaForProjectDB(projectId)).find(
+      (m) =>
+        m.fileName === file.name &&
+        m.fileSize === file.size &&
+        m.fileLastModified === file.lastModified,
+    )
+    if (existing) return { ...existing, isDuplicate: true }
+    const imported = await this.importMediaFileToOpfs(prepared, projectId, { mediaId })
+    const saved = await updateMediaDB(imported.id, {
+      fileSize: file.size,
+      fileLastModified: file.lastModified,
+    })
+    return { ...imported, ...saved }
   }
 
   /**

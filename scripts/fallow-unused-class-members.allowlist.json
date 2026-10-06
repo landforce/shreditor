@@ -42,11 +42,6 @@
         },
         {
           "parentName": "VideoFrameExtractor",
-          "memberName": "init",
-          "kind": "class_method"
-        },
-        {
-          "parentName": "VideoFrameExtractor",
           "memberName": "isBatchPrewarmAvailable",
           "kind": "class_method"
         },
