@@ -10,6 +10,7 @@ import { createMediabunnyInputSource } from '@/infrastructure/browser/mediabunny
 import type { ObjectUrlSourceMetadata } from '@/infrastructure/browser/object-url-registry'
 import { ensureProResDecoderRegistered } from '@/infrastructure/browser/register-prores-decoder'
 import { fitFilmstripFrameSize } from '../utils/fit-filmstrip-frame-size'
+import { applyBitstreamColorSpace } from '@/infrastructure/browser/mediabunny-video-color-space'
 
 const IMAGE_FORMAT = 'image/jpeg'
 const IMAGE_QUALITY = 0.7 // JPEG is substantially faster to encode for tiny thumbnails
@@ -210,7 +211,7 @@ async function extractAndSave(request: ExtractRequest, state: { aborted: boolean
     const displayHeight = quarterTurns === 0 ? squarePixelHeight : squarePixelWidth
     const frameSize = fitFilmstripFrameSize(displayWidth, displayHeight, width, height)
 
-    sink = new CanvasSink(videoTrack, {
+    sink = new CanvasSink(applyBitstreamColorSpace(videoTrack), {
       width: frameSize.width,
       height: frameSize.height,
       fit: 'fill',

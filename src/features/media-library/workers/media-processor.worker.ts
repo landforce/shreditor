@@ -13,6 +13,7 @@ import { probeFrameDecoding, probeDomPlayback } from '@/infrastructure/browser/m
 import { ensureProResDecoderRegistered } from '@/infrastructure/browser/register-prores-decoder'
 import { createLogger, createOperationId } from '@/shared/logging/logger'
 import { DEFAULT_PROJECT_HEIGHT, DEFAULT_PROJECT_WIDTH } from '@/shared/projects/defaults'
+import { applyBitstreamColorSpace } from '@/infrastructure/browser/mediabunny-video-color-space'
 
 const logger = createLogger('MediaProcessorWorker')
 const KEYFRAME_EXTRACTION_TIMEOUT_MS = 8_000
@@ -30,6 +31,7 @@ interface MediabunnyVideoTrack {
   computePacketStats(count: number): Promise<{ averagePacketRate: number } | null>
   canDecode?: () => Promise<boolean>
   getCodecParameterString?: () => Promise<string>
+  getDecoderConfig(): Promise<VideoDecoderConfig | null>
 }
 
 interface MediabunnyAudioTrack {
@@ -612,7 +614,7 @@ async function generateVideoThumbnail(
 
     // ProRes decodes through the registered @mediabunny/prores decoder (getMediabunny
     // registers it), so CanvasSink handles it directly like any other codec.
-    sink = new mb.CanvasSink(videoTrack, {
+    sink = new mb.CanvasSink(applyBitstreamColorSpace(videoTrack), {
       width,
       height,
       fit: 'fill',

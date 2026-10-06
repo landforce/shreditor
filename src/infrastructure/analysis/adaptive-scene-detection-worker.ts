@@ -12,6 +12,7 @@ import type {
   AdaptiveSceneWorkerRequest,
   AdaptiveSceneWorkerResponse,
 } from './adaptive-scene-detection-worker.types'
+import { applyBitstreamColorSpace } from '@/infrastructure/browser/mediabunny-video-color-space'
 
 interface ActiveAnalysis {
   requestId: string
@@ -149,7 +150,7 @@ async function analyze(
       throw new Error('The primary video track cannot be decoded in this browser')
     }
 
-    sink = new mb.CanvasSink(videoTrack, {
+    sink = new mb.CanvasSink(applyBitstreamColorSpace(videoTrack), {
       width: 96,
       poolSize: 1,
     }) as unknown as SceneCanvasSink

@@ -194,8 +194,13 @@ were measured before two browser-export fixes:
   the phone clip 32.7 dB before, 37.1 dB after (native 38.1); BT.709 limited
   bars unchanged at 41.0 dB. The few levels left come from the hardware
   decoder's full-to-limited range step. The editor preview's paused and
-  scrubbed frames use the same decode and are fixed too; playback through the
-  `<video>` element still shows such a file as BT.709.
+  scrubbed frames use the same decode and are fixed too, and so are
+  thumbnails, filmstrips, freeze frames, scene detection, proxies and the
+  upscale and frame-interpolation workers, which wrap their Mediabunny track
+  the same way (`applyBitstreamColorSpace`): CanvasSink/VideoSampleSink decode
+  of the bars 29.2 dB before, 36.5 dB after; the phone clip 35.1 dB before,
+  48.5 dB after. Playback through `<video>` needs the colour in the container:
+  see the colour rewrap in [media-compatibility.md](media-compatibility.md).
 
 `npm run headless:test:fidelity` checks both against ffmpeg-made fixtures.
 
