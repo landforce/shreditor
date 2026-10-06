@@ -1,3 +1,4 @@
+import { resolveCompatibleMedia } from '../../server/media-compatibility.mjs'
 // Read a FreeCut workspace folder from disk (plain fs, no File System Access
 // API). Locates a project's JSON and maps the media it references to source
 // files on disk, mirroring workspace-fs's `media/{id}/{filename}` layout.
@@ -170,7 +171,7 @@ function resolveSourceLink(mediaDir) {
  * Resolve a media id to its source file: the first non-reserved file under
  * media/{id}/, else the original a source.link.json points at.
  */
-export function resolveMediaFile(workspaceDir, mediaId) {
+export function resolveMediaFile(workspaceDir, mediaId, { original = false } = {}) {
   assertSinglePathComponent(mediaId, 'media id')
   const mediaRoot = path.join(workspaceDir, 'media')
   const mediaDir = resolveContained(mediaRoot, mediaId)
@@ -178,9 +179,11 @@ export function resolveMediaFile(workspaceDir, mediaId) {
   for (const entry of fs.readdirSync(mediaDir, { withFileTypes: true })) {
     if (!entry.isFile()) continue
     if (NON_SOURCE_NAMES.has(entry.name)) continue
-    return resolveContained(mediaRoot, path.join(mediaId, entry.name))
+    const source = resolveContained(mediaRoot, path.join(mediaId, entry.name))
+    return original ? source : (resolveCompatibleMedia(source, mediaDir) ?? source)
   }
-  return resolveSourceLink(mediaDir)
+  const source = resolveSourceLink(mediaDir)
+  return source && !original ? (resolveCompatibleMedia(source, mediaDir) ?? source) : source
 }
 
 /**

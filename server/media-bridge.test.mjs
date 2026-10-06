@@ -127,3 +127,29 @@ test('bridge routes: POST media/category and GET media/version', async (t) => {
   assert.notEqual(after.version, before.version)
   assert.equal((await fetch(`${base}/media/version`)).status, 400)
 })
+
+test('native preparation route validates media IDs and returns a workspace derivative', async (t) => {
+  const { execFileSync } = await import('node:child_process')
+  const ws = makeWorkspace(t)
+  const source = path.join(ws.root, 'legacy.mov')
+  execFileSync('ffmpeg', ['-v', 'error', '-y', '-f', 'lavfi', '-i', 'color=red:s=64x48:r=10:d=0.2', '-c:v', 'mpeg4', source])
+  const [imported] = await importMediaByPath(ws.root, [source], { mode: 'link' })
+  const previous = process.env.SHREDITOR_WORKSPACE
+  process.env.SHREDITOR_WORKSPACE = ws.root
+  const server = http.createServer(createWorkspaceBridge())
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve))
+  t.after(() => { server.close(); if (previous === undefined) delete process.env.SHREDITOR_WORKSPACE; else process.env.SHREDITOR_WORKSPACE = previous })
+  const base = `http://127.0.0.1:${server.address().port}`
+  const prepare = (mediaId) => fetch(`${base}/__shreditor/media/prepare`, { method: 'POST', body: JSON.stringify({ mediaId }) })
+  assert.equal((await prepare('../outside')).status, 400)
+  assert.equal((await prepare('missing')).status, 404)
+  const response = await prepare(imported.id)
+  assert.equal(response.status, 200)
+  const body = await response.json()
+  assert.equal(body.cached, true)
+  assert.equal(body.prepared, true)
+  const file = await fetch(`${base}${body.url}`)
+  assert.equal(file.status, 200)
+  assert.ok((await file.arrayBuffer()).byteLength > 0)
+  assert.equal(ws.read(imported.id).codec, 'avc')
+})
