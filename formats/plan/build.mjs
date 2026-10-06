@@ -132,20 +132,24 @@ function textOps(beat, index, findTrack, styleFor) {
   }
 }
 
+/** A first assembly goes on an empty draft; markers-only and --replace may meet items. */
+function assertEmpty(items, { replace, markersOnly }) {
+  if (!items.length || replace || markersOnly) return
+  throw new Error(
+    `the draft already has ${items.length} item(s): build makes the first assembly on an empty draft (--replace clears it first)`,
+  )
+}
+
 /** Ops that clear what a rebuild replaces: the plan's old markers, and with `replace` every item. */
-function clearingOps(project, { replace, markersOnly }) {
-  const timeline = project.timeline ?? {}
-  const items = timeline.items ?? []
-  if (items.length && !replace && !markersOnly)
-    throw new Error(
-      `the draft already has ${items.length} item(s): build makes the first assembly on an empty draft (--replace clears it first)`,
-    )
+function clearingOps(project, options) {
+  const items = project.timeline?.items ?? []
+  assertEmpty(items, options)
   const ops = []
-  if (replace && !markersOnly && items.length)
+  if (options.replace && !options.markersOnly && items.length)
     ops.push({ callerId: 'clear-items', op: 'removeItems', ids: items.map((item) => item.id) })
-  const old = (timeline.markers ?? []).filter((m) => m.id.startsWith(PLAN_MARKER_PREFIX))
-  if (old.length)
-    ops.push({ callerId: 'clear-markers', op: 'removeMarkers', ids: old.map((m) => m.id) })
+  const markers = project.timeline?.markers ?? []
+  const old = markers.filter((m) => m.id.startsWith(PLAN_MARKER_PREFIX)).map((m) => m.id)
+  if (old.length) ops.push({ callerId: 'clear-markers', op: 'removeMarkers', ids: old })
   return ops
 }
 

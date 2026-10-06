@@ -104,27 +104,41 @@ function sourceProblem(source, unit) {
   ])
 }
 
+/** The media a source names: an imported id and/or a catalogued file. */
+const sourceRef = (source) => ({
+  ...(isText(source.mediaId) ? { mediaId: source.mediaId.trim() } : {}),
+  ...(isText(source.asset) ? { asset: source.asset.trim() } : {}),
+})
+/** `in` in source seconds: frames count at the plan's fps. */
+const inSeconds = (source, unit, fps) => {
+  const at = hasIn(source) ? source.in : 0
+  return unit === 'frames' ? at / fps : at
+}
+const unitOf = (source, version) => source?.unit ?? (version === 1 ? 'frames' : undefined)
+
 function readSource(source, version, fps, where, issues) {
-  const unit = source?.unit ?? (version === 1 ? 'frames' : undefined)
+  const unit = unitOf(source, version)
   const problem = sourceProblem(source, unit)
   if (problem) {
     issues.error(where, problem)
     return null
   }
-  const at = hasIn(source) ? source.in : 0
-  return {
-    ...(isText(source.mediaId) ? { mediaId: source.mediaId.trim() } : {}),
-    ...(isText(source.asset) ? { asset: source.asset.trim() } : {}),
-    inSec: unit === 'frames' ? at / (fps || 1) : at,
-  }
+  return { ...sourceRef(source), inSec: inSeconds(source, unit, fps || 1) }
 }
 
+const hasText = (text) => text !== undefined && text !== null && text !== ''
+const textSpec = (text) => (typeof text === 'string' ? { text } : isObject(text) ? text : {})
+/** A title on the hook, a label elsewhere, unless the text says. */
+const textRole = (spec, beat) => spec.role ?? (beat.role === 'hook' ? 'title' : 'labels')
+const textSpan = (spec, beat) =>
+  spec.edit === undefined ? { start: beat.start, end: beat.end } : frameRange(spec.edit)
+const styleOf = (spec) => (isText(spec.style) ? { style: spec.style } : {})
+
 function readText(text, beat, where, issues) {
-  if (text === undefined || text === null || text === '') return null
-  const spec = typeof text === 'string' ? { text } : isObject(text) ? text : {}
-  const role = spec.role ?? (beat.role === 'hook' ? 'title' : 'labels')
-  const span =
-    spec.edit === undefined ? { start: beat.start, end: beat.end } : frameRange(spec.edit)
+  if (!hasText(text)) return null
+  const spec = textSpec(text)
+  const role = textRole(spec, beat)
+  const span = textSpan(spec, beat)
   const problem = firstProblem([
     [!isText(spec.text), '`text` is a string or { text, role?, edit?, style? }'],
     [!TEXT_ROLES.has(role), `text role "${role}" is not title or labels`],
@@ -134,7 +148,7 @@ function readText(text, beat, where, issues) {
     issues.error(where, problem)
     return null
   }
-  return { text: spec.text, role, ...span, ...(isText(spec.style) ? { style: spec.style } : {}) }
+  return { text: spec.text, role, ...span, ...styleOf(spec) }
 }
 
 /** What a beat says beyond its timing and source. */
