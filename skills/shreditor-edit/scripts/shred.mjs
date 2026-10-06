@@ -2,7 +2,8 @@
 // The one way an agent touches a Shreditor project. Every engine call in the
 // shreditor-edit skill goes through here, so edits are consistent and checked.
 //
-//   shred up                             start the editor (5273) and the agent service (8787)
+//   shred up [--dev] [--build]           start the editor (5273, a built preview; --dev for live reload)
+//                                        and the agent service (8787)
 //   shred start                          start only the agent edit service
 //   shred status                         editor, service, workspace and writer-lock state
 //   shred catalog <folder|file...> --name <slug> [--no-transcribe] [--no-proxies]
@@ -48,12 +49,14 @@ const { values: opt, positionals } = parseArgs({
     summary: { type: 'string' },
     link: { type: 'boolean' },
     build: { type: 'boolean' },
+    dev: { type: 'boolean' },
     json: { type: 'boolean' },
   },
 })
 const [command, ...args] = positionals
 
 function workspace() {
+  if (process.env.SHRED_WORKSPACE) return process.env.SHRED_WORKSPACE
   try {
     const config = JSON.parse(fs.readFileSync(path.join(os.homedir(), '.shreditor/config.json'), 'utf8'))
     if (config.workspace) return config.workspace
@@ -102,6 +105,60 @@ const editorUp = async () => {
     return false
   }
 }
+const editorInfo = async () => {
+  try {
+    const res = await fetch(`${EDITOR}/__shreditor/info`)
+    return res.ok ? await res.json() : null
+  } catch {
+    return null
+  }
+}
+// 'dev' or 'preview'. Older bridges don't say; a dev server serves /@vite/client.
+async function editorKind(info) {
+  if (info.mode) return info.mode
+  try {
+    const res = await fetch(`${EDITOR}/@vite/client`)
+    return (res.headers.get('content-type') ?? '').includes('javascript') ? 'dev' : 'preview'
+  } catch {
+    return 'unknown'
+  }
+}
+const portAnswers = async () => {
+  try {
+    await fetch(EDITOR)
+    return true
+  } catch {
+    return false
+  }
+}
+const gitHead = () => {
+  try {
+    const [sha, time] = execFileSync('git', ['log', '-1', '--format=%h %ct', 'HEAD'], { cwd: REPO, encoding: 'utf8' }).trim().split(' ')
+    return { sha, time: Number(time) }
+  } catch {
+    return null
+  }
+}
+let built = false
+function build(reason) {
+  const log = path.join(os.tmpdir(), 'shreditor-build.log')
+  say(`Building Shreditor (${reason})…`)
+  try {
+    execFileSync('npm', ['run', 'build'], { cwd: REPO, stdio: ['ignore', fs.openSync(log, 'w'), fs.openSync(log, 'a')] })
+  } catch {
+    throw new Error(`Build failed; see ${log}`)
+  }
+  built = true
+}
+// The built editor is stale when missing or older than the checked-out commit.
+function staleBuild() {
+  const index = path.join(REPO, 'dist', 'index.html')
+  if (!fs.existsSync(index)) return 'no build yet'
+  const head = gitHead()
+  if (head && fs.statSync(index).mtimeMs / 1000 < head.time) return `build is older than ${head.sha}`
+  return null
+}
+
 const slug = (t) => t.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 60) || 'footage'
 const MEDIA_EXT = /\.(mov|mp4|m4v|mkv|webm|avi|mts|mxf|wav|mp3|m4a|aac|aif|aiff|flac|png|jpe?g|webp|heic|gif)$/i
 const WHISPER_MODEL = path.join(os.homedir(), 'Library/Application Support/whisper.cpp/models/ggml-large-v3-turbo.bin')
@@ -168,18 +225,34 @@ function diffTimelines(before, after) {
 
 const commands = {
   async up() {
-    if (!(await editorUp())) {
+    const info = await editorInfo()
+    if (info) {
+      // Never kill or replace a running editor: the user may be mid-edit in it.
+      const kind = await editorKind(info)
+      const what = { dev: 'dev server (reloads on source edits)', preview: 'built preview' }[kind] ?? 'unknown kind'
+      say(`Editor   ${EDITOR}  already running: ${what}; left as is`)
+      if (opt.dev ? kind === 'preview' : kind === 'dev') say(`         (stop it yourself to switch to ${opt.dev ? 'the dev server' : 'a built preview'})`)
+    } else if (await portAnswers()) {
+      throw new Error(`Something other than the Shreditor editor is serving ${EDITOR}. Stop it, or set SHRED_EDITOR to a free port.`)
+    } else {
+      const port = new URL(EDITOR).port
+      if (!opt.dev) {
+        const reason = opt.build ? 'requested' : staleBuild()
+        if (reason) build(reason)
+      }
       const log = path.join(os.tmpdir(), 'shreditor-editor.log')
-      const child = spawn('npm', ['run', 'dev', '--', '--port', new URL(EDITOR).port, '--strictPort'], {
+      const child = spawn('npm', ['run', opt.dev ? 'dev' : 'preview', '--', '--port', port, '--strictPort'], {
         cwd: REPO,
+        // An overridden workspace is pinned for the editor too; otherwise it follows the config.
+        env: { ...process.env, ...(process.env.SHRED_WORKSPACE ? { SHREDITOR_WORKSPACE: process.env.SHRED_WORKSPACE } : {}) },
         detached: true,
         stdio: ['ignore', fs.openSync(log, 'a'), fs.openSync(log, 'a')],
       })
       child.unref()
       for (let i = 0; i < 120 && !(await editorUp()); i++) await new Promise((r) => setTimeout(r, 1000))
       if (!(await editorUp())) throw new Error(`Editor did not start; see ${log}`)
+      say(`Editor   ${EDITOR}  ${opt.dev ? 'dev server (reloads on source edits)' : `built preview of ${gitHead()?.sha ?? 'this checkout'}`}`)
     }
-    say(`Editor   ${EDITOR}`)
     await commands.start()
   },
 
@@ -306,10 +379,7 @@ const commands = {
     const ws = workspace()
     const log = path.join(os.tmpdir(), 'shreditor-service.log')
     // The service renders and edits through the built app; rebuild after code changes.
-    if (opt.build || !fs.existsSync(path.join(REPO, 'dist', 'headless.html'))) {
-      say('Building Shreditor…')
-      execFileSync('npm', ['run', 'build'], { cwd: REPO, stdio: 'ignore' })
-    }
+    if (!built && (opt.build || !fs.existsSync(path.join(REPO, 'dist', 'headless.html')))) build(opt.build ? 'requested' : 'no build yet')
     const child = spawn(process.execPath, [path.join(REPO, 'headless/serve.mjs'), '--workspace', ws, '--port', new URL(SERVICE).port], {
       cwd: REPO,
       detached: true,
@@ -422,7 +492,8 @@ const commands = {
 try {
   const fn = commands[command]
   if (!fn) {
-    say(fs.readFileSync(fileURLToPath(import.meta.url), 'utf8').split('\n').slice(1, 25).map((l) => l.replace(/^\/\/ ?/, '')).join('\n'))
+    const header = fs.readFileSync(fileURLToPath(import.meta.url), 'utf8').split('\n').slice(1)
+    say(header.slice(0, header.findIndex((l) => !l.startsWith('//'))).map((l) => l.replace(/^\/\/ ?/, '')).join('\n'))
     process.exit(command ? 1 : 0)
   }
   await fn(args)

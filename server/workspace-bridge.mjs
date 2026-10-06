@@ -152,9 +152,10 @@ function serveFile(req, res, full, st) {
 
 /**
  * Connect/Express-style middleware. Calls `next()` for anything outside
- * /__shreditor/ so it can sit in front of the app.
+ * /__shreditor/ so it can sit in front of the app. `mode` ('dev' or 'preview')
+ * is reported by GET info so `shred up` can say what is serving the editor.
  */
-export function createWorkspaceBridge() {
+export function createWorkspaceBridge({ mode = 'dev' } = {}) {
   // In-place media import and linked media sources (see media-bridge.mjs).
   const mediaRoutes = createMediaRoutes({ resolveInside, sendJson, readBody, serveFile })
   return async function workspaceBridge(req, res, next) {
@@ -169,7 +170,7 @@ export function createWorkspaceBridge() {
       switch (route) {
         case 'GET info': {
           const config = readConfig()
-          return sendJson(res, 200, { version: 1, root, name: path.basename(root), recent: config.recent ?? [root], platform: process.platform })
+          return sendJson(res, 200, { version: 1, root, name: path.basename(root), recent: config.recent ?? [root], platform: process.platform, mode })
         }
         case 'POST workspace': {
           const { path: dir } = JSON.parse((await readBody(req)).toString() || '{}')

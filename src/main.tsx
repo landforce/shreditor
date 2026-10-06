@@ -294,6 +294,16 @@ if (import.meta.env.PROD && 'serviceWorker' in navigator) {
   })
 }
 
+// `shred up` serves a built preview on the same port as `shred up --dev`, so a
+// dev page can inherit the preview's service worker, which would serve stale
+// modules. Dev never uses one.
+if (import.meta.env.DEV && 'serviceWorker' in navigator) {
+  void navigator.serviceWorker
+    .getRegistrations()
+    .then((registrations) => Promise.all(registrations.map((r) => r.unregister())))
+    .catch(() => {})
+}
+
 const rootElement = document.getElementById('root')
 
 if (!rootElement) {
