@@ -8,7 +8,18 @@ import {
   ContextMenuSeparator,
   ContextMenuTrigger,
 } from '@/components/ui/context-menu'
-import { Power, PowerOff, Lock, GripVertical, Radio, FoldHorizontal, Link2 } from 'lucide-react'
+import {
+  Power,
+  PowerOff,
+  Lock,
+  GripVertical,
+  Radio,
+  FoldHorizontal,
+  Link2,
+  LayoutTemplate,
+} from 'lucide-react'
+import type { FormatRole } from '@formats/registry.mjs'
+import { roleLabel } from '@/shared/formats/format-text'
 import type { TimelineTrack } from '@/types/timeline'
 import { useTrackDrag } from '../hooks/use-track-drag'
 import { TIMELINE_SIDEBAR_WIDTH } from '../constants'
@@ -47,6 +58,27 @@ function areTrackHeaderPropsEqual(prev: TrackHeaderProps, next: TrackHeaderProps
     prev.canDeleteEmptyTracks === next.canDeleteEmptyTracks
   )
   // Callbacks (onToggleLock, etc.) are ignored - they're recreated each render but functionality is same
+}
+
+/**
+ * The track's role in the project's format layout. The role name is left out
+ * when the track is already named after it (a fresh format layout).
+ */
+function FormatRoleBadge({ role, trackName }: { role: FormatRole; trackName: string }) {
+  const { t } = useTranslation()
+  const label = roleLabel(t, role)
+  const title = t('formats.timeline.roleBadge', { role: label })
+  return (
+    <span
+      data-testid="track-format-role"
+      title={title}
+      aria-label={title}
+      className="inline-flex shrink-0 items-center gap-0.5 rounded bg-primary-soft px-1 py-0.5 text-[10px] font-semibold leading-none text-primary-text"
+    >
+      <LayoutTemplate className="h-2.5 w-2.5" aria-hidden="true" />
+      {label.toLowerCase() !== trackName.trim().toLowerCase() && label}
+    </span>
+  )
 }
 
 /**
@@ -253,6 +285,9 @@ export const TrackHeader = memo(function TrackHeader({
               <span className="min-w-0 truncate text-xs font-semibold leading-none font-mono">
                 {track.name}
               </span>
+              {track.formatRole && (
+                <FormatRoleBadge role={track.formatRole} trackName={track.name} />
+              )}
               <span className="shrink-0 text-[10px] leading-none text-muted-foreground">
                 {itemCountLabel}
               </span>

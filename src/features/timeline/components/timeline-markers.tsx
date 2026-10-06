@@ -12,6 +12,7 @@ import { perfMarkRender } from '@/shared/logging/perf-marks'
 // Components
 import { TimelineInOutMarkers } from './timeline-in-out-markers'
 import { TimelineProjectMarkers } from './timeline-project-markers'
+import { TimelineFormatRanges } from './timeline-format-ranges'
 import { previewScrubberSuppressRef } from './preview-scrubber-suppress'
 import { beginIoPointerDrag, IoRangeStrip } from '@/shared/timeline/io-range'
 import {
@@ -1163,6 +1164,9 @@ export const TimelineMarkers = memo(function TimelineMarkers({
           testId="edit-timeline-io-strip"
         />
       )}
+
+      {/* Where the timeline fails its format (from the format scorecard) */}
+      <TimelineFormatRanges top={IO_LANE_HEIGHT} />
 
       {/* In/Out markers (DOM - only 2 elements) */}
       <TimelineInOutMarkers />
