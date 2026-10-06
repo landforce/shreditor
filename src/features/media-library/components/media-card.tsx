@@ -39,7 +39,7 @@ import {
   ContextMenuSubTrigger,
   ContextMenuTrigger,
 } from '@/components/ui/context-menu'
-import type { MediaCategory, MediaMetadata } from '@/types/storage'
+import type { MediaCategory, MediaCategorySource, MediaMetadata } from '@/types/storage'
 import { MEDIA_CATEGORIES } from '../utils/media-categories'
 import { FileAccessError } from '../services/file-access'
 import { importMediaLibraryService } from '../services/media-library-service-loader'
@@ -47,6 +47,7 @@ import { importMediaAnalysisService } from '../services/media-analysis-service-l
 import { getMediaType, formatDuration } from '../utils/validation'
 import { MediaInfoPopover } from './media-info-popover'
 import { NativeTranscriptionBadge } from './native-transcription-badge'
+import { AutoCategoryMarker } from './auto-category-marker'
 import { PreparationOverlay, PreparationRetry, WorkingCopyBadge } from './media-preparation-status'
 import { placeableMedia, preparationLabel } from '../utils/media-preparation'
 import { isMediaPreparationBlocked } from '@/shared/utils/media-compatibility'
@@ -129,6 +130,7 @@ interface MediaCardActionMenuProps {
   onExtractEmbeddedSubtitles: (event: React.MouseEvent) => void | Promise<void>
   onAnalyzeWithAI: (event: React.MouseEvent) => void
   category?: MediaCategory
+  categorySource?: MediaCategorySource
   onSetCategory: (category: MediaCategory | null) => void
   onDelete: (event: React.MouseEvent) => void
 }
@@ -179,6 +181,7 @@ type AiActionsProps = MediaCardMenuGroupProps & {
 
 type CategoryActionsProps = MediaCardMenuGroupProps & {
   category?: MediaCategory
+  categorySource?: MediaCategorySource
   onSetCategory: (category: MediaCategory | null) => void
 }
 
@@ -440,6 +443,7 @@ function MediaCardActionMenuItems(props: MediaCardActionMenuProps) {
       key="category"
       t={t}
       category={props.category}
+      categorySource={props.categorySource}
       onSetCategory={props.onSetCategory}
     />,
   )
@@ -665,8 +669,12 @@ function AiActions({ t, onAnalyzeWithAI }: AiActionsProps) {
   )
 }
 
-/** What the media is for in the edit; the agent reads it back from metadata.json. */
-function CategoryActions({ t, category, onSetCategory }: CategoryActionsProps) {
+/**
+ * What the media is for in the edit; the agent reads it back from
+ * metadata.json. Any pick here is explicit (also re-picking an automatic
+ * suggestion, which confirms it), so the background analysis leaves it.
+ */
+function CategoryActions({ t, category, categorySource, onSetCategory }: CategoryActionsProps) {
   return (
     <ContextMenuSub>
       <ContextMenuSubTrigger>
@@ -678,6 +686,11 @@ function CategoryActions({ t, category, onSetCategory }: CategoryActionsProps) {
           <ContextMenuItem key={value} onClick={() => onSetCategory(value)}>
             <Check className={`w-3 h-3 mr-2 ${category === value ? '' : 'invisible'}`} />
             {t(`media.category.${value}`)}
+            {category === value && categorySource === 'auto' && (
+              <span className="ml-auto pl-3 text-[10px] text-muted-foreground">
+                {t('media.card.autoCategory')}
+              </span>
+            )}
           </ContextMenuItem>
         ))}
         {category && (
@@ -1627,6 +1640,7 @@ const MediaCardInternal = memo(function MediaCardInternal({
       onExtractEmbeddedSubtitles={handleExtractEmbeddedSubtitles}
       onAnalyzeWithAI={handleAnalyzeWithAI}
       category={media.category}
+      categorySource={media.categorySource}
       onSetCategory={handleSetCategory}
       onDelete={handleDelete}
     />
@@ -1775,6 +1789,7 @@ const MediaCardInternal = memo(function MediaCardInternal({
                     <h3 className="text-xs font-medium text-foreground truncate">
                       {media.fileName}
                     </h3>
+                    <AutoCategoryMarker media={media} className="bg-muted text-muted-foreground" />
                     {(mediaType === 'video' || mediaType === 'audio') && media.duration > 0 && (
                       <span className="text-[10px] text-muted-foreground flex-shrink-0">
                         {formatDuration(media.duration)}
@@ -1867,6 +1882,12 @@ const MediaCardInternal = memo(function MediaCardInternal({
 
               {/* Preparing overlay */}
               {isPreparingMedia && <PreparationOverlay media={media} label={preparingLabel} />}
+              {!isPreparingMedia && (
+                <AutoCategoryMarker
+                  media={media}
+                  className="absolute top-1 left-1 z-10 bg-black/55 text-white/85"
+                />
+              )}
 
               {/* Top-right badges & info */}
               {!isPreparingMedia && (

@@ -36,9 +36,10 @@ export interface MediaAttribution {
 }
 
 /**
- * What a media file is for in the edit, assigned by the agent when it
- * catalogs footage (or by the user from the media card). The media library
- * groups by it when any item in the project has one. Absent = uncategorized.
+ * What a media file is for in the edit: assigned by the agent when it
+ * catalogs footage, by the user from the media card, or suggested by the
+ * background analysis (see {@link MediaCategorySource}). The media pane
+ * groups by it. Absent = uncategorized.
  * Mirrored in server/media-bridge.mjs (MEDIA_CATEGORIES).
  */
 export type MediaCategory =
@@ -50,6 +51,18 @@ export type MediaCategory =
   | 'music'
   | 'sfx'
   | 'other'
+
+/**
+ * Who set `MediaMetadata.category`:
+ * - 'user':  the media card's Category menu
+ * - 'agent': `shred import --category` / `shred categorize` (bridge route)
+ * - 'auto':  a suggestion from the background analysis, only ever written
+ *            when no explicit category is set, and replaceable by a newer one
+ * A category without a source (older metadata) counts as explicit. 'user' or
+ * 'agent' with no category means explicitly uncategorized: auto leaves it.
+ * Mirrored in server/media-bridge.mjs (CATEGORY_SOURCES).
+ */
+export type MediaCategorySource = 'auto' | 'user' | 'agent'
 
 /** Written by the local bridge into `metadata.json`; absent until an import queues it. */
 export interface NativeTranscriptionStatus {
@@ -204,6 +217,8 @@ export interface MediaMetadata {
   tags: string[]
   /** Role in the edit (see {@link MediaCategory}); absent when uncategorized. */
   category?: MediaCategory
+  /** Who set `category` (see {@link MediaCategorySource}). */
+  categorySource?: MediaCategorySource
   /** Working copy state when the original needs one (see {@link MediaCompatibility}). */
   compatibility?: MediaCompatibility
   /**

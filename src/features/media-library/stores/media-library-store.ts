@@ -7,7 +7,7 @@ import type {
   BrokenMediaInfo,
   UnsupportedCodecFile,
 } from '../types'
-import type { MediaMetadata } from '@/types/storage'
+import type { MediaCategory, MediaMetadata } from '@/types/storage'
 import { loadMediaLibraryService } from './media-library-service-access'
 import { getMediaType } from '../utils/validation'
 import { createLogger, createOperationId } from '@/shared/logging/logger'
@@ -30,6 +30,7 @@ import { isMediaPreparationBlocked } from '@/shared/utils/media-compatibility'
 import { blobUrlManager } from '@/infrastructure/browser/blob-url-manager'
 import { mergeTranscriptionProgress } from '@/shared/utils/transcription-progress'
 import { announceNativeTranscripts, findNewNativeTranscripts } from './native-transcription-sync'
+import { autoCategoryUpdate } from '../utils/media-categories'
 
 const logger = createLogger('MediaLibraryStore')
 
@@ -349,19 +350,43 @@ const newStore: MediaLibraryStoreApi =
         setMediaCategory: async (mediaIds, category) => {
           const ids = new Set(mediaIds)
           if (ids.size === 0) return
-          const updatedAt = Date.now()
+          // The user's choice is explicit: automatic suggestions never touch it.
+          const update = {
+            category: category ?? undefined,
+            categorySource: 'user' as const,
+            updatedAt: Date.now(),
+          }
           set((state) => ({
             mediaItems: state.mediaItems.map((item) =>
-              ids.has(item.id) ? { ...item, category: category ?? undefined, updatedAt } : item,
+              ids.has(item.id) ? { ...item, ...update } : item,
             ),
           }))
           try {
-            await Promise.all(
-              [...ids].map((id) => updateMedia(id, { category: category ?? undefined, updatedAt })),
-            )
+            await Promise.all([...ids].map((id) => updateMedia(id, update)))
           } catch (error) {
             logger.error('[MediaLibraryStore] Failed to save media category:', error)
             set({ error: 'Failed to save the media category' })
+            await get().refreshMediaItems()
+          }
+        },
+
+        suggestMediaCategories: async (suggestions) => {
+          const wanted = new Map(suggestions.map((s) => [s.mediaId, s.category]))
+          const applied: Array<{ mediaId: string; category: MediaCategory }> = []
+          set((state) => ({
+            mediaItems: state.mediaItems.map((item) => {
+              const update = autoCategoryUpdate(item, wanted.get(item.id))
+              if (!update) return item
+              applied.push({ mediaId: item.id, category: update.category })
+              return { ...item, ...update }
+            }),
+          }))
+          if (applied.length === 0) return
+          try {
+            const { persistCategorySuggestions } = await import('../services/category-suggestions')
+            if (await persistCategorySuggestions(applied)) await get().refreshMediaItems()
+          } catch (error) {
+            logger.warn('[MediaLibraryStore] Failed to save category suggestions:', error)
             await get().refreshMediaItems()
           }
         },

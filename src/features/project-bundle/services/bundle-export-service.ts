@@ -167,6 +167,7 @@ export async function exportProjectBundle(
       sha256: hash,
       mimeType: media.mimeType,
       ...(media.category ? { category: media.category } : {}),
+      ...(media.categorySource ? { categorySource: media.categorySource } : {}),
       metadata: {
         duration: media.duration,
         width: media.width,
@@ -357,6 +358,7 @@ export async function exportProjectBundleStreaming(
         sha256: hash,
         mimeType: media.mimeType,
         ...(media.category ? { category: media.category } : {}),
+        ...(media.categorySource ? { categorySource: media.categorySource } : {}),
         metadata: {
           duration: media.duration,
           width: media.width,

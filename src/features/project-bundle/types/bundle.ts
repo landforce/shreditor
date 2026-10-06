@@ -5,7 +5,7 @@
  */
 
 import type { Project, ProjectTimeline } from '@/types/project'
-import type { MediaCategory } from '@/types/storage'
+import type { MediaCategory, MediaCategorySource } from '@/types/storage'
 
 type BundleTimelineItem = Omit<ProjectTimeline['items'][number], 'mediaId'> & {
   mediaRef?: string
@@ -72,6 +72,8 @@ export interface BundleMediaEntry {
   mimeType: string
   /** Role in the edit (MediaMetadata.category); absent when uncategorized. */
   category?: MediaCategory
+  /** Who set it (MediaMetadata.categorySource); absent = explicit. */
+  categorySource?: MediaCategorySource
   metadata: {
     duration: number
     width: number

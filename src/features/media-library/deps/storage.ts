@@ -46,4 +46,5 @@ export {
   getPlacedMediaId,
   retryMediaPreparation,
   startPlacedMediaPreparation,
+  suggestMediaCategoriesInWorkspace,
 } from '@/infrastructure/storage/bridge-fs/bridge-media'

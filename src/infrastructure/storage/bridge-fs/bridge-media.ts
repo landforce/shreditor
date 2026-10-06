@@ -151,3 +151,32 @@ export async function startPlacedMediaPreparation(
 export async function retryMediaPreparation(mediaId: string): Promise<void> {
   await postBridge('media/retry', { mediaId })
 }
+
+interface CategoryWriteResult {
+  changed: Array<{ mediaId: string }>
+  unchanged: Array<{ mediaId: string }>
+  /** Explicit categories the bridge kept instead of the suggestion. */
+  kept: Array<{ mediaId: string }>
+}
+
+/**
+ * Record automatic category suggestions (`POST media/category` with source
+ * 'auto'). The bridge checks each media's metadata.json on disk and keeps any
+ * category the user or the agent set, so a suggestion can never overwrite
+ * one written meanwhile. Null when the workspace isn't bridge-served.
+ */
+export async function suggestMediaCategoriesInWorkspace(
+  items: ReadonlyArray<{ mediaId: string; category: string }>,
+): Promise<CategoryWriteResult | null> {
+  if (!canImportMediaInPlace() || items.length === 0) return null
+  const result = await postBridge<Partial<CategoryWriteResult>>('media/category', {
+    items,
+    source: 'auto',
+  })
+  if (!result) return null
+  return {
+    changed: result.changed ?? [],
+    unchanged: result.unchanged ?? [],
+    kept: result.kept ?? [],
+  }
+}

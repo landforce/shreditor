@@ -139,8 +139,19 @@ export interface MediaLibraryActions {
    * in-flight imports. Picks up media and categories written outside this tab.
    */
   refreshMediaItems: () => Promise<void>
-  /** Set (or clear, with null) the category of these media and persist it. */
+  /**
+   * Set (or clear, with null) the category of these media as the user's
+   * explicit choice (`categorySource: 'user'`) and persist it.
+   */
   setMediaCategory: (mediaIds: string[], category: MediaCategory | null) => Promise<void>
+  /**
+   * Record automatic suggestions from the background analysis
+   * (`categorySource: 'auto'`). Media with an explicit category, in the
+   * store or on disk, keep it.
+   */
+  suggestMediaCategories: (
+    suggestions: ReadonlyArray<{ mediaId: string; category: MediaCategory }>,
+  ) => Promise<void>
   /**
    * Import media using file picker.
    * Defaults to copying into Shreditor's workspace-backed media store. Use

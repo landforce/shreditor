@@ -12,21 +12,19 @@ import {
   Mic,
   Music,
   Presentation,
+  ScanSearch,
   Shapes,
   UserRound,
   Video,
 } from 'lucide-react'
-import type { MediaCategory, MediaMetadata } from '@/types/storage'
+import type { MediaMetadata } from '@/types/storage'
 import {
   groupMediaSections,
-  isMediaCategory,
   MEDIA_CATEGORIES,
-  mediaTypeGroupOf,
   UNCATEGORIZED,
   type MediaTypeGroupKey,
 } from '../utils/media-categories'
-import type { MediaRole } from '../utils/media-role'
-import { useMediaRoles } from './use-media-roles'
+import { useAutoCategories } from './use-auto-categories'
 
 export const MEDIA_GROUP_ICONS = {
   video: Video,
@@ -42,6 +40,7 @@ export const MEDIA_GROUP_ICONS = {
   music: Music,
   sfx: AudioWaveform,
   other: Shapes,
+  analyzing: ScanSearch,
   [UNCATEGORIZED]: CircleDashed,
 } as const
 
@@ -60,6 +59,7 @@ function categoryGroupKey(key: string): string {
 
 /** Every group key, so all groups start expanded. */
 export const ALL_MEDIA_GROUP_KEYS = [
+  'analyzing',
   'video',
   'audio',
   'image',
@@ -76,54 +76,43 @@ const TYPE_GROUP_LABELS = {
   lottie: 'media.library.groupLottie',
 } as const satisfies Record<MediaTypeGroupKey, string>
 
-const AUTO_ROLE_CATEGORY: Partial<Record<MediaRole, MediaCategory>> = {
-  speaker: 'speaker',
-  broll: 'b-roll',
-}
-
 /**
- * The media library's sections (see {@link groupMediaSections}). A saved
- * category always wins; uncategorized videos use the speaker / b-roll role
- * inferred from transcript + visual analysis. `filteredItems` keep their
- * search, filter and sort within each group.
+ * The media library's sections (see {@link groupMediaSections}): categories
+ * (explicit, or suggested by the background analysis), then "Analyzing",
+ * then the rest by file type. `filteredItems` keep their search, filter and
+ * sort within each group.
  */
 export function useMediaGroups(filteredItems: MediaMetadata[]): MediaGroup[] {
   const { t } = useTranslation()
-  const uncategorizedVideos = useMemo(
-    () =>
-      filteredItems.filter(
-        (item) => !isMediaCategory(item.category) && mediaTypeGroupOf(item) === 'video',
-      ),
-    [filteredItems],
-  )
-  const videoRoles = useMediaRoles(uncategorizedVideos)
+  const verdicts = useAutoCategories()
 
-  return useMemo(() => {
-    const sections = groupMediaSections(
-      filteredItems,
-      (item) => AUTO_ROLE_CATEGORY[videoRoles.get(item.id) ?? 'pending'],
-    )
-    const anyVideoSorted = sections.some(
-      (s) => s.kind === 'category' && (s.key === 'speaker' || s.key === 'b-roll'),
-    )
-    return sections.map((section) =>
-      section.kind === 'category'
-        ? {
-            key: categoryGroupKey(section.key),
-            label: t(`media.category.${section.key}`),
-            icon: section.key,
-            items: section.items,
-          }
-        : {
-            key: section.key,
-            // Videos not sorted yet read as "Analyzing" once others have a role
-            label:
-              section.key === 'video' && anyVideoSorted
-                ? t('media.library.groupAnalyzing')
-                : t(TYPE_GROUP_LABELS[section.key]),
-            icon: section.key,
-            items: section.items,
-          },
-    )
-  }, [filteredItems, videoRoles, t])
+  return useMemo(
+    () =>
+      groupMediaSections(filteredItems, (item) => verdicts.get(item.id)).map((section) => {
+        switch (section.kind) {
+          case 'category':
+            return {
+              key: categoryGroupKey(section.key),
+              label: t(`media.category.${section.key}`),
+              icon: section.key,
+              items: section.items,
+            }
+          case 'analyzing':
+            return {
+              key: 'analyzing',
+              label: t('media.library.groupAnalyzing'),
+              icon: 'analyzing',
+              items: section.items,
+            }
+          default:
+            return {
+              key: section.key,
+              label: t(TYPE_GROUP_LABELS[section.key]),
+              icon: section.key,
+              items: section.items,
+            }
+        }
+      }),
+    [filteredItems, verdicts, t],
+  )
 }

@@ -57,6 +57,8 @@
       },
       "menuCategory": "Category",
       "clearCategory": "Clear category",
+      "autoCategory": "auto",
+      "autoCategoryHint": "Sorted into {{category}} automatically. Pick a category from the right-click menu to confirm or change it.",
       "nativeTranscriptQueued": "Queued for transcription (local whisper.cpp)",
       "nativeTranscribing": "Transcribing locally with whisper.cpp",
       "nativeNoSpeech": "No speech found",
