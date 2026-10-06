@@ -89,6 +89,8 @@
       "uiSoundPreview": "プレビュー"
     },
     "ai": {
+      "autoAnalyzeOnOpen": "プロジェクトを開いたときにメディアを分析",
+      "autoAnalyzeOnOpenDescription": "新しい動画をバックグラウンドで文字起こし・映像解析し、メディアパネルでクリップを話者とBロールに分類します。",
       "captionSampleInterval": "字幕のサンプリング間隔",
       "captionSampleIntervalDescription": "「AI で分析」が字幕用にフレームをサンプリングする頻度です。",
       "seconds": "秒",

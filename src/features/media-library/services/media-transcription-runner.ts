@@ -26,6 +26,8 @@ export interface RunMediaTranscriptionJobOptions {
   onProgress?: TranscribeOptions['onProgress']
   onQueueStatusChange?: (state: QueueState) => void
   onModelFallback?: (from: MediaTranscriptModel, to: MediaTranscriptModel) => void
+  /** Set by the automatic analysis pass; see `MediaTranscript.origin`. */
+  origin?: 'background'
 }
 
 export type MediaTranscriptionJobResult =
@@ -99,6 +101,7 @@ export async function runMediaTranscriptionJob(
         model,
         quantization: options.quantization,
         language: options.language || undefined,
+        origin: options.origin,
         onQueueStatusChange: createQueueStatusHandler(mediaId, options.onQueueStatusChange),
         onProgress: createProgressHandler(mediaId, updateProgress, options.onProgress),
       })

@@ -89,6 +89,8 @@
       "uiSoundPreview": "Vorschau"
     },
     "ai": {
+      "autoAnalyzeOnOpen": "Medien beim Öffnen eines Projekts analysieren",
+      "autoAnalyzeOnOpenDescription": "Neue Videos im Hintergrund transkribieren und visuell analysieren, damit der Medienbereich Clips in Sprecher und B-Roll sortieren kann.",
       "captionSampleInterval": "Untertitel-Abtastintervall",
       "captionSampleIntervalDescription": "Wie oft „Mit KI analysieren\" ein Bild für Untertitel abtastet.",
       "seconds": "Sekunden",

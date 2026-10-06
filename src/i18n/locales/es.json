@@ -89,6 +89,8 @@
       "uiSoundPreview": "Vista previa"
     },
     "ai": {
+      "autoAnalyzeOnOpen": "Analizar medios al abrir un proyecto",
+      "autoAnalyzeOnOpenDescription": "Transcribe y analiza visualmente los vídeos nuevos en segundo plano para que el panel de medios separe los clips en Orador y B-roll.",
       "captionSampleInterval": "Intervalo de muestreo de subtítulos",
       "captionSampleIntervalDescription": "Con qué frecuencia Analizar con IA toma un fotograma para subtitular.",
       "seconds": "Segundos",

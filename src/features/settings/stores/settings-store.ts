@@ -50,6 +50,10 @@ interface AppSettings {
   captioningIntervalUnit: CaptioningIntervalUnit
   captioningIntervalValue: number
 
+  // Transcribe and visually analyze new video when a project opens, so the
+  // media pane can sort clips into speaker and b-roll.
+  autoAnalyzeMediaOnOpen: boolean
+
   // Scene Browser — how caption search matches queries. `semantic` uses a
   // sentence-transformer model to rank by meaning; `keyword` uses
   // substring + fuzzy-prefix matching on caption text.
@@ -159,6 +163,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   // AI captioning defaults
   captioningIntervalUnit: 'seconds',
   captioningIntervalValue: DEFAULT_CAPTIONING_INTERVAL_SECONDS,
+  autoAnalyzeMediaOnOpen: true,
 
   // Scene Browser defaults
   captionSearchMode: 'keyword',

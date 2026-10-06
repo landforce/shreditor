@@ -262,6 +262,14 @@ const newStore: MediaLibraryStoreApi =
               [...transcriptStatus.values()].filter((s) => s === 'ready').length,
             )
 
+            // Background transcription + visual analysis for new video
+            // (gated by the autoAnalyzeMediaOnOpen setting).
+            void import('../services/auto-media-analysis')
+              .then(({ scheduleAutoMediaAnalysis }) => scheduleAutoMediaAnalysis(currentProjectId))
+              .catch((error) =>
+                logger.warn('[MediaLibraryStore] Auto media analysis unavailable:', error),
+              )
+
             // Load existing proxies from OPFS and clean up interrupted/failed entries.
             try {
               await initializeProxyState(mediaItems)

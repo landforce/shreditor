@@ -201,6 +201,11 @@ export interface MediaTranscript {
   quantization: MediaTranscriptQuantization
   text: string
   segments: MediaTranscriptSegment[]
+  /**
+   * `background` when made by the automatic analysis pass rather than a user
+   * action. Background transcripts never auto-enable captions on clips.
+   */
+  origin?: 'background'
   createdAt: number
   updatedAt: number
 }
