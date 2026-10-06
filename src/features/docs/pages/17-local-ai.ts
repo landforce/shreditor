@@ -4,8 +4,7 @@ const page = {
   order: 17,
   slug: 'local-ai',
   title: 'Local AI Tools',
-  description:
-    'In-browser text to speech, music generation, and transcription, with local model caching.',
+  description: 'In-browser text to speech and transcription, with local model caching.',
   category: 'Creative Tools',
   related: ['scene-browser', 'text-captions-subtitles', 'audio'],
   sections: [
@@ -45,19 +44,6 @@ const page = {
             ['Kokoro', 'English', 'WebGPU'],
             ['MOSS Nano', '20 languages', 'CPU'],
             ['Supertonic 3', '31 languages', 'Local ONNX'],
-          ],
-        },
-      ],
-    },
-    {
-      title: 'Music generation',
-      blocks: [
-        {
-          kind: 'list',
-          items: [
-            'Expand **Music Generation** and describe the track with a prompt, or start from a preset such as Lo-fi chill or Upbeat EDM.',
-            'Set the length in seconds, then **Generate Music**; the first run downloads the model and caches it.',
-            'Preview the clip, then **Save and Insert** into the timeline or **Save to Library**.',
           ],
         },
       ],

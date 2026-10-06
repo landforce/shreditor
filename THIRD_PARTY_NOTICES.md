@@ -33,7 +33,6 @@ Loaded only when the matching feature is used. Licenses as tagged on each Huggin
 | `LiquidAI/LFM2.5-VL-450M-ONNX` (AI captions) | other: LFM Open License v1.0 |
 | `Xenova/all-MiniLM-L6-v2` (caption search) | Apache-2.0 |
 | `Xenova/clip-vit-base-patch32`, `Xenova/clap-htsat-unfused` | none on the conversion repo; see the upstream model cards |
-| `Xenova/musicgen-small` | CC-BY-NC-4.0 (non-commercial) |
 | `onnx-community/Kokoro-82M-v1.0-ONNX` | Apache-2.0 |
 | `onnx-community/gemma-4-E4B-it-ONNX` | Apache-2.0 |
 

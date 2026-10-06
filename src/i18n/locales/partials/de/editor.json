@@ -833,50 +833,19 @@
       "runsLocally": "{{runtime}} läuft lokal im Browser mit {{backend}}.",
       "history": "Verlauf ({{count}}) - {{size}}",
       "clearAll": "Alle löschen",
-      "musicGeneration": "Musik generieren",
-      "collapseMusicGeneration": "Musikgenerierung einklappen",
-      "expandMusicGeneration": "Musikgenerierung ausklappen",
-      "musicGenerationInfo": "Infos zur Musikgenerierung",
-      "musicgenDescription": "Verwendet Xenovas browserfähiges MusicGen-Modell über Transformers.js. Der erste Download ist groß, danach bleibt es lokal im Cache.",
-      "musicgenPromptHint": "Beschreibe Genre, Stimmung, Tempo und Instrumentierung. Kürzere Clips sind deutlich schneller fertig.",
-      "musicgenUnsupported": "WebGPU ist in diesem Browser nicht verfügbar. MusicGen benötigt Chrome 113+, Edge 113+ oder Safari 26+.",
-      "prompt": "Prompt",
-      "presets": "Vorgaben",
-      "musicPromptPlaceholder": "Beschreibe, welche Musik du erzeugen möchtest...",
-      "length": "Länge",
-      "generateMusic": "Musik generieren",
-      "musicHistory": "Musikverlauf ({{count}}) - {{size}}",
       "remove": "Entfernen",
       "saved": "Gespeichert",
       "saving": "Speichern...",
       "saveAndInsert": "Speichern und einfügen",
       "saveToLibrary": "In Bibliothek speichern",
-      "progressPreparingMusic": "Lokale Musikgenerierung wird vorbereitet...",
       "errors": {
-        "describeMusic": "Beschreibe die Musik, die du erzeugen möchtest.",
-        "musicgenUnsupported": "WebGPU ist für MusicGen erforderlich. Versuche Chrome 113+, Edge 113+ oder Safari 26+.",
-        "generateMusicFailed": "Musik konnte nicht generiert werden.",
         "saveAudioFailed": "Audio konnte nicht in der Medienbibliothek gespeichert werden."
       },
       "notifications": {
         "savedToLibrary": "\"{{fileName}}\" wurde in der Medienbibliothek gespeichert.",
         "savedAndAdded": "\"{{fileName}}\" wurde gespeichert und zur Timeline hinzugefügt."
       },
-      "defaultTtsPrompt": "Welcome to freecut. This voice was generated locally in the browser.",
-      "musicPresets": {
-        "lofiChillLabel": "Lo-fi Chill",
-        "lofiChillPrompt": "Warm lo-fi beat with dusty drums, mellow bass, and a dreamy synth lead",
-        "pop80sLabel": "80s Pop",
-        "pop80sPrompt": "80s pop track with bassy drums and synth",
-        "rock90sLabel": "90s Rock",
-        "rock90sPrompt": "90s rock song with loud guitars and heavy drums",
-        "upbeatEdmLabel": "Upbeat EDM",
-        "upbeatEdmPrompt": "A light and cheery EDM track, with syncopated drums, airy pads, and strong emotions bpm: 130",
-        "countryLabel": "Country",
-        "countryPrompt": "A cheerful country song with acoustic guitars",
-        "lofiElectroLabel": "Lo-fi Electro",
-        "lofiElectroPrompt": "Lofi slow bpm electro chill with organic samples"
-      }
+      "defaultTtsPrompt": "Welcome to freecut. This voice was generated locally in the browser."
     },
     "colorPanel": {
       "emptyState": "Wähle einen Clip für die Farbkorrektur aus",
