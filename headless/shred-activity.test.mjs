@@ -138,3 +138,32 @@ test('a pass that went stale (no heartbeat for 10 minutes) is not revived by a l
   await s.shred('apply', 'd4', s.ops)
   assert.equal(readActivity(s.root, 'p4').heartbeatAt, stale.heartbeatAt)
 })
+
+test('"Edit anyway" without any change lets the publish through; with a change it is refused', async (t) => {
+  const { createActivity } = await import('../skills/shreditor-edit/scripts/activity.mjs')
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'shred-activity-ws-'))
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }))
+  let drafts = { d1: { targetId: 'p1' } }
+  const activity = createActivity({
+    workspace: () => root,
+    editor: CLOSED,
+    editorUp: async () => false,
+    readDrafts: () => drafts,
+    writeDrafts: (next) => {
+      drafts = next
+    },
+    warn: () => {},
+  })
+  const released = () => {
+    let record = transition(null, 'start', { draftId: 'd1', label: 'Tighten' }, Date.now())
+    record = transition(record, 'release', {}, Date.now())
+    writeActivity(root, 'p1', record)
+  }
+  released()
+  await activity.beforePublish('d1', 'p1', async () => false)
+  released()
+  await assert.rejects(
+    activity.beforePublish('d1', 'p1', async () => true),
+    (e) => e.message === USER_EDITED_MESSAGE,
+  )
+})

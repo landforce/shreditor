@@ -858,6 +858,17 @@ const planDeps = () => ({
   warnUnsaved,
 })
 
+/** Did the user change the project since the draft was taken (saved, or unsaved in the editor)? */
+async function userChangedSince(origin, targetId) {
+  try {
+    const target = await getProject(targetId)
+    const unsaved = (await editorState(targetId))?.dirty === true
+    return unsaved || origin.baseRevision !== target.revision
+  } catch {
+    return true
+  }
+}
+
 const commands = {
   async up() {
     const info = await editorInfo()
@@ -1610,7 +1621,7 @@ const commands = {
       throw new Error(
         `${draftId} is not a draft of ${targetId} (make one with: shred draft ${targetId})`,
       )
-    await activity.beforePublish(draftId, targetId)
+    await activity.beforePublish(draftId, targetId, () => userChangedSince(origin, targetId))
     const draft = await getProject(draftId)
     const target = await getProject(targetId)
     if (origin.baseRevision !== target.revision) {
