@@ -82,6 +82,20 @@ function restoreProjectMetadata(snapshot: TimelineSnapshot): void {
   })
 }
 
+const sameFormat = (a: TimelineSnapshot['projectFormat'], b: TimelineSnapshot['projectFormat']) =>
+  JSON.stringify(a ?? null) === JSON.stringify(b ?? null)
+
+/** Put the project's format back (written to project.json, where the agent reads it). */
+function restoreProjectFormat(snapshot: TimelineSnapshot): void {
+  if (!snapshot.projectId || snapshot.projectFormat === undefined) return
+  const { currentProject, setProjectFormat } = useProjectStore.getState()
+  if (currentProject?.id !== snapshot.projectId) return
+  if (sameFormat(currentProject.format, snapshot.projectFormat)) return
+  void Promise.resolve(setProjectFormat(snapshot.projectId, snapshot.projectFormat ?? null)).catch(
+    (error) => logger.error(`Failed to restore the format of ${snapshot.projectId}:`, error),
+  )
+}
+
 /**
  * Capture a snapshot of all timeline state.
  * This is called before executing commands to enable undo.
@@ -116,6 +130,7 @@ export function captureSnapshot(): TimelineSnapshot {
     masterBusDb: playbackState.masterBusDb,
     projectId: currentProject?.id ?? null,
     projectMetadata: currentProject ? { ...currentProject.metadata } : null,
+    projectFormat: currentProject?.format ?? null,
   }
 }
 
@@ -165,6 +180,7 @@ export function restoreSnapshot(snapshot: TimelineSnapshot): void {
 
   // Restore current project metadata so canvas/project changes undo with the editor history.
   restoreProjectMetadata(snapshot)
+  restoreProjectFormat(snapshot)
 }
 
 /**
@@ -202,7 +218,8 @@ export function snapshotsEqual(a: TimelineSnapshot, b: TimelineSnapshot): boolea
     JSON.stringify(a.busAudioEq ?? null) === JSON.stringify(b.busAudioEq ?? null) &&
     a.masterBusDb === b.masterBusDb &&
     a.projectId === b.projectId &&
-    projectMetadataEqual(a.projectMetadata, b.projectMetadata)
+    projectMetadataEqual(a.projectMetadata, b.projectMetadata) &&
+    sameFormat(a.projectFormat, b.projectFormat)
   )
 }
 

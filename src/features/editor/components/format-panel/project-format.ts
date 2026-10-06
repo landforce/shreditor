@@ -12,7 +12,11 @@ import { addMissingFormatTracks } from '@/shared/formats/format-tracks'
 import type { FormatSelection } from '@/shared/formats/format-cards'
 import { useProjectStore } from '@/features/editor/deps/projects'
 import {
+  captureSnapshot,
   useCompositionNavigationStore,
+  useItemsStore,
+  useTimelineCommandStore,
+  useTimelineSettingsStore,
   useTimelineStore,
 } from '@/features/editor/deps/timeline-store'
 
@@ -68,13 +72,20 @@ export async function applyProjectFormat(
   { addTracks }: { addTracks: boolean },
 ): Promise<{ format: ProjectFormat; added: TimelineTrack[] }> {
   const format = projectFormatRecord(selection.id, selection.variant)
+  // The format and the tracks it adds are one undo step.
+  const before = captureSnapshot()
   await useProjectStore.getState().setProjectFormat(projectId, format)
-  if (!addTracks || !isMainTimelineActive()) return { format, added: [] }
-  const timeline = useTimelineStore.getState()
-  const { tracks, added } = addMissingFormatTracks(
-    timeline.tracks,
-    resolveFormat(selection.id, selection.variant),
-  )
-  if (added.length > 0) timeline.setTracks(tracks)
+  let added: TimelineTrack[] = []
+  if (addTracks && isMainTimelineActive()) {
+    const timeline = useTimelineStore.getState()
+    const result = addMissingFormatTracks(
+      timeline.tracks,
+      resolveFormat(selection.id, selection.variant),
+    )
+    added = result.added
+    if (added.length > 0) useItemsStore.getState().setTracks(result.tracks)
+  }
+  useTimelineSettingsStore.getState().markDirty()
+  useTimelineCommandStore.getState().addUndoEntry({ type: 'SET_FORMAT' }, before)
   return { format, added }
 }

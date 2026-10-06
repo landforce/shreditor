@@ -321,6 +321,7 @@ export const useTimelineCommandStore = create<CommandStoreState & CommandStoreAc
         fps: after.fps,
         projectId: after.projectId,
         projectMetadata: after.projectMetadata,
+        projectFormat: after.projectFormat,
         currentFrame: after.currentFrame,
         scrollPosition: after.scrollPosition,
         snapEnabled: after.snapEnabled,

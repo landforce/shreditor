@@ -3,7 +3,7 @@ import type { AudioEqSettings } from '@/types/audio'
 import type { Transition } from '@/types/transition'
 import type { ItemKeyframes } from '@/types/keyframe'
 import type { SubComposition } from '../compositions-store'
-import type { ProjectResolution } from '@/types/project'
+import type { Project, ProjectResolution } from '@/types/project'
 import type { TextStyleDefinition } from '@/types/text-style'
 
 /**
@@ -33,6 +33,8 @@ export interface TimelineSnapshot {
   masterBusDb: number
   projectId: string | null
   projectMetadata: ProjectResolution | null
+  /** The project's format record: a format change undoes with the tracks it added. */
+  projectFormat?: Project['format'] | null
 }
 
 /**

@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vite-plus/test'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vite-plus/test'
 import type { Project, ProjectTimeline } from '@/types/project'
 import type { TextItem } from '@/types/timeline'
 import {
@@ -13,7 +13,7 @@ import { useKeyframesStore } from './keyframes-store'
 import { useMarkersStore } from './markers-store'
 import { useTimelineSettingsStore } from './timeline-settings-store'
 import { useTimelineCommandStore } from './timeline-command-store'
-import { captureSnapshot, timelineContentEqual } from './commands/snapshot'
+import { captureSnapshot, restoreSnapshot, timelineContentEqual } from './commands/snapshot'
 import { formatTimelineCommandLabel } from './commands/labels'
 import { hydrateTimelineStoresFromProject } from './timeline-persistence'
 
@@ -223,5 +223,33 @@ describe('an agent pass reloaded from disk is one undo step', () => {
     } finally {
       useSettingsStore.setState({ maxUndoHistory: previous })
     }
+  })
+
+  it('a format change undoes with the timeline; a reload keeps the format it brought', async () => {
+    const setProjectFormat = vi.fn(async () => {})
+    const vlog = { id: 'vlog', variant: 'fast' } as never
+    useProjectStore.setState({
+      currentProject: { ...project({ tracks: [track], items: [] }), format: vlog },
+      setProjectFormat,
+    } as never)
+    const before = captureSnapshot()
+    useProjectStore.setState((state) => ({
+      currentProject: state.currentProject && { ...state.currentProject, format: undefined },
+    }))
+    restoreSnapshot(before)
+    expect(setProjectFormat).toHaveBeenCalledWith('project-1', vlog)
+
+    setProjectFormat.mockClear()
+    const beforePass = captureSnapshot()
+    await hydrateTimelineStoresFromProject(project(passTimeline), { keepHistory: true })
+    useProjectStore.setState((state) => ({
+      currentProject: state.currentProject && {
+        ...state.currentProject,
+        format: { id: 'ten-shot' } as never,
+      },
+    }))
+    useTimelineCommandStore.getState().recordExternalChange({ type: 'EXTERNAL_CHANGE' }, beforePass)
+    useTimelineCommandStore.getState().undo()
+    expect(setProjectFormat).not.toHaveBeenCalled()
   })
 })
