@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { FORMAT_IDS, getFormat } from '../../formats/registry.mjs'
 
 export const HEADLESS_API_VERSION = 1
 
@@ -127,10 +128,7 @@ const easing = z.enum([
 const easingConfigSchema = z
   .object({
     type: easing,
-    bezier: z
-      .object({ x1: finite, y1: finite, x2: finite, y2: finite })
-      .strict()
-      .optional(),
+    bezier: z.object({ x1: finite, y1: finite, x2: finite, y2: finite }).strict().optional(),
     spring: z
       .object({
         tension: z.number().min(0).max(500),
@@ -245,7 +243,9 @@ const opSchemas = [
       order: finite.optional(),
     })
     .strict(),
-  z.object({ op: z.literal('removeTrack'), trackId: id, removeItems: z.boolean().optional() }).strict(),
+  z
+    .object({ op: z.literal('removeTrack'), trackId: id, removeItems: z.boolean().optional() })
+    .strict(),
   z
     .object({
       op: z.literal('addClip'),
@@ -364,6 +364,16 @@ export const editRequestSchema = z
     path: ['project'],
   })
 
+// A project's format (formats/registry.mjs): the id, and a variant the format has.
+const formatChoice = z
+  .object({ id: z.enum(FORMAT_IDS), variant: z.string().min(1).optional() })
+  .strict()
+  .refine(
+    (value) => !value.variant || getFormat(value.id).variants.some((v) => v.id === value.variant),
+    { message: 'unknown variant for this format', path: ['variant'] },
+  )
+const storedFormat = formatChoice.and(z.object({ reviewedHash: z.string().optional() }))
+
 export const projectCreateRequestSchema = z
   .object({
     id: portableIdSchema.optional(),
@@ -376,6 +386,7 @@ export const projectCreateRequestSchema = z
       .string()
       .regex(/^#[0-9A-Fa-f]{6}$/)
       .optional(),
+    format: formatChoice.optional(),
   })
   .strict()
 
@@ -409,6 +420,7 @@ const lifecycleProjectSchema = z
           .optional(),
       })
       .strict(),
+    format: storedFormat.optional(),
     timeline: lifecycleTimelineSchema.optional(),
   })
   .strict()
@@ -438,6 +450,8 @@ export const projectUpdateRequestSchema = z
           .string()
           .regex(/^#[0-9A-Fa-f]{6}$/)
           .optional(),
+        // null clears it. Recording a format doesn't touch the canvas or tracks.
+        format: formatChoice.nullable().optional(),
       })
       .strict()
       .refine((v) => Object.keys(v).length > 0, 'updates must not be empty'),

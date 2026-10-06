@@ -6,6 +6,7 @@ import {
   mediaProbeRequestSchema,
   projectCreateRequestSchema,
   projectSaveRequestSchema,
+  projectUpdateRequestSchema,
 } from './lib/contract.mjs'
 
 test('lifecycle project requests are strict and revision guarded', () => {
@@ -40,6 +41,55 @@ test('lifecycle project requests are strict and revision guarded', () => {
   assert.equal(projectSaveRequestSchema.safeParse({ project: {} }).success, false)
   assert.equal(mediaProbeRequestSchema.safeParse({ persist: true }).success, false)
   assert.equal(mediaProbeRequestSchema.safeParse({ persist: true, force: true }).success, true)
+})
+
+test('projects carry an optional format: create, update and save', () => {
+  const ok = (schema, value) => schema.safeParse(value).success
+  assert.equal(ok(projectCreateRequestSchema, { name: 'A', format: { id: 'vlog' } }), true)
+  assert.equal(
+    ok(projectCreateRequestSchema, { name: 'A', format: { id: 'vlog', variant: 'slow' } }),
+    true,
+  )
+  assert.equal(
+    ok(projectCreateRequestSchema, { name: 'A', format: { id: 'vlog', variant: 'standard' } }),
+    false,
+  )
+  assert.equal(ok(projectCreateRequestSchema, { name: 'A', format: { id: 'yap' } }), false)
+  assert.equal(
+    ok(projectCreateRequestSchema, { name: 'A', format: { id: 'vlog', extra: 1 } }),
+    false,
+  )
+  assert.equal(
+    ok(projectUpdateRequestSchema, {
+      updates: { format: { id: 'ten-shot', variant: 'beat' } },
+      force: true,
+    }),
+    true,
+  )
+  assert.equal(ok(projectUpdateRequestSchema, { updates: { format: null }, force: true }), true)
+  const project = {
+    id: 'demo',
+    name: 'Demo',
+    description: '',
+    createdAt: 1,
+    updatedAt: 1,
+    duration: 0,
+    metadata: { width: 1080, height: 1920, fps: 30 },
+  }
+  const stored = { id: 'greenscreen', reviewedHash: 'sha256:abc' }
+  assert.equal(
+    ok(projectSaveRequestSchema, { project, force: true }),
+    true,
+    'older projects have none',
+  )
+  assert.equal(
+    ok(projectSaveRequestSchema, { project: { ...project, format: stored }, force: true }),
+    true,
+  )
+  assert.equal(
+    ok(projectSaveRequestSchema, { project: { ...project, format: { id: 'nope' } }, force: true }),
+    false,
+  )
 })
 
 test('lifecycle edits require unique caller ids and accept id references', () => {

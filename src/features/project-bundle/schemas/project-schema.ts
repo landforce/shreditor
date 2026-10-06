@@ -7,7 +7,10 @@
 
 import { z } from 'zod'
 import { TEXT_STYLE_PRESET_IDS } from '@/shared/typography/text-style-preset-ids'
+import { FORMAT_ROLES, getFormat, type FormatRole } from '@formats/registry.mjs'
 import { SNAPSHOT_VERSION } from '../types/snapshot'
+
+const formatRoleSchema = z.enum(FORMAT_ROLES as readonly [FormatRole, ...FormatRole[]])
 
 // ============================================================================
 // Keyframe Schemas
@@ -468,6 +471,7 @@ const timelineItemSchema = z
     textLayoutDrafts: textLayoutDraftsSchema.optional(),
     textRole: z.literal('caption').optional(),
     captionSource: captionSourceSchema.optional(),
+    formatRole: formatRoleSchema.optional(),
     fontSize: z.number().optional(),
     fontFamily: z.string().optional(),
     fontWeight: fontWeightSchema.optional(),
@@ -621,6 +625,7 @@ const trackSchema = z
     parentTrackId: z.string().optional(),
     isGroup: z.boolean().optional(),
     isCollapsed: z.boolean().optional(),
+    formatRole: formatRoleSchema.optional(),
   })
   .passthrough()
 
@@ -717,6 +722,32 @@ const projectResolutionSchema = z.object({
 })
 
 // ============================================================================
+// Project Format (formats/registry.mjs)
+// ============================================================================
+
+const projectFormatSchema = z
+  .object({
+    id: z.string().min(1),
+    variant: z.string().min(1).optional(),
+    reviewedHash: z.string().optional(),
+  })
+  .strict()
+  .superRefine((value, ctx) => {
+    const format = getFormat(value.id)
+    if (!format || format.id !== value.id) {
+      ctx.addIssue({ code: 'custom', path: ['id'], message: `Unknown format "${value.id}"` })
+      return
+    }
+    if (value.variant && !format.variants.some((variant) => variant.id === value.variant)) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['variant'],
+        message: `Unknown variant "${value.variant}" for ${format.name}`,
+      })
+    }
+  })
+
+// ============================================================================
 // Project Schema
 // ============================================================================
 
@@ -733,6 +764,7 @@ const projectSchema = z
     thumbnailId: z.string().optional(),
     rootFolderName: z.string().optional(),
     metadata: projectResolutionSchema,
+    format: projectFormatSchema.optional(),
     timeline: timelineSchema.optional(),
   })
   .strict()

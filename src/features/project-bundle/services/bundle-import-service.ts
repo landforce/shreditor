@@ -186,6 +186,7 @@ export async function importProjectBundle(
     duration: bundleProject.duration,
     thumbnail: bundleProject.thumbnail,
     metadata: bundleProject.metadata,
+    ...(bundleProject.format ? { format: bundleProject.format } : {}),
     // Store the project folder handle for smarter relinking and path display
     rootFolderHandle: projectDir,
     rootFolderName: projectName,

@@ -41,6 +41,8 @@ const OPTIONS = new Set([
   'height',
   'fps',
   'background-color',
+  'format',
+  'variant',
   'file',
   'ops',
   'persist',
@@ -153,6 +155,9 @@ async function run(argv = process.argv.slice(2)) {
         ...(args.height ? { height: number(args.height) } : {}),
         ...(args.fps ? { fps: number(args.fps) } : {}),
         ...(args['background-color'] ? { backgroundColor: args['background-color'] } : {}),
+        ...(args.format
+          ? { format: { id: args.format, ...(args.variant ? { variant: args.variant } : {}) } }
+          : {}),
       })
       const project = await withBrowser(workspace, args, (page) =>
         page.evaluate((value) => window.freecut.createProject(value), input),
