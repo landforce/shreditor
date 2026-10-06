@@ -53,6 +53,7 @@ import { PageSession, probeGpu } from './lib/page-session.mjs'
 import {
   assertSinglePathComponent,
   HttpError,
+  editOpFailure,
   readJsonBody,
   readJsonBodyWithBytes,
   setHttpTimeouts,
@@ -259,21 +260,25 @@ async function main() {
     stream.on('close', () => fs.rm(summary.outputPath, () => {}))
   }
 
+  // An op the timeline rejects (missing item, same-track overlap, ...) is the
+  // caller's input, not a server fault: answer 422 with the op's own message.
+  const runEdit = (payload) =>
+    queue
+      .enqueue(() => session.page.evaluate((value) => window.freecut.editProject(value), payload), {
+        timeoutMs: editTimeoutMs,
+        kind: 'edit',
+      })
+      .catch((error) => {
+        throw editOpFailure(error)
+      })
+
   const handleEdit = async (req, res) => {
     const body = validate(editRequestSchema, await readJsonBody(req))
     if (body.project) assertSinglePathComponent(body.project, 'project id')
     const project = body.projectObject ?? loadProjectById(workspace, body.project).project
     const ops = body.ops
     const media = collectAddClipMedia(workspace, ops)
-    const result = await queue.enqueue(
-      () =>
-        session.page.evaluate((payload) => window.freecut.editProject(payload), {
-          project,
-          ops,
-          media,
-        }),
-      { timeoutMs: editTimeoutMs, kind: 'edit' },
-    )
+    const result = await runEdit({ project, ops, media })
     sendJson(res, 200, result)
   }
 
@@ -389,15 +394,7 @@ async function main() {
     const execute = async () => {
       const current = await getProjectResource(workspace, id)
       const media = collectAddClipMedia(workspace, body.ops)
-      const result = await queue.enqueue(
-        () =>
-          session.page.evaluate((payload) => window.freecut.editProject(payload), {
-            project: current.project,
-            ops: body.ops,
-            media,
-          }),
-        { timeoutMs: editTimeoutMs, kind: 'edit' },
-      )
+      const result = await runEdit({ project: current.project, ops: body.ops, media })
       if (!body.persist)
         return {
           status: 200,

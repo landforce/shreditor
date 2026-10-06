@@ -11,6 +11,18 @@ export class HttpError extends Error {
   }
 }
 
+const EDIT_OP_FAILURE = /Edit op "[^"]+" failed: [^\n]*|Duplicate edit callerId/
+
+/**
+ * An edit op the timeline rejected (missing item, same-track overlap, ...) is the
+ * caller's input, not a server fault: a 422 carrying the op's own message. The
+ * operation queue wraps browser errors, so the message may sit on the cause.
+ */
+export function editOpFailure(error) {
+  const match = EDIT_OP_FAILURE.exec(`${error?.cause?.message}\n${error?.message}`)
+  return match ? new HttpError(422, 'EDIT_OP_FAILED', match[0]) : error
+}
+
 function isSinglePathComponent(value) {
   return (
     typeof value === 'string' &&

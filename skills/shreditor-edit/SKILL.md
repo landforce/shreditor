@@ -15,7 +15,7 @@ You are the agent half of Shreditor: you make the edit, the user previews and ad
 4. **Style is not yours to invent.** Load the style skill before planning. Landforce: read `~/Dev/landforce/.claude/skills/landforce-vlog/SKILL.md` and the kit it names. No style skill: ask once, record the answer in the brief.
 5. **A command succeeding is not a check.** Open every rendered image you rely on. Say plainly what you looked at, listened to, or didn't.
 
-**Setup, every session:** `shred up` starts the editor (http://localhost:5273) and the agent service, then `shred status`. Open the editor URL in your browser so you and the user see the same thing. The workspace (where projects, media and catalogs live) is `~/Movies/Shreditor` unless `~/.shreditor/config.json` says otherwise.
+**Setup, every session:** `shred up` starts the editor (http://localhost:5273) and the agent service, then `shred status`. Open the editor URL in your browser so you and the user see the same thing. The workspace (where projects, media and catalogs live) is `~/Movies/Shreditor` unless `~/.shreditor/config.json` says otherwise; `SHRED_WORKSPACE=<dir>` overrides both (tests and scratch work).
 
 ## The loop
 
@@ -31,14 +31,14 @@ You are the agent half of Shreditor: you make the edit, the user previews and ad
 ### 2. Understand the format the user wants
 
 - Ask what they're making, if they haven't said: format (for example VO vlog, talking-head yap, 10 shot), length, audience, the one thing the viewer should leave with, must-keep moments, music or not, and whether they want to see the plan before you build. Offer the formats their style skill defines. One round of questions, only what changes the result.
-- `shred new --name "..." --size 1080x1920 --fps 30` creates the project (or use the one they name). Import the footage you'll use, one call per category: `shred import <files> --project <id> --category <category>` (clones in place, no copying). Fix or add categories later with `shred categorize <mediaId>=<category> ...`. The open editor shows imports and category changes within a second. The user can recategorize from a media card; their choice is in `media/<id>/metadata.json` and wins.
+- `shred new --name "..." --size 1080x1920 --fps 30` creates the project (or use the one they name). It prints the default tracks (`V1 track-1`, `A1 track-2`); reuse them and add tracks only for extra layers. Import the footage you'll use, one call per category: `shred import <files> --project <id> --category <category>` (clones in place, no copying). Fix or add categories later with `shred categorize <mediaId>=<category> ...`. The open editor shows imports and category changes within a second. The user can recategorize from a media card; their choice is in `media/<id>/metadata.json` and wins.
 - Write the brief (`<workspace>/projects/<id>/agent/brief.yaml`) and the beat plan (`plan.json`). Templates: `references/brief-and-plan.md`. Every beat has a viewer takeaway; the style skill decides pacing, type and placement.
 - If the brief says `review.plan: true`, show the plan and wait.
 
 ### 3. Edit, then let the user preview and adjust
 
-- `shred draft <id>` gives you a private copy. Build there in coherent batches (assembly, then type, then callouts, then sound) with `shred apply <draftId> ops.json`. Op shapes, units and gotchas: `references/engine.md`; read it before the first batch.
-- Verify on the draft: `shred frames <draftId> --at <frames> --out grid.jpg`, then open it. Sample every shot, both sides of every cut, every text entrance, and anything near the style's safe area. Fix, re-render, look again. Measure loudness where audio matters; say if you couldn't listen.
+- `shred draft <id>` gives you a private copy. Build there in coherent batches (assembly, then type, then callouts, then sound) with `shred apply <draftId> ops.json`. Reuse the default V1/A1 tracks; add tracks only for extra layers. Items on one track can't overlap: a batch that would overlap fails whole, so place everything at free ranges. Op shapes, units and gotchas: `references/engine.md`; read it before the first batch.
+- Verify on the draft: `shred frames <draftId> --at <frames> --out grid.jpg`, then open it. Sample every shot, both sides of every cut, every text entrance, and anything near the style's safe area. Fix, re-render, look again. Sound: master the voiceover (or the final mix stem) with `shred master <file> --lufs -14 --tp -1.5` and import the `.mastered.wav` it writes; clip volume can't hit a loudness target. Measure the final export with ffmpeg `ebur128` (`references/engine.md`, Loudness). Say if you couldn't listen.
 - Write `summary.md` (template in `references/brief-and-plan.md`): what this pass does, what to look at and when, checks performed, what's placeholder.
 - `shred publish <draftId> <id> --label "<one line>" --summary summary.md`. Make sure your browser is showing the editor link it prints (the user's project, not the draft); the editor reloads the pass in about a second.
 - Hand over: tell the user the pass is in the editor, give the times worth watching, and invite them to adjust anything directly (trim, move, retime, swap, edit text) and save, or to tell you what to change. Then stop and wait.

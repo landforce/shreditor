@@ -33,6 +33,10 @@ import {
   DEFAULT_PROJECT_WIDTH,
 } from '@/shared/projects/defaults'
 import { validateProject } from '@/features/project-bundle/schemas/project-schema'
+import {
+  buildTimelineFromStores,
+  hydrateTimelineStoresFromProject,
+} from '@/features/timeline/stores/timeline-persistence'
 import { mediaProcessorService } from '@/features/media-library/services/media-processor-service'
 import { getMimeType, validateMediaFileContent } from '@/features/media-library/utils/validation'
 import { convertTimelineToComposition } from '@/features/export/utils/timeline-to-composition'
@@ -161,7 +165,8 @@ async function waitForFaceApplied(
   const isApplied = (): boolean =>
     GENERICS.every(
       (generic) =>
-        measure(`${weight} 100px "${family}", ${generic}`) !== measure(`${weight} 100px ${generic}`),
+        measure(`${weight} 100px "${family}", ${generic}`) !==
+        measure(`${weight} 100px ${generic}`),
     )
 
   let streak = 0
@@ -1202,7 +1207,7 @@ interface FreecutHeadlessApi {
   createProject: typeof createProjectForHeadless
 }
 
-function createProjectForHeadless(input: {
+async function createProjectForHeadless(input: {
   id?: string
   name: string
   description?: string
@@ -1210,7 +1215,7 @@ function createProjectForHeadless(input: {
   height?: number
   fps?: number
   backgroundColor?: string
-}): Project {
+}): Promise<Project> {
   const now = Date.now()
   const raw: Project = {
     id: input.id ?? crypto.randomUUID(),
@@ -1227,7 +1232,10 @@ function createProjectForHeadless(input: {
       ...(input.backgroundColor ? { backgroundColor: input.backgroundColor } : {}),
     },
   }
-  const validated = validateProject(raw)
+  // Start with the default V1/A1 tracks (the ones the first edit would create
+  // anyway), so callers see their ids up front and reuse them instead of adding more.
+  await hydrateTimelineStoresFromProject(raw)
+  const validated = validateProject({ ...raw, timeline: buildTimelineFromStores() })
   if (!validated.success || !validated.data) throw new Error('Created project failed validation')
   return validated.data as Project
 }

@@ -43,6 +43,7 @@ const samples = {
   updateTransition: { op: 'updateTransition', id: 't', presentation: 'wipe', direction: 'from-top' },
   removeTransition: { op: 'removeTransition', id: 't' },
   addTrack: { op: 'addTrack', kind: 'audio', order: 2 },
+  removeTrack: { op: 'removeTrack', trackId: 'v', removeItems: true },
   addClip: { op: 'addClip', mediaId: 'm', from: 0 },
   addKeyframe: {
     op: 'addKeyframe',
