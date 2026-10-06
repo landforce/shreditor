@@ -49,7 +49,20 @@
         "liveAction": "実写",
         "animation": "アニメ",
         "threeD": "3D レンダリング"
-      }
+      },
+      "menuCategory": "カテゴリ",
+      "clearCategory": "カテゴリを解除"
+    },
+    "category": {
+      "speaker": "話者",
+      "b-roll": "Bロール",
+      "graphics": "グラフィック",
+      "overlay": "オーバーレイ",
+      "voiceover": "ナレーション",
+      "music": "音楽",
+      "sfx": "効果音",
+      "other": "その他",
+      "uncategorized": "未分類"
     },
     "compositions": {
       "compositionsGroup": "コンポジション",

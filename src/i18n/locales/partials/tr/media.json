@@ -49,7 +49,20 @@
         "liveAction": "Gerçek çekim",
         "animation": "Anime",
         "threeD": "3B render"
-      }
+      },
+      "menuCategory": "Kategori",
+      "clearCategory": "Kategoriyi kaldır"
+    },
+    "category": {
+      "speaker": "Konuşmacı",
+      "b-roll": "B-roll",
+      "graphics": "Grafikler",
+      "overlay": "Katmanlar",
+      "voiceover": "Dış ses",
+      "music": "Müzik",
+      "sfx": "SFX",
+      "other": "Diğer",
+      "uncategorized": "Kategorisiz"
     },
     "compositions": {
       "compositionsGroup": "Kompozisyonlar",

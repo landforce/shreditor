@@ -5,6 +5,7 @@
  */
 
 import type { Project, ProjectTimeline } from '@/types/project'
+import type { MediaCategory } from '@/types/storage'
 
 type BundleTimelineItem = Omit<ProjectTimeline['items'][number], 'mediaId'> & {
   mediaRef?: string
@@ -69,6 +70,8 @@ export interface BundleMediaEntry {
   fileSize: number
   sha256: string // Content hash for integrity verification
   mimeType: string
+  /** Role in the edit (MediaMetadata.category); absent when uncategorized. */
+  category?: MediaCategory
   metadata: {
     duration: number
     width: number

@@ -9,7 +9,9 @@
 //                                        probe, contact-sheet, transcribe, and make playable proxies
 //   shred new --name "..." [--size 1080x1920] [--fps 30]   create a project; prints id and editor URL
 //   shred project <id>                   timeline summary (tracks, items, frames)
-//   shred import <file...> --project <id>   bring footage in (clone/link in place)
+//   shred import <file...> --project <id> [--category <c>]   bring footage in (clone/link in place)
+//   shred categorize <mediaId>=<category>... | --category <c> <mediaId>...
+//                                        set what each media is for; the editor groups by it
 //   shred draft <id>                     copy a project to a private draft; prints the draft id
 //   shred apply <id> <ops.json>          apply an op batch atomically (revision-checked)
 //   shred frames <id> --at 30,95,... [--out grid.jpg] [--size 270x480]
@@ -47,6 +49,7 @@ const { values: opt, positionals } = parseArgs({
     label: { type: 'string' },
     summary: { type: 'string' },
     link: { type: 'boolean' },
+    category: { type: 'string' },
     build: { type: 'boolean' },
     json: { type: 'boolean' },
   },
@@ -351,8 +354,30 @@ const commands = {
   async import(files) {
     if (!files.length) throw new Error('Pass one or more file paths')
     const cli = path.join(REPO, 'bin/shreditor.mjs')
-    const out = execFileSync(process.execPath, [cli, 'import', ...files, ...(opt.project ? ['--project', opt.project] : []), ...(opt.link ? ['--link'] : [])], { encoding: 'utf8' })
+    const out = execFileSync(process.execPath, [cli, 'import', ...files, ...(opt.project ? ['--project', opt.project] : []), ...(opt.link ? ['--link'] : []), ...(opt.category ? ['--category', opt.category] : [])], { encoding: 'utf8' })
     say(out.trim())
+  },
+
+  // Through the editor's bridge when it's up, else the same code in-process.
+  async categorize(pairs) {
+    if (!pairs.length) throw new Error('Pass <mediaId>=<category>... or --category <category> <mediaId>...')
+    if (!(await editorUp())) {
+      const cli = path.join(REPO, 'bin/shreditor.mjs')
+      const out = execFileSync(process.execPath, [cli, 'categorize', ...pairs, ...(opt.category ? ['--category', opt.category] : [])], { encoding: 'utf8' })
+      return say(out.trim())
+    }
+    const clear = (c) => (c === 'none' || c === '' ? null : c)
+    const items = pairs.map((arg) => {
+      if (opt.category) return { mediaId: arg, category: clear(opt.category) }
+      const at = arg.lastIndexOf('=')
+      if (at < 1) throw new Error(`Expected <mediaId>=<category>, got ${arg}`)
+      return { mediaId: arg.slice(0, at), category: clear(arg.slice(at + 1)) }
+    })
+    const res = await fetch(`${EDITOR}/__shreditor/media/category`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ items }) })
+    const body = await res.json()
+    if (!res.ok) throw new Error(body.message ?? `HTTP ${res.status}`)
+    for (const c of body.changed) say(`set     ${c.mediaId}  ${c.from ?? 'none'} -> ${c.to ?? 'none'}`)
+    for (const u of body.unchanged) say(`same    ${u.mediaId}  ${u.category ?? 'none'}`)
   },
 
   async draft([id]) {
@@ -422,7 +447,8 @@ const commands = {
 try {
   const fn = commands[command]
   if (!fn) {
-    say(fs.readFileSync(fileURLToPath(import.meta.url), 'utf8').split('\n').slice(1, 25).map((l) => l.replace(/^\/\/ ?/, '')).join('\n'))
+    const lines = fs.readFileSync(fileURLToPath(import.meta.url), 'utf8').split('\n').slice(1)
+    say(lines.slice(0, lines.findIndex((l) => !l.startsWith('//'))).map((l) => l.replace(/^\/\/ ?/, '')).join('\n'))
     process.exit(command ? 1 : 0)
   }
   await fn(args)

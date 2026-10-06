@@ -75,3 +75,18 @@ export async function discardPlacedMedia(mediaId: string): Promise<void> {
     cache: 'no-store',
   })
 }
+
+/**
+ * Change stamp for a project's media from the bridge (`GET media/version`):
+ * moves when anything outside this tab imports, removes or recategorizes
+ * media. Null when the workspace isn't bridge-served or the bridge is older.
+ */
+export async function readProjectMediaVersion(projectId: string): Promise<string | null> {
+  if (!canImportMediaInPlace()) return null
+  const res = await fetch(`${BASE}/media/version?projectId=${encodeURIComponent(projectId)}`, {
+    cache: 'no-store',
+  })
+  if (!res.ok) return null
+  const body = (await res.json().catch(() => ({}))) as { version?: unknown }
+  return typeof body.version === 'string' ? body.version : null
+}

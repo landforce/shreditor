@@ -99,7 +99,6 @@ import { cancelMediaTranscriptionJob } from '../services/media-transcription-run
 import { importMediaAnalysisService } from '../services/media-analysis-service-loader'
 import { getSupportedMediaFormatLabels } from '../utils/media-file-picker'
 import { getSharedProxyKey } from '../utils/proxy-key'
-import { getMediaType } from '../utils/validation'
 import { getProjectBrokenMediaIds } from '@/features/media-library/utils/broken-media'
 import type { MediaMetadata } from '@/types/storage'
 import { isMarqueeJustFinished } from '@/shared/marquee/use-marquee-selection'
@@ -107,6 +106,12 @@ import { useMediaLibraryMarquee } from './use-media-library-marquee'
 import { useMediaLibraryDragDrop } from './use-media-library-drag-drop'
 import { useMediaTaskProgress } from './use-media-task-progress'
 import { useMediaLibraryDeletion } from './use-media-library-deletion'
+import {
+  ALL_MEDIA_GROUP_KEYS,
+  MEDIA_GROUP_ICONS,
+  useMediaGroups,
+  type MediaGroupIcon,
+} from './use-media-groups'
 
 function CopyButton({ text }: { text: string }) {
   const { t } = useTranslation()
@@ -140,18 +145,10 @@ function HeaderActionTooltip({ label, children }: { label: string; children: Rea
   )
 }
 
-const GROUP_ICONS = {
-  video: Video,
-  audio: FileAudio,
-  image: ImageIcon,
-  gif: Film,
-  lottie: FileJson,
-} as const
-
 interface MediaTypeGroupProps {
   groupKey: string
   label: string
-  icon: keyof typeof GROUP_ICONS
+  icon: MediaGroupIcon
   items: MediaMetadata[]
   isOpen: boolean
   onToggle: (key: string, open: boolean) => void
@@ -182,7 +179,7 @@ const MediaTypeGroupBase = memo(function MediaTypeGroupBase({
   itemSize,
   Grid,
 }: MediaTypeGroupBaseProps) {
-  const Icon = GROUP_ICONS[icon]
+  const Icon = MEDIA_GROUP_ICONS[icon]
   return (
     <Collapsible open={isOpen} onOpenChange={(open) => onToggle(groupKey, open)}>
       <CollapsibleTrigger className="flex items-center gap-2 w-full py-2 hover:bg-secondary/50 rounded-md px-2 -mx-2 transition-colors">
@@ -239,9 +236,7 @@ export const MediaLibrary = memo(function MediaLibrary({ onMediaSelect }: MediaL
   const headerToolbarWidthRef = useRef(0)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const [headerCompactLevel, setHeaderCompactLevel] = useState(0)
-  const [openGroups, setOpenGroups] = useState<Set<string>>(
-    () => new Set(['video', 'audio', 'image', 'gif', 'lottie']),
-  )
+  const [openGroups, setOpenGroups] = useState<Set<string>>(() => new Set(ALL_MEDIA_GROUP_KEYS))
   const [showImportUrlDialog, setShowImportUrlDialog] = useState(false)
   const [importUrlValue, setImportUrlValue] = useState('')
   const [isImportUrlSubmitting, setIsImportUrlSubmitting] = useState(false)
@@ -284,61 +279,8 @@ export const MediaLibrary = memo(function MediaLibrary({ onMediaSelect }: MediaL
   const proxyStatus = useMediaLibraryStore((s) => s.proxyStatus)
   const transcriptStatus = useMediaLibraryStore((s) => s.transcriptStatus)
   const filteredMediaItems = useFilteredMediaItems()
-  const mediaGroups = useMemo(() => {
-    const groups: {
-      key: string
-      label: string
-      icon: 'video' | 'audio' | 'image' | 'gif' | 'lottie'
-      items: MediaMetadata[]
-    }[] = []
-    const videos: MediaMetadata[] = []
-    const audio: MediaMetadata[] = []
-    const gifs: MediaMetadata[] = []
-    const images: MediaMetadata[] = []
-    const lotties: MediaMetadata[] = []
-    for (const item of filteredMediaItems) {
-      if (item.mimeType === 'image/gif') {
-        gifs.push(item)
-      } else {
-        const t = getMediaType(item.mimeType)
-        if (t === 'video') videos.push(item)
-        else if (t === 'audio') audio.push(item)
-        else if (t === 'lottie') lotties.push(item)
-        else images.push(item)
-      }
-    }
-    if (videos.length > 0)
-      groups.push({
-        key: 'video',
-        label: t('media.library.groupVideos'),
-        icon: 'video',
-        items: videos,
-      })
-    if (audio.length > 0)
-      groups.push({
-        key: 'audio',
-        label: t('media.library.groupAudio'),
-        icon: 'audio',
-        items: audio,
-      })
-    if (images.length > 0)
-      groups.push({
-        key: 'image',
-        label: t('media.library.groupImages'),
-        icon: 'image',
-        items: images,
-      })
-    if (gifs.length > 0)
-      groups.push({ key: 'gif', label: t('media.library.groupGifs'), icon: 'gif', items: gifs })
-    if (lotties.length > 0)
-      groups.push({
-        key: 'lottie',
-        label: t('media.library.groupLottie'),
-        icon: 'lottie',
-        items: lotties,
-      })
-    return groups
-  }, [filteredMediaItems, t])
+  const allMediaItems = useMediaLibraryStore((s) => s.mediaItems)
+  const mediaGroups = useMediaGroups(filteredMediaItems, allMediaItems)
   const compositions = useCompositionsStore((s) => s.compositions)
   const MediaTypeGroupView = viewMode === 'grid' ? GridMediaTypeGroup : ListMediaTypeGroup
   const EmptyMediaGrid = viewMode === 'grid' ? GridMediaGrid : ListMediaGrid
@@ -1205,7 +1147,7 @@ export const MediaLibrary = memo(function MediaLibrary({ onMediaSelect }: MediaL
           {/* Compositions section — collapsible, auto-hidden when empty */}
           <CompositionsSection />
 
-          {/* Media sections — grouped by type */}
+          {/* Media sections — grouped by category when any media has one, else by type */}
           {mediaGroups.map((group) => (
             <MediaTypeGroupView
               key={group.key}

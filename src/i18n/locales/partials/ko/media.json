@@ -49,7 +49,20 @@
         "liveAction": "실사",
         "animation": "애니",
         "threeD": "3D 렌더링"
-      }
+      },
+      "menuCategory": "카테고리",
+      "clearCategory": "카테고리 지우기"
+    },
+    "category": {
+      "speaker": "화자",
+      "b-roll": "B롤",
+      "graphics": "그래픽",
+      "overlay": "오버레이",
+      "voiceover": "보이스오버",
+      "music": "음악",
+      "sfx": "효과음",
+      "other": "기타",
+      "uncategorized": "미분류"
     },
     "compositions": {
       "compositionsGroup": "컴포지션",
