@@ -601,6 +601,7 @@ function printScorecard(card, project) {
  */
 async function applyBatch(id, batch, revision) {
   const ops = batch.map((op, i) => ({ callerId: `op${i}`, ...op }))
+  const logStart = serviceLogSize()
   let res
   try {
     res = await call(
@@ -611,7 +612,7 @@ async function applyBatch(id, batch, revision) {
     )
   } catch (error) {
     throw new Error(
-      `${error.message}${serviceLogTail()}\nNothing was applied (batches are atomic).`,
+      `${error.message}${serviceLogTail(logStart)}\nNothing was applied (batches are atomic).`,
     )
   }
   say(`applied ${res.applied} ops, revision ${res.revision}`)
@@ -620,11 +621,19 @@ async function applyBatch(id, batch, revision) {
   return res
 }
 
-function serviceLogTail() {
-  const log = path.join(os.tmpdir(), 'shreditor-service.log')
-  if (!fs.existsSync(log)) return ''
-  const tail = fs
-    .readFileSync(log, 'utf8')
+const SERVICE_LOG = path.join(os.tmpdir(), 'shreditor-service.log')
+const serviceLogSize = () => fs.statSync(SERVICE_LOG, { throwIfNoEntry: false })?.size ?? 0
+
+/** Error lines the service logged since `from` (bytes), so another run's errors never show. */
+function serviceLogTail(from) {
+  const size = serviceLogSize()
+  if (size <= from) return ''
+  const fd = fs.openSync(SERVICE_LOG, 'r')
+  const buffer = Buffer.alloc(Math.min(size - from, 256 * 1024))
+  fs.readSync(fd, buffer, 0, buffer.length, size - buffer.length)
+  fs.closeSync(fd)
+  const tail = buffer
+    .toString('utf8')
     .split('\n')
     .filter((l) => /Error|failed/.test(l))
     .slice(-3)
