@@ -32,6 +32,7 @@ Every edit starts here; nothing is planned or cut until the format is agreed. A 
 
 - If the user named one, use it; if the footage doesn't fit it, say so before editing. Otherwise catalog first (step 2): `shred catalog` prints a suggested format with its reason. Propose one format and variant with a one-line reason from the footage and get the user's yes. The decision rules and tie-breakers are in `<repo>/formats/choosing.md`.
 - Record it: `shred new --name "..." --format <id> [--variant <v>]` (sets the canvas and creates the format's named tracks, each with its role), or `shred format set <projectId> <id> [--variant <v>]` on an existing project.
+- If the user has a Creator Stylesheet (`kit.json`), apply it once: `shred kit apply <kit.json|kit folder> --project <id>`. Use its styles for titles, captions and overlays (`kit:title`, `kit:caption` / `kit:caption-low`, `kit:overlay`, `kit:listicle-headline`, `kit:emphasis`), and follow the kit's preferences over the format's defaults (apply and `shred kit status` print them). `shred check` includes the kit's rules. Never edit `kit.json` unless the user asks; then `shred kit save-back <id>`.
 - `shred format <projectId>` prints the format's rules, targets, checklist and guide path. **Read the guide (`formats/<id>/guide.md`) fully before planning.** It is the source of truth; its targets and rules drive the plan. Ignore what it says about other plugin skills or tools: here every edit goes through `shred`.
 
 ### 2. Catalog the footage
