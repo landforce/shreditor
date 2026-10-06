@@ -72,6 +72,10 @@ vi.mock('./toolbar', () => ({
   Toolbar: () => <div data-testid="toolbar" />,
 }))
 
+vi.mock('./format-panel/format-scorecard-controller', () => ({
+  FormatScorecardController: () => null,
+}))
+
 vi.mock('./media-sidebar', () => ({
   MediaSidebar: () => <div data-testid="media-sidebar" />,
 }))

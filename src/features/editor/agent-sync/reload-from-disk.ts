@@ -2,6 +2,7 @@ import { useTimelineStore } from '@/features/editor/deps/timeline-store'
 import { usePlaybackStore } from '@/shared/state/playback'
 import { useSelectionStore } from '@/shared/state/selection'
 import { useProjectSyncStore } from './sync-store'
+import { refreshProjectFormatFromDisk } from '../components/format-panel/project-format'
 
 /**
  * Re-read project.json into the live editor, keeping the playhead and the
@@ -15,6 +16,8 @@ export async function reloadProjectFromDisk(projectId: string): Promise<void> {
   sync.setStatus('reloading')
   try {
     await useTimelineStore.getState().loadTimeline(projectId)
+    // An agent pass may have set or changed the format too (shred format set).
+    await refreshProjectFormatFromDisk(projectId)
     usePlaybackStore.getState().setCurrentFrame(frame)
     const stillThere = new Set(useTimelineStore.getState().items.map((item) => item.id))
     const keep = selected.filter((id) => stillThere.has(id))

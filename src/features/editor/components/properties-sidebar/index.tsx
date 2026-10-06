@@ -23,6 +23,9 @@ import { useEditorStore } from '@/shared/state/editor'
 import { useSelectionStore } from '@/shared/state/selection'
 import type { TimelineItem } from '@/types/timeline'
 import { CanvasPanel } from './canvas-panel'
+import { FormatPanel } from '../format-panel/format-panel'
+import { useFormatPanelStore, type NoSelectionTab } from '../../stores/format-panel-store'
+import { cn } from '@/shared/ui/cn'
 import { useSettingsStore } from '@/features/editor/deps/settings'
 import {
   EDITOR_LAYOUT_CSS_VALUES,
@@ -117,6 +120,47 @@ function getClipHeader(items: HeaderItem[]) {
         .filter(Boolean)
         .join(', ') || fallbackLabel,
   }
+}
+
+const NO_SELECTION_TABS: { id: NoSelectionTab; labelKey: string }[] = [
+  { id: 'format', labelKey: 'formats.panel.tab' },
+  { id: 'canvas', labelKey: 'formats.panel.canvasTab' },
+]
+
+/**
+ * With nothing selected: the project's format (scorecard) or the canvas
+ * settings. Inside a composition only its canvas applies.
+ */
+function NoSelectionInspector() {
+  const { t } = useTranslation()
+  const tab = useFormatPanelStore((s) => s.tab)
+  const setTab = useFormatPanelStore((s) => s.setTab)
+  const inComposition = useCompositionNavigationStore((s) => s.activeCompositionId !== null)
+  if (inComposition) return <CanvasPanel />
+  return (
+    <div className="space-y-3">
+      <div role="tablist" className="flex gap-1 rounded-lg bg-secondary p-1">
+        {NO_SELECTION_TABS.map((entry) => (
+          <button
+            key={entry.id}
+            type="button"
+            role="tab"
+            aria-selected={tab === entry.id}
+            onClick={() => setTab(entry.id)}
+            className={cn(
+              'flex-1 rounded-md px-2 py-1 text-xs font-semibold transition-colors',
+              tab === entry.id
+                ? 'bg-card text-foreground shadow-[0_1px_2px_rgb(29_33_41/0.08)]'
+                : 'text-muted-foreground hover:text-foreground',
+            )}
+          >
+            {t(entry.labelKey)}
+          </button>
+        ))}
+      </div>
+      {tab === 'format' ? <FormatPanel /> : <CanvasPanel />}
+    </div>
+  )
 }
 
 /**
@@ -366,11 +410,7 @@ export const PropertiesSidebar = memo(function PropertiesSidebar() {
                       <LazyClipPanel />
                     </Suspense>
                   </div>
-                  {!hasClipSelection && (
-                    <div>
-                      <CanvasPanel />
-                    </div>
-                  )}
+                  {!hasClipSelection && <NoSelectionInspector />}
                 </>
               )}
             </div>

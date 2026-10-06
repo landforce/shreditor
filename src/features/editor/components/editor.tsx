@@ -72,6 +72,8 @@ import {
   useSubtitleScanProgressStore,
 } from '@/features/editor/deps/media-library'
 import { IoDragReadout } from '@/shared/timeline/io-range'
+import type { ProjectFormat } from '@formats/registry.mjs'
+import { FormatScorecardController } from './format-panel/format-scorecard-controller'
 const logger = createLogger('Editor')
 const LazyTimeline = lazy(() => importTimeline().then(({ Timeline }) => ({ default: Timeline })))
 const LazyColorGradingDock = lazy(() =>
@@ -184,6 +186,8 @@ interface EditorProps {
     height: number
     fps: number
     backgroundColor?: string
+    /** The format that defines the project (project.format), when it has one. */
+    format?: ProjectFormat
   }
   migration: {
     storedSchemaVersion: number
@@ -420,6 +424,10 @@ export const LoadedEditor = memo(function LoadedEditor({
 
   // Guard against concurrent saves (e.g., spamming Ctrl+S)
   const isSavingRef = useRef(false)
+  // Read when the project context is set up; not an effect dependency, so a
+  // fresh loader object never reloads the timeline.
+  const formatRef = useRef(project.format)
+  formatRef.current = project.format
 
   useEffect(() => {
     hasRefreshedMigrationStateRef.current = false
@@ -498,6 +506,7 @@ export const LoadedEditor = memo(function LoadedEditor({
         fps: project.fps,
         backgroundColor: project.backgroundColor,
       },
+      ...(formatRef.current ? { format: formatRef.current } : {}),
       createdAt: Date.now(),
       updatedAt: Date.now(),
     })
@@ -705,6 +714,7 @@ export const LoadedEditor = memo(function LoadedEditor({
       aria-label={t('editor.editor.appLabel')}
     >
       <AutoSaveController onSave={handleSave} projectId={projectId} />
+      <FormatScorecardController />
       <ProjectSyncBanner projectId={projectId} />
       <TimelineShortcutsController />
 

@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vite-plus/test'
 import {
   useCompositionNavigationStore,
@@ -16,6 +16,10 @@ const panelModuleLoads = vi.hoisted(() => ({
 
 vi.mock('./canvas-panel', () => ({
   CanvasPanel: () => <div>Canvas Panel</div>,
+}))
+
+vi.mock('../format-panel/format-panel', () => ({
+  FormatPanel: () => <div>Format Panel</div>,
 }))
 
 vi.mock('./clip-panel', () => ({
@@ -107,7 +111,11 @@ describe('PropertiesSidebar', () => {
     await waitFor(() => {
       expect(panelModuleLoads.clip).toHaveBeenCalledTimes(1)
     })
+    // With nothing selected the format leads; the canvas is one tab away.
+    expect(screen.getByText('Format Panel')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('tab', { name: 'Canvas' }))
     expect(screen.getByText('Canvas Panel')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('tab', { name: 'Format' }))
   })
 
   it('identifies the active composition when Motion has no layer selection', () => {

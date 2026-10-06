@@ -31,6 +31,7 @@ import { ShortcutsDialog } from './shortcuts-dialog'
 import { UnsavedChangesDialog } from './unsaved-changes-dialog'
 import { WorkspaceSwitcher } from './workspace-switcher'
 import { WhatsNewDialog } from './whats-new-dialog'
+import { FormatChip } from './format-panel/format-chip'
 import { hasUnseenChangelog } from './whats-new-seen'
 import { EDITOR_LAYOUT_CSS_VALUES } from '@/config/editor-layout'
 import { cn } from '@/shared/ui/cn'
@@ -204,6 +205,8 @@ export const Toolbar = memo(function Toolbar({
             })}
           </span>
         </div>
+
+        <FormatChip />
       </div>
 
       <div className="flex flex-1 items-center justify-center">

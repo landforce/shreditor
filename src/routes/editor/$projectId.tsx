@@ -29,6 +29,7 @@ export const Route = createFileRoute('/editor/$projectId')({
         height: project.metadata.height,
         fps: project.metadata.fps,
         backgroundColor: project.metadata.backgroundColor,
+        format: project.format,
       },
       migration: {
         storedSchemaVersion,
