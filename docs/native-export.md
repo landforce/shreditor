@@ -171,6 +171,34 @@ file and a ProRes+PCM file, 190 frames):
 | Frames whose barcode index differs from the expected source frame | 0 of 190 | 0 of 190 |
 | Click minus flash, 4 events | 0.06, 0, 0, 0 ms | 57, 73, 52, 52 ms (audio late) |
 
+The browser figures above (late audio, the yellow cut B, the 5.077 s audio)
+were measured before two browser-export fixes:
+
+- **A/V.** Chrome's AAC encoder puts 2112 samples (44 ms at 48 kHz) of
+  priming before the audio and Mediabunny writes no edit list for it, so the
+  export now marks it in the MP4/MOV edit list
+  (`src/features/export/utils/isobmff-audio-priming.ts`, delay measured once
+  per encoder config by `audio-encoder-delay.ts`). Separately, a clip's audio
+  decode started at the packet before its source start, so a cut was late by
+  up to a packet (13-16 ms on the fixture); decodes are now cut to the exact
+  range by sample timestamp (`decoded-audio-range.ts`). Re-measured on an
+  8 s, three-cut fixture (H.264+AAC and ProRes+PCM): click minus flash 44, 44,
+  57, 57, 60, 60 ms before, 0 ms on all six after, for MP4 and MOV; the audio
+  is now as long as the video. WebM/Opus exports are still about 7 ms late.
+- **Colour.** Mediabunny takes a track's colour space only from a `colr` box,
+  and Chrome's decoder ignores the H.264 VUI, so full-range BT.601 footage
+  without `colr` decoded as BT.709. The decoder config now carries the matrix
+  and range from the SPS (`src/shared/media/avc-color-space.ts`, H.264 only;
+  HDR signals are left alone). Against the source decoded by its tags, RGB
+  PSNR: full-range BT.601 bars 29.2 dB before, 36.5 dB after (native 39.7);
+  the phone clip 32.7 dB before, 37.1 dB after (native 38.1); BT.709 limited
+  bars unchanged at 41.0 dB. The few levels left come from the hardware
+  decoder's full-to-limited range step. The editor preview's paused and
+  scrubbed frames use the same decode and are fixed too; playback through the
+  `<video>` element still shows such a file as BT.709.
+
+`npm run headless:test:fidelity` checks both against ffmpeg-made fixtures.
+
 A second project (speed 1.5 clip, text on a track between two video tracks, a
 cropped 70%-opacity picture-in-picture from ProRes, a keyframed clip on top)
 planned three native layers and two overlay groups, matched the expected
