@@ -30,6 +30,7 @@ import { useAutoSave } from '../hooks/use-auto-save'
 import { ProjectSyncBanner } from '../agent-sync/sync-banner'
 import { useProjectSyncStore } from '../agent-sync/sync-store'
 import { useProjectFileWatcher } from '../agent-sync/use-project-file-watcher'
+import { useAgentSync, type SaveOptions } from '../agent-sync/use-agent-sync'
 import { ProjectRevisionConflictError } from '@/infrastructure/storage'
 import {
   useTimelineShortcuts,
@@ -371,11 +372,13 @@ const AutoSaveController = memo(function AutoSaveController({
   onSave,
   projectId,
 }: {
-  onSave: () => Promise<void>
+  onSave: (options?: SaveOptions) => Promise<void>
   projectId: string
 }) {
   const isDirty = useTimelineStore((s: { isDirty: boolean }) => s.isDirty)
-  useAutoSave({ isDirty, onSave })
+  // Agent-native: save ~1.5s after each edit so the agent sees it.
+  const agentNative = useAgentSync(projectId, onSave)
+  useAutoSave({ isDirty, onSave, enabled: !agentNative })
   useProjectFileWatcher(projectId)
   return null
 })
@@ -590,42 +593,46 @@ export const LoadedEditor = memo(function LoadedEditor({
     }
   }, [isMaskEditingActive])
 
-  // Save timeline to project (with guard against concurrent saves)
-  const handleSave = useCallback(async () => {
-    // Prevent concurrent saves (e.g., spamming Ctrl+S)
-    if (isSavingRef.current) {
-      return
-    }
-
-    isSavingRef.current = true
-    const { saveTimeline } = useTimelineStore.getState()
-    const sync = useProjectSyncStore.getState()
-    if (sync.status === 'conflict') {
-      isSavingRef.current = false
-      toast.error('The project changed on disk. Choose a version in the banner first.')
-      return
-    }
-    sync.setWriting(true)
-
-    try {
-      await saveTimeline(projectId)
-      logger.debug('Project saved successfully')
-      toast.success(i18n.t('editor.editor.projectSaved'))
-    } catch (error) {
-      if (error instanceof ProjectRevisionConflictError) {
-        // An agent pass landed since this editor loaded; never overwrite it silently.
-        sync.setStatus('conflict')
-        toast.error('Not saved: the project changed on disk. Choose a version in the banner.')
+  // Save timeline to project (with guard against concurrent saves).
+  // `quiet` skips the success toast (the frequent agent-native autosave).
+  const handleSave = useCallback(
+    async (options?: SaveOptions) => {
+      // Prevent concurrent saves (e.g., spamming Ctrl+S)
+      if (isSavingRef.current) {
         return
       }
-      logger.error('Failed to save project:', error)
-      toast.error(i18n.t('editor.editor.projectSaveFailed'))
-      throw error // Re-throw so callers know save failed
-    } finally {
-      sync.setWriting(false)
-      isSavingRef.current = false
-    }
-  }, [projectId])
+
+      isSavingRef.current = true
+      const { saveTimeline } = useTimelineStore.getState()
+      const sync = useProjectSyncStore.getState()
+      if (sync.status === 'conflict') {
+        isSavingRef.current = false
+        toast.error('The project changed on disk. Choose a version in the banner first.')
+        return
+      }
+      sync.setWriting(true)
+
+      try {
+        await saveTimeline(projectId)
+        logger.debug('Project saved successfully')
+        if (!options?.quiet) toast.success(i18n.t('editor.editor.projectSaved'))
+      } catch (error) {
+        if (error instanceof ProjectRevisionConflictError) {
+          // An agent pass landed since this editor loaded; never overwrite it silently.
+          sync.setStatus('conflict')
+          toast.error('Not saved: the project changed on disk. Choose a version in the banner.')
+          return
+        }
+        logger.error('Failed to save project:', error)
+        toast.error(i18n.t('editor.editor.projectSaveFailed'))
+        throw error // Re-throw so callers know save failed
+      } finally {
+        sync.setWriting(false)
+        isSavingRef.current = false
+      }
+    },
+    [projectId],
+  )
 
   const handleExport = useCallback(() => {
     // Pause playback when opening export dialog

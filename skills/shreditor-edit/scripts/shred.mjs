@@ -18,6 +18,7 @@
 //   shred publish <draftId> <targetId> --label "..." --summary <file.md>
 //                                        hand the finished draft to the user's project as one pass
 //   shred changes <id>                   what the user changed since the last published pass
+//   shred sync <id> [--timeout 20]       make the open editor save now, so the agent sees unsaved tweaks
 //
 // Service: 127.0.0.1:8787 (SHRED_SERVICE to override). Times are frames at the
 // project fps. Ops reference earlier results with {"$ref":"<callerId>#/detail/..."}.
@@ -50,6 +51,7 @@ const { values: opt, positionals } = parseArgs({
     link: { type: 'boolean' },
     build: { type: 'boolean' },
     dev: { type: 'boolean' },
+    timeout: { type: 'string' },
     json: { type: 'boolean' },
   },
 })
@@ -159,6 +161,27 @@ function staleBuild() {
   return null
 }
 
+// What the open editor has not saved yet (see server/editor-state.mjs).
+// null when no editor answers, or it predates the heartbeat.
+async function editorState(id) {
+  try {
+    const res = await fetch(`${EDITOR}/__shreditor/editor-state?project=${encodeURIComponent(id)}`)
+    return res.ok ? await res.json() : null
+  } catch {
+    return null
+  }
+}
+const ago = (t) => `${Math.max(0, Math.round((Date.now() - t) / 1000))}s ago`
+const CONFLICT = 'The editor is showing a conflict banner for this project (it changed on disk while the user had unsaved edits). Ask the user to pick a version, then run shred sync again.'
+async function warnUnsaved(id) {
+  const s = await editorState(id)
+  if (!s?.dirty && !s?.conflict) return null
+  const line = s.conflict ? `WARNING: ${CONFLICT}` : `WARNING: The editor has unsaved edits (last edit ${s.lastEditAt ? ago(s.lastEditAt) : 'just now'}); run shred sync ${id} first. Below is the saved state only.`
+  if (opt.json) process.stderr.write(`${line}\n`)
+  else say(`${line}\n`)
+  return { unsaved: Boolean(s.dirty), conflict: Boolean(s.conflict), lastEditAt: s.lastEditAt }
+}
+
 const slug = (t) => t.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 60) || 'footage'
 const MEDIA_EXT = /\.(mov|mp4|m4v|mkv|webm|avi|mts|mxf|wav|mp3|m4a|aac|aif|aiff|flac|png|jpe?g|webp|heic|gif)$/i
 const WHISPER_MODEL = path.join(os.homedir(), 'Library/Application Support/whisper.cpp/models/ggml-large-v3-turbo.bin')
@@ -254,6 +277,31 @@ const commands = {
       say(`Editor   ${EDITOR}  ${opt.dev ? 'dev server (reloads on source edits)' : `built preview of ${gitHead()?.sha ?? 'this checkout'}`}`)
     }
     await commands.start()
+  },
+
+  async sync([id]) {
+    if (!id) throw new Error('Pass a project id')
+    const first = await editorState(id)
+    if (!first) return say(`No editor answering at ${EDITOR} (or it predates shred sync); the saved state is all there is.`)
+    if (!first.open) return say(`No editor open on ${id}; the saved state is current.`)
+    if (first.conflict) throw new Error(CONFLICT)
+    // Clean, not saving, and holding the revision that is on disk.
+    const settled = (s) => s.editors.every((e) => !e.dirty && !e.saving && (!e.revision || e.revision === s.diskRevision))
+    if (settled(first)) return say(`Editor has no unsaved edits (revision ${String(first.diskRevision).slice(0, 19)}…).`)
+    const res = await fetch(`${EDITOR}/__shreditor/editor-state/save?project=${encodeURIComponent(id)}`, { method: 'POST' })
+    if (!res.ok) throw new Error(`Save request failed: HTTP ${res.status}`)
+    const seconds = Number(opt.timeout ?? 20)
+    const deadline = Date.now() + seconds * 1000
+    let last = first
+    while (Date.now() < deadline) {
+      await new Promise((r) => setTimeout(r, 250))
+      const s = await editorState(id)
+      if (!s?.open) return say('The editor closed while syncing; the saved state is all there is (shred changes shows it).')
+      if (s.conflict) throw new Error(CONFLICT)
+      if (settled(s)) return say(`Saved: the editor's edits are on disk (revision ${String(s.diskRevision).slice(0, 19)}…).`)
+      last = s
+    }
+    throw new Error(`Timed out after ${seconds}s: the editor still has unsaved edits (last edit ${last.lastEditAt ? ago(last.lastEditAt) : 'unknown'}). The user may be mid-drag or in a dialog; ask them to save (Cmd+S), then run shred sync again.`)
   },
 
   async new() {
@@ -360,6 +408,7 @@ const commands = {
   },
 
   async changes([id]) {
+    const editor = await warnUnsaved(id)
     const dir = path.join(workspace(), 'projects', id, 'agent', 'passes')
     const passes = fs.existsSync(dir) ? fs.readdirSync(dir).filter((f) => f.endsWith('.json')).sort() : []
     if (!passes.length) return say('No published passes yet.')
@@ -367,7 +416,7 @@ const commands = {
     const { revision, project } = await getProject(id)
     if (revision === last.resultRevision) return say(`No changes since pass #${Number(last.id)} "${last.label}".`)
     const diff = diffTimelines(last.timeline, project.timeline)
-    if (opt.json) return say(JSON.stringify({ since: last.id, revision, diff }, null, 2))
+    if (opt.json) return say(JSON.stringify({ since: last.id, revision, diff, ...(editor ? { editor } : {}) }, null, 2))
     say(`Since pass #${Number(last.id)} "${last.label}" the user changed ${diff.length} item(s). Treat these as decisions:`)
     for (const d of diff) say(`  ${d.kind.padEnd(7)} ${String(d.from).padStart(5)}  ${d.name}${d.fields ? `  (${d.fields.join(', ')})` : ''}`)
     const notes = path.join(workspace(), 'projects', id, 'agent', 'notes.json')
@@ -404,9 +453,10 @@ const commands = {
   },
 
   async project([id]) {
+    const editor = await warnUnsaved(id)
     const { revision, project } = await getProject(id)
     const s = summarize(project)
-    if (opt.json) return say(JSON.stringify({ revision, ...s }, null, 2))
+    if (opt.json) return say(JSON.stringify({ revision, ...s, ...(editor ? { editor } : {}) }, null, 2))
     say(`${project.name}  ${project.metadata?.width}x${project.metadata?.height} @${s.fps}  ${s.end} frames (${(s.end / s.fps).toFixed(2)}s)`)
     say(`revision ${revision}`)
     for (const t of [...s.tracks].sort((x, y) => x.order - y.order)) {
