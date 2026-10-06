@@ -12,7 +12,10 @@
 //   rewrap    Playable video in a container Chrome can't open (AVI, MPEG-TS/PS,
 //             MXF, ...) or with audio it can't decode (AC-3, E-AC-3, ALAC, DTS,
 //             MP2, ...): video stream copied bit for bit, audio copied or decoded
-//             to PCM at the same rate, channels and sample format.
+//             to PCM at the same rate, channels and sample format. Also H.264/HEVC
+//             whose BT.470BG/FCC matrix is only in the bitstream (phone footage):
+//             <video> decodes that as BT.709, so the copy declares it in an MP4
+//             `colr` (nclx) box.
 //   hevc      Unplayable video that is HDR/BT.2020 or above 8-bit: HEVC Main10
 //             (libx265 CRF 12), chroma layout and colour tags kept. HDR stays HDR.
 //   h264      Unplayable 8-bit video: H.264 CRF 12 keeping the chroma layout
@@ -28,6 +31,7 @@ import { execFile, spawn } from 'node:child_process'
 import crypto from 'node:crypto'
 import fs from 'node:fs'
 import path from 'node:path'
+import { isCompleteColour, readContainerColour } from './isobmff-colour.mjs'
 
 const VERSION = 2
 const active = new Map()
@@ -210,7 +214,14 @@ const PLAYABLE_AUDIO = new Set([
 const MOV_AUDIO = new Set(['aac', 'mp3', 'pcm_s16le', 'pcm_s16be', 'pcm_s24le', 'pcm_s32le', 'pcm_f32le'])
 const MKV_AUDIO = new Set(['opus', 'vorbis', 'flac', 'pcm_s16le', 'pcm_s24le', 'pcm_s32le', 'pcm_f32le'])
 const PLAYABLE_CONTAINER = /^(mov,mp4|matroska)/
+const ISOBMFF = /^mov,mp4/
 const HDR_TRANSFER = new Set(['smpte2084', 'arib-std-b67'])
+// Matrices that Chrome 154's <video> on macOS (hardware decode) gets wrong when
+// only the H.264/HEVC bitstream declares them: it decodes them as BT.709.
+// BT.709, SMPTE 170M and 240M and the full-range flag are read from the
+// bitstream correctly; a complete `colr` box in the container fixes all of them.
+const BITSTREAM_MATRIX_IGNORED = new Set(['bt470bg', 'fcc'])
+const RANGE_NAME = { pc: 'full range', tv: 'limited range' }
 
 function videoPlayable(video, mac) {
   const table = mac ? MAC_VIDEO : OTHER_VIDEO
@@ -238,12 +249,46 @@ const FRIENDLY = {
 }
 const friendly = (v) => `${FRIENDLY[v.codec] ?? v.codec}${v.profile && v.codec === 'prores' ? ` ${v.profile}` : ''} (${v.pixFmt})`
 
-function rewrapPlan(base, video, audio, problem) {
-  const format = ['vp8', 'vp9', 'av1'].includes(video.codec) ? 'mkv' : 'mov'
+/**
+ * Colour tags an H.264/HEVC copy must declare in its container so Chrome
+ * decodes it with the stream's matrix, or null when it already does.
+ * `containerColour` is the source's `colr` boxes (null: none can apply, as for
+ * AVI or MPEG-TS). Primaries and transfer the stream leaves unspecified are
+ * tagged BT.709, the values Chrome assumes anyway: it ignores a `colr` box
+ * with any of them unspecified.
+ */
+function containerColourFor(video, containerColour) {
+  if ((video.codec !== 'h264' && video.codec !== 'hevc') || !BITSTREAM_MATRIX_IGNORED.has(video.colorSpace)) return null
+  if (containerColour?.some(isCompleteColour)) return null
+  return {
+    primaries: video.colorPrimaries ?? 'bt709',
+    transfer: video.colorTransfer ?? 'bt709',
+    matrix: video.colorSpace,
+    range: video.colorRange === 'pc' ? 'pc' : 'tv',
+  }
+}
+
+function colourNotes(video, colour, containerColour) {
+  const notes = [`colour declared in the container (${colour.matrix} matrix, ${RANGE_NAME[colour.range]}): Chrome ignores the ${colour.matrix} matrix in the bitstream`]
+  if (!video.colorPrimaries || !video.colorTransfer)
+    notes.push('primaries/transfer unspecified in the source, tagged BT.709 (what Chrome assumes for them)')
+  const icc = containerColour?.find((colr) => colr.type === 'prof' || colr.type === 'rICC')
+  if (icc) notes.push(`the original's ICC profile colr box (${icc.type}) is not carried over`)
+  return notes
+}
+
+// An MP4 `colr` is nclx, which carries the range flag; MOV's nclc does not.
+function rewrapFormat(video, colour) {
+  if (colour) return 'mp4'
+  return ['vp8', 'vp9', 'av1'].includes(video.codec) ? 'mkv' : 'mov'
+}
+
+function rewrapPlan(base, video, audio, problem, colour = null, containerColour = null) {
+  const format = rewrapFormat(video, colour)
   const out = outputAudio(audio, format)
-  const notes = []
+  const notes = colour ? colourNotes(video, colour, containerColour) : []
   if (out && !out.copy) notes.push(`${audio.codec} audio decoded to ${out.codec} (same rate and channels)`)
-  return { ...base, action: 'rewrap', format, reason: problem, video: { copy: true, codec: video.codec }, audio: out, notes }
+  return { ...base, action: 'rewrap', format, reason: problem, video: { copy: true, codec: video.codec, ...(colour ? { colour } : {}) }, audio: out, notes }
 }
 
 function alphaPlan(base, video, audio, force) {
@@ -279,12 +324,36 @@ function opaquePlan(base, video, audio, mac) {
   return { ...base, action: 'h264', format: 'mov', video: { codec: 'h264', pixFmt, crf: 12 }, audio: outputAudio(audio, 'mov'), notes }
 }
 
+/** A transcode keeps the source's matrix: declare it in the container where Chrome would ignore it. */
+function withTranscodeColour(plan, video) {
+  if (plan.video.codec !== 'h264' && plan.video.codec !== 'hevc') return plan
+  const colour = video.rgb ? null : containerColourFor({ ...video, codec: plan.video.codec }, null)
+  if (!colour) return plan
+  // MP4 takes the same audio as MOV here (AAC, MP3, PCM); Chrome plays PCM in MP4.
+  return { ...plan, format: 'mp4', video: { ...plan.video, colour }, notes: [...colourNotes(video, colour, null), ...plan.notes] }
+}
+
+/** Rewrap for a file whose video Chrome decodes, or null when nothing needs one. */
+function playableRewrap(base, probed, video, audio, { playable, containerOk, audioOk, containerColour }) {
+  const format = probed.format?.format_name ?? ''
+  // Matroska keeps its own colour elements; only MP4/MOV `colr` is checked.
+  const colour = playable && (ISOBMFF.test(format) || !containerOk) ? containerColourFor(video, ISOBMFF.test(format) ? containerColour : null) : null
+  if (containerOk && audioOk) {
+    if (!colour) return null
+    const detail = `Chrome ignores the ${colour.matrix} matrix in this ${FRIENDLY[video.codec]} stream`
+    return { ...rewrapPlan(base, video, audio, detail, colour, containerColour), reason: 'colour', detail }
+  }
+  const problem = !audioOk ? `Chrome can't decode ${audio.codec} audio` : `Chrome can't open ${format} files`
+  return { ...rewrapPlan(base, video, audio, problem, colour, containerColour), reason: audioOk ? 'container' : 'audio-codec', detail: problem }
+}
+
 /**
  * What a probed file needs so the editor (preview in Chrome, export in headless
  * Chrome) can decode it, or null when it decodes as it is. `force` (a decode
- * failed in the browser) converts even candidate codecs.
+ * failed in the browser) converts even candidate codecs. `containerColour` is
+ * the file's `colr` boxes; by default they are read from `probed.format.filename`.
  */
-export function compatibilityPolicy(probed, force = false, { platform = process.platform } = {}) {
+export function compatibilityPolicy(probed, force = false, { platform = process.platform, containerColour } = {}) {
   const v = videoStreamOf(probed)
   if (!v) return null
   const a = audioStreamOf(probed)
@@ -296,21 +365,21 @@ export function compatibilityPolicy(probed, force = false, { platform = process.
   const containerOk = PLAYABLE_CONTAINER.test(probed.format?.format_name ?? '')
   const audioOk = !audio || PLAYABLE_AUDIO.has(audio.codec)
   const base = { version: VERSION, alpha: video.alpha, videoIndex: v.index ?? 0, audioIndex: a?.index ?? null }
-  if (!force) {
-    if ((playable || wasm) && containerOk && audioOk) return null
-    if (playable || (wasm && containerOk)) {
-      const problem = !audioOk ? `Chrome can't decode ${audio.codec} audio` : `Chrome can't open ${probed.format?.format_name} files`
-      return { ...rewrapPlan(base, video, audio, problem), reason: audioOk ? 'container' : 'audio-codec', detail: problem }
-    }
+  if (!force && (playable || (wasm && containerOk))) {
+    const colr = containerColour === undefined && BITSTREAM_MATRIX_IGNORED.has(video.colorSpace) ? readContainerColour(probed.format?.filename) : containerColour
+    return playableRewrap(base, probed, video, audio, { playable, containerOk, audioOk, containerColour: colr })
   }
   const detail = force ? `${friendly(video)} failed to decode in the browser` : `Chrome can't decode ${friendly(video)}`
-  const plan = video.alpha ? alphaPlan(base, video, audio, force) : opaquePlan(base, video, audio, mac)
+  const plan = video.alpha ? alphaPlan(base, video, audio, force) : withTranscodeColour(opaquePlan(base, video, audio, mac), video)
   return { ...plan, reason: force ? 'decode-failed' : 'video-codec', detail }
 }
 
 /* ───────────────────────────── ffmpeg args ───────────────────────────── */
 
-/** Colour tags and conversion filter for a transcode; never invents tags the source lacks. */
+/**
+ * Colour tags and conversion filter for a transcode; never invents tags the
+ * source lacks, except BT.709 primaries/transfer where Chrome needs them.
+ */
 function colourArgs(plan, video) {
   const out = plan.video
   const filters = []
@@ -324,9 +393,13 @@ function colourArgs(plan, video) {
   // BT.2020 file); ffmpeg would then "convert" to the requested tags and alter
   // the pixels. Relabel decoded frames with the stream's tags first, so nothing
   // converts between YUV matrices or ranges.
+  // `out.colour`: tags Chrome needs in the container (see containerColourFor).
+  // Frames carry them too: ffmpeg tags the output from the frames.
+  const primaries = out.colour?.primaries ?? video.colorPrimaries
+  const transfer = out.colour?.transfer ?? video.colorTransfer
   const relabel = []
-  if (video.colorPrimaries) relabel.push(`color_primaries=${video.colorPrimaries}`)
-  if (video.colorTransfer) relabel.push(`color_trc=${video.colorTransfer}`)
+  if (primaries) relabel.push(`color_primaries=${primaries}`)
+  if (transfer) relabel.push(`color_trc=${transfer}`)
   if (!video.rgb && video.colorSpace) relabel.push(`colorspace=${video.colorSpace}`)
   if (!video.rgb && video.colorRange) relabel.push(`range=${video.colorRange === 'pc' ? 'pc' : 'tv'}`)
   if (relabel.length) filters.push(`setparams=${relabel.join(':')}`)
@@ -339,8 +412,8 @@ function colourArgs(plan, video) {
     plan.notes.push(`padded by one pixel to ${Math.ceil(video.width / sx) * sx}x${Math.ceil(video.height / sy) * sy} (${out.pixFmt} needs even dimensions)`)
   }
   filters.push(`format=${out.pixFmt}`)
-  if (video.colorPrimaries) tags.push('-color_primaries', video.colorPrimaries)
-  if (video.colorTransfer) tags.push('-color_trc', video.colorTransfer)
+  if (primaries) tags.push('-color_primaries', primaries)
+  if (transfer) tags.push('-color_trc', transfer)
   if (matrix) tags.push('-colorspace', matrix)
   if (range) tags.push('-color_range', range)
   return { filter: filters.join(','), tags }
@@ -358,7 +431,10 @@ const ENCODERS = {
 /** Human-readable encoder settings recorded in metadata. */
 export function describeSettings(plan) {
   const audio = plan.audio ? (plan.audio.copy ? `audio ${plan.audio.codec} copied` : `audio ${plan.audio.from} -> ${plan.audio.codec}`) : 'no audio'
-  if (plan.action === 'rewrap') return `video ${plan.video.codec} copied into ${plan.format.toUpperCase()}, ${audio}`
+  if (plan.action === 'rewrap') {
+    const colour = plan.video.colour ? ` with colour tags ${plan.video.colour.primaries}/${plan.video.colour.transfer}/${plan.video.colour.matrix}/${plan.video.colour.range}` : ''
+    return `video ${plan.video.codec} copied into ${plan.format.toUpperCase()}${colour}, ${audio}`
+  }
   const v = plan.video
   const codec = { h264: 'libx264 preset medium, no B-frames', hevc: 'libx265 preset medium (Main10), no B-frames', prores: 'prores_ks 4444 alpha_bits 16', vp9: 'libvpx-vp9' }[v.codec]
   return `${codec}${v.crf ? ` CRF ${v.crf}` : ''} ${v.pixFmt}, ${audio}, timestamps passed through`
@@ -374,14 +450,17 @@ export function compatibilityArgs(plan, probed, input, output) {
   args.push(...(plan.audioIndex === null ? ['-an'] : ['-map', `0:${plan.audioIndex}`]))
   if (plan.action === 'rewrap') {
     args.push('-c:v', 'copy')
-    if (video.codec === 'hevc' && plan.format === 'mov') args.push('-tag:v', 'hvc1')
+    if (video.codec === 'hevc' && plan.format !== 'mkv') args.push('-tag:v', 'hvc1')
+    // Container tags only: a stream copy leaves the bitstream as it is.
+    const colour = plan.video.colour
+    if (colour) args.push('-color_primaries', colour.primaries, '-color_trc', colour.transfer, '-colorspace', colour.matrix, '-color_range', colour.range)
   } else {
     const { filter, tags } = colourArgs(plan, video)
     args.push('-vf', filter, ...ENCODERS[plan.video.codec](plan.video), ...tags)
   }
   if (plan.audio) args.push('-c:a', plan.audio.copy ? 'copy' : plan.audio.codec)
   args.push('-fps_mode', 'passthrough')
-  if (plan.format === 'mov') {
+  if (plan.format === 'mov' || plan.format === 'mp4') {
     const timescale = Number(String(video.timeBase ?? '').split('/')[1])
     if (timescale > 0 && timescale < 2 ** 31) args.push('-video_track_timescale', String(timescale))
     args.push('-movflags', '+faststart')
