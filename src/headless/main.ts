@@ -25,6 +25,7 @@ import type { MediaMetadata } from '@/types/storage'
 import type { ItemEffect } from '@/types/effects'
 
 import { createLogger } from '@/shared/logging/logger'
+import { createFormatTracks, projectFormatRecord, resolveFormat } from '@formats/registry.mjs'
 import { CURRENT_SCHEMA_VERSION, migrateProject } from '@/shared/projects/migrations'
 import type { ProjectWarning } from '@/shared/projects/migrations'
 import {
@@ -1274,8 +1275,11 @@ async function createProjectForHeadless(input: {
   height?: number
   fps?: number
   backgroundColor?: string
+  /** A format sets the canvas (unless given) and the named track layout. */
+  format?: { id: string; variant?: string }
 }): Promise<Project> {
   const now = Date.now()
+  const format = input.format ? resolveFormat(input.format.id, input.format.variant) : null
   const raw: Project = {
     id: input.id ?? crypto.randomUUID(),
     name: input.name,
@@ -1285,14 +1289,21 @@ async function createProjectForHeadless(input: {
     duration: 0,
     schemaVersion: CURRENT_SCHEMA_VERSION,
     metadata: {
-      width: input.width ?? DEFAULT_PROJECT_WIDTH,
-      height: input.height ?? DEFAULT_PROJECT_HEIGHT,
-      fps: input.fps ?? DEFAULT_PROJECT_FPS,
+      width: input.width ?? format?.canvas.width ?? DEFAULT_PROJECT_WIDTH,
+      height: input.height ?? format?.canvas.height ?? DEFAULT_PROJECT_HEIGHT,
+      fps: input.fps ?? format?.canvas.fps ?? DEFAULT_PROJECT_FPS,
       ...(input.backgroundColor ? { backgroundColor: input.backgroundColor } : {}),
     },
+    // A format brings its named track layout; without one, the default V1/A1
+    // tracks (the ones the first edit would create anyway). Either way callers
+    // see the track ids up front and reuse them instead of adding more.
+    ...(format
+      ? {
+          format: projectFormatRecord(format.id, format.variant?.id),
+          timeline: { tracks: createFormatTracks(format), items: [] },
+        }
+      : {}),
   }
-  // Start with the default V1/A1 tracks (the ones the first edit would create
-  // anyway), so callers see their ids up front and reuse them instead of adding more.
   await hydrateTimelineStoresFromProject(raw)
   const validated = validateProject({ ...raw, timeline: buildTimelineFromStores() })
   if (!validated.success || !validated.data) throw new Error('Created project failed validation')

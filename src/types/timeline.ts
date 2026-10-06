@@ -7,6 +7,7 @@ import type { TextStylePresetId } from '@/shared/typography/text-style-preset-id
 import type { TextMotionSpec } from './text-motion'
 import type { TextLayoutDrafts, TextSpan, TextStyleFields } from './text'
 import type { CompositionControlOverrides } from './composition-controls'
+import type { FormatRole } from '@formats/registry.mjs'
 
 export interface TimelineItemCornerPin {
   topLeft: [number, number]
@@ -62,6 +63,11 @@ type BaseTimelineItem = {
   durationInFrames: number // Duration in frames (Composition convention)
   label: string
   mediaId?: string
+  /**
+   * Role in the project's format (formats/registry.mjs). Wins over the media
+   * category and the track's role when the scorecard resolves roles.
+   */
+  formatRole?: FormatRole
   compositionId?: string // Reference to a sub-composition for compound wrappers
   originId?: string // Tracks lineage - items from same split share this for stable React keys
   linkedGroupId?: string // Links paired timeline items like synced video/audio companions
@@ -492,6 +498,7 @@ export interface TimelineTrack {
   parentTrackId?: string // ID of the Layer Group track this track belongs to
   isGroup?: boolean // true = organizational Layer Group (no items, only children)
   isCollapsed?: boolean // Whether the group's children are collapsed
+  formatRole?: FormatRole // Role of the lane in the project's format layout
 }
 
 // Project markers (user-created timeline markers)

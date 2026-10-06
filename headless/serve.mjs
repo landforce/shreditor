@@ -89,6 +89,7 @@ import {
 } from './lib/lifecycle-store.mjs'
 import { withIdempotency } from './lib/idempotency.mjs'
 import { NativeExportRefused, exportsDir, runNativeExport } from './lib/native-export.mjs'
+import { projectFormatRecord } from '../formats/registry.mjs'
 
 const HELP = `Usage: node headless/serve.mjs --workspace <dir> [options]\n\nOptions:\n  --host <address>           Bind address (default: 127.0.0.1)\n  --port <n>                 HTTP port (default: 8787)\n  --render-timeout-ms <n>    Whole render deadline (default: 1800000)\n  --edit-timeout-ms <n>      Whole edit deadline (default: 120000)\n  --max-queue-depth <n>      Waiting operations allowed behind the active one (default: 8)\n  --shutdown-timeout-ms <n>  Graceful queue drain deadline (default: 30000)\n  --build  --head  --harness-url <url>\n`
 const SERVE_OPTIONS = new Set([
@@ -273,7 +274,8 @@ async function main() {
       console.log(`native export ${id} -> ${report.output} in ${Date.now() - t0}ms`)
       sendJson(res, 200, { ok: true, apiVersion: HEADLESS_API_VERSION, ...report })
     } catch (error) {
-      if (!(error instanceof NativeExportRefused) || body.engine !== 'auto' || error.hdr) throw error
+      if (!(error instanceof NativeExportRefused) || body.engine !== 'auto' || error.hdr)
+        throw error
       if (codec === 'prores')
         throw new HttpError(422, 'NATIVE_EXPORT_REFUSED', `${error.message} (ProRes needs native)`)
       const dir = exportsDir(workspace, id)
@@ -440,6 +442,16 @@ async function main() {
     sendJson(res, 200, resourceEnvelope(resource))
   }
 
+  // updates.format: a choice records it (with the guide hash it was reviewed
+  // against), null clears it, undefined leaves it.
+  const withFormat = (project, format) => {
+    if (format === undefined) return project
+    const { format: _previous, ...rest } = project
+    return format === null
+      ? rest
+      : { ...rest, format: projectFormatRecord(format.id, format.variant) }
+  }
+
   const handleV1ProjectUpdate = async (req, res, id) => {
     const body = validate(
       projectUpdateRequestSchema,
@@ -447,7 +459,7 @@ async function main() {
     )
     const current = await getProjectResource(workspace, id)
     const project = await browserNormalize({
-      ...current.project,
+      ...withFormat(current.project, body.updates.format),
       ...(body.updates.name !== undefined ? { name: body.updates.name } : {}),
       ...(body.updates.description !== undefined ? { description: body.updates.description } : {}),
       metadata: {

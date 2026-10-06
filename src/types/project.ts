@@ -8,6 +8,7 @@ import type { TextMotionSpec } from './text-motion'
 import type { MaskVertex } from './masks'
 import type { ShapeStyleFields } from './timeline'
 import type { CompositionControlOverrides, CompositionControlSchema } from './composition-controls'
+import type { FormatRole, ProjectFormat } from '@formats/registry.mjs'
 
 /**
  * Selects the editing surface a stored composition naturally opens in.
@@ -34,6 +35,12 @@ export interface Project {
   thumbnailId?: string // Reference to workspace-backed ThumbnailData
   thumbnail?: string // @deprecated Base64 data URL (for backward compatibility)
   metadata: ProjectResolution
+  /**
+   * The video format that defines this project (formats/registry.mjs): canvas,
+   * track layout, rules and scorecard targets. Absent on projects made before
+   * formats, or without one chosen.
+   */
+  format?: ProjectFormat
   timeline?: ProjectTimeline
   /**
    * Root folder handle for the project's media files.
@@ -73,6 +80,8 @@ export interface ProjectTimeline {
     parentTrackId?: string
     isGroup?: boolean
     isCollapsed?: boolean
+    /** Role of the track in the project's format (see FormatRole). */
+    formatRole?: FormatRole
   }>
   busAudioEq?: AudioEqSettings
   items: Array<
@@ -83,6 +92,8 @@ export interface ProjectTimeline {
       durationInFrames: number
       label: string
       mediaId?: string
+      /** Role in the project's format; overrides the media category and track role. */
+      formatRole?: FormatRole
       originId?: string // Tracks lineage for stable React keys
       linkedGroupId?: string
       type:

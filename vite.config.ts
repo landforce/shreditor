@@ -126,7 +126,8 @@ export default defineConfig({
     globals: true,
     environment: 'jsdom',
     setupFiles: ['./src/test/setup.ts'],
-    include: ['src/**/*.test.{ts,tsx}'],
+    // formats/ is plain ESM shared with the agent tools; its suites are TypeScript.
+    include: ['src/**/*.test.{ts,tsx}', 'formats/**/*.test.ts'],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],
@@ -149,6 +150,8 @@ export default defineConfig({
   ]),
   resolve: {
     alias: {
+      // Format definitions and scorecard, shared with the agent tools (plain ESM in formats/).
+      '@formats': fileURLToPath(new URL('./formats', import.meta.url)),
       '@': fileURLToPath(new URL('./src', import.meta.url)),
     },
     // Keep every UI dependency on the same React dispatcher. This also prevents

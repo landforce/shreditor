@@ -11,14 +11,18 @@ runs in Chrome.
 
 ## How the loop works
 
-1. **The agent catalogs your footage.** It probes each clip, makes a contact
-   sheet, transcribes speech, and notes what each shot shows and where the
-   good moments are.
-2. **You agree the format.** The agent asks what you're making (length, format,
+1. **You choose the format.** Every edit is one of four 9:16 formats: Graphic
+   Yap, Greenscreen Talking Head, Vlog or 10 Shot. The agent catalogs your
+   footage (probes each clip, makes a contact sheet, transcribes speech) and
+   suggests one; the format sets the canvas, the named tracks, and the rules
+   and targets every pass is scored against. Definitions and guides live in
+   `formats/`.
+2. **The agent plans.** It asks what the format doesn't settle (length,
    audience, must-keep moments) and writes a brief and a beat plan into the
    project.
 3. **The agent edits on a private draft.** It builds the pass, renders frames
-   to check its own work, then publishes the finished pass to your project.
+   to check its own work, scores it against the format (`shred check`), then
+   publishes the finished pass to your project.
    The editor reloads it within a second or so.
 4. **You adjust.** Trim, move, retime, swap clips, or edit text directly in the
    editor, then save. Or tell the agent what to change.

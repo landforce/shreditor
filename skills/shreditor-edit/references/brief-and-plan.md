@@ -12,7 +12,8 @@ audience: ""
 canvas: { width: 1080, height: 1920, fps: 30 }
 duration_target_seconds: null
 style_skill: ""        # e.g. landforce-vlog
-format: ""             # e.g. VO vlog, talking-head yap, 10 shot
+format: ""             # graphic-yap | greenscreen | vlog | ten-shot (same as the project's)
+format_variant: ""     # e.g. standard, intense, fast, slow, even, beat, shaped
 assets: []             # paths or media ids, with a word on each
 must_keep: []          # lines, shots or moments that stay
 audio_intent: ""       # VO only, music bed, source sound...

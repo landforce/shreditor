@@ -12,7 +12,14 @@
 //   shred transcript <mediaId> [--json]  the built-in transcript: words with start/end seconds
 //   shred transcribe <mediaId...> | --project <id> [--force]   transcribe now (imports do it on their own)
 //   shred setup [--yes]                  check ffmpeg, whisper-cli and the model; --yes downloads the model
-//   shred new --name "..." [--size 1080x1920] [--fps 30]   create a project; prints id and editor URL
+//   shred format list                    the four formats, with when each fits
+//   shred format <formatId|projectId> [--variant v]
+//                                        a format's (or a project's) rules, targets, checklist and guide
+//   shred format set <projectId> <formatId> [--variant v]   record the format (an empty project also
+//                                        gets its canvas and track layout)
+//   shred new --name "..." --format <id> [--variant v]   create a project in a format: its canvas and
+//                                        named tracks (with roles); prints id, editor URL and tracks
+//   shred new --name "..." [--size 1080x1920] [--fps 30]   create a project without a format
 //   shred project <id>                   timeline summary (tracks, items, frames)
 //   shred import <file...> --project <id> [--category <c>] [--no-wait]
 //                                        bring footage in (clone/link in place); video Chrome can't
@@ -24,8 +31,11 @@
 //   shred apply <id> <ops.json>          apply an op batch atomically (revision-checked)
 //   shred frames <id> --at 30,95,... [--out grid.jpg] [--size 270x480]
 //                                        render saved frames and tile them for review
+//   shred check <id> [--json]            the format scorecard: rules and targets, pass/warn/fail, with
+//                                        frame ranges to look at; exit 1 when a fail-severity check fails
 //   shred publish <draftId> <targetId> --label "..." --summary <file.md>
 //                                        hand the finished draft to the user's project as one pass
+//                                        (the pass record carries the scorecard)
 //   shred changes <id>                   what the user changed since the last published pass
 //   shred master <audio|video> [--lufs -14] [--tp -1.5] [--out file.wav]
 //                                        loudness-master to a new WAV (two-pass loudnorm)
@@ -45,6 +55,15 @@ import path from 'node:path'
 import { parseArgs } from 'node:util'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { compatibilityPolicy } from '../../../server/media-compatibility.mjs'
+import {
+  CHOOSING_GUIDE,
+  FORMATS,
+  createFormatTracks,
+  getFormat,
+  resolveFormat,
+} from '../../../formats/registry.mjs'
+import { describeTarget, scoreProject, trackRole } from '../../../formats/scorecard.mjs'
+import { suggestFormat } from '../../../formats/suggest.mjs'
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..')
 const SERVICE = process.env.SHRED_SERVICE || 'http://127.0.0.1:8787'
@@ -67,7 +86,9 @@ const { values: opt, positionals } = parseArgs({
     out: { type: 'string' },
     size: { type: 'string' },
     name: { type: 'string' },
-    fps: { type: 'string', default: '30' },
+    fps: { type: 'string' },
+    format: { type: 'string' },
+    variant: { type: 'string' },
     'no-transcribe': { type: 'boolean' },
     'no-wait': { type: 'boolean' },
     wait: { type: 'boolean' },
@@ -226,12 +247,28 @@ const which = (bin) => {
   }
 }
 
+// Share of strongly green pixels in the middle frame (0-1): talking heads shot
+// on a green screen read well above GREEN_SCREEN_SHARE.
+function greenShare(file, duration) {
+  try {
+    const raw = execFileSync('ffmpeg', ['-v', 'error', '-ss', String(Math.max(0, duration / 2)), '-i', file, '-frames:v', '1', '-vf', 'scale=36:64', '-f', 'rawvideo', '-pix_fmt', 'rgb24', '-'], { maxBuffer: 1 << 20 })
+    let green = 0
+    for (let i = 0; i + 2 < raw.length; i += 3) if (raw[i + 1] > 90 && raw[i + 1] > raw[i] * 1.4 && raw[i + 1] > raw[i + 2] * 1.4) green += 1
+    return raw.length ? Math.round((green / (raw.length / 3)) * 100) / 100 : 0
+  } catch {
+    return undefined
+  }
+}
+
 // Whisper invents these on non-speech audio (music, typing, room tone).
 const WHISPER_PHANTOMS = new Set(['thank you', 'thanks', 'thank you very much', 'thanks for watching', 'thank you for watching', 'you', 'bye', 'bye bye', 'music', 'applause', 'laughter', 'silence', 'subtitles by the amara org community', 'please subscribe'])
 const isPhantomSpeech = (text, seconds) => {
   const t = text.toLowerCase().replace(/\[[^\]]*\]|\([^)]*\)/g, ' ').replace(/[^a-z' ]+/g, ' ').replace(/\s+/g, ' ').trim()
   if (!t) return true
   if (WHISPER_PHANTOMS.has(t)) return true
+  // "Thank you. Thank you." on a music bed: every sentence a phantom.
+  const sentences = text.toLowerCase().split(/[.!?]+/).map((x) => x.replace(/[^a-z' ]+/g, ' ').replace(/\s+/g, ' ').trim()).filter(Boolean)
+  if (sentences.length && sentences.every((x) => WHISPER_PHANTOMS.has(x))) return true
   const words = t.split(' ').length
   return words <= 2 && seconds > 3
 }
@@ -263,6 +300,138 @@ function summarize(project) {
 
 // Items, markers and in/out points; the logic and its tests live beside this file.
 const { diffTimelines, describeChange, countChanges } = await import('./timeline-diff.mjs')
+
+// ---------------------------------------------------------------------------
+// Formats (formats/registry.mjs) and the scorecard (formats/scorecard.mjs)
+// ---------------------------------------------------------------------------
+
+const formatTitle = (format) => `${format.name}${format.variant ? ` (${format.variant.name})` : ''}`
+const repoPath = (file) => path.join(REPO, file)
+
+function formatOrThrow(id, variant) {
+  if (!getFormat(id)) throw new Error(`Unknown format "${id}". Formats: ${FORMATS.map((f) => f.id).join(', ')} (shred format list)`)
+  return resolveFormat(id, variant)
+}
+
+function projectFormatOrNull(project) {
+  if (!project.format?.id || !getFormat(project.format.id)) return null
+  try {
+    return resolveFormat(project.format.id, project.format.variant)
+  } catch {
+    return null
+  }
+}
+
+function listFormats() {
+  for (const f of FORMATS) {
+    const variants = f.variants.map((v) => `${v.id}${v.id === f.defaultVariant ? ' (default)' : ''}`).join(', ')
+    say(`${f.id.padEnd(12)} ${f.name}${variants ? `  [variants: ${variants}]` : ''}`)
+    say(`${''.padEnd(12)} ${f.tagline}`)
+    say(`${''.padEnd(12)} use when: ${f.useWhen}`)
+  }
+  say(`\nHow to choose: ${repoPath(CHOOSING_GUIDE.path)}`)
+}
+
+function printFormat(format) {
+  const c = format.canvas
+  const r = format.rules
+  say(`${formatTitle(format)}  [${format.id}${format.variant ? ` --variant ${format.variant.id}` : ''}]`)
+  say(format.description)
+  for (const v of format.variants) say(`  variant ${v.id.padEnd(9)} ${v.description}`)
+  say(`canvas    ${c.width}x${c.height} @${c.fps}`)
+  say(`guide     ${repoPath(format.guide.path)}  (read it fully before planning)`)
+  say(`research  ${repoPath(format.guide.research)}`)
+  say('\nTracks, top to bottom')
+  for (const t of format.tracks) say(`  ${t.name.padEnd(14)} ${t.kind.padEnd(6)} role ${t.role}`)
+  say('\nRules')
+  const hold = describeTarget({ ...r.titleHook.holdSec, ideal: null, unit: 's' })
+  say(`  ${'title hook'.padEnd(12)} ${r.titleHook.required ? 'required' : 'optional'} from ${r.titleHook.fromSec} s, held ${hold}${r.titleHook.allowFullHold ? ' or all video' : ''}`)
+  for (const k of ['captions', 'speech', 'voiceover', 'music', 'sfx', 'syncSound', 'transitions']) say(`  ${k.padEnd(12)} ${r[k]}`)
+  say('\nTargets (fail = must fix or explain; warn = starting point)')
+  for (const t of format.targets) {
+    const banded = t.min !== null || t.max !== null
+    const ideal = t.ideal !== null && banded ? `  ideal ~${t.ideal}` : ''
+    say(`  ${t.label.padEnd(42)} ${describeTarget(t).padEnd(16)} ${(banded ? t.severity : 'info').padEnd(5)}${t.source.padEnd(9)}${ideal}${t.note ? `  (${t.note})` : ''}`)
+  }
+  say('\nChecklist')
+  for (const line of format.checklist) say(`  - ${line}`)
+}
+
+function printTracks(project, format) {
+  const tracks = [...(project?.timeline?.tracks ?? [])].sort((a, b) => a.order - b.order)
+  for (const t of tracks) {
+    const role = format ? trackRole(t, format) : null
+    say(`${t.name.padEnd(format ? 14 : 3)} ${t.id}  (${t.kind ?? 'video'}${role ? `, role ${role}` : ', default track: reuse it'})`)
+  }
+}
+
+async function setFormat(id, formatId) {
+  if (!id || !formatId) throw new Error('Usage: shred format set <projectId> <formatId> [--variant v]')
+  const format = formatOrThrow(formatId, opt.variant)
+  const { project, revision } = await getProject(id)
+  const empty = !project.timeline?.items?.length
+  const c = format.canvas
+  const m = project.metadata ?? {}
+  const canvasDiffers = m.width !== c.width || m.height !== c.height || m.fps !== c.fps
+  const choice = { id: format.id, ...(format.variant ? { variant: format.variant.id } : {}) }
+  const updates = { format: choice, ...(empty && canvasDiffers ? { width: c.width, height: c.height, fps: c.fps } : {}) }
+  const updated = await call('PATCH', `/v1/projects/${id}`, { updates, expectedRevision: revision }, { 'Idempotency-Key': key('format') })
+  if (!updated.project?.format) throw new Error('The service ignored the format; restart it on this build (shred start --build)')
+  say(`${id}: format ${formatTitle(format)}`)
+  if (empty) {
+    // An empty timeline takes the format's canvas and named tracks.
+    const timeline = { ...(updated.project.timeline ?? {}), tracks: createFormatTracks(format), items: [] }
+    const saved = await call('PUT', `/v1/projects/${id}`, { project: { ...updated.project, timeline }, expectedRevision: updated.revision }, { 'Idempotency-Key': key('format-tracks') })
+    if (canvasDiffers) say(`canvas   ${c.width}x${c.height} @${c.fps}`)
+    say('Track layout applied (the timeline was empty):')
+    printTracks(saved.project, format)
+  } else {
+    if (canvasDiffers) say(`warning: the canvas is ${m.width}x${m.height} @${m.fps}, the format's is ${c.width}x${c.height} @${c.fps}; left as is (the timeline has items).`)
+    say('Tracks left as they are (the timeline has items). Roles come from item formatRole, media categories, then track names:')
+    printTracks(project, format)
+  }
+  say(`Read the guide before planning: ${repoPath(format.guide.path)}`)
+}
+
+const readJsonOrNull = (file) => {
+  try {
+    return JSON.parse(fs.readFileSync(file, 'utf8'))
+  } catch {
+    return null
+  }
+}
+
+/** Media metadata and built-in transcripts for the media a project uses. */
+async function scoringInputs(project) {
+  const ws = workspace()
+  const { readStoredTranscript } = await transcription()
+  const mediaById = {}
+  const transcripts = {}
+  for (const id of new Set((project.timeline?.items ?? []).map((i) => i.mediaId).filter(Boolean))) {
+    if (path.basename(id) !== id) continue
+    const meta = readJsonOrNull(path.join(ws, 'media', id, 'metadata.json'))
+    if (meta) mediaById[id] = meta
+    const stored = readStoredTranscript(ws, id)
+    if (stored) transcripts[id] = stored
+  }
+  return { mediaById, transcripts }
+}
+
+const TAG = { pass: 'pass', warn: 'WARN', fail: 'FAIL', info: 'info', na: 'n/a' }
+
+function printScorecard(card, project) {
+  const fps = project.metadata?.fps ?? 30
+  const format = resolveFormat(card.format, card.variant)
+  const s = card.summary
+  say(`Scorecard: ${formatTitle(format)}, ${card.durationSec} s  (${s.pass} pass, ${s.warn} warn, ${s.fail} fail)`)
+  const sec = (frame) => (frame / fps).toFixed(2)
+  for (const c of card.checks) {
+    const value = c.value === null ? '-' : typeof c.value === 'boolean' ? (c.value ? 'yes' : 'no') : String(c.value)
+    say(`  ${TAG[c.status].padEnd(4)}  ${c.label.padEnd(42)} ${value.padStart(6)}  target ${c.target}${c.detail ? `  (${c.detail})` : ''}`)
+    if (c.ranges.length) say(`        frames ${c.ranges.map((r) => `${r.startFrame}-${r.endFrame} [${sec(r.startFrame)}-${sec(r.endFrame)} s]`).join(', ')}`)
+  }
+  if (s.fail) say('Fix every FAIL before publishing, or tell the user why it stays.')
+}
 
 const commands = {
   async up() {
@@ -324,14 +493,55 @@ const commands = {
 
   async new() {
     if (!opt.name) throw new Error('--name is required')
-    const [width, height] = (opt.size ?? '1080x1920').split('x').map(Number)
-    const created = await call('POST', '/v1/projects', { name: opt.name, width, height, fps: Number(opt.fps) }, { 'Idempotency-Key': key('new') })
+    if (opt.variant && !opt.format) throw new Error('--variant needs --format')
+    const format = opt.format ? formatOrThrow(opt.format, opt.variant) : null
+    // A format sets the canvas; --size/--fps still win when given.
+    const [width, height] = opt.size ? opt.size.split('x').map(Number) : format ? [] : [1080, 1920]
+    const fps = opt.fps ? Number(opt.fps) : format ? undefined : 30
+    const body = {
+      name: opt.name,
+      ...(width ? { width, height } : {}),
+      ...(fps ? { fps } : {}),
+      ...(format ? { format: { id: format.id, ...(format.variant ? { variant: format.variant.id } : {}) } } : {}),
+    }
+    const created = await call('POST', '/v1/projects', body, { 'Idempotency-Key': key('new') })
     fs.mkdirSync(path.join(workspace(), 'projects', created.id, 'agent', 'passes'), { recursive: true })
     say(created.id)
     say(`${EDITOR}/editor/${created.id}`)
-    // New projects already have V1 and A1: build on these, add tracks only for extra layers.
-    const tracks = [...(created.project?.timeline?.tracks ?? [])].sort((a, b) => a.order - b.order)
-    for (const t of tracks) say(`${t.name.padEnd(3)} ${t.id}  (${t.kind ?? 'video'}, default track: reuse it)`)
+    const meta = created.project?.metadata ?? {}
+    if (format) {
+      if (!created.project?.format) throw new Error('The service ignored --format; restart it on this build (shred start --build)')
+      say(`${formatTitle(format)}  ${meta.width}x${meta.height} @${meta.fps}`)
+      say(`Read the guide before planning: ${path.join(REPO, format.guide.path)}`)
+    }
+    printTracks(created.project, format)
+  },
+
+  async format([first, ...rest]) {
+    if (!first || first === 'list') return listFormats()
+    if (first === 'set') return setFormat(rest[0], rest[1])
+    if (getFormat(first)) return printFormat(resolveFormat(first, opt.variant))
+    const { project } = await getProject(first)
+    if (!project.format) {
+      say(`${project.name} (${first}) has no format yet. Choose one with the user:`)
+      return listFormats()
+    }
+    const format = resolveFormat(project.format.id, opt.variant ?? project.format.variant)
+    printFormat(format)
+    if (project.format.reviewedHash && project.format.reviewedHash !== format.guide.reviewedHash) {
+      say(`\nNote: the format's guide changed since this project chose it (${project.format.reviewedHash.slice(0, 19)}…); re-read it.`)
+    }
+  },
+
+  async check([id]) {
+    if (!id) throw new Error('Pass a project id')
+    const editor = await warnUnsaved(id)
+    const { project, revision } = await getProject(id)
+    if (!project.format) throw new Error(`${id} has no format. Choose one (shred format list), then: shred format set ${id} <format>`)
+    const card = scoreProject(project, await scoringInputs(project))
+    if (opt.json) say(JSON.stringify({ revision, ...card, ...(editor ? { editor } : {}) }, null, 2))
+    else printScorecard(card, project)
+    if (card.summary.fail) process.exitCode = 1
   },
 
   async catalog(inputs) {
@@ -423,12 +633,20 @@ const commands = {
           fs.rmSync(wav, { force: true })
         }
       }
+      // Talking heads: how much of a frame is green screen (format choice).
+      if (entry.kind === 'video' && entry.speech) entry.greenShare = greenShare(file, duration)
       entries.push(entry)
       say(`${entry.kind.padEnd(5)} ${String(entry.duration).padStart(7)}s  ${path.basename(file)}${entry.browserPlayable ? '' : `  (import makes a working copy: ${entry.workingCopy})`}${entry.speechNote ? '  (no speech)' : ''}${entry.speech ? `  "${entry.speech.slice(0, 60)}…"` : ''}`)
     }
     const out = path.join(dir, 'catalog.json')
-    fs.writeFileSync(out, `${JSON.stringify({ name, createdAt: new Date().toISOString(), sources: inputs.map((p) => path.resolve(p)), entries }, null, 2)}\n`)
+    const suggestedFormat = suggestFormat(entries)
+    fs.writeFileSync(out, `${JSON.stringify({ name, createdAt: new Date().toISOString(), sources: inputs.map((p) => path.resolve(p)), ...(suggestedFormat ? { suggestedFormat } : {}), entries }, null, 2)}\n`)
     say(`\n${entries.length} items → ${out}`)
+    if (suggestedFormat) {
+      const also = suggestedFormat.alternatives.map((a) => getFormat(a).name).join(', ')
+      say(`Suggested format: ${suggestedFormat.name} (${suggestedFormat.id}): ${suggestedFormat.reason}${also ? `. Also consider: ${also}` : ''}.`)
+      say('A suggestion only: propose it to the user with the reason and let them pick (shred format list).')
+    } else say('No format suggestion from this footage (shred format list; ask the user).')
     say(`Contact sheets in ${path.join(dir, 'sheets')}: open them and write what each shot shows into catalog.json ("content", "usable").`)
     say('Import the original files: import makes a working copy automatically where browserPlayable is false (originals are untouched).')
   },
@@ -515,8 +733,11 @@ const commands = {
     if (opt.json) return say(JSON.stringify({ revision, ...s, ...(editor ? { editor } : {}) }, null, 2))
     say(`${project.name}  ${project.metadata?.width}x${project.metadata?.height} @${s.fps}  ${s.end} frames (${(s.end / s.fps).toFixed(2)}s)`)
     say(`revision ${revision}`)
+    const format = projectFormatOrNull(project)
+    say(format ? `format   ${formatTitle(format)} (shred format ${id})` : 'format   none (shred format list)')
     for (const t of [...s.tracks].sort((x, y) => x.order - y.order)) {
-      say(`\n${t.name} (${t.kind ?? 'track'} ${t.id})`)
+      const role = format ? trackRole(t, format) : null
+      say(`\n${t.name} (${t.kind ?? 'track'} ${t.id}${role ? `, role ${role}` : ''})`)
       for (const i of s.items.filter((x) => x.trackId === t.id).sort((x, y) => x.from - y.from)) {
         const src = i.sourceStart !== undefined ? `  src ${i.sourceStart}-${i.sourceEnd}` : ''
         say(`  ${String(i.from).padStart(5)}-${String(i.from + i.durationInFrames).padEnd(5)} ${i.type.padEnd(6)} ${(i.type === 'text' ? JSON.stringify(i.text) : i.label) ?? ''}${src}  [${i.id}]`)
@@ -528,7 +749,7 @@ const commands = {
     if (!files.length) throw new Error('Pass one or more file paths')
     const cli = path.join(REPO, 'bin/shreditor.mjs')
     // Streams progress while working copies are made (unless --no-wait).
-    const result = spawnSync(process.execPath, [cli, 'import', ...files, ...(opt.project ? ['--project', opt.project] : []), ...(opt.link ? ['--link'] : []), ...(opt.category ? ['--category', opt.category] : []), ...(opt['no-wait'] ? ['--no-wait'] : [])], { stdio: 'inherit', env: { ...process.env, SHREDITOR_WORKSPACE: workspace() } })
+    const result = spawnSync(process.execPath, [cli, 'import', ...files, ...(opt.project ? ['--project', opt.project] : []), ...(opt.link ? ['--link'] : []), ...(opt.category ? ['--category', opt.category] : []), ...(opt['no-wait'] ? ['--no-wait'] : [])], { stdio: 'inherit', env: { ...process.env, SHREDITOR_WORKSPACE: workspace(), SHREDITOR_PORT: new URL(EDITOR).port } })
     if (result.status) process.exitCode = result.status
   },
 
@@ -565,7 +786,8 @@ const commands = {
     const { project, revision } = await getProject(id)
     const created = await call('POST', '/v1/projects', { name: `${project.name} (draft)`.slice(0, 100), width: project.metadata?.width, height: project.metadata?.height, fps: project.metadata?.fps }, { 'Idempotency-Key': key('draft') })
     const fresh = await getProject(created.id)
-    await call('PUT', `/v1/projects/${created.id}`, { project: { ...fresh.project, timeline: project.timeline }, expectedRevision: fresh.revision }, { 'Idempotency-Key': key('draft-copy') })
+    const copy = { ...fresh.project, ...(project.format ? { format: project.format } : {}), timeline: project.timeline }
+    await call('PUT', `/v1/projects/${created.id}`, { project: copy, expectedRevision: fresh.revision }, { 'Idempotency-Key': key('draft-copy') })
     writeDrafts({ ...readDrafts(), [created.id]: { targetId: id, baseRevision: revision, createdAt: new Date().toISOString() } })
     say(created.id)
   },
@@ -618,10 +840,18 @@ const commands = {
     const dir = path.join(workspace(), 'projects', targetId, 'agent', 'passes')
     fs.mkdirSync(dir, { recursive: true })
     const n = String(fs.readdirSync(dir).filter((f) => f.endsWith('.json')).length + 1).padStart(3, '0')
-    const record = { id: n, label: opt.label, summary, by: 'agent', status: 'review', createdAt: new Date().toISOString(), draftId, baseRevision: target.revision, resultRevision: saved.revision, changes, timeline: draft.project.timeline }
+    // The format scorecard of what was published, kept with the pass.
+    const published = { ...target.project, timeline: draft.project.timeline }
+    const scorecard = published.format ? scoreProject(published, await scoringInputs(published)) : null
+    const record = { id: n, label: opt.label, summary, by: 'agent', status: 'review', createdAt: new Date().toISOString(), draftId, baseRevision: target.revision, resultRevision: saved.revision, changes, ...(scorecard ? { scorecard } : {}), timeline: draft.project.timeline }
     fs.writeFileSync(path.join(dir, `${n}.json`), `${JSON.stringify(record, null, 2)}\n`)
     say(`Pass #${Number(n)} "${opt.label}" published to ${targetId}: ${changes.length} changes, revision ${saved.revision}`)
     say(`Editor: ${EDITOR}/editor/${targetId}  (an open editor reloads it within a second; open this link if it isn't showing)`)
+    if (scorecard) {
+      say('')
+      printScorecard(scorecard, published)
+      say(`(saved in ${path.join(dir, `${n}.json`)} as "scorecard")`)
+    } else say('No format on this project, so no scorecard (shred format set).')
   },
 
   // Final export. Native: ffmpeg renders from the ORIGINAL media and the browser
