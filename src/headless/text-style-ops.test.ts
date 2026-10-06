@@ -275,7 +275,7 @@ describe('headless text style ops', () => {
     base.timeline!.tracks = base.timeline!.tracks.filter((track) => track.id === 'v1')
     const result = await run([{ op: 'addCaptions', clipId: 'clip', styleId: 'kit-captions' }], base)
     const tracks = result.project.timeline!.tracks
-    const { trackId } = result.results[0]?.detail as { trackId: string }
+    const { trackId } = result.results[0]!.detail as { trackId: string }
     expect(
       tracks.map((track) => [track.id === trackId ? 'captions' : track.id, track.order]),
     ).toEqual([
