@@ -16,13 +16,48 @@ import { fileURLToPath } from 'node:url'
 function workspaceBridgePlugin(): Plugin {
   const bridge = async (mode: 'dev' | 'preview') =>
     (await import('./server/workspace-bridge.mjs')).createWorkspaceBridge({ mode })
+  const pageMeta = () => import('./server/project-page-meta.mjs')
+  const workspace = async () => (await import('./server/workspace-bridge.mjs')).currentWorkspace()
   return {
     name: 'shreditor-workspace-bridge',
     configureServer: async (server) => {
       server.middlewares.use(await bridge('dev'))
+      const ws = (await import('./server/workspace-bridge.mjs')).currentWorkspace
+      server.middlewares.use((await pageMeta()).createProjectCoverRoute(ws))
+    },
+    // A project's editor link carries its name and cover (og:image) in the HTML.
+    transformIndexHtml: async (html, ctx) => {
+      const meta = await pageMeta()
+      const id = meta.editorProjectId(new URL(ctx.originalUrl ?? ctx.path, 'http://x').pathname)
+      if (!id) return html
+      const origin = `http://localhost:${ctx.server?.config.server.port ?? 5173}`
+      return meta.injectProjectMeta(html, meta.readProjectCard(await workspace(), id), origin)
     },
     configurePreviewServer: async (server) => {
       server.middlewares.use(await bridge('preview'))
+      const ws = (await import('./server/workspace-bridge.mjs')).currentWorkspace
+      server.middlewares.use((await pageMeta()).createProjectCoverRoute(ws))
+      // The built preview serves index.html as is, so the editor link's meta is added here.
+      const meta = await pageMeta()
+      const indexFile = join(server.config.root, server.config.build.outDir, 'index.html')
+      server.middlewares.use(async (req, res, next) => {
+        const id =
+          req.method === 'GET'
+            ? meta.editorProjectId(new URL(req.url ?? '/', 'http://x').pathname)
+            : null
+        if (!id || !String(req.headers.accept ?? '').includes('text/html')) return next()
+        const card = meta.readProjectCard(await workspace(), id)
+        if (!card) return next()
+        const html = meta.injectProjectMeta(
+          readFileSync(indexFile, 'utf8'),
+          card,
+          meta.requestOrigin(req),
+        )
+        res.setHeader('Content-Type', 'text/html; charset=utf-8')
+        for (const [key, value] of Object.entries(crossOriginIsolationHeaders))
+          res.setHeader(key, value)
+        res.end(html)
+      })
     },
   }
 }

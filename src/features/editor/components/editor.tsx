@@ -241,6 +241,15 @@ export const Editor = memo(function Editor({ projectId, project, migration }: Ed
     setUpgradeApproved(!migration.requiresUpgrade)
   }, [migration.requiresUpgrade, projectId])
 
+  // The tab (and any link card) names the project being edited.
+  useEffect(() => {
+    const previous = document.title
+    document.title = `${project.name} · Shreditor`
+    return () => {
+      document.title = previous
+    }
+  }, [project.name])
+
   // Auto-backup then auto-upgrade. The backup keeps the pre-upgrade project on its
   // original schema; loading proceeds regardless so the user is never blocked.
   useEffect(() => {
