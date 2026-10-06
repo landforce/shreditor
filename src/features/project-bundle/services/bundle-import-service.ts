@@ -27,7 +27,7 @@ import {
   saveAnimationPresets,
   sanitizeAnimationPresets,
 } from '@/infrastructure/storage'
-import { generateThumbnail } from '@/features/project-bundle/deps/media-library'
+import { generateThumbnail, isMediaCategory } from '@/features/project-bundle/deps/media-library'
 import { createLogger } from '@/shared/logging/logger'
 import { fileSystemService } from './file-system-service'
 import { restoreTimelineFromBundle } from './bundle-timeline'
@@ -151,6 +151,7 @@ export async function importProjectBundle(
         bitrate: entry.metadata.bitrate,
         thumbnailId,
         tags: [],
+        ...(isMediaCategory(entry.category) ? { category: entry.category } : {}),
         createdAt: Date.now(),
         updatedAt: Date.now(),
       }
