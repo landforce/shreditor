@@ -69,7 +69,9 @@
 //                                        frame ranges to look at; exit 1 when a fail-severity check fails
 //   shred publish <draftId> <targetId> --label "..." --summary <file.md>
 //                                        hand the finished draft to the user's project as one pass
-//                                        (the pass record carries the scorecard)
+//                                        (the pass record carries the scorecard; refreshes the
+//                                        project's thumbnail in the project list)
+//   shred thumbnail <id> [--at frame]    re-render the project's thumbnail
 //   shred changes <id>                   what the user changed since the last published pass
 //   shred master <audio|video> [--lufs -14] [--tp -1.5] [--out file.wav]
 //                                        loudness-master to a new WAV (two-pass loudnorm)
@@ -454,6 +456,40 @@ const shreditorCli = (args) => {
 
 const key = (tag) => `${tag}-${crypto.randomUUID()}`
 const getProject = (id) => call('GET', `/v1/projects/${encodeURIComponent(id)}`)
+
+/** Last frame any root item reaches (0 for an empty timeline). */
+const timelineEnd = (project) =>
+  Math.max(
+    0,
+    ...(project.timeline?.items ?? []).map((i) => (i.from ?? 0) + (i.durationInFrames ?? 0)),
+  )
+
+/**
+ * The project's cover in the project list, as the editor makes on save: a
+ * rendered frame (about a second in, or `at`) at the project's aspect.
+ * Best effort: a failed render only warns.
+ */
+async function writeThumbnail(id, project, at) {
+  const { width = 1080, height = 1920, fps = 30 } = project.metadata ?? {}
+  const scale = 640 / Math.max(width, height)
+  const frame = at ?? Math.max(0, Math.min(Math.round(fps), timelineEnd(project) - 1))
+  try {
+    const bytes = await call('POST', '/frame', {
+      project: id,
+      frame,
+      width: Math.round(width * scale),
+      height: Math.round(height * scale),
+      format: 'jpeg',
+    })
+    const file = path.join(workspace(), 'projects', id, 'thumbnail.jpg')
+    fs.writeFileSync(`${file}.tmp`, bytes)
+    fs.renameSync(`${file}.tmp`, file)
+    return file
+  } catch (error) {
+    say(`warning: no thumbnail (${error.message})`)
+    return null
+  }
+}
 
 async function health() {
   try {
@@ -1478,6 +1514,7 @@ const commands = {
       timeline: draft.project.timeline,
     }
     fs.writeFileSync(path.join(dir, `${n}.json`), `${JSON.stringify(record, null, 2)}\n`)
+    await writeThumbnail(targetId, published)
     say(
       `Pass #${Number(n)} "${opt.label}" published to ${targetId}: ${changes.length} changes, revision ${saved.revision}`,
     )
@@ -1489,6 +1526,17 @@ const commands = {
       printScorecard(scorecard, published)
       say(`(saved in ${path.join(dir, `${n}.json`)} as "scorecard")`)
     } else say('No format on this project, so no scorecard (shred format set).')
+  },
+
+  async thumbnail([id]) {
+    if (!id) throw new Error('Pass a project id')
+    const { project } = await getProject(id)
+    const file = await writeThumbnail(
+      id,
+      project,
+      opt.at === undefined ? undefined : Number(opt.at),
+    )
+    if (file) say(file)
   },
 
   // Final export. Native: ffmpeg renders from the ORIGINAL media and the browser

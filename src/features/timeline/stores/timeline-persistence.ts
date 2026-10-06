@@ -1002,8 +1002,10 @@ export async function saveTimeline(
         const height = project.metadata?.height || DEFAULT_PROJECT_HEIGHT
 
         // Calculate thumbnail dimensions preserving project aspect ratio
-        const maxThumbWidth = 320
-        const maxThumbHeight = 180
+        // The project list shows each card at the project's aspect, so a
+        // vertical project gets a tall thumbnail rather than a 180px-high one.
+        const maxThumbWidth = 640
+        const maxThumbHeight = 640
         const projectAspectRatio = width / height
         const targetAspectRatio = maxThumbWidth / maxThumbHeight
 

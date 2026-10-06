@@ -37,6 +37,7 @@ import {
   useDuplicateProject,
   useRestoreProject,
 } from '../hooks/use-project-actions'
+import { aspectKey } from '@/shared/projects/aspect.mjs'
 import { useProjectThumbnail } from '../hooks/use-project-thumbnail'
 import {
   DEFAULT_PROJECT_FPS,
@@ -166,23 +167,10 @@ export function ProjectCard({
     onCardMouseDown?.(e, project)
   }
 
-  // Safe metadata access with defaults
-  const width = project?.metadata?.width || DEFAULT_PROJECT_WIDTH
-  const height = project?.metadata?.height || DEFAULT_PROJECT_HEIGHT
-  const fps = project?.metadata?.fps || DEFAULT_PROJECT_FPS
+  const { width, height, fps } = cardCanvas(project)
 
   const resolution = `${width}×${height}`
-  const aspectRatio = width / height
-  const aspectRatioLabel =
-    Math.abs(aspectRatio - 16 / 9) < 0.01
-      ? '16:9'
-      : Math.abs(aspectRatio - 4 / 3) < 0.01
-        ? '4:3'
-        : Math.abs(aspectRatio - 1) < 0.01
-          ? '1:1'
-          : Math.abs(aspectRatio - 21 / 9) < 0.01
-            ? '21:9'
-            : `${width}:${height}`
+  const aspectRatioLabel = aspectKey(width, height)
 
   return (
     <div
@@ -208,35 +196,16 @@ export function ProjectCard({
         </div>
       )}
 
-      {/* Thumbnail */}
-      <div className="block relative aspect-video bg-secondary/30 overflow-hidden">
-        {thumbnailUrl ? (
-          <img
-            key={project.updatedAt}
-            src={thumbnailUrl}
-            alt={project.name}
-            draggable={false}
-            className="w-full h-full object-contain bg-video-preview-background pointer-events-none"
-          />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-secondary/40 to-secondary/20">
-            <PlayCircle className="w-12 h-12 text-muted-foreground/40" />
-          </div>
-        )}
-
-        {/* Hover overlay */}
-        <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity flex items-center justify-center">
-          <Button size="sm" className="gap-2" onClick={handleOpenClick}>
-            <PlayCircle className="w-4 h-4" />
-            {t('projects.card.openProject')}
-          </Button>
-        </div>
-
-        {/* Resolution badge */}
-        <div className="absolute top-2 right-2 px-2 py-1 bg-black/80 backdrop-blur-sm rounded text-xs font-mono text-white pointer-events-none">
-          {resolution}
-        </div>
-      </div>
+      <ProjectCardThumbnail
+        name={project.name}
+        updatedAt={project.updatedAt}
+        thumbnailUrl={thumbnailUrl}
+        width={width}
+        height={height}
+        resolution={resolution}
+        openLabel={t('projects.card.openProject')}
+        onOpen={handleOpenClick}
+      />
 
       {/* Content */}
       <div className="p-4">
@@ -376,6 +345,74 @@ export function ProjectCard({
             <span>{formatRelativeTime(project.updatedAt)}</span>
           </div>
         </div>
+      </div>
+    </div>
+  )
+}
+
+const CARD_DEFAULTS = {
+  width: DEFAULT_PROJECT_WIDTH,
+  height: DEFAULT_PROJECT_HEIGHT,
+  fps: DEFAULT_PROJECT_FPS,
+}
+
+/** Project size and frame rate, with the defaults for older projects (0 or missing). */
+export function cardCanvas(project: Project): typeof CARD_DEFAULTS {
+  const metadata: Partial<typeof CARD_DEFAULTS> = project.metadata ?? {}
+  const pick = (key: keyof typeof CARD_DEFAULTS) => metadata[key] || CARD_DEFAULTS[key]
+  return { width: pick('width'), height: pick('height'), fps: pick('fps') }
+}
+
+/** The cover, shaped like the project (a 9:16 project gets a tall card). */
+function ProjectCardThumbnail({
+  name,
+  updatedAt,
+  thumbnailUrl,
+  width,
+  height,
+  resolution,
+  openLabel,
+  onOpen,
+}: {
+  name: string
+  updatedAt: number
+  thumbnailUrl: string | null | undefined
+  width: number
+  height: number
+  resolution: string
+  openLabel: string
+  onOpen: (e: React.MouseEvent) => void
+}) {
+  return (
+    <div
+      className="block relative bg-secondary/30 overflow-hidden"
+      style={{ aspectRatio: `${width} / ${height}` }}
+    >
+      {thumbnailUrl ? (
+        <img
+          key={updatedAt}
+          src={thumbnailUrl}
+          alt={name}
+          draggable={false}
+          className="w-full h-full object-cover bg-video-preview-background pointer-events-none"
+        />
+      ) : (
+        <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-secondary/40 to-secondary/20">
+          <PlayCircle className="w-12 h-12 text-muted-foreground/40" />
+        </div>
+      )}
+
+      {/* Hover overlay */}
+      <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity flex items-center justify-center">
+        <Button size="sm" className="gap-2" onClick={onOpen}>
+          <PlayCircle className="w-4 h-4" />
+          {openLabel}
+        </Button>
+      </div>
+
+      {/* Resolution badge */}
+      <div className="absolute top-2 right-2 px-2 py-1 bg-black/80 backdrop-blur-sm rounded text-xs font-mono text-white pointer-events-none">
+        {resolution}
       </div>
     </div>
   )

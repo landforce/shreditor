@@ -521,7 +521,7 @@ export function ProjectList({ onEditProject, onImportProject }: ProjectListProps
           </div>
 
           <div ref={containerRef} className="relative -mx-3 px-3 py-2 min-h-[200px]">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            <div className="grid items-start gap-4 [grid-template-columns:repeat(auto-fill,minmax(220px,1fr))]">
               {filteredProjects.map((project) => (
                 <ProjectCard
                   key={project.id}
