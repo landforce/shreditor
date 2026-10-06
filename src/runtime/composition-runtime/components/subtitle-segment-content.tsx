@@ -63,6 +63,7 @@ export const SubtitleSegmentContent: React.FC<{
       color: item.color,
       backgroundColor: item.backgroundColor,
       backgroundRadius: item.backgroundRadius,
+      backgroundMode: item.backgroundMode,
       textAlign: parsed?.alignment?.textAlign ?? item.textAlign,
       verticalAlign: parsed?.alignment?.verticalAlign ?? item.verticalAlign,
       lineHeight: item.lineHeight,

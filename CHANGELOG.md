@@ -1,5 +1,7 @@
 # Changelog
 
+> **Note:** Shreditor is built on [FreeCut](https://github.com/walterlow/freecut). This changelog records FreeCut's releases, which Shreditor inherits. For Shreditor itself, see the [README](README.md).
+
 All notable changes to FreeCut. Weekly CalVer: `YYYY.MM.DD` = the Monday of the release week (Mon–Sun).
 
 <!-- Entries below are generated via the `changelog` skill. Newest first. -->

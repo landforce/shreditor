@@ -154,6 +154,7 @@ export function mergeLiveItemPresentation(
     letterSpacing: liveItem.letterSpacing,
     backgroundColor: liveItem.backgroundColor,
     backgroundRadius: liveItem.backgroundRadius,
+    backgroundMode: liveItem.backgroundMode,
     textAlign: liveItem.textAlign,
     verticalAlign: liveItem.verticalAlign,
     lineHeight: liveItem.lineHeight,

@@ -9,6 +9,7 @@
  */
 
 import type { SubtitleSegmentItem, TextItem } from '@/types/timeline'
+import type { TextStroke } from '@/types/text'
 import { parseSubtitleCueText } from '@/shared/utils/subtitle-cue-format'
 import {
   layoutTextBlock,
@@ -69,6 +70,7 @@ export function getTextRasterCacheKey(item: TextItem, boxWidth: number, boxHeigh
     color: item.color,
     backgroundColor: item.backgroundColor,
     backgroundRadius: item.backgroundRadius,
+    backgroundMode: item.backgroundMode,
     textAlign: item.textAlign,
     verticalAlign: item.verticalAlign,
     lineHeight: item.lineHeight,
@@ -141,6 +143,19 @@ function paintTextBlock(
   }
 }
 
+/**
+ * Miter limit for `stroke.join: 'miter'`: keeps square/obtuse corners crisp
+ * (a 90° corner needs ~1.41) while acute glyph points (A, V, W apexes) fall
+ * back to a bevel instead of spiking far past the outline.
+ */
+export const TEXT_STROKE_MITER_LIMIT = 3
+
+/** Set the outline corner style; default 'round' matches the original look. */
+function applyStrokeJoin(ctx: OffscreenCanvasRenderingContext2D, join: TextStroke['join']): void {
+  ctx.lineJoin = join ?? 'round'
+  if (join === 'miter') ctx.miterLimit = TEXT_STROKE_MITER_LIMIT
+}
+
 /** Paint one laid-out line: stroke pass, then fill (per-run for inline flow). */
 function paintLaidOutLine(
   ctx: OffscreenCanvasRenderingContext2D,
@@ -156,7 +171,7 @@ function paintLaidOutLine(
   if (item.stroke && strokeWidth > 0) {
     ctx.strokeStyle = item.stroke.color
     ctx.lineWidth = strokeWidth * 2
-    ctx.lineJoin = 'round'
+    applyStrokeJoin(ctx, item.stroke.join)
     ctx.strokeText(line.text, x, y)
   }
 
@@ -195,6 +210,7 @@ function drawGlyphWithMotion(
   color: string,
   strokeColor: string | undefined,
   strokeWidth: number,
+  strokeJoin: TextStroke['join'],
   motion: GlyphMotionState | null,
 ): void {
   ctx.save()
@@ -215,7 +231,7 @@ function drawGlyphWithMotion(
   if (strokeColor && strokeWidth > 0) {
     ctx.strokeStyle = strokeColor
     ctx.lineWidth = strokeWidth * 2
-    ctx.lineJoin = 'round'
+    applyStrokeJoin(ctx, strokeJoin)
     ctx.strokeText(char, x, baselineY)
   }
   ctx.fillText(char, x, baselineY)
@@ -328,6 +344,7 @@ function paintTextBlockWithMotion(
             runColorByChar?.[charIndex] ?? line.color,
             strokeColor,
             strokeWidth,
+            item.stroke?.join,
             glyphMotion,
           )
         }
@@ -514,6 +531,7 @@ export function renderSubtitleSegmentItem(
     color: item.color,
     backgroundColor: item.backgroundColor,
     backgroundRadius: item.backgroundRadius,
+    backgroundMode: item.backgroundMode,
     textAlign: parsed.alignment?.textAlign ?? item.textAlign,
     verticalAlign: parsed.alignment?.verticalAlign ?? item.verticalAlign,
     lineHeight: item.lineHeight,

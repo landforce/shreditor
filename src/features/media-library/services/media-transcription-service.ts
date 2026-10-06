@@ -135,6 +135,11 @@ interface QueuedTranscriptionJob {
   origin?: 'background'
 }
 
+/** A user request joining a background job makes it a user transcript. */
+function joinRequestOrigin(job: QueuedTranscriptionJob, origin: 'background' | undefined): void {
+  if (origin !== 'background') job.origin = undefined
+}
+
 function sanitizeTranscriptWord(word: NonNullable<TranscriptSegment['words']>[number]) {
   return {
     text: word.text.trim(),
@@ -391,8 +396,7 @@ class MediaTranscriptionService {
     const existingJob = this.findJobByKey(requestKey)
 
     if (existingJob) {
-      // A user request joining a background job makes it a user transcript
-      if (options.origin !== 'background') existingJob.origin = undefined
+      joinRequestOrigin(existingJob, options.origin)
       this.attachListener(existingJob, listener)
       return existingJob.promise
     }

@@ -245,6 +245,7 @@ const opSchemas = [
       order: finite.optional(),
     })
     .strict(),
+  z.object({ op: z.literal('removeTrack'), trackId: id, removeItems: z.boolean().optional() }).strict(),
   z
     .object({
       op: z.literal('addClip'),
@@ -312,6 +313,7 @@ export const EDIT_OPERATION_NAMES = [
   'updateTransition',
   'removeTransition',
   'addTrack',
+  'removeTrack',
   'addClip',
   'addKeyframe',
   'removeKeyframes',
@@ -338,6 +340,7 @@ function samplesDescription(name) {
     updateTransition: 'Update an existing transition',
     removeTransition: 'Remove an existing transition',
     addTrack: 'Add a video or audio track',
+    removeTrack: 'Remove a track (refused if it has items unless removeItems is true)',
     addClip: 'Add workspace media as a clip',
     addKeyframe: 'Add a property keyframe',
     removeKeyframes: 'Remove keyframes for a property',

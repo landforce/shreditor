@@ -1,4 +1,4 @@
-import type { MediaAttribution, MediaMetadata } from '@/types/storage'
+import type { MediaAttribution, MediaCategory, MediaMetadata } from '@/types/storage'
 import type { TranscriptionProgressSnapshot } from '@/shared/utils/transcription-progress'
 import type { InterpolationStage } from './frame-interpolation-constants'
 import type { UpscaleStage } from './upscale-constants'
@@ -134,6 +134,13 @@ export interface MediaLibraryActions {
 
   // CRUD Operations (project-scoped in v3)
   loadMediaItems: () => Promise<void>
+  /**
+   * Re-read the project's media from disk without the loading state, keeping
+   * in-flight imports. Picks up media and categories written outside this tab.
+   */
+  refreshMediaItems: () => Promise<void>
+  /** Set (or clear, with null) the category of these media and persist it. */
+  setMediaCategory: (mediaIds: string[], category: MediaCategory | null) => Promise<void>
   /**
    * Import media using file picker.
    * Defaults to copying into Shreditor's workspace-backed media store. Use

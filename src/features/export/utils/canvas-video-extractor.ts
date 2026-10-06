@@ -1,3 +1,5 @@
+import { requestNativeMedia } from '@/infrastructure/browser/native-media-fallback'
+import { getObjectUrlSourceMetadata } from '@/infrastructure/browser/object-url-registry'
 /**
  * Video frame extractor using mediabunny for precise frame access.
  *
@@ -74,6 +76,12 @@ export class VideoFrameExtractor {
   /** Forward jump threshold: restart stream instead of reading through samples */
   private static readonly FORWARD_JUMP_RESTART_SECONDS = 3.0
 
+  private accelerationIndex = 0
+  private nativeAttempted = false
+  private nativeController: AbortController | null = null
+  private decodeSource: string | null = null
+  private sinkFactory: ((mode: HardwareAcceleration) => MediabunnySink) | null = null
+  private lifecycle = 0
   private sink: MediabunnySink | null = null
   private input: MediabunnyInput | null = null
   private videoTrack: MediabunnyVideoTrack | null = null
@@ -115,9 +123,11 @@ export class VideoFrameExtractor {
    */
   async init(): Promise<boolean> {
     this.disposed = false
+    const lifecycle = this.lifecycle
     try {
       const [mb] = await Promise.all([import('mediabunny'), ensureProResDecoderRegistered()])
-      const source = createMediabunnyInputSource(mb, this.src)
+      if (!this.isCurrentLifecycle(lifecycle)) return false
+      const source = createMediabunnyInputSource(mb, this.decodeSource ?? this.src)
 
       // Prefer direct file-backed reads for OPFS / file handles, with BlobSource
       // fallback for in-memory blob URLs we manage locally.
@@ -126,47 +136,17 @@ export class VideoFrameExtractor {
         source,
       }) as unknown as MediabunnyInput
 
-      // Get video track
-      this.videoTrack = await this.input!.getPrimaryVideoTrack()
-      if (!this.videoTrack) {
-        this.logInitFailure('No video track found', { itemId: this.itemId }, 'warn')
-        return false
-      }
+      const properties = await this.loadTrackProperties(this.input)
+      if (!this.isCurrentLifecycle(lifecycle)) return false
+      this.videoTrack = properties.track
+      this.canBeTransparent = properties.alpha
+      this.duration = properties.duration
 
-      // Bail out if the track is genuinely undecodable. ProRes decodes through the
-      // registered @mediabunny/prores decoder, so canDecode() reports it as decodable
-      // and VideoSampleSink handles it like any other codec.
-      if (typeof this.videoTrack.canDecode === 'function') {
-        const decodable = await this.videoTrack.canDecode()
-        if (!decodable) {
-          this.logInitFailure(
-            'Video track is not decodable via mediabunny/WebCodecs',
-            { itemId: this.itemId },
-            'warn',
-          )
-          return false
-        }
-      }
-
-      // Resolve alpha capability once (codec/container-level signal). VideoSampleSink
-      // decodes and merges alpha side-data automatically, so a transparent source
-      // draws with real alpha — occlusion culling must know this to avoid hiding
-      // the layers beneath a full-canvas transparent overlay.
-      // NOTE: this is a *capability* signal ("may contain alpha"), not per-frame
-      // truth. A fully-opaque clip in an alpha-capable container (VP8/VP9/AV1 with
-      // alpha, ProRes 4444) will conservatively disable occlusion culling for the
-      // layers beneath it — identical output, just a little more work. Opaque H.264
-      // reports false, so the common case (plain video base track) keeps culling.
-      if (typeof this.videoTrack.canBeTransparent === 'function') {
-        this.canBeTransparent = await this.videoTrack.canBeTransparent().catch(() => false)
-      }
-
-      // Get duration
-      this.duration = await this.input!.computeDuration()
-
-      this.sink = new mb.VideoSampleSink(
-        this.videoTrack as unknown as ConstructorParameters<typeof mb.VideoSampleSink>[0],
-      )
+      const track = this.videoTrack as unknown as ConstructorParameters<
+        typeof mb.VideoSampleSink
+      >[0]
+      this.sinkFactory = (mode) => new mb.VideoSampleSink(track, { hardwareAcceleration: mode })
+      this.sink = this.sinkFactory('no-preference')
 
       this.ready = true
       log.debug('Initialized', {
@@ -178,9 +158,27 @@ export class VideoFrameExtractor {
 
       return true
     } catch (error) {
+      if (!this.isCurrentLifecycle(lifecycle)) return false
+      this.input?.dispose()
+      this.input = null
+      if (await this.prepareNativeFallback()) return this.init()
       this.logInitFailure('Failed to initialize', { itemId: this.itemId, error }, 'error')
       return false
     }
+  }
+
+  private isCurrentLifecycle(lifecycle: number): boolean {
+    return !this.disposed && lifecycle === this.lifecycle
+  }
+
+  private async loadTrackProperties(input: MediabunnyInput) {
+    const track = await input.getPrimaryVideoTrack()
+    if (!track) throw new Error('No video track found')
+    if (track.canDecode && !(await track.canDecode()))
+      throw new Error('Video track is not decodable')
+    // Conservative alpha capability controls occlusion culling, not pixel alpha.
+    const alpha = (await track.canBeTransparent?.().catch(() => false)) ?? false
+    return { track, alpha, duration: await input.computeDuration() }
   }
 
   private logInitFailure(message: string, data: Record<string, unknown>, level: 'warn' | 'error') {
@@ -295,6 +293,13 @@ export class VideoFrameExtractor {
       }
     } catch (error) {
       this.sampleLoopError = error
+      if (await this.recoverAndPrime(clampedTime, error)) {
+        return {
+          success: true,
+          frame: await this.captureCurrentOrientedFrame(),
+          sourceTime: this.currentSample?.timestamp ?? null,
+        }
+      }
       this.lastFailureKind = 'decode-error'
       return { success: false, frame: null, sourceTime: null }
     }
@@ -384,7 +389,21 @@ export class VideoFrameExtractor {
 
     const iterator = this.sampleIterator
     const generation = this.streamGeneration
-    const nextResult = await iterator.next()
+    let timeout: ReturnType<typeof setTimeout> | undefined
+    let expired = false
+    const pending = iterator.next().then((result) => {
+      if (expired && !result.done) this.closeSample(result.value)
+      return result
+    })
+    const nextResult = await Promise.race([
+      pending,
+      new Promise<never>((_, reject) => {
+        timeout = setTimeout(() => {
+          expired = true
+          reject(new Error('Video decode timeout'))
+        }, 10_000)
+      }),
+    ]).finally(() => clearTimeout(timeout))
     if (this.disposed || generation !== this.streamGeneration || iterator !== this.sampleIterator) {
       if (!nextResult.done) this.closeSample(nextResult.value)
       return null
@@ -537,24 +556,65 @@ export class VideoFrameExtractor {
     }
   }
 
-  private async recoverAndPrime(timestamp: number, error: unknown): Promise<boolean> {
-    const message = error instanceof Error ? error.message : String(error)
-    const looksRecoverable = /key frame|configure\(\)|flush\(\)|InvalidStateError|decode/i.test(
-      message,
-    )
-    if (!looksRecoverable) {
-      return false
-    }
+  private nativeMediaId(): string | undefined {
+    const metadata = getObjectUrlSourceMetadata(this.src)
+    return metadata?.storageType === 'workspace' ? metadata.mediaId : undefined
+  }
 
+  private async prepareNativeFallback(): Promise<boolean> {
+    const mediaId = this.nativeMediaId()
+    if (this.disposed || this.nativeAttempted || !mediaId) return false
+    this.nativeAttempted = true
+    this.nativeController = new AbortController()
     try {
-      this.resetSampleIterator(timestamp, 'recover')
+      const result = await requestNativeMedia(mediaId, true, this.nativeController.signal)
+      if (this.disposed || !result) return false
+      this.decodeSource = result.url
+      return true
+    } catch (error) {
+      if (!this.disposed)
+        this.logInitFailure('Native fallback unavailable', { itemId: this.itemId, error }, 'warn')
+      return false
+    } finally {
+      this.nativeController = null
+    }
+  }
+
+  private async recoverAndPrime(timestamp: number, error: unknown): Promise<boolean> {
+    if (this.disposed) return false
+    const message = error instanceof Error ? `${error.name}: ${error.message}` : String(error)
+    if (!/key frame|configure|flush|InvalidStateError|decode|quota|resource|timeout/i.test(message))
+      return false
+    const modes: HardwareAcceleration[] = ['no-preference', 'prefer-software', 'prefer-hardware']
+    while (!this.disposed && this.sinkFactory && this.accelerationIndex < modes.length - 1) {
+      this.accelerationIndex++
+      this.closeStreamState()
+      this.sink = this.sinkFactory(modes[this.accelerationIndex]!)
+      if (await this.tryPrime(timestamp)) return true
+    }
+    if (await this.prepareNativeFallback()) return this.reopenPreparedSource(timestamp)
+    this.lastFailureKind = 'decode-error'
+    return false
+  }
+
+  private async tryPrime(timestamp: number): Promise<boolean> {
+    try {
       await this.ensureSampleForTimestamp(timestamp)
-      return this.currentSample !== null
-    } catch (recoveryError) {
-      this.sampleLoopError = recoveryError
+      return this.currentSampleCoversTimestamp(timestamp)
+    } catch (error) {
+      this.sampleLoopError = error
       this.lastFailureKind = 'decode-error'
       return false
     }
+  }
+
+  private async reopenPreparedSource(timestamp: number): Promise<boolean> {
+    this.closeStreamState()
+    this.input?.dispose()
+    this.input = null
+    this.accelerationIndex = 0
+    if (!(await this.init())) return false
+    return this.tryPrime(timestamp)
   }
 
   private closeStreamState(): void {
@@ -717,6 +777,9 @@ export class VideoFrameExtractor {
    */
   dispose(): void {
     this.disposed = true
+    this.lifecycle++
+    this.nativeController?.abort()
+    this.sinkFactory = null
     this.closeStreamState()
 
     try {

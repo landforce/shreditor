@@ -25,6 +25,8 @@ import {
   Wind,
   Maximize2,
   X,
+  Check,
+  Tag,
 } from 'lucide-react'
 import {
   ContextMenu,
@@ -37,7 +39,8 @@ import {
   ContextMenuSubTrigger,
   ContextMenuTrigger,
 } from '@/components/ui/context-menu'
-import type { MediaMetadata } from '@/types/storage'
+import type { MediaCategory, MediaMetadata } from '@/types/storage'
+import { MEDIA_CATEGORIES } from '../utils/media-categories'
 import { FileAccessError } from '../services/file-access'
 import { importMediaLibraryService } from '../services/media-library-service-loader'
 import { importMediaAnalysisService } from '../services/media-analysis-service-loader'
@@ -121,6 +124,8 @@ interface MediaCardActionMenuProps {
   onDeleteTranscript: (event: React.MouseEvent) => Promise<void>
   onExtractEmbeddedSubtitles: (event: React.MouseEvent) => void | Promise<void>
   onAnalyzeWithAI: (event: React.MouseEvent) => void
+  category?: MediaCategory
+  onSetCategory: (category: MediaCategory | null) => void
   onDelete: (event: React.MouseEvent) => void
 }
 
@@ -166,6 +171,11 @@ type EmbeddedSubtitleActionsProps = MediaCardMenuGroupProps & {
 
 type AiActionsProps = MediaCardMenuGroupProps & {
   onAnalyzeWithAI: (event: React.MouseEvent) => void
+}
+
+type CategoryActionsProps = MediaCardMenuGroupProps & {
+  category?: MediaCategory
+  onSetCategory: (category: MediaCategory | null) => void
 }
 
 type DeleteMediaActionProps = MediaCardMenuGroupProps & {
@@ -421,6 +431,15 @@ function MediaCardActionMenuItems(props: MediaCardActionMenuProps) {
     groups.push(<AiActions key="ai" t={t} onAnalyzeWithAI={onAnalyzeWithAI} />)
   }
 
+  groups.push(
+    <CategoryActions
+      key="category"
+      t={t}
+      category={props.category}
+      onSetCategory={props.onSetCategory}
+    />,
+  )
+
   groups.push(<DeleteMediaAction key="destructive" t={t} onDelete={onDelete} />)
 
   return (
@@ -642,6 +661,35 @@ function AiActions({ t, onAnalyzeWithAI }: AiActionsProps) {
   )
 }
 
+/** What the media is for in the edit; the agent reads it back from metadata.json. */
+function CategoryActions({ t, category, onSetCategory }: CategoryActionsProps) {
+  return (
+    <ContextMenuSub>
+      <ContextMenuSubTrigger>
+        <Tag className="w-3 h-3 mr-2" />
+        {t('media.card.menuCategory')}
+      </ContextMenuSubTrigger>
+      <ContextMenuSubContent>
+        {MEDIA_CATEGORIES.map((value) => (
+          <ContextMenuItem key={value} onClick={() => onSetCategory(value)}>
+            <Check className={`w-3 h-3 mr-2 ${category === value ? '' : 'invisible'}`} />
+            {t(`media.category.${value}`)}
+          </ContextMenuItem>
+        ))}
+        {category && (
+          <>
+            <ContextMenuSeparator />
+            <ContextMenuItem onClick={() => onSetCategory(null)}>
+              <X className="w-3 h-3 mr-2" />
+              {t('media.card.clearCategory')}
+            </ContextMenuItem>
+          </>
+        )}
+      </ContextMenuSubContent>
+    </ContextMenuSub>
+  )
+}
+
 function DeleteMediaAction({ t, onDelete }: DeleteMediaActionProps) {
   return (
     <ContextMenuItem onClick={onDelete} className="text-destructive focus:text-destructive">
@@ -777,6 +825,11 @@ const MediaCardInternal = memo(function MediaCardInternal({
     },
     [media.id],
   )
+
+  const handleSetCategory = (category: MediaCategory | null) => {
+    const ids = getTargetMediaItems().map((m) => m.id)
+    void useMediaLibraryStore.getState().setMediaCategory(ids, category)
+  }
 
   const handleDelete = (e: React.MouseEvent) => {
     e.stopPropagation()
@@ -1565,6 +1618,8 @@ const MediaCardInternal = memo(function MediaCardInternal({
       onDeleteTranscript={handleDeleteTranscript}
       onExtractEmbeddedSubtitles={handleExtractEmbeddedSubtitles}
       onAnalyzeWithAI={handleAnalyzeWithAI}
+      category={media.category}
+      onSetCategory={handleSetCategory}
       onDelete={handleDelete}
     />
   )

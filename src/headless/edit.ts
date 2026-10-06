@@ -55,6 +55,13 @@ import {
   updateItemTransform,
 } from '@/features/timeline/stores/timeline-actions'
 import { getGpuEffect } from '@/infrastructure/gpu-effects'
+import {
+  assertItemPlacement,
+  assertNoTrackOverlap,
+  assertTrimPlacement,
+  findFreeTrack,
+  type OverlapContext,
+} from './track-overlap'
 
 const log = createLogger('HeadlessEdit')
 
@@ -71,6 +78,7 @@ export type EditOperationName =
   | 'updateTransition'
   | 'removeTransition'
   | 'addTrack'
+  | 'removeTrack'
   | 'addClip'
   | 'addKeyframe'
   | 'removeKeyframes'
@@ -233,17 +241,37 @@ function newId(): string {
   return crypto.randomUUID()
 }
 
-/** Find a non-group track of the given kind, or create one (video on top, audio at bottom). */
-function getOrCreateTrack(kind: 'video' | 'audio'): string {
+/** Create a track of the given kind (video on top, audio at bottom unless `order` is given). */
+function createTrack(kind: 'video' | 'audio', order?: number): TimelineTrack {
   const all = tracks()
-  const existing = all.find((t) => !t.isGroup && (t.kind ?? 'video') === kind)
-  if (existing) return existing.id
   const orders = all.map((t) => t.order)
-  const order = kind === 'video' ? Math.min(0, ...orders) - 1 : Math.max(0, ...orders) + 1
-  const track = createClassicTrack({ tracks: all, kind, order })
+  const track = createClassicTrack({
+    tracks: all,
+    kind,
+    order: order ?? (kind === 'video' ? Math.min(0, ...orders) - 1 : Math.max(0, ...orders) + 1),
+  })
   setTracks([...all, track])
-  return track.id
+  return track
 }
+
+/** Find a non-group track of the given kind, or create one. */
+function getOrCreateTrack(kind: 'video' | 'audio'): string {
+  const existing = tracks().find((t) => !t.isGroup && (t.kind ?? 'video') === kind)
+  return existing?.id ?? createTrack(kind).id
+}
+
+/** Add a new item at exactly its requested place, failing on a same-track overlap. */
+function addItemExactly(context: OverlapContext, item: TimelineItem, name: string): void {
+  assertNoTrackOverlap(context, {
+    trackId: item.trackId,
+    from: item.from,
+    durationInFrames: item.durationInFrames,
+    name,
+  })
+  addItem(item)
+}
+
+const quoted = (kind: string, text: string) => `${kind} "${text.slice(0, 40)}"`
 
 /** The requested track if it exists, else find-or-create one of the given kind. */
 function resolveOrCreateTrack(preferred: unknown, kind: 'video' | 'audio'): string {
@@ -289,12 +317,48 @@ function buildTextItem(op: EditOp): TextItem {
   }
 }
 
+/**
+ * Remove a track. A track with items is refused unless `removeItems: true`, which
+ * removes them first (linked companions on other tracks go with them, as in the
+ * editor). The editor never removes the last track, so neither does this.
+ */
+function removeTrackOp(op: EditOp): unknown {
+  const trackId = asString(op.trackId)
+  if (!trackId) throw new Error('removeTrack requires `trackId`')
+  const track = requireTrack(trackId)
+  const label = `track ${track.name} (${track.id})`
+  if (tracks().length <= 1)
+    throw new Error(`${label} is the only track; a project keeps at least one`)
+  const before = useItemsStore.getState().items
+  const onTrack = before.filter((item) => item.trackId === trackId)
+  if (onTrack.length > 0 && op.removeItems !== true) {
+    const names = onTrack
+      .slice(0, 5)
+      .map((item) => `${item.type} "${item.label ?? item.id}" (${item.id})`)
+      .join(', ')
+    throw new Error(
+      `${label} has ${onTrack.length} item(s): ${names}${onTrack.length > 5 ? ', ...' : ''}. ` +
+        'Move or remove them first, or pass removeItems: true to delete them with the track.',
+    )
+  }
+  if (onTrack.length > 0) removeItems(onTrack.map((item) => item.id))
+  const remaining = new Set(useItemsStore.getState().items.map((item) => item.id))
+  setTracks(tracks().filter((candidate) => candidate.id !== trackId))
+  return {
+    trackId,
+    name: track.name,
+    removedItems: before.filter((item) => !remaining.has(item.id)).map((item) => item.id),
+  }
+}
+
 /** Apply a single op by driving the real timeline action modules. Throws on bad input. */
 function applyOp(op: EditOp): unknown {
+  // Same-track overlaps are errors here, never silently shifted (see ./track-overlap).
+  const context: OverlapContext = { op: op.op, callerId: asString(op.callerId) }
   switch (op.op) {
     case 'addText': {
       const item = buildTextItem(op)
-      addItem(item)
+      addItemExactly(context, item, quoted('text', item.text))
       return { id: item.id }
     }
     case 'addItem': {
@@ -302,15 +366,22 @@ function applyOp(op: EditOp): unknown {
       if (!item || typeof item !== 'object') throw new Error('addItem requires `item`')
       const withId: TimelineItem = { ...item, id: item.id || newId() }
       requireTrack(withId.trackId, 'item.trackId')
-      addItem(withId)
+      addItemExactly(context, withId, quoted(withId.type, withId.label ?? withId.id))
       return { id: withId.id }
     }
     case 'updateItem': {
       const id = asString(op.id)
       if (!id) throw new Error('updateItem requires `id`')
-      requireItem(id)
+      const item = requireItem(id)
       const updates = (op.updates ?? {}) as Partial<TimelineItem>
       if (updates.trackId) requireTrack(updates.trackId, 'updates.trackId')
+      if ('from' in updates || 'durationInFrames' in updates || 'trackId' in updates) {
+        assertItemPlacement(context, item, {
+          trackId: asString(updates.trackId),
+          from: asNumber(updates.from),
+          durationInFrames: asNumber(updates.durationInFrames),
+        })
+      }
       updateItem(id, updates)
       return { id }
     }
@@ -318,9 +389,10 @@ function applyOp(op: EditOp): unknown {
       const id = asString(op.id)
       const from = asNumber(op.from)
       if (!id || from === undefined) throw new Error('moveItem requires `id` and `from`')
-      requireItem(id)
+      const item = requireItem(id)
       const destination = asString(op.trackId)
       if (destination) requireTrack(destination)
+      assertItemPlacement(context, item, { from, trackId: destination })
       moveItem(id, from, destination)
       return { id, from }
     }
@@ -347,6 +419,7 @@ function applyOp(op: EditOp): unknown {
       const amount = asNumber(op.amount)
       if (!id || amount === undefined) throw new Error('trimStart requires `id` and `amount`')
       requireItem(id)
+      assertTrimPlacement(context, id, 'start', amount)
       trimItemStart(id, amount)
       return { id }
     }
@@ -355,6 +428,7 @@ function applyOp(op: EditOp): unknown {
       const amount = asNumber(op.amount)
       if (!id || amount === undefined) throw new Error('trimEnd requires `id` and `amount`')
       requireItem(id)
+      assertTrimPlacement(context, id, 'end', amount)
       trimItemEnd(id, amount)
       return { id }
     }
@@ -429,16 +503,11 @@ function applyOp(op: EditOp): unknown {
       return { id }
     }
     case 'addTrack': {
-      const kind = op.kind === 'audio' ? 'audio' : 'video'
-      const all = tracks()
-      const orders = all.map((t) => t.order)
-      const order =
-        asNumber(op.order) ??
-        (kind === 'video' ? Math.min(0, ...orders) - 1 : Math.max(0, ...orders) + 1)
-      const track = createClassicTrack({ tracks: all, kind, order })
-      setTracks([...all, track])
+      const track = createTrack(op.kind === 'audio' ? 'audio' : 'video', asNumber(op.order))
       return { trackId: track.id, name: track.name }
     }
+    case 'removeTrack':
+      return removeTrackOp(op)
     case 'addClip': {
       const mediaId = asString(op.mediaId)
       if (!mediaId) throw new Error('addClip requires `mediaId`')
@@ -450,8 +519,12 @@ function applyOp(op: EditOp): unknown {
       }
       const from = asNumber(op.from, 0)!
       const projectFps = useTimelineSettingsStore.getState().fps || 30
-      const created: Array<{ id: string; type: string }> = []
+      const created: Array<{ id: string; type: string; trackId: string }> = []
       const label = media.fileName ?? mediaId
+      const place = (item: TimelineItem) => {
+        addItemExactly(context, item, quoted(item.type, label))
+        created.push({ id: item.id, type: item.type, trackId: item.trackId })
+      }
 
       if (media.mimeType.startsWith('image/')) {
         const item: ImageItem = {
@@ -466,8 +539,7 @@ function applyOp(op: EditOp): unknown {
           ...(media.width ? { sourceWidth: media.width } : {}),
           ...(media.height ? { sourceHeight: media.height } : {}),
         }
-        addItem(item)
-        created.push({ id: item.id, type: 'image' })
+        place(item)
       } else if (media.mimeType.startsWith('audio/')) {
         const sf = sourceFieldsFor(media, projectFps)
         const item: AudioItem = {
@@ -484,8 +556,7 @@ function applyOp(op: EditOp): unknown {
           volume: 0,
           ...sf,
         }
-        addItem(item)
-        created.push({ id: item.id, type: 'audio' })
+        place(item)
       } else if (media.mimeType.startsWith('video/')) {
         const sf = sourceFieldsFor(media, projectFps)
         const durationInFrames =
@@ -507,14 +578,15 @@ function applyOp(op: EditOp): unknown {
           ...(media.height ? { sourceHeight: media.height } : {}),
           ...sf,
         }
-        addItem(video)
-        created.push({ id: video.id, type: 'video' })
+        place(video)
         // Linked audio companion (as the app creates on import) so audio renders.
+        // It must stay in sync with the video, so it takes the first audio track
+        // free for that range (a new one if none is) instead of being shifted.
         if (media.audioCodec) {
           const audio: AudioItem = {
             id: newId(),
             type: 'audio',
-            trackId: getOrCreateTrack('audio'),
+            trackId: findFreeTrack('audio', from, durationInFrames)?.id ?? createTrack('audio').id,
             from,
             durationInFrames,
             label: `${label} audio`,
@@ -524,8 +596,7 @@ function applyOp(op: EditOp): unknown {
             linkedGroupId,
             ...sf,
           }
-          addItem(audio)
-          created.push({ id: audio.id, type: 'audio' })
+          place(audio)
         }
       } else {
         throw new Error(`addClip: unsupported media mimeType ${media.mimeType}`)

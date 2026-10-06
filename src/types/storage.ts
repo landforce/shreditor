@@ -35,6 +35,22 @@ export interface MediaAttribution {
   license?: string
 }
 
+/**
+ * What a media file is for in the edit, assigned by the agent when it
+ * catalogs footage (or by the user from the media card). The media library
+ * groups by it when any item in the project has one. Absent = uncategorized.
+ * Mirrored in server/media-bridge.mjs (MEDIA_CATEGORIES).
+ */
+export type MediaCategory =
+  | 'speaker'
+  | 'b-roll'
+  | 'graphics'
+  | 'overlay'
+  | 'voiceover'
+  | 'music'
+  | 'sfx'
+  | 'other'
+
 export interface MediaMetadata {
   id: string
   /**
@@ -111,6 +127,8 @@ export interface MediaMetadata {
   gopInterval?: number
   thumbnailId?: string
   tags: string[]
+  /** Role in the edit (see {@link MediaCategory}); absent when uncategorized. */
+  category?: MediaCategory
   /**
    * Provenance for media pulled from a third-party provider (e.g. the
    * in-app LottieFiles browser). Persisted so the editor can surface the

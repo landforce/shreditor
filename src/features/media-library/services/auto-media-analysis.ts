@@ -1,4 +1,5 @@
 import { createLogger } from '@/shared/logging/logger'
+import { getTranscriptMediaIds } from '@/infrastructure/storage'
 import { getMediaType } from '../utils/validation'
 import { hasAudioTrack } from '../utils/media-role'
 import { useMediaLibraryStore } from '../stores/media-library-store'
@@ -48,12 +49,12 @@ async function runAutoMediaAnalysis(projectId: string): Promise<void> {
     (media) => getMediaType(media.mimeType) === 'video' && !broken.has(media.id),
   )
 
-  // Retries earlier failures too (e.g. a model download that failed last open)
-  const untranscribed = videos.filter(
-    (media) =>
-      hasAudioTrack(media) &&
-      useMediaLibraryStore.getState().transcriptStatus.get(media.id) !== 'ready',
-  )
+  // Ask the workspace, not the store: the store's transcript map may still be
+  // loading, and re-transcribing would overwrite a user's transcript.
+  // Retries earlier failures too (e.g. a model download that failed last open).
+  const withAudio = videos.filter(hasAudioTrack)
+  const transcribed = await getTranscriptMediaIds(withAudio.map((media) => media.id))
+  const untranscribed = withAudio.filter((media) => !transcribed.has(media.id))
   for (const media of untranscribed) {
     if (!isStillCurrent(projectId)) return
     try {

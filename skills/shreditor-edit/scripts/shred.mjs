@@ -2,14 +2,17 @@
 // The one way an agent touches a Shreditor project. Every engine call in the
 // shreditor-edit skill goes through here, so edits are consistent and checked.
 //
-//   shred up                             start the editor (5273) and the agent service (8787)
+//   shred up [--dev] [--build]           start the editor (5273, a built preview; --dev for live reload)
+//                                        and the agent service (8787)
 //   shred start                          start only the agent edit service
 //   shred status                         editor, service, workspace and writer-lock state
 //   shred catalog <folder|file...> --name <slug> [--no-transcribe] [--no-proxies]
 //                                        probe, contact-sheet, transcribe, and make playable proxies
 //   shred new --name "..." [--size 1080x1920] [--fps 30]   create a project; prints id and editor URL
 //   shred project <id>                   timeline summary (tracks, items, frames)
-//   shred import <file...> --project <id>   bring footage in (clone/link in place)
+//   shred import <file...> --project <id> [--category <c>]   bring footage in (clone/link in place)
+//   shred categorize <mediaId>=<category>... | --category <c> <mediaId>...
+//                                        set what each media is for; the editor groups by it
 //   shred draft <id>                     copy a project to a private draft; prints the draft id
 //   shred apply <id> <ops.json>          apply an op batch atomically (revision-checked)
 //   shred frames <id> --at 30,95,... [--out grid.jpg] [--size 270x480]
@@ -17,10 +20,14 @@
 //   shred publish <draftId> <targetId> --label "..." --summary <file.md>
 //                                        hand the finished draft to the user's project as one pass
 //   shred changes <id>                   what the user changed since the last published pass
+//   shred master <audio|video> [--lufs -14] [--tp -1.5] [--out file.wav]
+//                                        loudness-master to a new WAV (two-pass loudnorm)
+//   shred sync <id> [--timeout 20]       make the open editor save now, so the agent sees unsaved tweaks
 //
-// Service: 127.0.0.1:8787 (SHRED_SERVICE to override). Times are frames at the
+// Service: 127.0.0.1:8787 (SHRED_SERVICE to override). Workspace: SHRED_WORKSPACE,
+// else ~/.shreditor/config.json, else ~/Movies/Shreditor. Times are frames at the
 // project fps. Ops reference earlier results with {"$ref":"<callerId>#/detail/..."}.
-import { execFileSync, spawn } from 'node:child_process'
+import { execFileSync, spawn, spawnSync } from 'node:child_process'
 import crypto from 'node:crypto'
 import fs from 'node:fs'
 import os from 'node:os'
@@ -35,7 +42,15 @@ process.stdout.on('error', (e) => e.code === 'EPIPE' && process.exit(0))
 
 const { values: opt, positionals } = parseArgs({
   allowPositionals: true,
+  // `--lufs -14` reads as a flag to parseArgs; glue negative numbers to their option.
+  args: process.argv.slice(2).reduce((out, arg) => {
+    if (/^-\d/.test(arg) && /^--(lufs|tp)$/.test(out.at(-1) ?? '')) out.push(`${out.pop()}=${arg}`)
+    else out.push(arg)
+    return out
+  }, []),
   options: {
+    lufs: { type: 'string', default: '-14' },
+    tp: { type: 'string', default: '-1.5' },
     project: { type: 'string' },
     at: { type: 'string' },
     out: { type: 'string' },
@@ -47,13 +62,17 @@ const { values: opt, positionals } = parseArgs({
     label: { type: 'string' },
     summary: { type: 'string' },
     link: { type: 'boolean' },
+    category: { type: 'string' },
     build: { type: 'boolean' },
+    dev: { type: 'boolean' },
+    timeout: { type: 'string' },
     json: { type: 'boolean' },
   },
 })
 const [command, ...args] = positionals
 
 function workspace() {
+  if (process.env.SHRED_WORKSPACE) return path.resolve(process.env.SHRED_WORKSPACE)
   try {
     const config = JSON.parse(fs.readFileSync(path.join(os.homedir(), '.shreditor/config.json'), 'utf8'))
     if (config.workspace) return config.workspace
@@ -102,6 +121,81 @@ const editorUp = async () => {
     return false
   }
 }
+const editorInfo = async () => {
+  try {
+    const res = await fetch(`${EDITOR}/__shreditor/info`)
+    return res.ok ? await res.json() : null
+  } catch {
+    return null
+  }
+}
+// 'dev' or 'preview'. Older bridges don't say; a dev server serves /@vite/client.
+async function editorKind(info) {
+  if (info.mode) return info.mode
+  try {
+    const res = await fetch(`${EDITOR}/@vite/client`)
+    return (res.headers.get('content-type') ?? '').includes('javascript') ? 'dev' : 'preview'
+  } catch {
+    return 'unknown'
+  }
+}
+const portAnswers = async () => {
+  try {
+    await fetch(EDITOR)
+    return true
+  } catch {
+    return false
+  }
+}
+const gitHead = () => {
+  try {
+    const [sha, time] = execFileSync('git', ['log', '-1', '--format=%h %ct', 'HEAD'], { cwd: REPO, encoding: 'utf8' }).trim().split(' ')
+    return { sha, time: Number(time) }
+  } catch {
+    return null
+  }
+}
+let built = false
+function build(reason) {
+  const log = path.join(os.tmpdir(), 'shreditor-build.log')
+  say(`Building Shreditor (${reason})…`)
+  try {
+    execFileSync('npm', ['run', 'build'], { cwd: REPO, stdio: ['ignore', fs.openSync(log, 'w'), fs.openSync(log, 'a')] })
+  } catch {
+    throw new Error(`Build failed; see ${log}`)
+  }
+  built = true
+}
+// The built editor is stale when missing or older than the checked-out commit.
+function staleBuild() {
+  const index = path.join(REPO, 'dist', 'index.html')
+  if (!fs.existsSync(index)) return 'no build yet'
+  const head = gitHead()
+  if (head && fs.statSync(index).mtimeMs / 1000 < head.time) return `build is older than ${head.sha}`
+  return null
+}
+
+// What the open editor has not saved yet (see server/editor-state.mjs).
+// null when no editor answers, or it predates the heartbeat.
+async function editorState(id) {
+  try {
+    const res = await fetch(`${EDITOR}/__shreditor/editor-state?project=${encodeURIComponent(id)}`)
+    return res.ok ? await res.json() : null
+  } catch {
+    return null
+  }
+}
+const ago = (t) => `${Math.max(0, Math.round((Date.now() - t) / 1000))}s ago`
+const CONFLICT = 'The editor is showing a conflict banner for this project (it changed on disk while the user had unsaved edits). Ask the user to pick a version, then run shred sync again.'
+async function warnUnsaved(id) {
+  const s = await editorState(id)
+  if (!s?.dirty && !s?.conflict) return null
+  const line = s.conflict ? `WARNING: ${CONFLICT}` : `WARNING: The editor has unsaved edits (last edit ${s.lastEditAt ? ago(s.lastEditAt) : 'just now'}); run shred sync ${id} first. Below is the saved state only.`
+  if (opt.json) process.stderr.write(`${line}\n`)
+  else say(`${line}\n`)
+  return { unsaved: Boolean(s.dirty), conflict: Boolean(s.conflict), lastEditAt: s.lastEditAt }
+}
+
 const slug = (t) => t.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 60) || 'footage'
 const MEDIA_EXT = /\.(mov|mp4|m4v|mkv|webm|avi|mts|mxf|wav|mp3|m4a|aac|aif|aiff|flac|png|jpe?g|webp|heic|gif)$/i
 const WHISPER_MODEL = path.join(os.homedir(), 'Library/Application Support/whisper.cpp/models/ggml-large-v3-turbo.bin')
@@ -168,19 +262,60 @@ function diffTimelines(before, after) {
 
 const commands = {
   async up() {
-    if (!(await editorUp())) {
+    const info = await editorInfo()
+    if (info) {
+      // Never kill or replace a running editor: the user may be mid-edit in it.
+      const kind = await editorKind(info)
+      const what = { dev: 'dev server (reloads on source edits)', preview: 'built preview' }[kind] ?? 'unknown kind'
+      say(`Editor   ${EDITOR}  already running: ${what}; left as is`)
+      if (opt.dev ? kind === 'preview' : kind === 'dev') say(`         (stop it yourself to switch to ${opt.dev ? 'the dev server' : 'a built preview'})`)
+    } else if (await portAnswers()) {
+      throw new Error(`Something other than the Shreditor editor is serving ${EDITOR}. Stop it, or set SHRED_EDITOR to a free port.`)
+    } else {
+      const port = new URL(EDITOR).port
+      if (!opt.dev) {
+        const reason = opt.build ? 'requested' : staleBuild()
+        if (reason) build(reason)
+      }
       const log = path.join(os.tmpdir(), 'shreditor-editor.log')
-      const child = spawn('npm', ['run', 'dev', '--', '--port', new URL(EDITOR).port, '--strictPort'], {
+      const child = spawn('npm', ['run', opt.dev ? 'dev' : 'preview', '--', '--port', port, '--strictPort'], {
         cwd: REPO,
+        // An overridden workspace is pinned for the editor too; otherwise it follows the config.
+        env: { ...process.env, ...(process.env.SHRED_WORKSPACE ? { SHREDITOR_WORKSPACE: process.env.SHRED_WORKSPACE } : {}) },
         detached: true,
         stdio: ['ignore', fs.openSync(log, 'a'), fs.openSync(log, 'a')],
       })
       child.unref()
       for (let i = 0; i < 120 && !(await editorUp()); i++) await new Promise((r) => setTimeout(r, 1000))
       if (!(await editorUp())) throw new Error(`Editor did not start; see ${log}`)
+      say(`Editor   ${EDITOR}  ${opt.dev ? 'dev server (reloads on source edits)' : `built preview of ${gitHead()?.sha ?? 'this checkout'}`}`)
     }
-    say(`Editor   ${EDITOR}`)
     await commands.start()
+  },
+
+  async sync([id]) {
+    if (!id) throw new Error('Pass a project id')
+    const first = await editorState(id)
+    if (!first) return say(`No editor answering at ${EDITOR} (or it predates shred sync); the saved state is all there is.`)
+    if (!first.open) return say(`No editor open on ${id}; the saved state is current.`)
+    if (first.conflict) throw new Error(CONFLICT)
+    // Clean, not saving, and holding the revision that is on disk.
+    const settled = (s) => s.editors.every((e) => !e.dirty && !e.saving && (!e.revision || e.revision === s.diskRevision))
+    if (settled(first)) return say(`Editor has no unsaved edits (revision ${String(first.diskRevision).slice(0, 19)}…).`)
+    const res = await fetch(`${EDITOR}/__shreditor/editor-state/save?project=${encodeURIComponent(id)}`, { method: 'POST' })
+    if (!res.ok) throw new Error(`Save request failed: HTTP ${res.status}`)
+    const seconds = Number(opt.timeout ?? 20)
+    const deadline = Date.now() + seconds * 1000
+    let last = first
+    while (Date.now() < deadline) {
+      await new Promise((r) => setTimeout(r, 250))
+      const s = await editorState(id)
+      if (!s?.open) return say('The editor closed while syncing; the saved state is all there is (shred changes shows it).')
+      if (s.conflict) throw new Error(CONFLICT)
+      if (settled(s)) return say(`Saved: the editor's edits are on disk (revision ${String(s.diskRevision).slice(0, 19)}…).`)
+      last = s
+    }
+    throw new Error(`Timed out after ${seconds}s: the editor still has unsaved edits (last edit ${last.lastEditAt ? ago(last.lastEditAt) : 'unknown'}). The user may be mid-drag or in a dialog; ask them to save (Cmd+S), then run shred sync again.`)
   },
 
   async new() {
@@ -190,6 +325,9 @@ const commands = {
     fs.mkdirSync(path.join(workspace(), 'projects', created.id, 'agent', 'passes'), { recursive: true })
     say(created.id)
     say(`${EDITOR}/editor/${created.id}`)
+    // New projects already have V1 and A1: build on these, add tracks only for extra layers.
+    const tracks = [...(created.project?.timeline?.tracks ?? [])].sort((a, b) => a.order - b.order)
+    for (const t of tracks) say(`${t.name.padEnd(3)} ${t.id}  (${t.kind ?? 'video'}, default track: reuse it)`)
   },
 
   async catalog(inputs) {
@@ -287,6 +425,7 @@ const commands = {
   },
 
   async changes([id]) {
+    const editor = await warnUnsaved(id)
     const dir = path.join(workspace(), 'projects', id, 'agent', 'passes')
     const passes = fs.existsSync(dir) ? fs.readdirSync(dir).filter((f) => f.endsWith('.json')).sort() : []
     if (!passes.length) return say('No published passes yet.')
@@ -294,7 +433,7 @@ const commands = {
     const { revision, project } = await getProject(id)
     if (revision === last.resultRevision) return say(`No changes since pass #${Number(last.id)} "${last.label}".`)
     const diff = diffTimelines(last.timeline, project.timeline)
-    if (opt.json) return say(JSON.stringify({ since: last.id, revision, diff }, null, 2))
+    if (opt.json) return say(JSON.stringify({ since: last.id, revision, diff, ...(editor ? { editor } : {}) }, null, 2))
     say(`Since pass #${Number(last.id)} "${last.label}" the user changed ${diff.length} item(s). Treat these as decisions:`)
     for (const d of diff) say(`  ${d.kind.padEnd(7)} ${String(d.from).padStart(5)}  ${d.name}${d.fields ? `  (${d.fields.join(', ')})` : ''}`)
     const notes = path.join(workspace(), 'projects', id, 'agent', 'notes.json')
@@ -306,10 +445,7 @@ const commands = {
     const ws = workspace()
     const log = path.join(os.tmpdir(), 'shreditor-service.log')
     // The service renders and edits through the built app; rebuild after code changes.
-    if (opt.build || !fs.existsSync(path.join(REPO, 'dist', 'headless.html'))) {
-      say('Building Shreditor…')
-      execFileSync('npm', ['run', 'build'], { cwd: REPO, stdio: 'ignore' })
-    }
+    if (!built && (opt.build || !fs.existsSync(path.join(REPO, 'dist', 'headless.html')))) build(opt.build ? 'requested' : 'no build yet')
     const child = spawn(process.execPath, [path.join(REPO, 'headless/serve.mjs'), '--workspace', ws, '--port', new URL(SERVICE).port], {
       cwd: REPO,
       detached: true,
@@ -334,16 +470,17 @@ const commands = {
   },
 
   async project([id]) {
+    const editor = await warnUnsaved(id)
     const { revision, project } = await getProject(id)
     const s = summarize(project)
-    if (opt.json) return say(JSON.stringify({ revision, ...s }, null, 2))
+    if (opt.json) return say(JSON.stringify({ revision, ...s, ...(editor ? { editor } : {}) }, null, 2))
     say(`${project.name}  ${project.metadata?.width}x${project.metadata?.height} @${s.fps}  ${s.end} frames (${(s.end / s.fps).toFixed(2)}s)`)
     say(`revision ${revision}`)
     for (const t of [...s.tracks].sort((x, y) => x.order - y.order)) {
       say(`\n${t.name} (${t.kind ?? 'track'} ${t.id})`)
       for (const i of s.items.filter((x) => x.trackId === t.id).sort((x, y) => x.from - y.from)) {
         const src = i.sourceStart !== undefined ? `  src ${i.sourceStart}-${i.sourceEnd}` : ''
-        say(`  ${String(i.from).padStart(5)}-${String(i.from + i.durationInFrames).padEnd(5)} ${i.type.padEnd(6)} ${i.label ?? i.text ?? ''}${src}  [${i.id}]`)
+        say(`  ${String(i.from).padStart(5)}-${String(i.from + i.durationInFrames).padEnd(5)} ${i.type.padEnd(6)} ${(i.type === 'text' ? JSON.stringify(i.text) : i.label) ?? ''}${src}  [${i.id}]`)
       }
     }
   },
@@ -351,8 +488,30 @@ const commands = {
   async import(files) {
     if (!files.length) throw new Error('Pass one or more file paths')
     const cli = path.join(REPO, 'bin/shreditor.mjs')
-    const out = execFileSync(process.execPath, [cli, 'import', ...files, ...(opt.project ? ['--project', opt.project] : []), ...(opt.link ? ['--link'] : [])], { encoding: 'utf8' })
+    const out = execFileSync(process.execPath, [cli, 'import', ...files, ...(opt.project ? ['--project', opt.project] : []), ...(opt.link ? ['--link'] : []), ...(opt.category ? ['--category', opt.category] : [])], { encoding: 'utf8', env: { ...process.env, SHREDITOR_WORKSPACE: workspace() } })
     say(out.trim())
+  },
+
+  // Through the editor's bridge when it's up, else the same code in-process.
+  async categorize(pairs) {
+    if (!pairs.length) throw new Error('Pass <mediaId>=<category>... or --category <category> <mediaId>...')
+    if (!(await editorUp())) {
+      const cli = path.join(REPO, 'bin/shreditor.mjs')
+      const out = execFileSync(process.execPath, [cli, 'categorize', ...pairs, ...(opt.category ? ['--category', opt.category] : [])], { encoding: 'utf8' })
+      return say(out.trim())
+    }
+    const clear = (c) => (c === 'none' || c === '' ? null : c)
+    const items = pairs.map((arg) => {
+      if (opt.category) return { mediaId: arg, category: clear(opt.category) }
+      const at = arg.lastIndexOf('=')
+      if (at < 1) throw new Error(`Expected <mediaId>=<category>, got ${arg}`)
+      return { mediaId: arg.slice(0, at), category: clear(arg.slice(at + 1)) }
+    })
+    const res = await fetch(`${EDITOR}/__shreditor/media/category`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ items }) })
+    const body = await res.json()
+    if (!res.ok) throw new Error(body.message ?? `HTTP ${res.status}`)
+    for (const c of body.changed) say(`set     ${c.mediaId}  ${c.from ?? 'none'} -> ${c.to ?? 'none'}`)
+    for (const u of body.unchanged) say(`same    ${u.mediaId}  ${u.category ?? 'none'}`)
   },
 
   async draft([id]) {
@@ -417,12 +576,79 @@ const commands = {
     say(`Pass #${Number(n)} "${opt.label}" published to ${targetId}: ${changes.length} changes, revision ${saved.revision}`)
     say(`Editor: ${EDITOR}/editor/${targetId}  (an open editor reloads it within a second; open this link if it isn't showing)`)
   },
+
+  // Clip volume is plain gain with no limiter, so loudness targets are met here,
+  // before import: ffmpeg loudnorm, measure pass then linear pass with the measured
+  // values (it limits true peak itself when linear gain alone would clip).
+  async master([input]) {
+    if (!input) throw new Error('Pass an audio or video file')
+    const src = path.resolve(input)
+    if (!fs.existsSync(src)) throw new Error(`${src} does not exist`)
+    const lufs = Number(opt.lufs)
+    const tp = Number(opt.tp)
+    if (!(lufs >= -70 && lufs <= -5)) throw new Error('--lufs must be between -70 and -5')
+    if (!(tp >= -9 && tp <= 0)) throw new Error('--tp must be between -9 and 0')
+    const out = path.resolve(opt.out ?? path.join(path.dirname(src), `${path.parse(src).name}.mastered.wav`))
+    if (out === src) throw new Error('--out must differ from the input; the original is never overwritten')
+    const before = measureLoudness(src)
+    if (!Number.isFinite(before.i)) throw new Error(`No measurable audio in ${src}`)
+    const runLoudnorm = (filter, outArgs) => {
+      const log = ffmpegLog(['-i', src, '-vn', '-af', `${filter}:print_format=json`, ...outArgs])
+      return JSON.parse(log.slice(log.lastIndexOf('{'), log.lastIndexOf('}') + 1))
+    }
+    const m = runLoudnorm(`loudnorm=I=${lufs}:TP=${tp}:LRA=11`, ['-f', 'null', '-'])
+    // Linear mode needs a target range at least as wide as the source's.
+    const lra = Math.min(50, Math.max(11, Math.ceil(Number(m.input_lra)) + 1))
+    const rate = Number(execFileSync('ffprobe', ['-v', 'error', '-select_streams', 'a:0', '-show_entries', 'stream=sample_rate', '-of', 'csv=p=0', src], { encoding: 'utf8' }).trim()) || 48000
+    // loudnorm limits at 192 kHz and its limiter costs a little loudness, so the file
+    // can land a hair over the ceiling or under the target. Measure the result and
+    // render again with the target and ceiling nudged by the miss (max 4 tries).
+    let aimI = lufs
+    let ceiling = tp
+    let pass2
+    let after
+    for (let attempt = 0; attempt < 4; attempt++) {
+      pass2 = runLoudnorm(
+        `loudnorm=I=${aimI}:TP=${ceiling}:LRA=${lra}:measured_I=${m.input_i}:measured_TP=${m.input_tp}:measured_LRA=${m.input_lra}:measured_thresh=${m.input_thresh}:offset=${m.target_offset}:linear=true`,
+        ['-ar', String(rate), '-c:a', 'pcm_s16le', '-y', out],
+      )
+      after = measureLoudness(out)
+      const iMiss = lufs - after.i
+      const tpOver = after.tp - tp
+      if (Math.abs(iMiss) <= 0.3 && !(tpOver > 0)) break
+      const tenth = (x) => Math.round(x * 10) / 10
+      aimI = tenth(Math.min(-5, Math.max(-70, aimI + iMiss)))
+      if (tpOver > 0) ceiling = tenth(Math.max(-9, ceiling - tpOver - 0.1))
+    }
+    const row = (name, x) => `${name.padEnd(7)} ${x.i.toFixed(1).padStart(6)} LUFS integrated   ${x.tp.toFixed(1).padStart(5)} dBTP true peak   ${x.lra.toFixed(1)} LU range`
+    say(row('before', before))
+    say(row('after', after))
+    say(`target  ${lufs} LUFS, true peak <= ${tp} dBTP (loudnorm ${pass2.normalization_type ?? 'two-pass'}${aimI === lufs && ceiling === tp ? '' : `, aimed ${aimI} LUFS / ceiling ${ceiling}`}; measured with ebur128)`)
+    if (Math.abs(after.i - lufs) > 0.5) say(`warning: integrated is ${(after.i - lufs).toFixed(1)} LU off target (very short or very dynamic source?)`)
+    if (after.tp > tp) say(`warning: true peak ${after.tp.toFixed(1)} dBTP is above ${tp}`)
+    say(`${out}  (original untouched; import this file)`)
+  },
+}
+
+function ffmpegLog(args) {
+  const r = spawnSync('ffmpeg', ['-hide_banner', '-nostats', ...args], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 })
+  if (r.status !== 0) throw new Error(`ffmpeg failed: ${r.stderr.trim().split('\n').slice(-3).join(' ')}`)
+  return r.stderr
+}
+
+/** Integrated loudness, true peak and loudness range from ffmpeg's ebur128 summary. */
+function measureLoudness(file) {
+  const log = ffmpegLog(['-i', file, '-vn', '-filter_complex', 'ebur128=peak=true', '-f', 'null', '-'])
+  const summary = log.slice(log.lastIndexOf('Summary:'))
+  const num = (re) => Number(re.exec(summary)?.[1] ?? Number.NaN)
+  return { i: num(/I:\s+(-?[\d.]+|-inf) LUFS/), tp: num(/Peak:\s+(-?[\d.]+|-inf) dBFS/), lra: num(/LRA:\s+(-?[\d.]+) LU/) }
 }
 
 try {
   const fn = commands[command]
   if (!fn) {
-    say(fs.readFileSync(fileURLToPath(import.meta.url), 'utf8').split('\n').slice(1, 25).map((l) => l.replace(/^\/\/ ?/, '')).join('\n'))
+    const lines = fs.readFileSync(fileURLToPath(import.meta.url), 'utf8').split('\n').slice(1)
+    say(lines.slice(0, lines.findIndex((l) => !l.startsWith('//'))).map((l) => l.replace(/^\/\/ ?/, '')).join('\n'))
     process.exit(command ? 1 : 0)
   }
   await fn(args)

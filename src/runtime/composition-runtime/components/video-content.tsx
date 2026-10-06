@@ -30,6 +30,7 @@ import {
   unregisterDomVideoElement,
 } from '../utils/dom-video-element-registry'
 import { subscribeToWarmupActivity } from '../utils/activity-rewarm'
+import { paintVideoFrameToCanvas, shouldMirrorVideoToCanvas } from '../utils/video-canvas-mirror'
 import { ProResPreviewCanvas } from './prores-preview-canvas'
 import {
   applyVideoElementAudioState,
@@ -104,6 +105,7 @@ const NativePreviewVideo: React.FC<{
   fitMode?: 'contain' | 'fill'
   forceCssComposite?: boolean
   sharedTransitionSync?: boolean
+  mirrorToCanvas?: boolean
 }> = ({
   poolClipId,
   itemId,
@@ -121,6 +123,7 @@ const NativePreviewVideo: React.FC<{
   fitMode = 'contain',
   forceCssComposite = false,
   sharedTransitionSync = false,
+  mirrorToCanvas = false,
 }) => {
   // Get local frame from Sequence context (not global frame from Clock)
   // The Sequence provides localFrame which is 0-based within this sequence
@@ -131,6 +134,8 @@ const NativePreviewVideo: React.FC<{
   const elementRef = useRef<HTMLVideoElement | null>(null)
   const preWarmTimerRef = useRef<number | null>(null)
   const preWarmInFlightRef = useRef(false)
+  // Canvas that presents this lane's frames when mirrorToCanvas is on.
+  const mirrorCanvasRef = useRef<HTMLCanvasElement | null>(null)
   const itemIdRef = useRef(itemId)
   itemIdRef.current = itemId
 
@@ -149,10 +154,12 @@ const NativePreviewVideo: React.FC<{
       preWarmTimerRef.current = null
       const v = elementRef.current
       if (v && v.paused && v.readyState >= 2 && !usePlaybackStore.getState().isPlaying) {
-        const style = window.getComputedStyle(v)
+        // A canvas-mirrored lane is presented by its canvas, not the element.
+        const presented = mirrorCanvasRef.current ?? v
+        const style = window.getComputedStyle(presented)
         const isVisiblyPresented =
-          v.isConnected &&
-          v.getClientRects().length > 0 &&
+          presented.isConnected &&
+          presented.getClientRects().length > 0 &&
           style.display !== 'none' &&
           style.visibility !== 'hidden' &&
           style.opacity !== '0'
@@ -644,6 +651,76 @@ const NativePreviewVideo: React.FC<{
     element.style.backfaceVisibility = ''
     element.style.willChange = ''
   }, [forceCssComposite])
+
+  // Software-decoded video (VP9 alpha included) can stop painting through its
+  // own layer after a tab/pane switch; present it through a canvas instead.
+  // See video-canvas-mirror.ts.
+  useEffect(() => {
+    const container = containerRef.current
+    if (!mirrorToCanvas || !container) return
+    const canvas = document.createElement('canvas')
+    canvas.style.cssText =
+      'position:absolute;top:0;left:0;width:100%;height:100%;display:block;pointer-events:none'
+    canvas.style.objectFit = fitMode
+    container.appendChild(canvas)
+    mirrorCanvasRef.current = canvas
+    const ctx = canvas.getContext('2d')
+
+    let mirrored: HTMLVideoElement | null = null
+    let paintedFrame = -1
+    let needsPaint = true
+    const requestPaint = () => {
+      needsPaint = true
+    }
+    const detach = () => {
+      if (!mirrored) return
+      mirrored.style.opacity = ''
+      mirrored.removeEventListener('seeked', requestPaint)
+      mirrored.removeEventListener('loadeddata', requestPaint)
+      mirrored = null
+    }
+    let rafId = 0
+    // Follow the pooled element as it is swapped; hide its own layer, the
+    // canvas carries its frames.
+    const follow = (video: HTMLVideoElement | null) => {
+      if (video === mirrored) return
+      detach()
+      if (!video) return
+      video.style.opacity = '0'
+      video.addEventListener('seeked', requestPaint)
+      video.addEventListener('loadeddata', requestPaint)
+      mirrored = video
+      needsPaint = true
+    }
+    // currentTime moves every animation frame while playing; repaint once
+    // per source frame.
+    const sourceFrameOf = (video: HTMLVideoElement) => {
+      const fps = sourceFpsRef.current
+      return fps > 0 ? Math.floor(video.currentTime * fps + 1e-3) : video.currentTime
+    }
+    const tick = () => {
+      rafId = requestAnimationFrame(tick)
+      const video = elementRef.current
+      follow(video)
+      // A decoder warm-up plays ahead and then restores the position (which
+      // fires seeked); don't present the decoded-ahead frames.
+      if (!video || !ctx || preWarmInFlightRef.current) return
+      const sourceFrame = sourceFrameOf(video)
+      if (!needsPaint && sourceFrame === paintedFrame) return
+      if (paintVideoFrameToCanvas(video, canvas, ctx)) {
+        paintedFrame = sourceFrame
+        needsPaint = false
+      }
+    }
+    rafId = requestAnimationFrame(tick)
+
+    return () => {
+      cancelAnimationFrame(rafId)
+      detach()
+      canvas.remove()
+      if (mirrorCanvasRef.current === canvas) mirrorCanvasRef.current = null
+    }
+  }, [mirrorToCanvas, containerRef, fitMode])
 
   // Sync video playback with timeline
   // Layout pass handles immediate seeks before paint to avoid one-frame stale
@@ -1192,6 +1269,9 @@ export const VideoContent: React.FC<{
 
   // NativePreviewVideo mounts pooled <video> into this container.
   const containerRef = useRef<HTMLDivElement | null>(null)
+  const mirrorToCanvas = useMediaLibraryStore((s) =>
+    shouldMirrorVideoToCanvas(item.mediaId ? s.mediaById[item.mediaId]?.codec : undefined),
+  )
 
   // Handle media errors (e.g., invalid blob URL after HMR or cache cleanup).
   const handleError = useCallback(
@@ -1294,6 +1374,7 @@ export const VideoContent: React.FC<{
       fitMode="fill"
       forceCssComposite={forceCssComposite}
       sharedTransitionSync={item._sharedTransitionSync === true}
+      mirrorToCanvas={mirrorToCanvas}
     />
   )
 }

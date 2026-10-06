@@ -7,7 +7,9 @@ import test from 'node:test'
 import { createHarnessServer } from './server.mjs'
 import { createMediaServer } from './media-server.mjs'
 import {
+  HttpError,
   assertSinglePathComponent,
+  editOpFailure,
   readJsonBody,
   resolveContained,
   sendHttpError,
@@ -246,4 +248,19 @@ test('aborted file streams are cleaned up and do not poison the server', async (
     await server.close()
     fs.rmSync(root, { recursive: true, force: true })
   }
+})
+
+test('editOpFailure turns a rejected edit op into a 422 with the op message', () => {
+  const browser = new Error(
+    'page.evaluate: Error: Edit op "addText" failed: same-track overlap: callerId "cta" ...\n    at applyOp',
+  )
+  const wrapped = new Error('edit operation failed', { cause: browser })
+  const mapped = editOpFailure(wrapped)
+  assert.ok(mapped instanceof HttpError)
+  assert.equal(mapped.statusCode, 422)
+  assert.equal(mapped.code, 'EDIT_OP_FAILED')
+  assert.equal(mapped.message, 'Edit op "addText" failed: same-track overlap: callerId "cta" ...')
+  assert.equal(editOpFailure(browser).statusCode, 422)
+  const other = new Error('Target page closed')
+  assert.equal(editOpFailure(other), other)
 })

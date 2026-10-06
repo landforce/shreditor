@@ -82,8 +82,7 @@ jobs:
 
       # Quality ratchet: fails only on dead code / complexity / duplication
       # INTRODUCED by the PR (gate new-only), never on inherited issues.
-      # Advisory for now (continue-on-error) — drop that line to enforce once
-      # the current develop-vs-main delta is cleaned up.
+      # Advisory for now (continue-on-error) — drop that line to enforce it.
       - name: Fallow quality ratchet
         if: github.event_name == 'pull_request'
         continue-on-error: true

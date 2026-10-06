@@ -1,6 +1,12 @@
-# FreeCut Web
+# Shreditor
 
-Browser-based multi-track video editor. React 19 + TypeScript + Vite.
+Agent-first video editor built on FreeCut, a browser-based multi-track video editor. React 19 + TypeScript + Vite.
+
+## Shreditor
+
+- The agent side lives in `skills/shreditor-edit/` (the skill and `scripts/shred.mjs`) and `agent/` (the design spec). Read `SKILL.md` and `references/engine.md` before changing the edit loop or the ops it sends
+- Agents edit projects only through `shred` and the edit service. **Never hand-write `project.json`**: it is revision-checked, and the editor reloads or raises a conflict on every external write
+- Internal identifiers (the package name, the `.freecut-workspace.json` marker and similar) still say `freecut` on purpose, so existing workspaces and upstream merges keep working. Don't rename them
 
 ## Environment
 
@@ -13,7 +19,6 @@ Browser-based multi-track video editor. React 19 + TypeScript + Vite.
 
 ## Git
 
-- `main` — production, `staging` — pre-release integration, `develop` — active development
-- Commit work straight to `develop` — do **not** cut feature branches
-- PR target: `staging` (`develop` PRs into `staging`; `staging` is promoted to `main`). Do **not** open PRs against `main` directly
+- Single branch: work on `main`. There is no `develop` or `staging` flow here
 - Conventional commits — `type(scope): description` (e.g. `fix(timeline):`, `feat(export):`)
+- `upstream` is FreeCut (walterlow/freecut). Pull its fixes with `git fetch upstream && git merge upstream/main`

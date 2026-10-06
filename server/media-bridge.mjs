@@ -29,6 +29,19 @@
 //       curl -X POST http://localhost:5273/__shreditor/media/import \
 //         -d '{"paths":["/Volumes/Card/A001.mov"],"projectId":"<project id>"}'
 //     Also available as `shreditor import <file...> [--project <id>]`.
+//     Optional `category` (see below) is written into each file's metadata.
+//
+//   POST media/category  { items: [{ mediaId, category }] }
+//     Sets each media's category in media/{id}/metadata.json: 'speaker',
+//     'b-roll', 'graphics', 'overlay', 'voiceover', 'music', 'sfx', 'other',
+//     or null to clear it. All items are checked before anything is written.
+//     Returns { changed: [{ mediaId, from, to }], unchanged: [{ mediaId, category }] }.
+//     Also available as `shreditor categorize <mediaId>=<category>...`.
+//
+//   GET media/version?projectId=<id>
+//     A cheap change stamp for a project's media (media-links.json plus each
+//     linked metadata.json). The open editor polls it to pick up imports and
+//     category changes made outside the tab.
 //
 // `mode` is 'auto' (default: clone, else link), 'clone' (fail if cloning is
 // unavailable) or 'link' (always reference the original).
@@ -37,6 +50,8 @@ import crypto from 'node:crypto'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
+import { prepareCompatibleMedia } from './media-compatibility.mjs'
+import { resolveMediaFile } from '../headless/lib/workspace.mjs'
 
 const SOURCE_LINK_FILENAME = 'source.link.json'
 
@@ -71,6 +86,12 @@ const MIME_BY_EXT = {
 }
 
 const MODES = new Set(['auto', 'clone', 'link'])
+
+// Mirrors MediaCategory in src/types/storage.ts.
+export const MEDIA_CATEGORIES = ['speaker', 'b-roll', 'graphics', 'overlay', 'voiceover', 'music', 'sfx', 'other']
+const CATEGORY_SET = new Set(MEDIA_CATEGORIES)
+
+const ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/
 
 class MediaBridgeError extends Error {
   constructor(status, name, message) {
@@ -389,8 +410,11 @@ function associateWithProject(root, projectId, mediaId, resolveInside) {
  * metadata.json and thumbnail, and associate it with `projectId` if given.
  * Used by the HTTP route and by `shreditor import`.
  */
-export async function importMediaByPath(root, paths, { projectId, mode = 'auto', resolveInside } = {}) {
+export async function importMediaByPath(root, paths, { projectId, mode = 'auto', category, resolveInside } = {}) {
   if (!Array.isArray(paths) || paths.length === 0) throw new MediaBridgeError(400, 'TypeError', 'paths must be a non-empty array')
+  if (category !== undefined && category !== null && !CATEGORY_SET.has(category)) {
+    throw new MediaBridgeError(400, 'TypeError', `category must be one of ${MEDIA_CATEGORIES.join(', ')}`)
+  }
   const inside = resolveInside ?? defaultResolveInside
   if (projectId) {
     // Fail before placing anything when the project doesn't exist.
@@ -408,6 +432,10 @@ export async function importMediaByPath(root, paths, { projectId, mode = 'auto',
       )
       if (duplicate) {
         if (projectId) associateWithProject(root, projectId, duplicate.id, inside)
+        if (category && duplicate.category !== category) {
+          setMediaCategories(root, [{ mediaId: duplicate.id, category }], { resolveInside: inside })
+          duplicate.category = category
+        }
         results.push({ id: duplicate.id, fileName: duplicate.fileName, duplicate: true, sourcePath: source.real, metadata: duplicate })
         continue
       }
@@ -417,7 +445,10 @@ export async function importMediaByPath(root, paths, { projectId, mode = 'auto',
       try {
         const readable = placed.method === 'clone' ? path.join(dir, placed.entryName) : placed.sourcePath
         const probed = await probe(readable)
-        const details = metadataFromProbe(probed, placed.mimeType)
+        const prepared = placed.mimeType.startsWith('video/') && probed
+          ? await prepareCompatibleMedia(readable, dir) : null
+        const effectiveMime = prepared ? (prepared.manifest.policy.alpha ? 'video/quicktime' : 'video/mp4') : placed.mimeType
+        const details = metadataFromProbe(prepared?.manifest.probe ?? probed, effectiveMime)
         const hasThumbnail = await writeThumbnail(readable, dir, details, placed.mimeType)
         const now = Date.now()
         const metadata = {
@@ -426,10 +457,12 @@ export async function importMediaByPath(root, paths, { projectId, mode = 'auto',
           fileName: placed.fileName,
           fileSize: placed.size,
           fileLastModified: placed.mtimeMs,
-          mimeType: placed.mimeType,
+          mimeType: effectiveMime,
           ...details,
+          ...(prepared ? { compatibility: { version: 1, backend: 'native', reason: prepared.manifest.policy.reason, alpha: prepared.manifest.policy.alpha, originalMimeType: placed.mimeType } } : {}),
           ...(hasThumbnail ? { thumbnailId: crypto.randomUUID() } : {}),
           tags: [],
+          ...(category ? { category } : {}),
           createdAt: now,
           updatedAt: now,
         }
@@ -458,6 +491,78 @@ export async function importMediaByPath(root, paths, { projectId, mode = 'auto',
   return results
 }
 
+/**
+ * Set (or clear, with null) the category of each media. Every item is
+ * validated, and every media must exist, before any metadata.json is
+ * written. Used by the HTTP route and by `shreditor categorize`.
+ * @param {Array<{ mediaId: string, category: string | null }>} items
+ */
+export function setMediaCategories(root, items, { resolveInside } = {}) {
+  if (!Array.isArray(items) || items.length === 0) throw new MediaBridgeError(400, 'TypeError', 'items must be a non-empty array')
+  const inside = resolveInside ?? defaultResolveInside
+  const planned = new Map()
+  items.forEach((item, index) => {
+    const mediaId = item?.mediaId
+    if (typeof mediaId !== 'string' || !ID_PATTERN.test(mediaId)) {
+      throw new MediaBridgeError(400, 'TypeError', `items[${index}].mediaId is invalid`)
+    }
+    const category = item.category ?? null
+    if (category !== null && !CATEGORY_SET.has(category)) {
+      throw new MediaBridgeError(400, 'TypeError', `items[${index}].category must be one of ${MEDIA_CATEGORIES.join(', ')} (or null to clear)`)
+    }
+    const file = path.join(inside(root, `media/${mediaId}`), 'metadata.json')
+    if (!fs.existsSync(file)) throw new MediaBridgeError(404, 'NotFoundError', `Media not found: ${mediaId}`)
+    planned.set(mediaId, { category, file })
+  })
+  const changed = []
+  const unchanged = []
+  for (const [mediaId, { category, file }] of planned) {
+    const metadata = JSON.parse(fs.readFileSync(file, 'utf8'))
+    const from = metadata.category ?? null
+    if (from === category) {
+      unchanged.push({ mediaId, category })
+      continue
+    }
+    const next = { ...metadata, updatedAt: Date.now() }
+    if (category) next.category = category
+    else delete next.category
+    writeJsonAtomic(file, next)
+    changed.push({ mediaId, from, to: category })
+  }
+  return { changed, unchanged }
+}
+
+/**
+ * Change stamp for a project's media: the newest modified time and count of
+ * media-links.json plus every linked metadata.json. Any import, removal or
+ * metadata write (a category change) moves it.
+ */
+export function projectMediaVersion(root, projectId, { resolveInside } = {}) {
+  const inside = resolveInside ?? defaultResolveInside
+  const projectDir = inside(root, `projects/${projectId}`)
+  if (!fs.existsSync(path.join(projectDir, 'project.json'))) {
+    throw new MediaBridgeError(404, 'NotFoundError', `Project not found: ${projectId}`)
+  }
+  const mtime = (file) => fs.statSync(file, { throwIfNoEntry: false })?.mtimeMs ?? 0
+  const linksFile = path.join(projectDir, 'media-links.json')
+  let ids = []
+  try {
+    const links = JSON.parse(fs.readFileSync(linksFile, 'utf8'))
+    if (Array.isArray(links?.mediaIds)) ids = links.mediaIds.map((entry) => (typeof entry === 'string' ? entry : entry?.id))
+  } catch {
+    // no media yet
+  }
+  let newest = mtime(linksFile)
+  let present = 0
+  for (const id of ids) {
+    if (typeof id !== 'string' || !ID_PATTERN.test(id)) continue
+    const at = mtime(path.join(root, 'media', id, 'metadata.json'))
+    if (at) present += 1
+    newest = Math.max(newest, at)
+  }
+  return `${ids.length}.${present}.${Math.round(newest)}`
+}
+
 function defaultResolveInside(root, rel) {
   const full = path.join(root, ...String(rel).split('/').filter(Boolean))
   if (full !== root && !full.startsWith(root + path.sep)) throw new MediaBridgeError(403, 'SecurityError', 'Outside the workspace')
@@ -481,13 +586,13 @@ export function createMediaRoutes({ resolveInside, sendJson, readBody, serveFile
   }
   const projectIdOf = (value) => {
     if (value === undefined || value === null || value === '') return undefined
-    if (typeof value !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(value)) {
+    if (typeof value !== 'string' || !ID_PATTERN.test(value)) {
       throw new MediaBridgeError(400, 'TypeError', 'Invalid projectId')
     }
     return value
   }
 
-  return async function handleMediaRoute(req, res, { route, rel, root }) {
+  return async function handleMediaRoute(req, res, { route, rel, root, query }) {
     switch (route) {
       case 'POST media/choose': {
         const { mode = 'auto' } = await readJson(req)
@@ -510,9 +615,49 @@ export function createMediaRoutes({ resolveInside, sendJson, readBody, serveFile
         const media = await importMediaByPath(root, paths, {
           projectId: projectIdOf(body.projectId),
           mode: body.mode ?? 'auto',
+          category: body.category,
           resolveInside,
         })
         sendJson(res, media.some((m) => !m.error) ? 200 : 422, { media })
+        return true
+      }
+      case 'POST media/prepare': {
+        const body = await readJson(req)
+        if (typeof body.mediaId !== 'string' || !ID_PATTERN.test(body.mediaId)) throw new MediaBridgeError(400, 'TypeError', 'Invalid mediaId')
+        const source = resolveMediaFile(root, body.mediaId, { original: true })
+        if (!source) throw new MediaBridgeError(404, 'NotFoundError', 'Media source is missing')
+        const controller = new AbortController()
+        const cancel = () => { if (!res.writableEnded) controller.abort() }
+        res.once('close', cancel)
+        try {
+          const prepared = await prepareCompatibleMedia(source, path.join(root, 'media', body.mediaId), { force: body.force === true, signal: controller.signal })
+          if (prepared) {
+            const metadataPath = path.join(root, 'media', body.mediaId, 'metadata.json')
+            if (fs.existsSync(metadataPath)) {
+              const previous = JSON.parse(fs.readFileSync(metadataPath, 'utf8'))
+              const mimeType = prepared.manifest.policy.alpha ? 'video/quicktime' : 'video/mp4'
+              writeJsonAtomic(metadataPath, { ...previous, ...metadataFromProbe(prepared.manifest.probe, mimeType), mimeType,
+                compatibility: { version: 1, backend: 'native', reason: prepared.manifest.policy.reason, alpha: prepared.manifest.policy.alpha },
+                updatedAt: Date.now() })
+            }
+          }
+          sendJson(res, 200, prepared ? {
+            prepared: true, cached: prepared.cached,
+            url: `/__shreditor/fs/file?path=${encodeURIComponent(`media/${body.mediaId}/cache/compatibility/${prepared.manifest.file}`)}`,
+            alpha: prepared.manifest.policy.alpha,
+          } : { prepared: false })
+        } finally { res.off('close', cancel) }
+        return true
+      }
+      case 'POST media/category': {
+        const body = await readJson(req)
+        sendJson(res, 200, setMediaCategories(root, body.items, { resolveInside }))
+        return true
+      }
+      case 'GET media/version': {
+        const projectId = projectIdOf(query?.get('projectId'))
+        if (!projectId) throw new MediaBridgeError(400, 'TypeError', 'projectId is required')
+        sendJson(res, 200, { version: projectMediaVersion(root, projectId, { resolveInside }) })
         return true
       }
       // Linked media: answer for the virtual source file in media/{id}/.

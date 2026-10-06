@@ -49,7 +49,20 @@
         "liveAction": "Realfilm",
         "animation": "Anime",
         "threeD": "3D-Rendering"
-      }
+      },
+      "menuCategory": "Kategorie",
+      "clearCategory": "Kategorie entfernen"
+    },
+    "category": {
+      "speaker": "Sprecher",
+      "b-roll": "B-Roll",
+      "graphics": "Grafiken",
+      "overlay": "Overlays",
+      "voiceover": "Voiceover",
+      "music": "Musik",
+      "sfx": "SFX",
+      "other": "Sonstiges",
+      "uncategorized": "Ohne Kategorie"
     },
     "compositions": {
       "compositionsGroup": "Kompositionen",
@@ -147,8 +160,6 @@
       "generatingProxies": "Proxys werden erstellt…",
       "generatingTranscripts": "Transkripte werden erstellt…",
       "groupAnalyzing": "Wird analysiert",
-      "groupBroll": "B-Roll",
-      "groupSpeaker": "Sprecher",
       "interpolatingFrames": "Frames werden interpoliert…",
       "interpolationProgress": "Frame-Interpolation-Fortschritt",
       "timeRemaining": "noch {{time}}",

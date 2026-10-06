@@ -1,3 +1,4 @@
+import { probeFrameDecoding, probeDomPlayback } from '@/infrastructure/browser/media-capability'
 /**
  * Media Processor Web Worker
  *
@@ -28,6 +29,7 @@ interface MediabunnyVideoTrack {
   codec: string
   computePacketStats(count: number): Promise<{ averagePacketRate: number } | null>
   canDecode?: () => Promise<boolean>
+  getCodecParameterString?: () => Promise<string>
 }
 
 interface MediabunnyAudioTrack {
@@ -450,13 +452,22 @@ async function extractVideoMetadata(
     // decodable by us (via the registered @mediabunny/prores decoder, which flips
     // canDecode() to true) but is NOT playable in a <video> element, so it must be forced
     // false here. Other codecs WebCodecs can't decode still report canDecode() === false.
-    // Assume supported if the probe is absent or throws.
-    const videoCodecSupported =
+    // Unknown probe results must use the controlled frame-decoder path.
+    const frameCapability = await probeFrameDecoding(videoTrack)
+    const codecString = await videoTrack.getCodecParameterString?.().catch(() => undefined)
+    const domCapability =
       videoTrack.codec === 'prores'
-        ? false
-        : videoTrack.canDecode
-          ? await videoTrack.canDecode().catch(() => true)
-          : true
+        ? 'unsupported'
+        : codecString
+          ? await probeDomPlayback({
+              contentType: `${file.type || 'video/mp4'}; codecs="${codecString}"`,
+              width: videoTrack.displayWidth,
+              height: videoTrack.displayHeight,
+              bitrate: 1_000_000,
+              framerate: fps || 30,
+            })
+          : 'unknown'
+    const videoCodecSupported = domCapability === 'supported' && frameCapability !== 'unsupported'
 
     // Compute average GOP interval from keyframe timestamps
     let gopInterval: number | undefined

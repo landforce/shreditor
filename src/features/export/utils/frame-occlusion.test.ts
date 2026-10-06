@@ -75,9 +75,23 @@ describe('isItemFullyOccluding', () => {
     expect(isItemFullyOccluding(makeVideoItem(), 0, makeContext())).toBe(true)
   })
 
-  it('returns true for a full-cover opaque image', () => {
-    const image = { ...makeVideoItem(), type: 'image' } as unknown as ImageItem
+  it('returns true for a full-cover JPEG image', () => {
+    const image = { ...makeVideoItem(), type: 'image', label: 'photo.JPG' } as unknown as ImageItem
     expect(isItemFullyOccluding(image, 0, makeContext())).toBe(true)
+  })
+
+  it('returns false for a full-cover image that can carry alpha (PNG cutout)', () => {
+    // A full-canvas PNG with a transparent surround must not cull the layers
+    // below, or its transparent pixels show the black base fill.
+    const png = { ...makeVideoItem(), type: 'image', label: 'cutout.png' } as unknown as ImageItem
+    expect(isItemFullyOccluding(png, 0, makeContext())).toBe(false)
+    const unnamed = {
+      ...makeVideoItem(),
+      type: 'image',
+      label: 'Logo',
+      src: 'blob:abc',
+    } as unknown as ImageItem
+    expect(isItemFullyOccluding(unnamed, 0, makeContext())).toBe(false)
   })
 
   it('returns false for non-opaque item types (text)', () => {
@@ -122,7 +136,7 @@ describe('isItemFullyOccluding', () => {
   })
 
   it('ignores the transparent-source check for images (video-only)', () => {
-    const image = { ...makeVideoItem(), type: 'image' } as unknown as ImageItem
+    const image = { ...makeVideoItem(), type: 'image', label: 'photo.jpg' } as unknown as ImageItem
     const ctx = makeContext({ hasTransparentVideoSource: () => true })
     expect(isItemFullyOccluding(image, 0, ctx)).toBe(true)
   })

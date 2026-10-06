@@ -46,14 +46,15 @@
     "headless:serve": "node headless/serve.mjs",
     "headless:agent": "node headless/agent.mjs",
     "headless:test": "npm run build && npm run headless:test:portable",
-    "headless:test:node": "node --test headless/*.test.mjs",
+    "headless:test:node": "node --test headless/*.test.mjs server/*.test.mjs",
     "headless:test:chrome": "node headless/test.mjs --skip-build && node headless/edit-operations.mjs && node headless/lifecycle-e2e.mjs",
     "headless:test:media": "node headless/media-test.mjs",
     "headless:test:portable": "npm run headless:test:node && npm run headless:test:chrome && npm run headless:test:media",
     "headless:gpu:probe": "node headless/probe.mjs",
     "changelog:append": "node scripts/changelog-append.mjs",
     "changelog:rollup": "node scripts/changelog-rollup.mjs",
-    "prepare": "vp config"
+    "prepare": "vp config",
+    "headless:test:compatibility": "node --test server/media-compatibility.test.mjs && node headless/media-compatibility-browser.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "5.2.2",

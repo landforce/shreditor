@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, useEffect, useCallback, memo } from 'react'
+import { useState, useMemo, useRef, useEffect, useCallback, memo, type CSSProperties } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Loader2, Upload, AlertTriangle } from 'lucide-react'
 import { createLogger } from '@/shared/logging/logger'
@@ -50,6 +50,34 @@ export const ListMediaGrid = memo(function ListMediaGrid(props: MediaGridProps) 
   return <MediaGridBase {...props} layout="list" />
 })
 
+/**
+ * Justified rows: each cell grows in proportion to its aspect so every card in
+ * a row lands on the same height while keeping its own shape.
+ */
+function getJustifiedCellStyle(
+  layout: MediaGridBaseProps['layout'],
+  media: MediaMetadata,
+  itemSize: number,
+): CSSProperties | undefined {
+  if (layout !== 'grid') return undefined
+  const aspect = getMediaCardAspect(media)
+  const rowHeight = GRID_ROW_HEIGHT_PX[itemSize] ?? GRID_ROW_HEIGHT_PX[3]!
+  return {
+    flex: `${aspect} 1 ${aspect * rowHeight}px`,
+    minWidth: 0,
+    // A row holding one wide card must not balloon to the panel width
+    maxWidth: `${aspect * rowHeight * 1.4}px`,
+  }
+}
+
+function getGridContainerClass(layout: MediaGridBaseProps['layout'], itemSize: number): string {
+  return layout === 'grid'
+    ? `flex flex-wrap ${GRID_GAP_BY_SIZE[itemSize] ?? GRID_GAP_BY_SIZE[3]} after:content-[''] after:grow-[1000000]`
+    : 'space-y-1'
+}
+
+// Pre-existing size (cyclomatic 14 on main, 12 here); covered by media-grid.test.tsx
+// fallow-ignore-next-line complexity
 const MediaGridBase = memo(function MediaGridBase({
   onMediaSelect,
   layout,
@@ -273,35 +301,15 @@ const MediaGridBase = memo(function MediaGridBase({
           </button>
         </div>
       ) : (
-        <div
-          className={
-            layout === 'grid'
-              ? `flex flex-wrap ${GRID_GAP_BY_SIZE[itemSize] ?? GRID_GAP_BY_SIZE[3]} after:content-[''] after:grow-[1000000]`
-              : 'space-y-1'
-          }
-        >
+        <div className={getGridContainerClass(layout, itemSize)}>
           {filteredItems.map((media) => {
             const handlers = cardHandlersById.get(media.id)
             const Card = layout === 'grid' ? GridMediaCard : ListMediaCard
-            // Justified rows: grow in proportion to aspect so every card in a
-            // row lands on the same height while keeping its own shape.
-            const aspect = getMediaCardAspect(media)
-            const rowHeight = GRID_ROW_HEIGHT_PX[itemSize] ?? GRID_ROW_HEIGHT_PX[3]!
-
             return (
               <div
                 key={media.id}
                 data-media-id={media.id}
-                style={
-                  layout === 'grid'
-                    ? {
-                        flex: `${aspect} 1 ${aspect * rowHeight}px`,
-                        minWidth: 0,
-                        // A row holding one wide card must not balloon to the panel width
-                        maxWidth: `${aspect * rowHeight * 1.4}px`,
-                      }
-                    : undefined
-                }
+                style={getJustifiedCellStyle(layout, media, itemSize)}
               >
                 <Card
                   media={media}

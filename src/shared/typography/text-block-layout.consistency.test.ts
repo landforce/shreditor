@@ -146,6 +146,31 @@ describe('layoutTextBlock', () => {
     expect(bg.x).toBeCloseTo(800 / 2 - bg.width / 2)
     expect(bg.radius).toBe(12)
   })
+
+  it("fills the whole item box with backgroundMode 'box', text laid out inside", () => {
+    const style = {
+      text: 'hi there',
+      fontSize: 40,
+      backgroundColor: '#ffffff',
+      backgroundRadius: 500,
+      textPadding: 24,
+      textAlign: 'left' as const,
+    }
+    const hug = layoutTextBlock(baseTextItem(style), 800, 200, makeMeasurer())
+    const box = layoutTextBlock(
+      baseTextItem({ ...style, backgroundMode: 'box' }),
+      800,
+      200,
+      makeMeasurer(),
+    )
+    // Default mode still hugs the line.
+    expect(hug.background!.width).toBeCloseTo(hug.lines[0]!.width + 24 * 2)
+    // Box mode: the panel is the transform box; radius clamps to a pill.
+    expect(box.background).toEqual({ x: 0, y: 0, width: 800, height: 200, radius: 100 })
+    // Text geometry is unchanged by the background mode.
+    expect(box.lines[0]!.startX).toBeCloseTo(24)
+    expect(box.lines[0]!.baselineY).toBeCloseTo(hug.lines[0]!.baselineY)
+  })
 })
 
 describe('inline span flow (spanLayout: inline)', () => {
@@ -234,7 +259,12 @@ describe('inline span flow (spanLayout: inline)', () => {
       textSpans: [{ text: '  раз два', color: '#ffffff' }],
     })
     // Narrow enough to force a break between the two words.
-    const layout = layoutTextBlock(item, makeMeasurer().measure('  раз', '58px x', 0) + 1, 400, makeMeasurer())
+    const layout = layoutTextBlock(
+      item,
+      makeMeasurer().measure('  раз', '58px x', 0) + 1,
+      400,
+      makeMeasurer(),
+    )
 
     expect(layout.lines).toHaveLength(2)
     // Paragraph indent survives on the first line...

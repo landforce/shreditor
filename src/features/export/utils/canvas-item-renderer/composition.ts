@@ -9,6 +9,7 @@ import { hasMediaCrop } from '@/shared/utils/media-crop'
 import { applyPreviewPathVerticesToShape } from '@/features/export/deps/composition-runtime'
 import { hasCornerPin } from '@/features/export/deps/composition-runtime'
 import { getAnimatedCrop, getAnimatedTransform } from '../canvas-keyframes'
+import { isOpaqueImageFormat } from '../frame-occlusion'
 import {
   renderEffectsFromMaskedSource,
   getAdjustmentLayerEffects,
@@ -457,6 +458,7 @@ function isSubCompFullyOccludingItem(
   // pre-composition would reveal the black base fill instead of the clip below.
   if (item.type === 'video' && rctx.videoExtractors.get(item.id)?.getCanBeTransparent())
     return false
+  if (item.type === 'image' && !isOpaqueImageFormat(item)) return false
   if (item.blendMode && item.blendMode !== 'normal') return false
   if (hasCornerPin(item.cornerPin)) return false
   // Use the same preview-override path as the renderer above. Otherwise a

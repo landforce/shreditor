@@ -22,6 +22,7 @@ import { useMediaPreparationStore } from './media-preparation-store'
 import {
   getTranscriptMediaIds,
   hasMediaSource,
+  updateMedia,
   validateMediaHandle,
 } from '@/infrastructure/storage'
 import { scanWorkspaceMediaHealth } from '../utils/workspace-health'
@@ -262,14 +263,6 @@ const newStore: MediaLibraryStoreApi =
               [...transcriptStatus.values()].filter((s) => s === 'ready').length,
             )
 
-            // Background transcription + visual analysis for new video
-            // (gated by the autoAnalyzeMediaOnOpen setting).
-            void import('../services/auto-media-analysis')
-              .then(({ scheduleAutoMediaAnalysis }) => scheduleAutoMediaAnalysis(currentProjectId))
-              .catch((error) =>
-                logger.warn('[MediaLibraryStore] Auto media analysis unavailable:', error),
-              )
-
             // Load existing proxies from OPFS and clean up interrupted/failed entries.
             try {
               await initializeProxyState(mediaItems)
@@ -283,6 +276,57 @@ const newStore: MediaLibraryStoreApi =
             const errorMessage = error instanceof Error ? error.message : 'Failed to load media'
             set({ error: errorMessage, isLoading: false })
             throw error
+          }
+        },
+
+        refreshMediaItems: async () => {
+          const { currentProjectId, isLoading } = get()
+          if (!currentProjectId || isLoading) return
+          const { mediaLibraryService } = await loadMediaLibraryService()
+          const fresh = await mediaLibraryService.getMediaForProject(currentProjectId)
+          const state = get()
+          if (state.currentProjectId !== currentProjectId) return
+
+          const freshIds = new Set(fresh.map((item) => item.id))
+          const knownIds = new Set(state.mediaItems.map((item) => item.id))
+          // Keep placeholders of imports still running in this tab.
+          const pending = state.mediaItems.filter(
+            (item) => state.importingIds.includes(item.id) && !freshIds.has(item.id),
+          )
+          const added = fresh.filter((item) => !knownIds.has(item.id))
+          set({ mediaItems: [...pending, ...fresh] })
+          if (added.length === 0) return
+
+          void mediaLibraryService
+            .prefetchThumbnails(added.map((m) => ({ id: m.id, thumbnailId: m.thumbnailId })))
+            .catch((error) => logger.warn('[MediaLibraryStore] Thumbnail prefetch failed:', error))
+          void get().scanMediaHealth()
+          const addedStatus = await loadTranscriptStatusMap(added)
+          set((s) => ({ transcriptStatus: new Map([...s.transcriptStatus, ...addedStatus]) }))
+          try {
+            await initializeProxyState(added)
+          } catch (error) {
+            logger.warn('[MediaLibraryStore] Proxy initialization failed:', error)
+          }
+        },
+
+        setMediaCategory: async (mediaIds, category) => {
+          const ids = new Set(mediaIds)
+          if (ids.size === 0) return
+          const updatedAt = Date.now()
+          set((state) => ({
+            mediaItems: state.mediaItems.map((item) =>
+              ids.has(item.id) ? { ...item, category: category ?? undefined, updatedAt } : item,
+            ),
+          }))
+          try {
+            await Promise.all(
+              [...ids].map((id) => updateMedia(id, { category: category ?? undefined, updatedAt })),
+            )
+          } catch (error) {
+            logger.error('[MediaLibraryStore] Failed to save media category:', error)
+            set({ error: 'Failed to save the media category' })
+            await get().refreshMediaItems()
           }
         },
 

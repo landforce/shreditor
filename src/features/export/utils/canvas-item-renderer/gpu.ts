@@ -1488,6 +1488,7 @@ function getGpuTextTextureCacheKey(item: TextItem, width: number, height: number
     color: item.color,
     backgroundColor: item.backgroundColor,
     backgroundRadius: item.backgroundRadius,
+    backgroundMode: item.backgroundMode,
     textAlign: item.textAlign,
     verticalAlign: item.verticalAlign,
     lineHeight: item.lineHeight,

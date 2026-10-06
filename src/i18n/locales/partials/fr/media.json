@@ -49,7 +49,20 @@
         "liveAction": "Prises de vues réelles",
         "animation": "Anime",
         "threeD": "Rendu 3D"
-      }
+      },
+      "menuCategory": "Catégorie",
+      "clearCategory": "Retirer la catégorie"
+    },
+    "category": {
+      "speaker": "Intervenant",
+      "b-roll": "B-roll",
+      "graphics": "Graphiques",
+      "overlay": "Superpositions",
+      "voiceover": "Voix off",
+      "music": "Musique",
+      "sfx": "SFX",
+      "other": "Autre",
+      "uncategorized": "Sans catégorie"
     },
     "compositions": {
       "compositionsGroup": "Compositions",
@@ -147,8 +160,6 @@
       "generatingProxies": "Génération des proxys…",
       "generatingTranscripts": "Génération des transcriptions…",
       "groupAnalyzing": "Analyse en cours",
-      "groupBroll": "B-roll",
-      "groupSpeaker": "Intervenant",
       "interpolatingFrames": "Interpolation des images…",
       "interpolationProgress": "Progression de l'interpolation des images",
       "timeRemaining": "{{time}} restant",
