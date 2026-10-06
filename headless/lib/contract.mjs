@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { z } from 'zod'
 import { FORMAT_IDS, getFormat } from '../../formats/registry.mjs'
+import { TEXT_STYLE_ROLES, captionRulesSchema, textStyleInputSchema } from './text-styles.mjs'
 
 export const HEADLESS_API_VERSION = 1
 
@@ -130,6 +131,9 @@ const opSchemas = [
       fontWeight: z.enum(['medium', 'semibold', 'bold']).optional(),
       textAlign: z.enum(['left', 'center', 'right']).optional(),
       verticalAlign: z.enum(['top', 'middle', 'bottom']).optional(),
+      // A project or library text style (id or name): look, layout, motion and
+      // default length; the fields above win and are recorded as overrides.
+      styleId: z.string().min(1).optional(),
     })
     .strict(),
   z
@@ -262,6 +266,30 @@ const opSchemas = [
       ),
     })
     .strict(),
+  z.object({ op: z.literal('applyTextStyle'), ids: z.array(id).min(1), styleId: z.string().min(1) }).strict(),
+  z.union([
+    z.object({ op: z.literal('upsertTextStyle'), style: textStyleInputSchema }).strict(),
+    z
+      .object({
+        op: z.literal('upsertTextStyle'),
+        fromItemId: id,
+        name: z.string().trim().min(1).max(80),
+        role: z.enum(TEXT_STYLE_ROLES),
+        id: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/).optional(),
+        description: z.string().max(500).optional(),
+        caption: captionRulesSchema.optional(),
+      })
+      .strict(),
+  ]),
+  z
+    .object({
+      op: z.literal('addCaptions'),
+      clipId: id,
+      styleId: z.string().min(1),
+      trackId: id.optional(),
+      replace: z.boolean().optional(),
+    })
+    .strict(),
 ]
 
 export const EDIT_OPERATION_NAMES = [
@@ -286,6 +314,9 @@ export const EDIT_OPERATION_NAMES = [
   'removeEffect',
   'updateEffect',
   'setTransform',
+  'applyTextStyle',
+  'upsertTextStyle',
+  'addCaptions',
 ]
 const EDIT_OPERATION_DESCRIPTIONS = Object.fromEntries(
   EDIT_OPERATION_NAMES.map((name) => [name, samplesDescription(name)]),
@@ -314,6 +345,9 @@ function samplesDescription(name) {
     removeEffect: 'Remove an existing item effect',
     updateEffect: "Change an effect's params (merged) or turn it on/off",
     setTransform: 'Update an item transform',
+    applyTextStyle: 'Link text items to a text style and give them its look',
+    upsertTextStyle: "Add or replace a project text style (or save one from an item's look); restyles its items",
+    addCaptions: "Caption a clip from its transcript with a caption style, on the captions track",
   }
   return descriptions[name]
 }
@@ -449,6 +483,8 @@ export const lifecycleEditRequestSchema = z
       'rightClipId',
       'effectId',
       'mediaId',
+      'clipId',
+      'fromItemId',
     ])
     for (let index = 0; index < value.ops.length; index++) {
       const callerId = value.ops[index]?.callerId

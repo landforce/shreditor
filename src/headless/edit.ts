@@ -57,6 +57,8 @@ import {
 } from '@/features/timeline/stores/timeline-actions'
 import { getGpuEffect } from '@/infrastructure/gpu-effects'
 import { timelineItemProblem } from '@/features/project-bundle/schemas/project-schema'
+import { runTextStyleOp, setTextStyleEditInput, styleNewTextItem } from './text-style-ops'
+import type { TextStyleEditInput } from './text-style-ops'
 import {
   assertItemPlacement,
   assertNoTrackOverlap,
@@ -89,6 +91,9 @@ export type EditOperationName =
   | 'removeEffect'
   | 'updateEffect'
   | 'setTransform'
+  | 'applyTextStyle'
+  | 'upsertTextStyle'
+  | 'addCaptions'
 
 /** A wire operation. Node validates its discriminator and fields before this browser boundary. */
 export type EditOp = Record<string, unknown> & { op: EditOperationName }
@@ -98,6 +103,10 @@ export interface HeadlessEditInput {
   ops: EditOp[]
   /** MediaMetadata for any media referenced by ops (e.g. addClip), keyed for codec/fps/duration lookups. */
   media?: Array<{ mediaId: string; metadata?: MediaMetadata }>
+  /** Library text styles the ops name by styleId (copied into the project on use). */
+  textStyleLibrary?: TextStyleEditInput['library']
+  /** Built-in transcripts of the media addCaptions captions. */
+  transcripts?: TextStyleEditInput['transcripts']
 }
 
 export interface HeadlessEditResult {
@@ -129,6 +138,8 @@ const REFERENCE_ID_FIELDS = new Set([
   'rightClipId',
   'effectId',
   'mediaId',
+  'clipId',
+  'fromItemId',
 ])
 
 function resolveOperationRefs(
@@ -404,7 +415,7 @@ function applyOp(op: EditOp): unknown {
   const context: OverlapContext = { op: op.op, callerId: asString(op.callerId) }
   switch (op.op) {
     case 'addText': {
-      const item = buildTextItem(op)
+      const item = styleNewTextItem(buildTextItem(op), op)
       addItemExactly(context, item, quoted('text', item.text))
       return { id: item.id }
     }
@@ -786,8 +797,11 @@ function applyOp(op: EditOp): unknown {
       updateItemTransform(id, op.transform as Partial<TransformProperties>)
       return { id }
     }
-    default:
+    default: {
+      const handled = runTextStyleOp(op, context)
+      if (handled) return handled.result
       throw new Error(`Unknown edit op: ${String(op.op)}`)
+    }
   }
 }
 
@@ -826,6 +840,11 @@ export async function editProject(input: HeadlessEditInput): Promise<HeadlessEdi
   }
   await hydrateTimelineStoresFromProject(migrated)
   seedMediaLibrary(input.media)
+  setTextStyleEditInput({
+    canvas: editCanvas,
+    library: input.textStyleLibrary,
+    transcripts: input.transcripts,
+  })
 
   log.info('Headless edit starting', { ops: input.ops.length })
 
