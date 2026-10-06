@@ -168,19 +168,19 @@ export function TimelinePreviewScrubberVisual({
       const isRateStretch = tool === 'rate-stretch'
       const isTrimEdit = tool === 'trim-edit'
       const lineColor = isRazor
-        ? 'rgba(239, 68, 68, 0.7)'
+        ? 'rgba(245, 63, 63, 0.75)'
         : isRateStretch
-          ? 'rgba(168, 85, 247, 0.7)'
+          ? 'rgba(124, 58, 237, 0.7)'
           : isTrimEdit
-            ? 'rgba(234, 179, 8, 0.7)'
-            : 'rgba(255, 255, 255, 0.3)'
+            ? 'rgba(217, 119, 6, 0.75)'
+            : 'rgba(29, 33, 41, 0.35)'
       const handleColor = isRazor
-        ? 'rgba(239, 68, 68, 0.8)'
+        ? 'rgba(245, 63, 63, 0.85)'
         : isRateStretch
-          ? 'rgba(168, 85, 247, 0.8)'
+          ? 'rgba(124, 58, 237, 0.8)'
           : isTrimEdit
-            ? 'rgba(234, 179, 8, 0.8)'
-            : 'rgba(255, 255, 255, 0.4)'
+            ? 'rgba(217, 119, 6, 0.85)'
+            : 'rgba(29, 33, 41, 0.45)'
 
       if (lineRef.current) lineRef.current.style.backgroundColor = lineColor
       if (handleRef.current) handleRef.current.style.backgroundColor = handleColor
@@ -202,7 +202,7 @@ export function TimelinePreviewScrubberVisual({
     >
       <div
         ref={lineRef}
-        className="absolute bg-white/30"
+        className="absolute bg-foreground/35"
         style={{
           top: inRuler ? rulerOffset + FLAG_HEIGHT : 0,
           bottom: 0,
@@ -215,13 +215,13 @@ export function TimelinePreviewScrubberVisual({
         <>
           <div
             ref={handleRef}
-            className="absolute left-1/2 h-3 w-2 -translate-x-1/2 rounded-b-[2px] bg-white/40"
+            className="absolute left-1/2 h-3 w-2 -translate-x-1/2 rounded-b-[2px] bg-foreground/45"
             style={{ top: rulerOffset }}
           />
           {showTooltip ? (
             <div
               ref={tooltipRef}
-              className="absolute left-1/2 -top-[22px] -translate-x-1/2 whitespace-nowrap rounded bg-black/80 px-1.5 py-0.5 font-mono text-[10px] leading-3 text-white"
+              className="absolute left-1/2 -top-[22px] -translate-x-1/2 whitespace-nowrap rounded bg-ink px-1.5 py-0.5 font-mono text-[10px] leading-3 text-ink-foreground"
             />
           ) : null}
         </>

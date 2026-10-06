@@ -68,23 +68,23 @@ export function DopesheetExpressionDock({
   return (
     <section
       ref={rootRef}
-      className="flex flex-shrink-0 flex-col border-t border-border bg-background/95 shadow-[0_-8px_24px_rgba(0,0,0,0.22)]"
+      className="flex flex-shrink-0 flex-col border-t border-border bg-background/95 shadow-[0_-8px_24px_rgba(11,31,51,0.08)]"
       style={{ height: EXPRESSION_DOCK_HEIGHT }}
       role="region"
       aria-label={`${propertyLabel} expression editor`}
       data-testid="dopesheet-expression-dock"
     >
       <div className="flex h-8 flex-shrink-0 items-center gap-2 border-b border-border/60 px-2">
-        <Braces className="h-3.5 w-3.5 text-sky-400" />
+        <Braces className="h-3.5 w-3.5 text-sky-600" />
         <span className="text-[11px] font-medium text-foreground">{propertyLabel} expression</span>
-        <span className="rounded bg-sky-500/10 px-1 py-0.5 text-[8px] font-medium uppercase tracking-wide text-sky-300">
+        <span className="rounded bg-sky-500/10 px-1 py-0.5 text-[8px] font-medium uppercase tracking-wide text-sky-700">
           Advanced
         </span>
         <Button
           type="button"
           variant="ghost"
           size="sm"
-          className={cn('h-6 px-2 text-[10px]', enabled ? 'text-sky-300' : 'text-muted-foreground')}
+          className={cn('h-6 px-2 text-[10px]', enabled ? 'text-sky-700' : 'text-muted-foreground')}
           aria-pressed={enabled}
           onClick={onToggleEnabled}
         >
@@ -152,8 +152,8 @@ export function DopesheetExpressionDock({
                   variant="ghost"
                   size="sm"
                   className={cn(
-                    'h-7 cursor-crosshair gap-1 px-2 text-[10px] text-muted-foreground hover:text-sky-300',
-                    pickingReference && 'bg-sky-500/10 text-sky-300',
+                    'h-7 cursor-crosshair gap-1 px-2 text-[10px] text-muted-foreground hover:text-sky-700',
+                    pickingReference && 'bg-sky-500/10 text-sky-700',
                   )}
                   aria-label={`Pick a reference property for ${propertyLabel}`}
                   aria-pressed={pickingReference}
@@ -174,7 +174,7 @@ export function DopesheetExpressionDock({
                   {pickingReference ? 'Choose property…' : 'Pick property'}
                 </Button>
                 {pickingReference ? (
-                  <span className="truncate text-[9px] text-sky-300" role="status">
+                  <span className="truncate text-[9px] text-sky-700" role="status">
                     Click a highlighted row · Esc to cancel
                   </span>
                 ) : null}
@@ -182,7 +182,7 @@ export function DopesheetExpressionDock({
                   type="button"
                   variant="ghost"
                   size="sm"
-                  className="h-7 gap-1 px-2 text-[10px] text-muted-foreground hover:text-sky-300"
+                  className="h-7 gap-1 px-2 text-[10px] text-muted-foreground hover:text-sky-700"
                   onClick={() => setShowSyntaxGuide(true)}
                   aria-label="Open expression syntax guide"
                 >
@@ -226,13 +226,13 @@ export function DopesheetExpressionDock({
               }
             }}
             className={cn(
-              'min-h-0 flex-1 resize-none rounded border bg-background px-2 py-1.5 font-mono text-[10px] leading-4 text-foreground outline-none focus:border-sky-500/70',
+              'min-h-0 flex-1 resize-none rounded border bg-background px-2 py-1.5 font-mono text-[10px] leading-4 text-foreground outline-none focus:border-sky-600/70',
               error ? 'border-red-500/60' : 'border-border',
             )}
             aria-label={`${propertyLabel} expression source`}
           />
           {error ? (
-            <div className="truncate rounded border border-red-500/40 bg-red-500/10 px-2 py-1 text-[9px] text-red-300">
+            <div className="truncate rounded border border-red-500/40 bg-red-500/10 px-2 py-1 text-[9px] text-red-700">
               {error}
             </div>
           ) : (

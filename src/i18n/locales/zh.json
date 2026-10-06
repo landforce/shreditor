@@ -89,6 +89,8 @@
       "uiSoundPreview": "试听"
     },
     "ai": {
+      "autoAnalyzeOnOpen": "打开项目时分析媒体",
+      "autoAnalyzeOnOpenDescription": "在后台转录并视觉分析新视频，以便媒体面板将片段分为讲话者和 B-roll。",
       "captionSampleInterval": "字幕采样间隔",
       "captionSampleIntervalDescription": "\"使用 AI 分析\"采样一帧用于字幕的频率。",
       "seconds": "秒",

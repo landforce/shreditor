@@ -89,6 +89,8 @@
       "uiSoundPreview": "미리듣기"
     },
     "ai": {
+      "autoAnalyzeOnOpen": "프로젝트를 열 때 미디어 분석",
+      "autoAnalyzeOnOpenDescription": "새 동영상을 백그라운드에서 전사하고 시각적으로 분석하여 미디어 패널에서 클립을 화자와 B롤로 분류합니다.",
       "captionSampleInterval": "자막 샘플링 간격",
       "captionSampleIntervalDescription": "'AI로 분석'이 자막용 프레임을 샘플링하는 빈도입니다.",
       "seconds": "초",

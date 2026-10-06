@@ -89,6 +89,8 @@
       "uiSoundPreview": "Prévia"
     },
     "ai": {
+      "autoAnalyzeOnOpen": "Analisar mídia ao abrir um projeto",
+      "autoAnalyzeOnOpenDescription": "Transcreve e analisa visualmente vídeos novos em segundo plano para que o painel de mídia separe os clipes em Locutor e B-roll.",
       "captionSampleInterval": "Intervalo de amostragem de legendas",
       "captionSampleIntervalDescription": "Com que frequência o Analisar com IA captura um quadro para legendar.",
       "seconds": "Segundos",

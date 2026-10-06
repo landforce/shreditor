@@ -495,7 +495,7 @@ export function SilenceRemovalDialog() {
               {t('timeline.silenceRemoval.rangesSelected', { count: summary.rangeCount })}
             </div>
             {failedMediaCount > 0 && (
-              <div className="mt-1 text-xs text-amber-400">
+              <div className="mt-1 text-xs text-amber-700">
                 {t('timeline.silenceRemoval.partialFailure', { count: failedMediaCount })}
               </div>
             )}

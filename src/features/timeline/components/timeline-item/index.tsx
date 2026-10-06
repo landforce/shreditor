@@ -580,15 +580,15 @@ export const TimelineItem = memo(function TimelineItem({
       case 'audio':
         return 'bg-timeline-audio border-timeline-audio'
       case 'image':
-        return 'bg-timeline-image/30 border-timeline-image'
+        return 'bg-timeline-image border-timeline-image'
       case 'text':
-        return 'bg-timeline-text/30 border-timeline-text'
+        return 'bg-timeline-text border-timeline-text'
       case 'shape':
-        return 'bg-timeline-shape/30 border-timeline-shape'
+        return 'bg-timeline-shape border-timeline-shape'
       case 'adjustment':
-        return 'bg-purple-500/30 border-purple-400'
+        return 'bg-purple-600/90 border-purple-700'
       case 'composition':
-        return 'bg-violet-600/40 border-violet-400'
+        return 'bg-violet-700/90 border-violet-800'
       default:
         return 'bg-timeline-video border-timeline-video'
     }
@@ -987,7 +987,7 @@ export const TimelineItem = memo(function TimelineItem({
         >
           {/* Keep selection visible throughout drag so the moving cohort stays legible. */}
           {isSelected && !trackLocked && (
-            <div className="timeline-selection-indicator absolute inset-0 rounded pointer-events-none z-20 border border-primary" />
+            <div className="timeline-selection-indicator absolute inset-0 rounded pointer-events-none z-20 border border-ink shadow-[inset_0_0_0_1px_rgba(255,255,255,0.85)]" />
           )}
 
           {isEffectDropTarget && (

@@ -303,7 +303,7 @@ export const TextMotionTimelineRows = memo(function TextMotionTimelineRows({
           onClick={() => onBandClick?.(band.slot)}
           title={title}
         >
-          <span className="w-8 shrink-0 font-medium text-sky-300">{slotLabel}</span>
+          <span className="w-8 shrink-0 font-medium text-sky-700">{slotLabel}</span>
           <span className="truncate text-muted-foreground">{presetLabel}</span>
           <span className="ml-auto shrink-0 tabular-nums text-muted-foreground/70">
             {previewDuration}f
@@ -365,7 +365,7 @@ export const TextMotionTimelineRows = memo(function TextMotionTimelineRows({
               <span
                 aria-hidden
                 data-testid={`edit-text-motion-band-${band.slot}-visual`}
-                className="pointer-events-none absolute inset-0 rounded-[2px] bg-sky-400/40"
+                className="pointer-events-none absolute inset-0 rounded-[2px] bg-sky-500/30"
               />
               <button
                 type="button"
@@ -374,7 +374,7 @@ export const TextMotionTimelineRows = memo(function TextMotionTimelineRows({
                 title={`${slotLabel} duration · ${previewDuration}f`}
                 disabled={disabled}
                 className={cn(
-                  'absolute inset-y-0 z-10 w-2 bg-transparent transition-colors enabled:cursor-ew-resize enabled:hover:bg-sky-100/10 disabled:cursor-default',
+                  'absolute inset-y-0 z-10 w-2 bg-transparent transition-colors enabled:cursor-ew-resize enabled:hover:bg-sky-700/10 disabled:cursor-default',
                   band.slot === 'out' && 'left-0',
                   band.slot === 'in' && 'right-0',
                 )}
@@ -403,7 +403,7 @@ export const TextMotionTimelineRows = memo(function TextMotionTimelineRows({
                 <span
                   aria-hidden
                   className={cn(
-                    'pointer-events-none absolute inset-y-0.5 w-px rounded-full bg-sky-100/80 shadow-[0_0_0_1px_rgba(2,132,199,0.22)] transition-colors group-hover:bg-sky-50',
+                    'pointer-events-none absolute inset-y-0.5 w-px rounded-full bg-sky-700/80 shadow-[0_0_0_1px_rgba(2,132,199,0.22)] transition-colors group-hover:bg-sky-800',
                     band.slot === 'out'
                       ? 'left-0.5'
                       : band.slot === 'in'

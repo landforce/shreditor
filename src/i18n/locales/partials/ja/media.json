@@ -164,6 +164,7 @@
       "generateProxiesForSelected": "選択した {{count}} 個の項目のプロキシを生成",
       "generatingProxies": "プロキシを生成中…",
       "generatingTranscripts": "文字起こしを生成中…",
+      "groupAnalyzing": "分析中",
       "interpolatingFrames": "フレームを補間中…",
       "interpolationProgress": "フレーム補間の進行状況",
       "timeRemaining": "残り{{time}}",

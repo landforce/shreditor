@@ -642,7 +642,7 @@ export const ColorGradeSection = memo(function ColorGradeSection({
             </button>
             <button
               type="button"
-              className="absolute right-1 top-1 hidden h-4 w-4 items-center justify-center rounded-sm bg-black/55 text-white/80 hover:text-white focus:flex group-hover:flex group-focus-within:flex"
+              className="absolute right-1 top-1 hidden h-4 w-4 items-center justify-center rounded-sm bg-card text-muted-foreground shadow-panel hover:text-foreground focus:flex group-hover:flex group-focus-within:flex"
               onClick={(event) => {
                 event.stopPropagation()
                 void removeUserPreset(preset.id)

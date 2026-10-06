@@ -29,7 +29,7 @@ function StepIcon({ status }: { status: PlanStepState['status'] }) {
     case 'running':
       return <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-primary" />
     case 'done':
-      return <Check className="h-3.5 w-3.5 shrink-0 text-emerald-500" />
+      return <Check className="h-3.5 w-3.5 shrink-0 text-emerald-600" />
     case 'error':
       return <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-destructive" />
     default:

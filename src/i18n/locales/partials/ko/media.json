@@ -164,6 +164,7 @@
       "generateProxiesForSelected": "선택한 항목 {{count}}개의 프록시 생성",
       "generatingProxies": "프록시 생성 중…",
       "generatingTranscripts": "전사 생성 중…",
+      "groupAnalyzing": "분석 중",
       "interpolatingFrames": "프레임 보간 중…",
       "interpolationProgress": "프레임 보간 진행률",
       "timeRemaining": "{{time}} 남음",

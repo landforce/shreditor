@@ -556,14 +556,15 @@ export const PreviewArea = memo(function PreviewArea({
         role="region"
         aria-label="Program monitor"
       >
-        {hasSidePanels && (
-          <div
-            className="border-b border-border flex items-center px-3 flex-shrink-0"
-            style={{ height: EDITOR_LAYOUT_CSS_VALUES.previewSplitHeaderHeight }}
-          >
-            <span className="text-xs text-muted-foreground">Program</span>
-          </div>
-        )}
+        {/* CapCut-style panel title */}
+        <div
+          className="flex items-center px-3 flex-shrink-0"
+          style={{ height: EDITOR_LAYOUT_CSS_VALUES.previewSplitHeaderHeight }}
+        >
+          <span className="text-[13px] font-semibold text-foreground">
+            {hasSidePanels ? 'Program' : 'Player'}
+          </span>
+        </div>
 
         <div className="flex-1 flex flex-col min-w-0 min-h-0">
           <div
@@ -581,7 +582,7 @@ export const PreviewArea = memo(function PreviewArea({
 
           {isPenModeActive ? (
             <div
-              className="border-t border-border panel-header flex items-center px-3 flex-shrink-0 gap-3 overflow-hidden"
+              className="border-t border-border bg-panel-header flex items-center px-3 flex-shrink-0 gap-3 overflow-hidden"
               style={{
                 height: `calc(1.75rem + ${EDITOR_LAYOUT_CSS_VALUES.previewControlsHeight})`,
               }}
@@ -590,10 +591,10 @@ export const PreviewArea = memo(function PreviewArea({
             >
               <div className="flex min-w-0 flex-1 items-center gap-3">
                 <div className="flex items-center gap-2 flex-shrink-0">
-                  <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-cyan-500">
+                  <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-cyan-700">
                     Pen Tool
                   </span>
-                  <span className="rounded-full bg-cyan-500/10 px-2 py-0.5 text-[10px] font-medium text-cyan-600">
+                  <span className="rounded-full bg-cyan-600/10 px-2 py-0.5 text-[10px] font-medium text-cyan-700">
                     {penVertexCount} {penVertexCount === 1 ? 'point' : 'points'}
                   </span>
                 </div>
@@ -627,7 +628,7 @@ export const PreviewArea = memo(function PreviewArea({
             </div>
           ) : isPathEditModeActive ? (
             <div
-              className="border-t border-border panel-header flex items-center px-3 flex-shrink-0 gap-3 overflow-hidden"
+              className="border-t border-border bg-panel-header flex items-center px-3 flex-shrink-0 gap-3 overflow-hidden"
               style={{
                 height: `calc(1.75rem + ${EDITOR_LAYOUT_CSS_VALUES.previewControlsHeight})`,
               }}
@@ -636,10 +637,10 @@ export const PreviewArea = memo(function PreviewArea({
             >
               <div className="flex min-w-0 flex-1 items-center gap-3">
                 <div className="flex items-center gap-2 flex-shrink-0">
-                  <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-cyan-500">
+                  <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-cyan-700">
                     Path Edit
                   </span>
-                  <span className="rounded-full bg-cyan-500/10 px-2 py-0.5 text-[10px] font-medium text-cyan-600">
+                  <span className="rounded-full bg-cyan-600/10 px-2 py-0.5 text-[10px] font-medium text-cyan-700">
                     {displayedEditVertexCount} {displayedEditVertexCount === 1 ? 'point' : 'points'}
                   </span>
                 </div>
@@ -688,7 +689,7 @@ export const PreviewArea = memo(function PreviewArea({
             <InteractionLockRegion locked={false} overlayClassName="rounded-none">
               <div className="flex flex-col flex-shrink-0">
                 {previewChrome === 'edit' && (
-                  <div className="border-t border-border panel-header flex h-7 items-center justify-center overflow-hidden px-3">
+                  <div className="border-t border-border bg-panel-header flex h-7 items-center justify-center overflow-hidden px-3">
                     <div className="flex items-center gap-0">
                       <AlignmentToolbar projectSize={{ width, height }} />
                     </div>
@@ -697,7 +698,7 @@ export const PreviewArea = memo(function PreviewArea({
 
                 {/* Playback controls row */}
                 <div
-                  className="@container border-t border-border panel-header relative flex items-center px-3 overflow-hidden"
+                  className="@container border-t border-border bg-panel-header relative flex items-center px-3 overflow-hidden"
                   style={{ height: EDITOR_LAYOUT_CSS_VALUES.previewControlsHeight }}
                 >
                   <div className="flex flex-shrink-0 items-center gap-2">

@@ -164,6 +164,7 @@
       "generateProxiesForSelected": "{{count}} seçili öğe için proxy oluştur",
       "generatingProxies": "Proxy'ler oluşturuluyor",
       "generatingTranscripts": "Transkriptler oluşturuluyor",
+      "groupAnalyzing": "Analiz ediliyor",
       "interpolatingFrames": "Kare enterpolasyonu yapılıyor",
       "interpolationProgress": "Kare enterpolasyonu ilerlemesi",
       "timeRemaining": "{{time}} kaldı",

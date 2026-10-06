@@ -349,12 +349,7 @@ const TimelineZoomControls = memo(function TimelineZoomControls({
         finishSliderZoomInteraction()
       }
     },
-    [
-      commitSliderZoom,
-      finishSliderZoomInteraction,
-      releaseSliderZoomGesture,
-      renderSliderPreview,
-    ],
+    [commitSliderZoom, finishSliderZoomInteraction, releaseSliderZoomGesture, renderSliderPreview],
   )
 
   const controlledSliderValue = zoomToSlider(settledZoomLevel)
@@ -504,7 +499,7 @@ export const TimelineHeader = memo(function TimelineHeader({
     >
       {/* Left: Title */}
       <div className="flex min-w-0 items-center gap-2.5">
-        <h2 className="text-xs font-semibold tracking-wide uppercase text-muted-foreground flex items-center gap-2">
+        <h2 className="text-[13px] font-semibold text-foreground flex items-center gap-2">
           <Film className="w-3 h-3" />
           {t('timeline.header.title')}
         </h2>

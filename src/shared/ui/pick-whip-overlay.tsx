@@ -7,11 +7,7 @@ import type {
 function getOverlayGeometry(drag: MotionPickWhipOverlaySnapshot) {
   const controlDistance = Math.max(48, Math.abs(drag.currentX - drag.startX) * 0.45)
   return {
-    color: drag.valid
-      ? 'rgb(251 146 60)'
-      : drag.rejectionMessage
-        ? 'rgb(248 113 113)'
-        : 'rgb(148 163 184)',
+    color: drag.valid ? '#ea580c' : drag.rejectionMessage ? '#f53f3f' : '#6b7785',
     clipWidth: Math.max(0, drag.clipBounds.right - drag.clipBounds.left),
     clipHeight: Math.max(0, drag.clipBounds.bottom - drag.clipBounds.top),
     path: `M ${drag.startX} ${drag.startY} C ${drag.startX + controlDistance} ${drag.startY}, ${drag.currentX - controlDistance} ${drag.currentY}, ${drag.currentX} ${drag.currentY}`,
@@ -127,7 +123,7 @@ export function PickWhipOverlay({
         role="status"
         aria-live="polite"
         data-testid={`${testId}-feedback`}
-        className="pointer-events-none fixed z-[101] rounded-md border border-red-400/40 bg-background/95 px-2 py-1.5 text-[10px] font-medium leading-tight text-red-300 shadow-lg backdrop-blur-sm"
+        className="pointer-events-none fixed z-[101] rounded-md border border-red-500/40 bg-popover/95 px-2 py-1.5 text-[10px] font-medium leading-tight text-red-700 shadow-float backdrop-blur-sm"
         style={{
           display: initialDrag.rejectionMessage ? 'block' : 'none',
           left: initialFeedbackPosition.left,

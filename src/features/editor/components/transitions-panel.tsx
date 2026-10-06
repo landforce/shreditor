@@ -91,7 +91,7 @@ const TransitionCard = memo(function TransitionCard({
           active={hovered}
         />
       ) : (
-        <div className="flex aspect-video w-full items-center justify-center rounded-[3px] bg-black/40">
+        <div className="flex aspect-video w-full items-center justify-center rounded-[3px] bg-secondary">
           <Icon className="w-4 h-4 text-muted-foreground group-hover:text-foreground" />
         </div>
       )}

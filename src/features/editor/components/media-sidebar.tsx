@@ -431,8 +431,7 @@ export const MediaSidebar = memo(function MediaSidebar() {
     const { tracks, fps, addItemOnNewTrack } = useTimelineStore.getState()
     const { activeTrackId, selectItems, setActiveTrack } = useSelectionStore.getState()
     const currentProject = useProjectStore.getState().currentProject
-    const activeCompositionId =
-      useCompositionNavigationStore.getState().activeCompositionId
+    const activeCompositionId = useCompositionNavigationStore.getState().activeCompositionId
     const activeComposition = activeCompositionId
       ? useCompositionsStore.getState().getComposition(activeCompositionId)
       : undefined
@@ -533,7 +532,7 @@ export const MediaSidebar = memo(function MediaSidebar() {
     return grouped
   }, [])
 
-  // Category items for the vertical nav
+  // Category items for the tab row (and the collapsed rail)
   const categories = [
     { id: 'media' as const, icon: Film, label: t('editor.mediaSidebar.media') },
     { id: 'text' as const, icon: Type, label: t('editor.mediaSidebar.text') },
@@ -584,70 +583,58 @@ export const MediaSidebar = memo(function MediaSidebar() {
     }, 0)
   }, [])
 
+  const selectCategory = (id: (typeof categories)[number]['id']) => {
+    if (activeTab === id && leftSidebarOpen) {
+      toggleLeftSidebar()
+    } else {
+      setActiveTab(id)
+      if (!leftSidebarOpen) toggleLeftSidebar()
+      if (id === 'effects') triggerPreviews()
+    }
+  }
+
   return (
     <div className="flex h-full flex-shrink-0">
-      {/* Vertical Category Bar */}
-      <div
-        className="panel-header border-r border-border flex flex-col items-center flex-shrink-0"
-        style={{ width: EDITOR_LAYOUT_CSS_VALUES.sidebarRailWidth }}
-      >
-        {/* Header row - aligned with content panel header */}
+      {/* Collapsed: slim vertical rail so every category stays one click away.
+          Open: the categories move into a CapCut-style tab row on top of the panel. */}
+      {!leftSidebarOpen && (
         <div
-          className="flex items-center justify-center border-b border-border w-full"
-          style={{ height: EDITOR_LAYOUT_CSS_VALUES.sidebarHeaderHeight }}
+          className="bg-panel-header flex flex-col items-center flex-shrink-0"
+          style={{ width: EDITOR_LAYOUT_CSS_VALUES.sidebarRailWidth }}
         >
-          <button
-            onClick={toggleLeftSidebar}
-            className="rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-colors"
-            style={{
-              width: EDITOR_LAYOUT_CSS_VALUES.sidebarHeaderButtonSize,
-              height: EDITOR_LAYOUT_CSS_VALUES.sidebarHeaderButtonSize,
-            }}
-            data-tooltip={
-              leftSidebarOpen
-                ? t('editor.mediaSidebar.collapsePanel')
-                : t('editor.mediaSidebar.expandPanel')
-            }
-            data-tooltip-side="right"
+          <div
+            className="flex items-center justify-center w-full"
+            style={{ height: EDITOR_LAYOUT_CSS_VALUES.sidebarHeaderHeight }}
           >
-            {leftSidebarOpen ? (
-              <ChevronLeft className="w-3.5 h-3.5" />
-            ) : (
-              <ChevronRight className="w-3.5 h-3.5" />
-            )}
-          </button>
-        </div>
-
-        {/* Category Icons */}
-        <div className="flex flex-col gap-1 py-1.5">
-          {categories.map(({ id, icon: Icon, label }) => (
             <button
-              key={id}
-              onClick={() => {
-                if (activeTab === id && leftSidebarOpen) {
-                  toggleLeftSidebar()
-                } else {
-                  setActiveTab(id)
-                  if (!leftSidebarOpen) toggleLeftSidebar()
-                  if (id === 'effects') triggerPreviews()
-                }
+              onClick={toggleLeftSidebar}
+              className="rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+              style={{
+                width: EDITOR_LAYOUT_CSS_VALUES.sidebarHeaderButtonSize,
+                height: EDITOR_LAYOUT_CSS_VALUES.sidebarHeaderButtonSize,
               }}
-              className={`
-                w-9 h-9 rounded-lg flex items-center justify-center transition-[transform,background-color,color] duration-150 active:scale-95
-                ${
-                  activeTab === id && leftSidebarOpen
-                    ? 'bg-primary text-primary-foreground hover:bg-primary/90'
-                    : 'text-muted-foreground hover:text-foreground hover:bg-secondary/50'
-                }
-              `}
-              data-tooltip={label}
+              data-tooltip={t('editor.mediaSidebar.expandPanel')}
               data-tooltip-side="right"
             >
-              <Icon className="w-4 h-4" />
+              <ChevronRight className="w-3.5 h-3.5" />
             </button>
-          ))}
+          </div>
+
+          <div className="flex flex-col gap-1 py-1.5">
+            {categories.map(({ id, icon: Icon, label }) => (
+              <button
+                key={id}
+                onClick={() => selectCategory(id)}
+                className="w-9 h-9 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-secondary transition-[transform,background-color,color] duration-150 active:scale-95"
+                data-tooltip={label}
+                data-tooltip-side="right"
+              >
+                <Icon className="w-4 h-4" />
+              </button>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Content Panel — width animated via motion for the open/close toggle.
           We intentionally animate `width` (a layout property, not the cheaper
@@ -658,7 +645,7 @@ export const MediaSidebar = memo(function MediaSidebar() {
           a touch faster than open (exit < entrance). During a resize-drag we snap
           (duration 0) so width tracks the pointer instead of easing behind it. */}
       <motion.div
-        className="panel-bg border-r border-border overflow-hidden relative"
+        className="bg-panel-bg overflow-hidden relative"
         initial={false}
         animate={{ width: leftSidebarOpen ? sidebarWidth : 0 }}
         transition={
@@ -680,41 +667,86 @@ export const MediaSidebar = memo(function MediaSidebar() {
           inert={contentInert}
         >
           <>
-            {/* Panel Header — sits with the tab content */}
-            <div
-              className="flex items-center justify-between px-3 border-b border-border flex-shrink-0"
-              style={{ height: EDITOR_LAYOUT_CSS_VALUES.sidebarHeaderHeight }}
-            >
-              <span className="text-sm font-medium text-foreground">
-                {categories.find((c) => c.id === activeTab)?.label}
-              </span>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="shrink-0"
-                style={{
-                  width: EDITOR_LAYOUT_CSS_VALUES.sidebarHeaderButtonSize,
-                  height: EDITOR_LAYOUT_CSS_VALUES.sidebarHeaderButtonSize,
-                }}
-                onClick={toggleMediaFullColumn}
-                aria-label={
-                  mediaFullColumn
-                    ? t('editor.propertiesSidebar.dockToPreview')
-                    : t('editor.propertiesSidebar.expandFullColumn')
-                }
-                data-tooltip={
-                  mediaFullColumn
-                    ? t('editor.propertiesSidebar.dockToPreview')
-                    : t('editor.propertiesSidebar.expandFullColumn')
-                }
-                data-tooltip-side="bottom"
+            {/* Category tabs — CapCut-style icon-over-label row */}
+            <div className="flex items-stretch border-b border-border flex-shrink-0">
+              <div
+                className="flex min-w-0 flex-1 items-stretch overflow-x-auto px-1 pt-1.5 [mask-image:linear-gradient(to_right,black_calc(100%-20px),transparent)] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                role="tablist"
+                aria-label={t('editor.mediaSidebar.media')}
               >
-                {mediaFullColumn ? (
-                  <ChevronUp className="w-3 h-3" />
-                ) : (
-                  <ChevronDown className="w-3 h-3" />
-                )}
-              </Button>
+                {categories.map(({ id, icon: Icon, label }) => {
+                  const isActive = activeTab === id
+                  return (
+                    <button
+                      key={id}
+                      role="tab"
+                      aria-selected={isActive}
+                      onClick={(event) => {
+                        event.currentTarget.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+                        selectCategory(id)
+                      }}
+                      className={`
+                        relative flex min-w-[44px] shrink-0 flex-col items-center gap-1 px-1.5 pb-2 pt-1 text-[11px] leading-none transition-colors
+                        ${
+                          isActive
+                            ? 'font-semibold text-foreground'
+                            : 'text-muted-foreground hover:text-foreground'
+                        }
+                      `}
+                    >
+                      <Icon className={`h-[18px] w-[18px] ${isActive ? 'text-primary' : ''}`} />
+                      <span className="whitespace-nowrap">{label}</span>
+                      {isActive && (
+                        <span className="absolute inset-x-2 bottom-0 h-0.5 rounded-full bg-primary" />
+                      )}
+                    </button>
+                  )
+                })}
+              </div>
+              <div className="flex shrink-0 flex-col items-center justify-center gap-0.5 pr-1">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="shrink-0"
+                  style={{
+                    width: EDITOR_LAYOUT_CSS_VALUES.sidebarHeaderButtonSize,
+                    height: EDITOR_LAYOUT_CSS_VALUES.sidebarHeaderButtonSize,
+                  }}
+                  onClick={toggleMediaFullColumn}
+                  aria-label={
+                    mediaFullColumn
+                      ? t('editor.propertiesSidebar.dockToPreview')
+                      : t('editor.propertiesSidebar.expandFullColumn')
+                  }
+                  data-tooltip={
+                    mediaFullColumn
+                      ? t('editor.propertiesSidebar.dockToPreview')
+                      : t('editor.propertiesSidebar.expandFullColumn')
+                  }
+                  data-tooltip-side="bottom"
+                >
+                  {mediaFullColumn ? (
+                    <ChevronUp className="w-3 h-3" />
+                  ) : (
+                    <ChevronDown className="w-3 h-3" />
+                  )}
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="shrink-0"
+                  style={{
+                    width: EDITOR_LAYOUT_CSS_VALUES.sidebarHeaderButtonSize,
+                    height: EDITOR_LAYOUT_CSS_VALUES.sidebarHeaderButtonSize,
+                  }}
+                  onClick={toggleLeftSidebar}
+                  aria-label={t('editor.mediaSidebar.collapsePanel')}
+                  data-tooltip={t('editor.mediaSidebar.collapsePanel')}
+                  data-tooltip-side="bottom"
+                >
+                  <ChevronLeft className="w-3.5 h-3.5" />
+                </Button>
+              </div>
             </div>
 
             {/* Media Tab - Full Media Library */}

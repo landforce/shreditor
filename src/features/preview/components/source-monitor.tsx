@@ -1220,7 +1220,7 @@ function SourcePlaybackControls({
   return (
     <div className="@container flex flex-col shrink-0">
       {/* Seek bar row with I/O region above and editing buttons */}
-      <div className="border-t border-border panel-header flex items-center gap-2 px-4 h-7 shrink-0">
+      <div className="border-t border-border bg-panel-header flex items-center gap-2 px-4 h-7 shrink-0">
         <div className="flex-1 flex flex-col justify-center gap-0.5 min-w-0">
           {/* I/O region strip — styled like timeline I/O controls */}
           {interactive && (inPct !== null || outPct !== null) && (
@@ -1336,7 +1336,7 @@ function SourcePlaybackControls({
 
       {/* Transport row */}
       <div
-        className="border-t border-border panel-header flex items-center justify-between px-4 shrink-0"
+        className="border-t border-border bg-panel-header flex items-center justify-between px-4 shrink-0"
         style={{ height: EDITOR_LAYOUT_CSS_VALUES.previewControlsHeight }}
       >
         <div className="flex min-w-0 shrink-0 items-center gap-2">

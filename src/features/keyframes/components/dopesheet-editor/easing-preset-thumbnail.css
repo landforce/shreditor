@@ -1,5 +1,5 @@
 /**
- * Square easing-preset thumbnails. Each tile shows a muted dot grid, a white
+ * Square easing-preset thumbnails. Each tile shows a muted dot grid, an ink
  * easing curve, and an orange marker resting at the curve's start. On hover the
  * marker rides the curve (via CSS motion path) to preview the timing. The
  * animation is paused at rest, so a grid of ~25 thumbnails costs nothing until
@@ -21,7 +21,7 @@
   height: 7px;
   width: 7px;
   border-radius: 9999px;
-  background: #fb923c; /* orange-400 */
+  background: #ea580c; /* orange-600 */
   offset-anchor: center;
   offset-distance: 0%;
   animation: ep-run 1.15s ease-in-out infinite alternate;

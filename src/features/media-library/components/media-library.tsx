@@ -97,6 +97,7 @@ import { upscaleService } from '../services/upscale-service'
 import { importMediaLibraryService } from '../services/media-library-service-loader'
 import { cancelMediaTranscriptionJob } from '../services/media-transcription-runner'
 import { importMediaAnalysisService } from '../services/media-analysis-service-loader'
+import { scheduleAutoMediaAnalysis } from '../services/auto-media-analysis'
 import { getSupportedMediaFormatLabels } from '../utils/media-file-picker'
 import { getSharedProxyKey } from '../utils/proxy-key'
 import { getProjectBrokenMediaIds } from '@/features/media-library/utils/broken-media'
@@ -128,7 +129,7 @@ function CopyButton({ text }: { text: string }) {
       title={t('media.library.copyToClipboard')}
     >
       {copied ? (
-        <Check className="h-3 w-3 text-green-500" />
+        <Check className="h-3 w-3 text-green-600" />
       ) : (
         <Copy className="h-3 w-3 text-muted-foreground" />
       )}
@@ -279,8 +280,7 @@ export const MediaLibrary = memo(function MediaLibrary({ onMediaSelect }: MediaL
   const proxyStatus = useMediaLibraryStore((s) => s.proxyStatus)
   const transcriptStatus = useMediaLibraryStore((s) => s.transcriptStatus)
   const filteredMediaItems = useFilteredMediaItems()
-  const allMediaItems = useMediaLibraryStore((s) => s.mediaItems)
-  const mediaGroups = useMediaGroups(filteredMediaItems, allMediaItems)
+  const mediaGroups = useMediaGroups(filteredMediaItems)
   const compositions = useCompositionsStore((s) => s.compositions)
   const MediaTypeGroupView = viewMode === 'grid' ? GridMediaTypeGroup : ListMediaTypeGroup
   const EmptyMediaGrid = viewMode === 'grid' ? GridMediaGrid : ListMediaGrid
@@ -295,6 +295,13 @@ export const MediaLibrary = memo(function MediaLibrary({ onMediaSelect }: MediaL
   const unsupportedCodecFiles = useMediaLibraryStore((s) => s.unsupportedCodecFiles)
   const showUnsupportedCodecDialog = useMediaLibraryStore((s) => s.showUnsupportedCodecDialog)
   const resolveUnsupportedCodecDialog = useMediaLibraryStore((s) => s.resolveUnsupportedCodecDialog)
+
+  // Background transcription + visual analysis for new video once media has
+  // loaded (gated by the autoAnalyzeMediaOnOpen setting).
+  const isMediaLoading = useMediaLibraryStore((s) => s.isLoading)
+  useEffect(() => {
+    if (currentProjectId && !isMediaLoading) scheduleAutoMediaAnalysis(currentProjectId)
+  }, [currentProjectId, isMediaLoading])
 
   // HMR recovery: if media store lost project context, rehydrate it from project store.
   useEffect(() => {
@@ -850,7 +857,7 @@ export const MediaLibrary = memo(function MediaLibrary({ onMediaSelect }: MediaL
         <div
           className={`mx-4 mt-3 p-2.5 rounded text-xs animate-in slide-in-from-top-2 duration-200 ${
             notification.type === 'info'
-              ? 'bg-orange-500/10 border border-orange-500/30'
+              ? 'bg-primary/10 border border-primary/30'
               : notification.type === 'warning'
                 ? 'bg-yellow-500/10 border border-yellow-500/30'
                 : notification.type === 'success'
@@ -863,22 +870,22 @@ export const MediaLibrary = memo(function MediaLibrary({ onMediaSelect }: MediaL
               <Info
                 className={`w-3.5 h-3.5 flex-shrink-0 ${
                   notification.type === 'info'
-                    ? 'text-orange-500'
+                    ? 'text-primary'
                     : notification.type === 'warning'
-                      ? 'text-yellow-500'
+                      ? 'text-yellow-600'
                       : notification.type === 'success'
-                        ? 'text-green-500'
+                        ? 'text-green-600'
                         : 'text-destructive'
                 }`}
               />
               <p
                 className={`leading-relaxed line-clamp-2 ${
                   notification.type === 'info'
-                    ? 'text-orange-600 dark:text-orange-400'
+                    ? 'text-primary'
                     : notification.type === 'warning'
-                      ? 'text-yellow-600 dark:text-yellow-400'
+                      ? 'text-yellow-700'
                       : notification.type === 'success'
-                        ? 'text-green-600 dark:text-green-400'
+                        ? 'text-green-700'
                         : 'text-destructive'
                 }`}
               >
@@ -1113,13 +1120,13 @@ export const MediaLibrary = memo(function MediaLibrary({ onMediaSelect }: MediaL
         <div className="px-3 py-1.5 border-b border-violet-500/30 bg-violet-500/10 flex items-center gap-2 flex-shrink-0">
           <button
             onClick={exitComposition}
-            className="flex items-center gap-1.5 text-xs text-violet-300 hover:text-violet-100 transition-colors"
+            className="flex items-center gap-1.5 text-xs text-violet-700 hover:text-violet-900 transition-colors"
           >
             <ArrowLeft className="w-3.5 h-3.5" />
             <span>{t('media.library.back')}</span>
           </button>
-          <span className="text-xs text-violet-400/60">/</span>
-          <span className="text-xs text-violet-300 font-medium truncate">{activeCompLabel}</span>
+          <span className="text-xs text-violet-600/60">/</span>
+          <span className="text-xs text-violet-700 font-medium truncate">{activeCompLabel}</span>
         </div>
       )}
 
@@ -1210,7 +1217,7 @@ export const MediaLibrary = memo(function MediaLibrary({ onMediaSelect }: MediaL
       {/* Background AI analysis status */}
       {analysisProgress && (
         <BackgroundTaskProgress
-          icon={<Loader2 className="w-3.5 h-3.5 text-purple-400 animate-spin flex-shrink-0" />}
+          icon={<Loader2 className="w-3.5 h-3.5 text-purple-600 animate-spin flex-shrink-0" />}
           label={
             analysisProgress.total > 1
               ? t('media.library.analyzingMultiple', {
@@ -1241,7 +1248,7 @@ export const MediaLibrary = memo(function MediaLibrary({ onMediaSelect }: MediaL
               )}
             </>
           }
-          trailing={<Sparkles className="w-3.5 h-3.5 text-purple-400 flex-shrink-0" />}
+          trailing={<Sparkles className="w-3.5 h-3.5 text-purple-600 flex-shrink-0" />}
           fillClassName="bg-purple-500"
         />
       )}
@@ -1249,7 +1256,7 @@ export const MediaLibrary = memo(function MediaLibrary({ onMediaSelect }: MediaL
       {/* Unified media readiness progress bar */}
       {preparingCount > 0 && (
         <BackgroundTaskProgress
-          icon={<Film className="w-3.5 h-3.5 text-cyan-500 flex-shrink-0" />}
+          icon={<Film className="w-3.5 h-3.5 text-cyan-600 flex-shrink-0" />}
           label={t('media.library.preparingMediaWithCount', { count: preparingCount })}
           progressAriaLabel={t('media.library.mediaPreparationProgress')}
           progressPercent={preparingAvgProgress * 100}
@@ -1288,7 +1295,7 @@ export const MediaLibrary = memo(function MediaLibrary({ onMediaSelect }: MediaL
       {/* Transcript generation progress bar */}
       {transcribingCount > 0 && (
         <BackgroundTaskProgress
-          icon={<FileText className="w-3.5 h-3.5 text-blue-500 flex-shrink-0" />}
+          icon={<FileText className="w-3.5 h-3.5 text-blue-600 flex-shrink-0" />}
           // With one job the stage ("Downloading model") is far more useful than the generic
           // title, and the panel is too narrow to show both without truncating each to noise.
           label={
@@ -1341,7 +1348,7 @@ export const MediaLibrary = memo(function MediaLibrary({ onMediaSelect }: MediaL
       {/* Proxy generation progress bar */}
       {generatingCount > 0 && (
         <BackgroundTaskProgress
-          icon={<Loader2 className="w-3.5 h-3.5 text-green-500 animate-spin flex-shrink-0" />}
+          icon={<Loader2 className="w-3.5 h-3.5 text-green-600 animate-spin flex-shrink-0" />}
           label={t('media.library.generatingProxies', { count: generatingCount })}
           progressAriaLabel={t('media.library.proxyGenerationProgress')}
           progressPercent={generatingAvgProgress * 100}
@@ -1365,7 +1372,7 @@ export const MediaLibrary = memo(function MediaLibrary({ onMediaSelect }: MediaL
 
       {interpolatingCount > 0 && (
         <BackgroundTaskProgress
-          icon={<Loader2 className="w-3.5 h-3.5 text-sky-500 animate-spin flex-shrink-0" />}
+          icon={<Loader2 className="w-3.5 h-3.5 text-sky-600 animate-spin flex-shrink-0" />}
           label={
             isDownloadingInterpolationModel
               ? t('media.library.downloadingInterpolationModel')
@@ -1396,7 +1403,7 @@ export const MediaLibrary = memo(function MediaLibrary({ onMediaSelect }: MediaL
 
       {upscalingCount > 0 && (
         <BackgroundTaskProgress
-          icon={<Loader2 className="w-3.5 h-3.5 text-violet-500 animate-spin flex-shrink-0" />}
+          icon={<Loader2 className="w-3.5 h-3.5 text-violet-600 animate-spin flex-shrink-0" />}
           label={t('media.library.upscalingVideo', { count: upscalingCount })}
           progressAriaLabel={t('media.library.upscaleProgress')}
           progressPercent={upscalingAvgProgress * 100}
@@ -1461,14 +1468,14 @@ export const MediaLibrary = memo(function MediaLibrary({ onMediaSelect }: MediaL
                 </p>
                 {affectedAssetInstanceCount > 0 && (
                   <div className="flex items-start gap-2 p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-md">
-                    <AlertTriangle className="w-4 h-4 text-yellow-500 flex-shrink-0 mt-0.5" />
-                    <div className="text-sm text-yellow-600 dark:text-yellow-400">
+                    <AlertTriangle className="w-4 h-4 text-yellow-600 flex-shrink-0 mt-0.5" />
+                    <div className="text-sm text-yellow-700">
                       <p className="font-medium">
                         {isMediaOnlyDeletion
                           ? t('media.deleteDialog.timelineClipsRemoved')
                           : t('media.library.linkedInstancesTitle')}
                       </p>
-                      <p className="text-xs mt-1 text-yellow-600/80 dark:text-yellow-400/80">
+                      <p className="text-xs mt-1 text-yellow-700/80">
                         {isMediaOnlyDeletion
                           ? t('media.deleteDialog.timelineClipsDetail', {
                               count: affectedAssetInstanceCount,

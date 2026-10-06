@@ -253,7 +253,7 @@ export const PropertiesSidebar = memo(function PropertiesSidebar() {
           (exit < entrance). During a resize-drag we snap (duration 0) so width
           tracks the pointer instead of easing behind it. */}
       <motion.div
-        className="panel-bg border-l border-border shrink-0 relative h-full overflow-hidden"
+        className="bg-panel-bg shrink-0 relative h-full overflow-hidden"
         initial={false}
         animate={{ width: rightSidebarOpen ? rightSidebarWidth : 0 }}
         transition={
@@ -301,16 +301,14 @@ export const PropertiesSidebar = memo(function PropertiesSidebar() {
                     <ChevronDown className="w-3 h-3" />
                   )}
                 </Button>
-                <Settings2 className="w-3 h-3 shrink-0 text-muted-foreground" />
-                <h2 className="min-w-0 flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
-                  <span className="shrink-0 uppercase tracking-wide">
-                    {headerLabel}
-                  </span>
+                <Settings2 className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />
+                <h2 className="min-w-0 flex items-center gap-1.5 text-[13px] font-semibold text-foreground">
+                  <span className="shrink-0">{headerLabel}</span>
                   {headerContext && (
                     <>
                       <span className="shrink-0">-</span>
                       <span
-                        className="truncate normal-case tracking-normal"
+                        className="truncate font-normal text-muted-foreground"
                         title={headerTitle}
                       >
                         {headerContext}

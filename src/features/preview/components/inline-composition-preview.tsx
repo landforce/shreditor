@@ -440,7 +440,7 @@ const InlineCompositionPreviewContent = memo(function InlineCompositionPreviewCo
           className="block w-full h-full object-contain"
         />
         {showLoading && (
-          <div className="absolute inset-0 flex items-center justify-center text-sm text-muted-foreground bg-black/30">
+          <div className="absolute inset-0 flex items-center justify-center text-sm text-white/75 bg-black/30">
             Loading compound clip...
           </div>
         )}
@@ -460,11 +460,11 @@ const InlineCompositionPreviewContent = memo(function InlineCompositionPreviewCo
       >
         <div className="relative">
           <div
-            className="relative shadow-2xl overflow-hidden bg-black"
+            className="relative shadow-float overflow-hidden bg-black"
             style={{
               width: `${playerSize.width}px`,
               height: `${playerSize.height}px`,
-              outline: '2px solid hsl(var(--border))',
+              outline: '2px solid var(--border)',
               outlineOffset: 0,
             }}
           >
@@ -475,7 +475,7 @@ const InlineCompositionPreviewContent = memo(function InlineCompositionPreviewCo
               style={{ width: '100%', height: '100%', display: 'block' }}
             />
             {showLoading && (
-              <div className="absolute inset-0 flex items-center justify-center text-sm text-muted-foreground bg-black/30">
+              <div className="absolute inset-0 flex items-center justify-center text-sm text-white/75 bg-black/30">
                 Loading compound clip...
               </div>
             )}

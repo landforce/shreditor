@@ -15,7 +15,11 @@ const logger = createLogger('ParakeetWorker')
 
 const ORT_WASM_PATH =
   'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.26.0-dev.20260410-5e55544225/dist/'
-const HF_BASE = 'https://huggingface.co/Olicorne/parakeet-tdt-0.6b-v3-smoothquant-onnx/resolve/main'
+// Pinned to the last revision with the flat file layout this worker expects.
+// The repo was renamed (…-optimized-onnx) and later moved/withdrew these files,
+// so `main` 404s for the int8 encoder/decoder.
+const HF_REVISION = 'c154c66ee2aa8febbbeb344aa98f1a7167fcdfee'
+const HF_BASE = `https://huggingface.co/Olicorne/parakeet-tdt-0.6b-v3-smoothquant-onnx/resolve/${HF_REVISION}`
 
 const ENCODER_FP16 = 'encoder-model.fp16.onnx'
 const ENCODER_INT8 = 'encoder-model.int8.onnx'

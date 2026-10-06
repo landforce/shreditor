@@ -348,10 +348,10 @@ function ScopeModeBar({
 }) {
   const modes: Array<{ value: ScopeViewMode; label: string; activeColor?: string }> = [
     { value: 'rgb', label: 'RGB' },
-    { value: 'r', label: 'R', activeColor: '#ff6666' },
-    { value: 'g', label: 'G', activeColor: '#66cc66' },
-    { value: 'b', label: 'B', activeColor: '#6688ff' },
-    { value: 'luma', label: 'Y', activeColor: '#ccccaa' },
+    { value: 'r', label: 'R', activeColor: '#c62828' },
+    { value: 'g', label: 'G', activeColor: '#1e8a3a' },
+    { value: 'b', label: 'B', activeColor: '#00b5c9' },
+    { value: 'luma', label: 'Y', activeColor: '#7a6f2e' },
   ]
   return (
     <div className="flex items-center gap-0.5">
@@ -360,13 +360,13 @@ function ScopeModeBar({
           key={m.value}
           className={cn(
             'h-4 px-1 text-[9px] font-semibold font-mono rounded transition-colors',
-            mode === m.value ? 'text-white' : 'text-muted-foreground hover:text-foreground',
+            mode === m.value ? 'text-foreground' : 'text-muted-foreground hover:text-foreground',
           )}
           style={
             mode === m.value
               ? {
-                  backgroundColor: `${m.activeColor ?? '#888'}33`,
-                  borderBottom: `1.5px solid ${m.activeColor ?? '#888'}`,
+                  backgroundColor: `${m.activeColor ?? '#6b7785'}33`,
+                  borderBottom: `1.5px solid ${m.activeColor ?? '#6b7785'}`,
                 }
               : undefined
           }
@@ -976,7 +976,7 @@ export const ColorScopesView = memo(function ColorScopesView({
       className={cn(
         embedded
           ? 'h-full rounded-md border border-border bg-background p-2'
-          : 'absolute bottom-3 right-3 z-20 rounded-md border border-border bg-background/95 backdrop-blur-sm shadow-lg p-2 pointer-events-none',
+          : 'absolute bottom-3 right-3 z-20 rounded-md border border-border bg-background/95 backdrop-blur-sm shadow-float p-2 pointer-events-none',
       )}
     >
       <div className="flex items-center justify-between mb-2">
@@ -1005,7 +1005,7 @@ export const ColorScopesView = memo(function ColorScopesView({
         </div>
         <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
           <Activity
-            className={`w-3 h-3 ${status === 'live' ? 'text-emerald-500' : status === 'error' ? 'text-red-500' : ''}`}
+            className={`w-3 h-3 ${status === 'live' ? 'text-emerald-600' : status === 'error' ? 'text-destructive' : ''}`}
           />
           {status === 'live' ? (gpuReady ? 'gpu' : 'cpu') : status === 'error' ? 'err' : 'idle'}
         </div>

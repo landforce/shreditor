@@ -216,7 +216,7 @@ export function ProjectCard({
             src={thumbnailUrl}
             alt={project.name}
             draggable={false}
-            className="w-full h-full object-contain bg-black/40 pointer-events-none"
+            className="w-full h-full object-contain bg-video-preview-background pointer-events-none"
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-secondary/40 to-secondary/20">

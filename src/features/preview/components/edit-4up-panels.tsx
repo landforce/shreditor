@@ -52,7 +52,7 @@ export function EditFourUpPanels({
   }, [])
 
   if (containerSize.width <= 0 || containerSize.height <= 0) {
-    return <div ref={containerRef} className="absolute inset-0 z-30 bg-black" />
+    return <div ref={containerRef} className="absolute inset-0 z-30 bg-video-preview-background" />
   }
 
   const panelWidth = Math.max((containerSize.width - GAP) / 2, 1)
@@ -69,7 +69,7 @@ export function EditFourUpPanels({
   return (
     <div
       ref={containerRef}
-      className="absolute inset-0 z-30 bg-black flex items-center"
+      className="absolute inset-0 z-30 bg-video-preview-background flex items-center"
       style={{ gap: GAP }}
     >
       {/* Corner thumbnails - absolutely positioned */}
@@ -113,15 +113,15 @@ function MainPanel({ data, areaHeight, panelWidth }: MainPanelProps) {
 
   return (
     <div className="flex-1 min-w-0 flex flex-col items-center justify-center">
-      <span className="text-base font-semibold tracking-widest text-white/80 uppercase pb-1">
+      <span className="text-base font-semibold tracking-widest text-muted-foreground uppercase pb-1">
         {data.label}
       </span>
       <div
-        className="flex items-center justify-center shrink-0 bg-black"
+        className="flex items-center justify-center shrink-0 bg-video-preview-background"
         style={{ width: panelWidth, height: areaHeight }}
       >
         <div
-          className="overflow-hidden border border-white/10"
+          className="overflow-hidden border border-border bg-black"
           style={{ width: mediaWidth, height: mediaHeight }}
         >
           {renderPanelMedia(
@@ -146,7 +146,7 @@ function MainPanel({ data, areaHeight, panelWidth }: MainPanelProps) {
           )}
         </div>
       </div>
-      <span className="text-lg font-mono text-white/90 tabular-nums pt-1">{data.timecode}</span>
+      <span className="text-lg font-mono text-foreground tabular-nums pt-1">{data.timecode}</span>
     </div>
   )
 }
@@ -172,7 +172,7 @@ function CornerThumbnail({
 
   return (
     <div
-      className={`absolute ${positionClass} z-40 overflow-hidden border border-white/20 rounded-sm shadow-lg`}
+      className={`absolute ${positionClass} z-40 overflow-hidden border border-border bg-black rounded-sm shadow-float`}
       style={{ width, height }}
     >
       {renderPanelMedia(

@@ -164,6 +164,7 @@
       "generateProxiesForSelected": "Générer des proxies pour {{count}} éléments sélectionnés",
       "generatingProxies": "Génération des proxys…",
       "generatingTranscripts": "Génération des transcriptions…",
+      "groupAnalyzing": "Analyse en cours",
       "interpolatingFrames": "Interpolation des images…",
       "interpolationProgress": "Progression de l'interpolation des images",
       "timeRemaining": "{{time}} restant",

@@ -229,11 +229,11 @@ function preflightIconClass(severity: ReturnType<typeof summarizePreflightSeveri
     case 'error':
       return 'text-destructive'
     case 'warning':
-      return 'text-amber-500'
+      return 'text-amber-600'
     case 'info':
-      return 'text-blue-500'
+      return 'text-primary'
     case 'ok':
-      return 'text-green-500'
+      return 'text-green-600'
   }
 }
 
@@ -279,10 +279,10 @@ function ExportPreflightPanel({ preflight }: { preflight: ExportPreflightResult 
                 check.severity === 'error'
                   ? 'text-destructive'
                   : check.severity === 'warning'
-                    ? 'text-amber-500'
+                    ? 'text-amber-600'
                     : check.severity === 'info'
-                      ? 'text-blue-500'
-                      : 'text-green-500'
+                      ? 'text-primary'
+                      : 'text-green-600'
               }
             >
               {t(check.titleKey, check.titleParams)}
@@ -394,8 +394,7 @@ export function ExportDialog({ open, onClose, onOpenRenderQueue }: ExportDialogP
     const reversedClipIds = new Set(
       items
         .filter(
-          (item) =>
-            (item.type === 'video' || item.type === 'audio') && item.isReversed === true,
+          (item) => (item.type === 'video' || item.type === 'audio') && item.isReversed === true,
         )
         .map((item) => item.id),
     )
@@ -966,7 +965,7 @@ export function ExportDialog({ open, onClose, onOpenRenderQueue }: ExportDialogP
       case 'complete':
         return (
           <span className="flex items-center gap-2">
-            <CheckCircle2 className="h-5 w-5 text-green-500" />
+            <CheckCircle2 className="h-5 w-5 text-green-600" />
             {t('export.dialog.titleComplete')}
           </span>
         )
@@ -1574,8 +1573,7 @@ export function ExportDialog({ open, onClose, onOpenRenderQueue }: ExportDialogP
                 </div>
                 <div className="flex items-center justify-between text-sm gap-2">
                   <span className="text-muted-foreground truncate">
-                    {status === 'preparing' &&
-                      (progressMessage ?? t('export.progress.preparing'))}
+                    {status === 'preparing' && (progressMessage ?? t('export.progress.preparing'))}
                     {status === 'rendering' && t('export.progress.rendering')}
                     {status === 'encoding' && t('export.progress.encoding')}
                     {status === 'finalizing' && t('export.progress.finalizing')}
@@ -1625,9 +1623,9 @@ export function ExportDialog({ open, onClose, onOpenRenderQueue }: ExportDialogP
           <div className="space-y-4 py-4">
             {previewUrl && <ExportPreviewPlayer src={previewUrl} isVideo={isVideoResult} />}
 
-            <Alert className="border-green-900 bg-green-950">
-              <CheckCircle2 className="h-4 w-4 text-green-500" />
-              <AlertDescription className="text-green-400">
+            <Alert className="border-green-200 bg-green-50">
+              <CheckCircle2 className="h-4 w-4 text-green-600" />
+              <AlertDescription className="text-green-800">
                 {exportMode === 'audio'
                   ? t('export.complete.audioSuccess')
                   : t('export.complete.videoSuccess')}

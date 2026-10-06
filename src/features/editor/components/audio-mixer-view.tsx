@@ -110,7 +110,7 @@ function formatFaderDb(db: number): string {
 const SEGMENT_MASK =
   'repeating-linear-gradient(to top, black 0px, black 3px, transparent 3px, transparent 4px)'
 const UNLIT_LED_BG =
-  'repeating-linear-gradient(to top, rgba(255,255,255,0.03) 0px, rgba(255,255,255,0.03) 3px, transparent 3px, transparent 4px)'
+  'repeating-linear-gradient(to top, rgba(11,31,51,0.06) 0px, rgba(11,31,51,0.06) 3px, transparent 3px, transparent 4px)'
 
 interface SegmentedMeterBarProps {
   /** CSS height value, e.g. "42%" */
@@ -136,7 +136,9 @@ const SegmentedMeterBar = memo(function SegmentedMeterBar({
   fillRef,
 }: SegmentedMeterBarProps) {
   return (
-    <div className={`relative flex-1 rounded-[2px] bg-[#08090b] overflow-hidden ${className}`}>
+    <div
+      className={`relative flex-1 rounded-[2px] bg-secondary shadow-[inset_0_1px_2px_rgba(11,31,51,0.12)] overflow-hidden ${className}`}
+    >
       {/* Unlit LED backdrop */}
       <div className="absolute inset-0 pointer-events-none" style={{ background: UNLIT_LED_BG }} />
 
@@ -144,7 +146,7 @@ const SegmentedMeterBar = memo(function SegmentedMeterBar({
       <div
         ref={fillRef}
         {...fillProps}
-        className={`absolute inset-x-0 bottom-0 bg-gradient-to-t from-[#1be255] via-[#f5e146] to-[#ff6633] ${scanning ? 'opacity-50' : ''}`}
+        className={`absolute inset-x-0 bottom-0 bg-gradient-to-t from-green-600 via-yellow-500 to-red-600 ${scanning ? 'opacity-50' : ''}`}
         style={{
           height,
           maskImage: SEGMENT_MASK,
@@ -156,7 +158,7 @@ const SegmentedMeterBar = memo(function SegmentedMeterBar({
       {/* Peak hold — single bright segment */}
       {peakBottom != null && (
         <div
-          className="absolute inset-x-0 h-[3px] rounded-[1px] bg-white/85 shadow-[0_0_4px_rgba(255,255,255,0.5)]"
+          className="absolute inset-x-0 h-[3px] rounded-[1px] bg-foreground/80"
           style={{
             bottom: peakBottom,
             maskImage: SEGMENT_MASK,
@@ -404,13 +406,13 @@ const ChannelFader = memo(function ChannelFader({
         }}
       >
         {/* Knob body */}
-        <div className="w-full h-full rounded-[4px] bg-gradient-to-b from-zinc-300 to-zinc-400 shadow-[0_1px_4px_rgba(0,0,0,0.6),inset_0_1px_0_rgba(255,255,255,0.3)] border border-zinc-500/40">
+        <div className="w-full h-full rounded-[4px] bg-gradient-to-b from-popover to-accent shadow-[0_1px_3px_rgba(11,31,51,0.3),inset_0_1px_0_rgba(255,255,255,0.8)] border border-muted-foreground/50">
           {/* Grip lines */}
-          <div className="absolute inset-x-[3px] top-[7px] h-px bg-zinc-600/50" />
-          <div className="absolute inset-x-[3px] top-[10px] h-px bg-zinc-600/50" />
-          <div className="absolute inset-x-[3px] top-[13px] h-px bg-zinc-600/50" />
+          <div className="absolute inset-x-[3px] top-[7px] h-px bg-muted-foreground/50" />
+          <div className="absolute inset-x-[3px] top-[10px] h-px bg-muted-foreground/50" />
+          <div className="absolute inset-x-[3px] top-[13px] h-px bg-muted-foreground/50" />
           {/* Center notch — unity indicator */}
-          <div className="absolute left-0 right-0 top-1/2 -translate-y-1/2 h-[2px] bg-zinc-600/30 rounded-full mx-[2px]" />
+          <div className="absolute left-0 right-0 top-1/2 -translate-y-1/2 h-[2px] bg-muted-foreground/30 rounded-full mx-[2px]" />
         </div>
       </div>
     </div>
@@ -498,9 +500,9 @@ const ChannelStrip = memo(function ChannelStrip({
   // dB readout color: green at unity, amber when boosted, dim when cut
   const dbColor =
     track.volume > 0.05
-      ? 'text-amber-400/90'
+      ? 'text-amber-700'
       : track.volume > -0.05
-        ? 'text-emerald-400/80'
+        ? 'text-emerald-700'
         : 'text-muted-foreground/60'
 
   const stripWidth = expanded ? 'min-w-[68px] w-[68px]' : 'min-w-[52px] w-[52px]'
@@ -531,8 +533,8 @@ const ChannelStrip = memo(function ChannelStrip({
             type="button"
             className={`min-w-[28px] rounded-[3px] px-2 py-0.5 text-[9px] font-semibold tracking-[0.14em] transition-colors ${
               eqActive
-                ? 'border border-sky-400/50 bg-sky-500/15 text-sky-300 shadow-[0_0_10px_rgba(56,189,248,0.22)]'
-                : 'border border-transparent bg-muted/30 text-muted-foreground/45 hover:bg-sky-500/10 hover:text-sky-300'
+                ? 'border border-primary/40 bg-primary/10 text-primary'
+                : 'border border-transparent bg-muted text-muted-foreground/70 hover:bg-primary/10 hover:text-primary'
             } ${!onEqToggle ? 'pointer-events-none opacity-50' : ''}`}
             onClick={handleEqClick}
             aria-label={`EQ ${track.name}`}
@@ -548,8 +550,8 @@ const ChannelStrip = memo(function ChannelStrip({
             type="button"
             className={`${buttonSize} rounded-[3px] font-bold leading-none flex items-center justify-center transition-colors ${
               track.solo
-                ? 'bg-amber-500 text-black shadow-[0_0_8px_rgba(245,158,11,0.4)]'
-                : 'bg-muted/40 text-muted-foreground/40 hover:bg-muted/70 hover:text-muted-foreground/70'
+                ? 'bg-amber-500 text-foreground'
+                : 'bg-muted text-muted-foreground/70 hover:bg-accent hover:text-foreground'
             }`}
             onClick={handleSoloClick}
             aria-label={`Solo ${track.name}`}
@@ -561,8 +563,8 @@ const ChannelStrip = memo(function ChannelStrip({
             type="button"
             className={`${buttonSize} rounded-[3px] font-bold leading-none flex items-center justify-center transition-colors ${
               track.muted
-                ? 'bg-red-600 text-white shadow-[0_0_8px_rgba(220,38,38,0.4)]'
-                : 'bg-muted/40 text-muted-foreground/40 hover:bg-muted/70 hover:text-muted-foreground/70'
+                ? 'bg-red-600 text-white'
+                : 'bg-muted text-muted-foreground/70 hover:bg-accent hover:text-foreground'
             }`}
             onClick={handleMuteClick}
             aria-label={`Mute ${track.name}`}
@@ -698,9 +700,9 @@ const BusMeter = memo(function BusMeter({
         dbReadoutRef.current.textContent = formatFaderDb(db)
         dbReadoutRef.current.className = `text-[10px] font-mono py-0.5 leading-none ${
           db > 0.05
-            ? 'text-amber-400/90'
+            ? 'text-amber-700'
             : db > -0.05
-              ? 'text-emerald-400/80'
+              ? 'text-emerald-700'
               : 'text-muted-foreground/60'
         }`
       }
@@ -804,15 +806,15 @@ const BusMeter = memo(function BusMeter({
   const unityPercent = dbToFaderPercent(0)
   const dbColor =
     volumeDb > 0.05
-      ? 'text-amber-400/90'
+      ? 'text-amber-700'
       : volumeDb > -0.05
-        ? 'text-emerald-400/80'
+        ? 'text-emerald-700'
         : 'text-muted-foreground/60'
 
   return (
     <div className="flex flex-col items-center h-full w-[60px] min-w-[60px] shrink-0">
       {/* Inset panel */}
-      <div className="flex flex-col items-center h-full w-full rounded-[3px] bg-black/30 shadow-[inset_0_1px_3px_rgba(0,0,0,0.4)] border border-border/20 px-1">
+      <div className="flex flex-col items-center h-full w-full rounded-[3px] bg-panel-header shadow-[inset_0_1px_2px_rgba(11,31,51,0.06)] border border-border px-1">
         {/* Label */}
         <div className="text-[10px] uppercase tracking-[0.15em] text-muted-foreground/70 py-1 leading-tight font-mono whitespace-nowrap">
           Bus 1
@@ -822,8 +824,8 @@ const BusMeter = memo(function BusMeter({
             type="button"
             className={`min-w-[28px] rounded-[3px] px-2 py-0.5 text-[9px] font-semibold tracking-[0.14em] transition-colors ${
               eqActive
-                ? 'border border-sky-400/50 bg-sky-500/15 text-sky-300 shadow-[0_0_10px_rgba(56,189,248,0.22)]'
-                : 'border border-transparent bg-muted/30 text-muted-foreground/45 hover:bg-sky-500/10 hover:text-sky-300'
+                ? 'border border-primary/40 bg-primary/10 text-primary'
+                : 'border border-transparent bg-muted text-muted-foreground/70 hover:bg-primary/10 hover:text-primary'
             } ${!onEqToggle ? 'pointer-events-none opacity-50' : ''}`}
             onClick={onEqToggle}
             aria-label="EQ Bus 1"
@@ -839,8 +841,8 @@ const BusMeter = memo(function BusMeter({
             type="button"
             className={`w-[18px] h-[16px] rounded-[3px] text-[9px] font-bold leading-none flex items-center justify-center transition-colors ${
               muted
-                ? 'bg-red-600 text-white shadow-[0_0_8px_rgba(220,38,38,0.4)]'
-                : 'bg-muted/40 text-muted-foreground/40 hover:bg-muted/70 hover:text-muted-foreground/70'
+                ? 'bg-red-600 text-white'
+                : 'bg-muted text-muted-foreground/70 hover:bg-accent hover:text-foreground'
             }`}
             onClick={onMuteToggle}
             aria-label="Mute master"
@@ -854,7 +856,7 @@ const BusMeter = memo(function BusMeter({
         <div className="flex-1 min-h-0 flex items-stretch gap-px py-1">
           {/* Stereo segmented meter bars */}
           <div className="flex gap-[2px] w-[14px] shrink-0">
-            <div className="relative flex-1 rounded-[2px] bg-[#08090b] overflow-hidden">
+            <div className="relative flex-1 rounded-[2px] bg-secondary shadow-[inset_0_1px_2px_rgba(11,31,51,0.12)] overflow-hidden">
               {/* Unlit LED backdrop */}
               <div
                 className="absolute inset-0 pointer-events-none"
@@ -864,7 +866,7 @@ const BusMeter = memo(function BusMeter({
               <div
                 ref={leftBarRef}
                 data-bus-channel="left"
-                className={`absolute inset-x-0 bottom-0 bg-gradient-to-t from-[#1be255] via-[#f5e146] to-[#ff6633] ${showScanningFallback ? 'opacity-50' : ''}`}
+                className={`absolute inset-x-0 bottom-0 bg-gradient-to-t from-green-600 via-yellow-500 to-red-600 ${showScanningFallback ? 'opacity-50' : ''}`}
                 style={{
                   height: '0%',
                   maskImage: SEGMENT_MASK,
@@ -873,7 +875,7 @@ const BusMeter = memo(function BusMeter({
                 }}
               />
             </div>
-            <div className="relative flex-1 rounded-[2px] bg-[#08090b] overflow-hidden">
+            <div className="relative flex-1 rounded-[2px] bg-secondary shadow-[inset_0_1px_2px_rgba(11,31,51,0.12)] overflow-hidden">
               {/* Unlit LED backdrop */}
               <div
                 className="absolute inset-0 pointer-events-none"
@@ -883,7 +885,7 @@ const BusMeter = memo(function BusMeter({
               <div
                 ref={rightBarRef}
                 data-bus-channel="right"
-                className={`absolute inset-x-0 bottom-0 bg-gradient-to-t from-[#1be255] via-[#f5e146] to-[#ff6633] ${showScanningFallback ? 'opacity-50' : ''}`}
+                className={`absolute inset-x-0 bottom-0 bg-gradient-to-t from-green-600 via-yellow-500 to-red-600 ${showScanningFallback ? 'opacity-50' : ''}`}
                 style={{
                   height: '0%',
                   maskImage: SEGMENT_MASK,
@@ -933,7 +935,7 @@ const BusMeter = memo(function BusMeter({
                   height: `${FADER_KNOB_HEIGHT_PX}px`,
                 }}
               >
-                <div className="w-full h-full rounded-[4px] bg-gradient-to-b from-[#d4c9a8] to-[#b8ad8e] shadow-[0_1px_4px_rgba(0,0,0,0.6),inset_0_1px_0_rgba(255,255,255,0.25)] border border-[#9a9076]/50">
+                <div className="w-full h-full rounded-[4px] bg-gradient-to-b from-[#d4c9a8] to-[#b8ad8e] shadow-[0_1px_3px_rgba(11,31,51,0.3),inset_0_1px_0_rgba(255,255,255,0.5)] border border-[#9a9076]/70">
                   <div className="absolute inset-x-[3px] top-[7px] h-px bg-[#6b6350]/45" />
                   <div className="absolute inset-x-[3px] top-[10px] h-px bg-[#6b6350]/45" />
                   <div className="absolute inset-x-[3px] top-[13px] h-px bg-[#6b6350]/45" />
@@ -1182,8 +1184,8 @@ export const AudioMixerView = memo(function AudioMixerView({
 }: AudioMixerViewProps) {
   const { t } = useTranslation()
   const outerClassName = expanded
-    ? 'panel-bg flex h-full flex-col overflow-hidden w-fit'
-    : 'panel-bg border-l border-border flex h-full flex-col overflow-hidden w-fit'
+    ? 'bg-panel-bg flex h-full flex-col overflow-hidden w-fit'
+    : 'bg-panel-bg border-l border-border flex h-full flex-col overflow-hidden w-fit'
 
   const allItemIds = useMemo(() => tracks.flatMap((track) => track.itemIds), [tracks])
 
@@ -1200,7 +1202,7 @@ export const AudioMixerView = memo(function AudioMixerView({
           </span>
           {headerExtra ?? (
             <span
-              className={`h-2 w-2 rounded-full ${isPlaying ? 'bg-emerald-400 shadow-[0_0_8px_rgba(74,222,128,0.7)]' : 'bg-muted-foreground/30'}`}
+              className={`h-2 w-2 rounded-full ${isPlaying ? 'bg-emerald-600' : 'bg-muted-foreground/30'}`}
               aria-hidden="true"
             />
           )}

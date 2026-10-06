@@ -89,6 +89,8 @@
       "uiSoundPreview": "Aperçu"
     },
     "ai": {
+      "autoAnalyzeOnOpen": "Analyser les médias à l'ouverture d'un projet",
+      "autoAnalyzeOnOpenDescription": "Transcrire et analyser visuellement les nouvelles vidéos en arrière-plan pour trier les clips en Intervenant et B-roll.",
       "captionSampleInterval": "Intervalle d'échantillonnage des sous-titres",
       "captionSampleIntervalDescription": "Fréquence à laquelle Analyser avec l'IA échantillonne une image pour le sous-titrage.",
       "seconds": "Secondes",

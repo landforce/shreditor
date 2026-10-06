@@ -43,11 +43,11 @@ export function DopesheetLegendPopover({ disabled }: DopesheetLegendPopoverProps
         </p>
         <ul className="mb-2 space-y-1 text-muted-foreground">
           <li className="flex items-start gap-1.5">
-            <LineChart className="mt-px h-3 w-3 flex-shrink-0 text-orange-500" />
+            <LineChart className="mt-px h-3 w-3 flex-shrink-0 text-orange-600" />
             <span>{t('timeline.keyframeEditor.legend.iconCurve')}</span>
           </li>
           <li className="flex items-start gap-1.5">
-            <Lock className="mt-px h-3 w-3 flex-shrink-0 text-red-400" />
+            <Lock className="mt-px h-3 w-3 flex-shrink-0 text-red-600" />
             <span>{t('timeline.keyframeEditor.legend.iconLock')}</span>
           </li>
           <li className="flex items-start gap-1.5">
@@ -55,7 +55,7 @@ export function DopesheetLegendPopover({ disabled }: DopesheetLegendPopoverProps
             <span>{t('timeline.keyframeEditor.legend.iconAutoKey')}</span>
           </li>
           <li className="flex items-start gap-1.5">
-            <span className="mt-0.5 block h-2 w-2 flex-shrink-0 rotate-45 bg-neutral-200" />
+            <span className="mt-0.5 block h-2 w-2 flex-shrink-0 rotate-45 bg-muted-foreground" />
             <span>{t('timeline.keyframeEditor.legend.iconDiamond')}</span>
           </li>
         </ul>
@@ -65,11 +65,11 @@ export function DopesheetLegendPopover({ disabled }: DopesheetLegendPopoverProps
         </p>
         <ul className="space-y-1 text-muted-foreground">
           <li className="flex items-start gap-1.5">
-            <span className="mt-0.5 block h-2 w-2 flex-shrink-0 rotate-45 bg-neutral-200" />
+            <span className="mt-0.5 block h-2 w-2 flex-shrink-0 rotate-45 bg-muted-foreground" />
             <span>{t('timeline.keyframeEditor.legend.colorDefault')}</span>
           </li>
           <li className="flex items-start gap-1.5">
-            <span className="mt-0.5 block h-2 w-2 flex-shrink-0 rotate-45 bg-blue-500 shadow-[0_0_0_1px_rgba(59,130,246,0.45)]" />
+            <span className="mt-0.5 block h-2 w-2 flex-shrink-0 rotate-45 bg-primary shadow-[0_0_0_1px_rgba(37,81,163,0.45)]" />
             <span>{t('timeline.keyframeEditor.legend.colorSelected')}</span>
           </li>
         </ul>

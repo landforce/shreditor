@@ -56,7 +56,7 @@ const GraphCurve = memo(function GraphCurve({
   }, [startPoint, endPoint, easingConfig])
 
   // Always use orange for curves (blue glow added when selected)
-  const color = strokeColor || '#f97316'
+  const color = strokeColor || '#ea580c'
 
   return (
     <g className="graph-curve" style={{ pointerEvents: 'none' }}>
@@ -65,7 +65,7 @@ const GraphCurve = memo(function GraphCurve({
         <path
           d={path}
           fill="none"
-          stroke="#3b82f6"
+          stroke="#00b5c9"
           strokeWidth={5}
           strokeLinecap="round"
           strokeLinejoin="round"
@@ -381,7 +381,7 @@ export const GraphPlayhead = memo(function GraphPlayhead({
       )}
       {visuals === 'visible' && (
         <>
-          {/* Playhead line — orange, matching the dopesheet body line and the
+          {/* Playhead line — red, matching the dopesheet body line and the
               main timeline playhead; the flag handle is rendered once in the
               shared ruler. */}
           <line
@@ -393,7 +393,7 @@ export const GraphPlayhead = memo(function GraphPlayhead({
             strokeWidth={1}
             onPointerDown={isInteractive ? handlePointerDown : undefined}
             style={{
-              filter: 'drop-shadow(0 0 5px rgba(255, 140, 58, 0.65))',
+              filter: 'drop-shadow(0 0 3px rgba(29, 33, 41, 0.25))',
               cursor: isInteractive ? 'ew-resize' : 'default',
             }}
           />

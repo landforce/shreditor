@@ -16,14 +16,17 @@ import {
   UserRound,
   Video,
 } from 'lucide-react'
-import type { MediaMetadata } from '@/types/storage'
-import { getMediaType } from '../utils/validation'
+import type { MediaCategory, MediaMetadata } from '@/types/storage'
 import {
-  groupMediaByCategory,
-  hasMediaCategories,
+  groupMediaSections,
+  isMediaCategory,
   MEDIA_CATEGORIES,
+  mediaTypeGroupOf,
   UNCATEGORIZED,
+  type MediaTypeGroupKey,
 } from '../utils/media-categories'
+import type { MediaRole } from '../utils/media-role'
+import { useMediaRoles } from './use-media-roles'
 
 export const MEDIA_GROUP_ICONS = {
   video: Video,
@@ -65,54 +68,62 @@ export const ALL_MEDIA_GROUP_KEYS = [
   ...[...MEDIA_CATEGORIES, UNCATEGORIZED].map(categoryGroupKey),
 ]
 
-type TypeGroupKey = 'video' | 'audio' | 'image' | 'gif' | 'lottie'
-
 const TYPE_GROUP_LABELS = {
   video: 'media.library.groupVideos',
   audio: 'media.library.groupAudio',
   image: 'media.library.groupImages',
   gif: 'media.library.groupGifs',
   lottie: 'media.library.groupLottie',
-} as const satisfies Record<TypeGroupKey, string>
+} as const satisfies Record<MediaTypeGroupKey, string>
 
-function typeGroupOf(item: MediaMetadata): TypeGroupKey {
-  if (item.mimeType === 'image/gif') return 'gif'
-  const type = getMediaType(item.mimeType)
-  return type === 'video' || type === 'audio' || type === 'lottie' ? type : 'image'
+const AUTO_ROLE_CATEGORY: Partial<Record<MediaRole, MediaCategory>> = {
+  speaker: 'speaker',
+  broll: 'b-roll',
 }
 
 /**
- * The media library's sections. By file type, unless some media in the
- * project (`allItems`, unfiltered, so a search doesn't flip the layout) has a
- * category: then by category, uncategorized last. `filteredItems` keep their
+ * The media library's sections (see {@link groupMediaSections}). A saved
+ * category always wins; uncategorized videos use the speaker / b-roll role
+ * inferred from transcript + visual analysis. `filteredItems` keep their
  * search, filter and sort within each group.
  */
-export function useMediaGroups(
-  filteredItems: MediaMetadata[],
-  allItems: MediaMetadata[],
-): MediaGroup[] {
+export function useMediaGroups(filteredItems: MediaMetadata[]): MediaGroup[] {
   const { t } = useTranslation()
-  const byCategory = useMemo(() => hasMediaCategories(allItems), [allItems])
+  const uncategorizedVideos = useMemo(
+    () =>
+      filteredItems.filter(
+        (item) => !isMediaCategory(item.category) && mediaTypeGroupOf(item) === 'video',
+      ),
+    [filteredItems],
+  )
+  const videoRoles = useMediaRoles(uncategorizedVideos)
+
   return useMemo(() => {
-    if (byCategory) {
-      return groupMediaByCategory(filteredItems).map(({ key, items }) => ({
-        key: categoryGroupKey(key),
-        label: t(`media.category.${key}`),
-        icon: key,
-        items,
-      }))
-    }
-    const buckets = new Map<TypeGroupKey, MediaMetadata[]>()
-    for (const item of filteredItems) {
-      const key = typeGroupOf(item)
-      const bucket = buckets.get(key)
-      if (bucket) bucket.push(item)
-      else buckets.set(key, [item])
-    }
-    const order: TypeGroupKey[] = ['video', 'audio', 'image', 'gif', 'lottie']
-    return order.flatMap((key) => {
-      const items = buckets.get(key)
-      return items ? [{ key, label: t(TYPE_GROUP_LABELS[key]), icon: key, items }] : []
-    })
-  }, [byCategory, filteredItems, t])
+    const sections = groupMediaSections(
+      filteredItems,
+      (item) => AUTO_ROLE_CATEGORY[videoRoles.get(item.id) ?? 'pending'],
+    )
+    const anyVideoSorted = sections.some(
+      (s) => s.kind === 'category' && (s.key === 'speaker' || s.key === 'b-roll'),
+    )
+    return sections.map((section) =>
+      section.kind === 'category'
+        ? {
+            key: categoryGroupKey(section.key),
+            label: t(`media.category.${section.key}`),
+            icon: section.key,
+            items: section.items,
+          }
+        : {
+            key: section.key,
+            // Videos not sorted yet read as "Analyzing" once others have a role
+            label:
+              section.key === 'video' && anyVideoSorted
+                ? t('media.library.groupAnalyzing')
+                : t(TYPE_GROUP_LABELS[section.key]),
+            icon: section.key,
+            items: section.items,
+          },
+    )
+  }, [filteredItems, videoRoles, t])
 }

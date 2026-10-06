@@ -360,8 +360,8 @@ export function ProjectDebugPanel({ projectId }: ProjectDebugPanelProps) {
   return (
     <div className="text-sm">
       {/* Header */}
-      <div className="flex items-center gap-2 px-3 py-2 border-b border-zinc-700">
-        <Bug className="h-4 w-4 text-amber-500" />
+      <div className="flex items-center gap-2 px-3 py-2 border-b border-border">
+        <Bug className="h-4 w-4 text-amber-600" />
         <span className="font-medium">Debug Panel</span>
       </div>
 
@@ -370,9 +370,9 @@ export function ProjectDebugPanel({ projectId }: ProjectDebugPanelProps) {
         <div
           className={cn(
             'px-3 py-1.5 text-xs flex items-center gap-2',
-            status.type === 'loading' && 'bg-blue-500/20 text-blue-300',
-            status.type === 'success' && 'bg-green-500/20 text-green-300',
-            status.type === 'error' && 'bg-red-500/20 text-red-300',
+            status.type === 'loading' && 'bg-blue-500/15 text-blue-700',
+            status.type === 'success' && 'bg-green-500/15 text-green-700',
+            status.type === 'error' && 'bg-red-500/15 text-red-700',
           )}
         >
           {status.type === 'loading' && (
@@ -387,7 +387,7 @@ export function ProjectDebugPanel({ projectId }: ProjectDebugPanelProps) {
       {/* Content */}
       <Collapsible open={isExpanded} onOpenChange={setIsExpanded}>
         <CollapsibleTrigger asChild>
-          <button className="w-full px-3 py-2 flex items-center justify-between hover:bg-zinc-800/50 text-xs text-zinc-400">
+          <button className="w-full px-3 py-2 flex items-center justify-between hover:bg-accent text-xs text-muted-foreground">
             <span>Project: {projectId.slice(0, 8)}...</span>
             <ChevronDown
               className={cn('h-3.5 w-3.5 transition-transform', isExpanded && 'rotate-180')}
@@ -399,7 +399,7 @@ export function ProjectDebugPanel({ projectId }: ProjectDebugPanelProps) {
           <div className="px-2 pb-2 space-y-3">
             {/* Overlays Section */}
             <div>
-              <div className="px-1 py-1 text-[10px] uppercase tracking-wider text-zinc-500 font-medium">
+              <div className="px-1 py-1 text-[10px] uppercase tracking-wider text-muted-foreground font-medium">
                 Overlays
               </div>
               <div className="space-y-0.5">
@@ -408,7 +408,7 @@ export function ProjectDebugPanel({ projectId }: ProjectDebugPanelProps) {
                   size="sm"
                   className={cn(
                     'w-full justify-start gap-2 h-8 text-xs',
-                    showVideoDebugOverlay && 'bg-amber-500/20 text-amber-300',
+                    showVideoDebugOverlay && 'bg-amber-500/15 text-amber-800',
                   )}
                   onClick={toggleVideoDebugOverlay}
                   title="Show debug info on video clips"
@@ -416,7 +416,7 @@ export function ProjectDebugPanel({ projectId }: ProjectDebugPanelProps) {
                   <Eye className="h-3.5 w-3.5" />
                   Video Debug Overlay
                   {showVideoDebugOverlay && (
-                    <span className="ml-auto text-[10px] bg-amber-500/30 px-1.5 py-0.5 rounded">
+                    <span className="ml-auto text-[10px] bg-amber-500/25 px-1.5 py-0.5 rounded">
                       ON
                     </span>
                   )}
@@ -426,7 +426,7 @@ export function ProjectDebugPanel({ projectId }: ProjectDebugPanelProps) {
                   size="sm"
                   className={cn(
                     'w-full justify-start gap-2 h-8 text-xs',
-                    showPreviewPerfPanel && 'bg-amber-500/20 text-amber-300',
+                    showPreviewPerfPanel && 'bg-amber-500/15 text-amber-800',
                   )}
                   onClick={togglePreviewPerfPanel}
                   title="Show preview performance diagnostics"
@@ -434,7 +434,7 @@ export function ProjectDebugPanel({ projectId }: ProjectDebugPanelProps) {
                   <Eye className="h-3.5 w-3.5" />
                   Preview Perf Panel
                   {showPreviewPerfPanel && (
-                    <span className="ml-auto text-[10px] bg-amber-500/30 px-1.5 py-0.5 rounded">
+                    <span className="ml-auto text-[10px] bg-amber-500/25 px-1.5 py-0.5 rounded">
                       ON
                     </span>
                   )}
@@ -444,7 +444,7 @@ export function ProjectDebugPanel({ projectId }: ProjectDebugPanelProps) {
 
             {/* Export Section */}
             <div>
-              <div className="px-1 py-1 text-[10px] uppercase tracking-wider text-zinc-500 font-medium">
+              <div className="px-1 py-1 text-[10px] uppercase tracking-wider text-muted-foreground font-medium">
                 Export
               </div>
               <div className="space-y-0.5">
@@ -456,7 +456,7 @@ export function ProjectDebugPanel({ projectId }: ProjectDebugPanelProps) {
 
             {/* Import Section */}
             <div>
-              <div className="px-1 py-1 text-[10px] uppercase tracking-wider text-zinc-500 font-medium">
+              <div className="px-1 py-1 text-[10px] uppercase tracking-wider text-muted-foreground font-medium">
                 Import
               </div>
               <div className="space-y-0.5">
@@ -468,7 +468,7 @@ export function ProjectDebugPanel({ projectId }: ProjectDebugPanelProps) {
 
             {/* Inspect Section */}
             <div>
-              <div className="px-1 py-1 text-[10px] uppercase tracking-wider text-zinc-500 font-medium">
+              <div className="px-1 py-1 text-[10px] uppercase tracking-wider text-muted-foreground font-medium">
                 Inspect Live State
               </div>
               <div className="space-y-0.5">
@@ -480,7 +480,7 @@ export function ProjectDebugPanel({ projectId }: ProjectDebugPanelProps) {
 
             {/* Storage Section */}
             <div>
-              <div className="px-1 py-1 text-[10px] uppercase tracking-wider text-zinc-500 font-medium">
+              <div className="px-1 py-1 text-[10px] uppercase tracking-wider text-muted-foreground font-medium">
                 Storage
               </div>
               <div className="space-y-0.5">
@@ -492,7 +492,7 @@ export function ProjectDebugPanel({ projectId }: ProjectDebugPanelProps) {
 
             {/* Fixtures Section */}
             <div>
-              <div className="px-1 py-1 text-[10px] uppercase tracking-wider text-zinc-500 font-medium flex items-center gap-1">
+              <div className="px-1 py-1 text-[10px] uppercase tracking-wider text-muted-foreground font-medium flex items-center gap-1">
                 <FlaskConical className="h-3 w-3" />
                 Synthetic Fixtures
               </div>
@@ -501,15 +501,17 @@ export function ProjectDebugPanel({ projectId }: ProjectDebugPanelProps) {
                   value={selectedFixture}
                   onValueChange={(value) => setSelectedFixture(value as FixtureType)}
                 >
-                  <SelectTrigger className="h-7 text-xs bg-zinc-800 border-zinc-700">
+                  <SelectTrigger className="h-7 text-xs bg-card border-input">
                     <SelectValue placeholder="Select fixture..." />
                   </SelectTrigger>
-                  <SelectContent className="bg-zinc-800 border-zinc-700">
+                  <SelectContent className="bg-popover border-border">
                     {availableFixtures.map((fixture) => (
                       <SelectItem key={fixture.type} value={fixture.type} className="text-xs">
                         <div className="flex flex-col">
                           <span>{fixture.name}</span>
-                          <span className="text-[10px] text-zinc-500">{fixture.description}</span>
+                          <span className="text-[10px] text-muted-foreground">
+                            {fixture.description}
+                          </span>
                         </div>
                       </SelectItem>
                     ))}
@@ -553,10 +555,10 @@ export function ProjectDebugPanel({ projectId }: ProjectDebugPanelProps) {
             </div>
 
             {/* Console Hint */}
-            <div className="px-1 pt-2 border-t border-zinc-800">
-              <p className="text-[10px] text-zinc-500">
+            <div className="px-1 pt-2 border-t border-border">
+              <p className="text-[10px] text-muted-foreground">
                 Also available via{' '}
-                <code className="bg-zinc-800 px-1 rounded">window.__DEBUG__</code>
+                <code className="bg-secondary px-1 rounded">window.__DEBUG__</code>
               </p>
             </div>
           </div>

@@ -119,7 +119,7 @@ export function RouteErrorScreen({ error, reset }: ErrorComponentProps) {
       <div className="w-full max-w-md">
         <ShreditorLogo variant="full" size="md" className="mb-6 justify-center" />
 
-        <main className="rounded-2xl border border-border/80 bg-card/70 px-6 py-8 text-center shadow-2xl shadow-black/20 backdrop-blur-sm sm:px-8">
+        <main className="rounded-2xl border border-border/80 bg-card/70 px-6 py-8 text-center shadow-float backdrop-blur-sm sm:px-8">
           <div
             className={
               projectNotFound

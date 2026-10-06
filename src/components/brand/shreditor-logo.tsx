@@ -24,7 +24,8 @@ const sizeConfig = {
   },
 }
 
-// A frame cut into offset strips: the edit, shredded.
+// A frame cut into offset strips: the edit, shredded. Drawn in navy ink so
+// the mark and wordmark read as one on paper.
 function ShredMark({ className }: { className?: string }) {
   return (
     <svg
@@ -46,15 +47,13 @@ export function ShreditorLogo({ variant = 'full', size = 'md', className }: Shre
   const config = sizeConfig[size]
 
   if (variant === 'icon') {
-    return <ShredMark className={cn(config.icon, 'text-primary', className)} />
+    return <ShredMark className={cn(config.icon, 'text-ink', className)} />
   }
 
   return (
     <div className={cn('flex items-center', config.gap, className)}>
-      <ShredMark className={cn(config.icon, 'text-primary')} />
-      <span className={cn(config.text, 'font-semibold tracking-tight text-foreground')}>
-        Shreditor
-      </span>
+      <ShredMark className={cn(config.icon, 'text-ink')} />
+      <span className={cn(config.text, 'font-semibold tracking-tight text-ink')}>Shreditor</span>
     </div>
   )
 }

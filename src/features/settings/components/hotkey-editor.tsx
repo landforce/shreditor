@@ -236,10 +236,10 @@ function HotkeyBindingPill({
           <kbd
             key={`${binding}-${token}`}
             className={cn(
-              'min-w-8 rounded-lg border px-2.5 py-1 text-[11px] font-mono tracking-wide shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] transition-colors duration-150 ease-out motion-reduce:transition-none',
+              'min-w-8 rounded-lg border px-2.5 py-1 text-[11px] font-mono tracking-wide shadow-[0_1px_0_rgba(11,31,51,0.08)] transition-colors duration-150 ease-out motion-reduce:transition-none',
               isActive
                 ? 'border-primary/55 bg-primary/18 text-foreground'
-                : 'border-white/8 bg-white/6 text-foreground/90',
+                : 'border-border bg-card text-foreground/90',
               isListening && 'border-primary/60 bg-primary/20 text-primary',
             )}
           >
@@ -268,7 +268,7 @@ function HotkeyBindingPill({
       onClick={onClick}
       className={cn(
         'rounded-xl p-1 transition-colors duration-150 ease-out motion-reduce:transition-none',
-        isActive ? 'bg-primary/10' : 'hover:bg-white/5',
+        isActive ? 'bg-primary/10' : 'hover:bg-accent',
       )}
     >
       {content}
@@ -281,13 +281,13 @@ function HotkeyBindingPill({
 // ---------------------------------------------------------------------------
 
 const KEY_BASE_CLASSES =
-  'flex h-[3.25rem] items-center justify-center rounded-lg border text-[11px] font-medium tracking-[0.06em] shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_8px_20px_rgba(0,0,0,0.22)] transition-[background-color,border-color,color,box-shadow] duration-150 ease-out motion-reduce:transition-none select-none'
+  'flex h-[3.25rem] items-center justify-center rounded-lg border text-[11px] font-medium tracking-[0.06em] shadow-[inset_0_-1px_0_rgba(11,31,51,0.06),0_1px_2px_rgba(11,31,51,0.08)] transition-[background-color,border-color,color,box-shadow] duration-150 ease-out motion-reduce:transition-none select-none'
 
 const KEY_ACTIVE_CLASSES =
-  'border-primary/55 bg-primary/18 text-primary shadow-[inset_0_1px_0_rgba(255,255,255,0.12),0_0_20px_rgba(255,140,58,0.14)]'
+  'border-primary/55 bg-primary/18 text-primary shadow-[0_0_0_1px_rgba(37,81,163,0.12),0_2px_8px_rgba(37,81,163,0.14)]'
 
 const KEY_IDLE_CLASSES =
-  'border-white/6 bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] text-foreground/78'
+  'border-border bg-[linear-gradient(180deg,#ffffff,#fafbfc)] text-foreground/78'
 
 function KeyCap({
   keySpec,
@@ -337,7 +337,7 @@ function KeyCap({
         aria-pressed={isActive}
         className={cn(
           capClassName,
-          'cursor-pointer hover:border-white/12 hover:text-foreground/92 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60',
+          'cursor-pointer hover:border-foreground/20 hover:text-foreground/92 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60',
         )}
         style={{ flex: keySpec.width ?? 1 }}
         onClick={onClick}
@@ -996,7 +996,7 @@ export function HotkeyEditor() {
   }
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col bg-[radial-gradient(circle_at_top,rgba(255,140,58,0.14),transparent_32%),linear-gradient(180deg,rgba(255,255,255,0.03),rgba(255,255,255,0))]">
+    <div className="flex min-h-0 flex-1 flex-col bg-[radial-gradient(circle_at_top,rgba(37,81,163,0.06),transparent_32%)]">
       <input
         ref={fileInputRef}
         type="file"
@@ -1006,7 +1006,7 @@ export function HotkeyEditor() {
       />
 
       {/* ── Header ── */}
-      <div className="flex items-center gap-4 border-b border-white/6 px-5 py-2.5">
+      <div className="flex items-center gap-4 border-b border-border px-5 py-2.5">
         <div className="flex flex-1 items-center gap-2.5">
           <Keyboard className="h-4 w-4 shrink-0 text-muted-foreground" />
           <span className="text-sm font-medium text-foreground">
@@ -1019,7 +1019,7 @@ export function HotkeyEditor() {
         <span className="shrink-0 rounded-full border border-primary/20 bg-primary/10 px-2.5 py-0.5 text-[11px] font-medium uppercase tracking-[0.18em] text-primary">
           {t('projects.settings.hotkeys.customCount', { count: customCount })}
         </span>
-        <DialogPrimitive.Close className="shrink-0 rounded-md border border-white/10 bg-white/5 p-1.5 text-muted-foreground transition-colors hover:bg-white/10 hover:text-foreground">
+        <DialogPrimitive.Close className="shrink-0 rounded-md border border-border bg-card p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground">
           <X className="h-4 w-4" />
           <span className="sr-only">{t('common.close')}</span>
         </DialogPrimitive.Close>
@@ -1027,16 +1027,16 @@ export function HotkeyEditor() {
 
       {/* ── Full-width keyboard preview with section layers ── */}
       <div className="px-4 pb-3 md:px-5">
-        <div className="flex min-h-[380px] overflow-hidden rounded-lg border border-white/7 bg-[#0d0d0f]/90">
+        <div className="flex min-h-[380px] overflow-hidden rounded-lg border border-border bg-secondary">
           {/* Section layers sidebar */}
-          <div className="flex w-44 shrink-0 flex-col gap-0.5 border-r border-white/6 p-2 xl:w-52">
+          <div className="flex w-44 shrink-0 flex-col gap-0.5 border-r border-border p-2 xl:w-52">
             <div className="relative mb-2">
               <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
               <Input
                 value={searchQuery}
                 onChange={(event) => setSearchQuery(event.target.value)}
                 placeholder={t('projects.settings.hotkeys.searchPlaceholder')}
-                className="h-8 border-white/10 bg-white/5 pl-8 pr-2 text-xs"
+                className="h-8 border-input bg-card pl-8 pr-2 text-xs"
               />
             </div>
             {!hasSearchQuery ? (
@@ -1055,7 +1055,7 @@ export function HotkeyEditor() {
                       'rounded-md border px-2 py-1 text-[10px] font-medium uppercase tracking-[0.1em] transition-colors duration-150 ease-out motion-reduce:transition-none',
                       filterMode === mode
                         ? 'border-primary/45 bg-primary/15 text-primary'
-                        : 'border-white/8 bg-white/4 text-muted-foreground hover:text-foreground/80',
+                        : 'border-border bg-foreground/[0.04] text-muted-foreground hover:text-foreground/80',
                     )}
                   >
                     {t(`projects.settings.hotkeys.filters.${mode}`)} {filterCounts[mode]}
@@ -1085,7 +1085,7 @@ export function HotkeyEditor() {
                               'w-full rounded-lg px-2.5 py-2 text-left transition-colors duration-150 ease-out motion-reduce:transition-none',
                               isSelectedResult
                                 ? 'bg-primary/15 text-primary'
-                                : 'text-muted-foreground hover:bg-white/5 hover:text-foreground/80',
+                                : 'text-muted-foreground hover:bg-accent hover:text-foreground/80',
                             )}
                           >
                             <div className="text-[11px] font-medium leading-4 text-foreground">
@@ -1107,7 +1107,7 @@ export function HotkeyEditor() {
                       )
                     })
                   ) : (
-                    <div className="rounded-lg border border-white/8 bg-white/4 px-2.5 py-2 text-xs leading-4 text-muted-foreground">
+                    <div className="rounded-lg border border-border bg-foreground/[0.04] px-2.5 py-2 text-xs leading-4 text-muted-foreground">
                       {t('projects.settings.hotkeys.noSearchResults')}
                     </div>
                   )}
@@ -1126,12 +1126,12 @@ export function HotkeyEditor() {
                     'rounded-lg px-3 py-2 text-left text-[11px] font-medium uppercase tracking-[0.16em] transition-colors duration-150 ease-out motion-reduce:transition-none',
                     activeLayer === null
                       ? 'bg-primary/15 text-primary'
-                      : 'text-muted-foreground hover:bg-white/5 hover:text-foreground/80',
+                      : 'text-muted-foreground hover:bg-accent hover:text-foreground/80',
                   )}
                 >
                   {t('projects.settings.hotkeys.all')}
                 </button>
-                <div className="my-1 border-t border-white/6" />
+                <div className="my-1 border-t border-border" />
                 {HOTKEY_EDITOR_SECTIONS.map((section) => (
                   <button
                     key={section.titleKey}
@@ -1146,7 +1146,7 @@ export function HotkeyEditor() {
                       'rounded-lg px-3 py-2 text-left text-[11px] font-medium uppercase tracking-[0.16em] transition-colors duration-150 ease-out motion-reduce:transition-none',
                       activeLayer === section
                         ? 'bg-primary/15 text-primary'
-                        : 'text-muted-foreground hover:bg-white/5 hover:text-foreground/80',
+                        : 'text-muted-foreground hover:bg-accent hover:text-foreground/80',
                     )}
                   >
                     {t(section.titleKey)}
@@ -1175,11 +1175,11 @@ export function HotkeyEditor() {
           </div>
 
           {/* Selected command panel — beside keyboard */}
-          <div className="w-[280px] shrink-0 space-y-3 border-l border-white/6 p-4 pt-5">
+          <div className="w-[280px] shrink-0 space-y-3 border-l border-border p-4 pt-5">
             <div aria-live="polite" role="status" className="sr-only">
               {liveMessage}
             </div>
-            <div className="border-b border-white/6 pb-3">
+            <div className="border-b border-border pb-3">
               <div className="flex items-start justify-between gap-2">
                 <div>
                   <div className="text-[10px] uppercase tracking-[0.22em] text-muted-foreground">
@@ -1196,7 +1196,7 @@ export function HotkeyEditor() {
                 ) : null}
               </div>
               {selectedSection?.scopeKey ? (
-                <div className="mt-2 flex items-center gap-1.5 rounded-md border border-white/8 bg-white/4 px-2 py-1 text-[10px] leading-4 text-muted-foreground">
+                <div className="mt-2 flex items-center gap-1.5 rounded-md border border-border bg-foreground/[0.04] px-2 py-1 text-[10px] leading-4 text-muted-foreground">
                   <span className="shrink-0 rounded-sm bg-primary/15 px-1.5 py-0.5 font-medium uppercase tracking-[0.12em] text-primary">
                     {t('projects.settings.hotkeys.scopedBadge')}
                   </span>
@@ -1241,7 +1241,7 @@ export function HotkeyEditor() {
                       'rounded-lg border p-2 transition-colors duration-150 ease-out motion-reduce:transition-none',
                       selectedKey === key
                         ? 'border-primary/35 bg-primary/8'
-                        : 'border-white/6 bg-white/3',
+                        : 'border-border bg-foreground/[0.03]',
                     )}
                   >
                     <div className="mb-1.5 flex items-center justify-between">
@@ -1253,7 +1253,7 @@ export function HotkeyEditor() {
                           type="button"
                           aria-label={t('projects.settings.hotkeys.removeBinding')}
                           onClick={() => unbindHotkeyBinding(key)}
-                          className="rounded p-0.5 text-muted-foreground transition-colors hover:bg-white/10 hover:text-foreground"
+                          className="rounded p-0.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
                         >
                           <X className="h-3 w-3" />
                         </button>
@@ -1288,8 +1288,8 @@ export function HotkeyEditor() {
             <AnimatePresence initial={false}>
               {selectedBrowserHotkey ? (
                 <CollapseBlock reduce={reduceMotion}>
-                  <div className="rounded-lg border border-amber-500/20 bg-amber-500/8 p-3 text-xs">
-                    <div className="flex items-center gap-1.5 text-amber-300">
+                  <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs">
+                    <div className="flex items-center gap-1.5 text-amber-700">
                       <AlertTriangle className="h-3.5 w-3.5" />
                       {t('projects.settings.hotkeys.browserOverride')}
                     </div>
@@ -1433,7 +1433,7 @@ export function HotkeyEditor() {
                     <AnimatePresence initial={false}>
                       {pendingBrowserHotkey ? (
                         <CollapseBlock reduce={reduceMotion}>
-                          <div className="mt-2 flex items-start gap-1.5 text-xs text-amber-300">
+                          <div className="mt-2 flex items-start gap-1.5 text-xs text-amber-700">
                             <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
                             <span>
                               {t('projects.settings.hotkeys.thisOverrides', {
@@ -1453,7 +1453,7 @@ export function HotkeyEditor() {
               {t('projects.settings.hotkeys.importExportHint')}
             </p>
 
-            <div className="border-t border-white/6 pt-3">
+            <div className="border-t border-border pt-3">
               <AlertDialog open={isResetAllDialogOpen} onOpenChange={setIsResetAllDialogOpen}>
                 <Button
                   variant="destructive"
@@ -1493,7 +1493,7 @@ export function HotkeyEditor() {
       {/* ── Command list — height animates to fit its content so the dialog
           shrinks for short sections; tall content caps at 50vh and scrolls. ── */}
       <motion.div
-        className="min-h-0 overflow-hidden border-t border-white/8"
+        className="min-h-0 overflow-hidden border-t border-border"
         initial={false}
         animate={{ height: commandListHeight ?? 'auto' }}
         transition={
@@ -1523,10 +1523,10 @@ export function HotkeyEditor() {
                               splitHotkeyBinding(hotkeys[k]).includes(hoveredToken),
                             ))
                           ? 'border-primary/35 bg-primary/10'
-                          : 'border-white/7 bg-white/4'
+                          : 'border-border bg-foreground/[0.04]'
                         : item.keys.includes(selectedKey)
                           ? 'border-primary/35 bg-primary/10'
-                          : 'border-white/7 bg-white/4 hover:border-white/12 hover:bg-white/6',
+                          : 'border-border bg-foreground/[0.04] hover:border-foreground/20 hover:bg-accent',
                     )}
                     onMouseEnter={() => setHoveredKey(item.keys[0]!)}
                     onMouseLeave={() => setHoveredKey(null)}
@@ -1596,7 +1596,7 @@ export function HotkeyEditor() {
                     })}`
                   : ''}
               </div>
-              <div className="max-h-56 space-y-1 overflow-y-auto rounded-md border border-white/8 bg-white/3 p-2">
+              <div className="max-h-56 space-y-1 overflow-y-auto rounded-md border border-border bg-foreground/[0.03] p-2">
                 {pendingImport.changes.map((change) => (
                   <div key={change.key} className="flex items-center justify-between gap-2 text-xs">
                     <span className="min-w-0 flex-1 truncate text-foreground/90">

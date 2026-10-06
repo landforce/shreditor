@@ -164,6 +164,7 @@
       "generateProxiesForSelected": "为 {{count}} 个所选项生成代理",
       "generatingProxies": "正在生成代理…",
       "generatingTranscripts": "正在生成字幕…",
+      "groupAnalyzing": "分析中",
       "interpolatingFrames": "正在插帧…",
       "interpolationProgress": "插帧进度",
       "timeRemaining": "剩余 {{time}}",

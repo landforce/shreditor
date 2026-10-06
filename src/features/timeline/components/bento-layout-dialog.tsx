@@ -46,14 +46,14 @@ const BUILT_IN_PRESETS: BuiltInPreset[] = [
 // â”€â”€ Item type colors â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const ITEM_TYPE_COLORS: Record<string, { bg: string; border: string }> = {
-  video: { bg: 'bg-blue-500/60', border: 'border-blue-400/80' },
-  image: { bg: 'bg-green-500/60', border: 'border-green-400/80' },
-  text: { bg: 'bg-amber-500/60', border: 'border-amber-400/80' },
-  shape: { bg: 'bg-purple-500/60', border: 'border-purple-400/80' },
-  adjustment: { bg: 'bg-violet-500/60', border: 'border-violet-400/80' },
+  video: { bg: 'bg-timeline-video/85', border: 'border-timeline-video' },
+  image: { bg: 'bg-timeline-image/85', border: 'border-timeline-image' },
+  text: { bg: 'bg-timeline-text/85', border: 'border-timeline-text' },
+  shape: { bg: 'bg-timeline-shape/85', border: 'border-timeline-shape' },
+  adjustment: { bg: 'bg-purple-600/85', border: 'border-purple-700' },
 }
 
-const DEFAULT_COLOR = { bg: 'bg-muted-foreground/40', border: 'border-muted-foreground/60' }
+const DEFAULT_COLOR = { bg: 'bg-muted-foreground/75', border: 'border-muted-foreground' }
 
 function getItemColor(type: string) {
   return ITEM_TYPE_COLORS[type] ?? DEFAULT_COLOR
@@ -139,7 +139,7 @@ function CanvasItem({
         'flex items-center justify-center',
         color.bg,
         color.border,
-        isDragging && 'shadow-lg opacity-80 cursor-grabbing',
+        isDragging && 'shadow-float opacity-80 cursor-grabbing',
         isDropTarget && 'ring-2 ring-primary ring-dashed',
         !isDragging && 'hover:brightness-110',
       )}

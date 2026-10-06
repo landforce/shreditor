@@ -1,3 +1,4 @@
+import { cn } from '@/shared/ui/cn'
 import { useEffect, useState, useRef, useCallback, memo, lazy, Suspense } from 'react'
 import { useRouter } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
@@ -720,11 +721,12 @@ export const LoadedEditor = memo(function LoadedEditor({
         />
       </InteractionLockRegion>
 
-      {/* Main Layout: Full-height sidebar + vertical split */}
-      <div className="flex-1 flex overflow-hidden">
+      {/* Main Layout: Full-height sidebar + vertical split. CapCut-style
+          floating panels: rounded cards separated by a small gap. */}
+      <div className="flex-1 flex overflow-hidden gap-[var(--panel-gap)] px-[var(--panel-gap)] pb-[var(--panel-gap)]">
         {/* Left Sidebar - Media Library (full column mode) */}
         {mediaFullColumn && !hidesDefaultSidebars && (
-          <InteractionLockRegion locked={isMaskEditingActive}>
+          <InteractionLockRegion locked={isMaskEditingActive} className="editor-panel">
             <ErrorBoundary level="feature">
               <MediaSidebar />
             </ErrorBoundary>
@@ -765,10 +767,10 @@ export const LoadedEditor = memo(function LoadedEditor({
               minSize={100 - editorLayout.timelineMaxSize}
               maxSize={100 - editorLayout.timelineMinSize}
             >
-              <div className="h-full flex overflow-hidden relative">
+              <div className="h-full flex overflow-hidden relative gap-[var(--panel-gap)]">
                 {/* Left Sidebar - Media Library (inline with preview) */}
                 {!mediaFullColumn && (
-                  <InteractionLockRegion locked={isMaskEditingActive}>
+                  <InteractionLockRegion locked={isMaskEditingActive} className="editor-panel">
                     <ErrorBoundary level="feature">
                       <MediaSidebar />
                     </ErrorBoundary>
@@ -776,17 +778,19 @@ export const LoadedEditor = memo(function LoadedEditor({
                 )}
 
                 {/* Center - Preview */}
-                <ErrorBoundary level="feature">
-                  {isMotionWorkspace ? (
-                    <MotionPreviewArea project={project} />
-                  ) : (
-                    <PreviewArea project={project} />
-                  )}
-                </ErrorBoundary>
+                <div className="editor-panel flex min-w-0 flex-1 flex-col">
+                  <ErrorBoundary level="feature">
+                    {isMotionWorkspace ? (
+                      <MotionPreviewArea project={project} />
+                    ) : (
+                      <PreviewArea project={project} />
+                    )}
+                  </ErrorBoundary>
+                </div>
 
                 {/* Right Sidebar - Properties (inline with preview) */}
                 {!propertiesFullColumn && (
-                  <InteractionLockRegion locked={isMaskEditingActive}>
+                  <InteractionLockRegion locked={isMaskEditingActive} className="editor-panel">
                     <ErrorBoundary level="feature">
                       <PropertiesSidebar />
                     </ErrorBoundary>
@@ -796,8 +800,10 @@ export const LoadedEditor = memo(function LoadedEditor({
             </ResizablePanel>
 
             <ResizableHandle
-              withHandle
-              className={isMaskEditingActive ? 'pointer-events-none opacity-60' : undefined}
+              className={cn(
+                'bg-transparent data-[panel-group-direction=vertical]:h-[var(--panel-gap)] hover:bg-primary/40',
+                isMaskEditingActive && 'pointer-events-none opacity-60',
+              )}
             />
 
             {/* Bottom - Timeline */}
@@ -809,8 +815,8 @@ export const LoadedEditor = memo(function LoadedEditor({
             >
               <InteractionLockRegion locked={isMaskEditingActive} className="h-full">
                 <ErrorBoundary level="feature">
-                  <div className="h-full flex overflow-hidden">
-                    <div className="min-w-0 flex-1">
+                  <div className="h-full flex overflow-hidden gap-[var(--panel-gap)]">
+                    <div className="editor-panel min-w-0 flex-1">
                       {isMotionWorkspace ? (
                         <MotionTimelineDock project={project} />
                       ) : (
@@ -829,7 +835,7 @@ export const LoadedEditor = memo(function LoadedEditor({
 
         {/* Right Sidebar - Properties (full column mode) */}
         {propertiesFullColumn && !hidesDefaultSidebars && (
-          <InteractionLockRegion locked={isMaskEditingActive}>
+          <InteractionLockRegion locked={isMaskEditingActive} className="editor-panel">
             <ErrorBoundary level="feature">
               <PropertiesSidebar />
             </ErrorBoundary>

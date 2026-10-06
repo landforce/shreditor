@@ -73,7 +73,7 @@ describe('PropertyLinkPickWhipOverlay', () => {
 
     const overlay = screen.getByTestId('property-link-pick-whip')
     const feedback = screen.getByTestId('property-link-pick-whip-feedback')
-    expect(overlay.querySelector('path')).toHaveAttribute('stroke', 'rgb(248 113 113)')
+    expect(overlay.querySelector('path')).toHaveAttribute('stroke', '#f53f3f')
     expect(feedback).toHaveTextContent(snapshot.rejectionMessage!)
     expect(feedback).toHaveStyle({ display: 'block' })
 
@@ -85,7 +85,7 @@ describe('PropertyLinkPickWhipOverlay', () => {
       })
     })
 
-    expect(overlay.querySelector('path')).toHaveAttribute('stroke', 'rgb(251 146 60)')
+    expect(overlay.querySelector('path')).toHaveAttribute('stroke', '#ea580c')
     expect(feedback).toHaveTextContent('')
     expect(feedback).toHaveStyle({ display: 'none' })
   })

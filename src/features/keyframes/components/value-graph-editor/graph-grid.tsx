@@ -137,7 +137,8 @@ export const GraphGrid = memo(function GraphGrid({
         y={graphTop}
         width={graphWidth}
         height={graphHeight}
-        fill="hsl(var(--muted) / 0.3)"
+        fill="var(--color-muted)"
+        fillOpacity={0.5}
         rx={4}
       />
 

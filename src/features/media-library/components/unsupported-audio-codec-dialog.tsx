@@ -39,7 +39,7 @@ export function UnsupportedAudioCodecDialog({
       <AlertDialogContent className="sm:max-w-[500px] overflow-hidden">
         <AlertDialogHeader className="overflow-hidden">
           <AlertDialogTitle className="flex items-center gap-2">
-            <VolumeX className="w-5 h-5 text-yellow-500 shrink-0" />
+            <VolumeX className="w-5 h-5 text-yellow-600 shrink-0" />
             {t('media.unsupportedCodec.title')}
           </AlertDialogTitle>
           <AlertDialogDescription asChild>

@@ -42,10 +42,10 @@ interface DragState {
 const CURVE_SIZE = 230
 const CURVE_SAMPLE_STEPS = 64
 const CHANNELS: Array<{ key: GpuCurvesChannelKey; labelKey: string; color: string }> = [
-  { key: 'master', labelKey: 'effects.curves.channelMaster', color: '#e5e7eb' },
-  { key: 'red', labelKey: 'effects.curves.channelRed', color: '#ef4444' },
-  { key: 'green', labelKey: 'effects.curves.channelGreen', color: '#22c55e' },
-  { key: 'blue', labelKey: 'effects.curves.channelBlue', color: '#3b82f6' },
+  { key: 'master', labelKey: 'effects.curves.channelMaster', color: '#1d2129' },
+  { key: 'red', labelKey: 'effects.curves.channelRed', color: '#dc2626' },
+  { key: 'green', labelKey: 'effects.curves.channelGreen', color: '#16a34a' },
+  { key: 'blue', labelKey: 'effects.curves.channelBlue', color: '#2563eb' },
 ]
 
 function clamp(value: number, min: number, max: number): number {
@@ -492,7 +492,7 @@ export const GpuCurvesPanel = memo(function GpuCurvesPanel({
         <div className={cn('px-2', isDock && 'flex min-h-0 flex-1 pb-2')}>
           <div
             className={cn(
-              'relative overflow-hidden rounded border border-border/70 bg-black/50',
+              'relative overflow-hidden rounded border border-border/70 bg-secondary',
               isDock && 'flex min-h-0 flex-1',
             )}
           >
@@ -518,7 +518,7 @@ export const GpuCurvesPanel = memo(function GpuCurvesPanel({
                     y1={0}
                     x2={grid * CURVE_SIZE}
                     y2={CURVE_SIZE}
-                    stroke="rgba(148,163,184,0.22)"
+                    stroke="rgba(11,31,51,0.1)"
                     strokeWidth={1}
                     vectorEffect="non-scaling-stroke"
                   />
@@ -527,7 +527,7 @@ export const GpuCurvesPanel = memo(function GpuCurvesPanel({
                     y1={grid * CURVE_SIZE}
                     x2={CURVE_SIZE}
                     y2={grid * CURVE_SIZE}
-                    stroke="rgba(148,163,184,0.22)"
+                    stroke="rgba(11,31,51,0.1)"
                     strokeWidth={1}
                     vectorEffect="non-scaling-stroke"
                   />
@@ -536,7 +536,7 @@ export const GpuCurvesPanel = memo(function GpuCurvesPanel({
 
               <path
                 d={`M 0 ${CURVE_SIZE} L ${CURVE_SIZE} 0`}
-                stroke="rgba(148,163,184,0.35)"
+                stroke="rgba(11,31,51,0.22)"
                 strokeWidth={1}
                 fill="none"
                 strokeDasharray="4 4"
@@ -547,7 +547,7 @@ export const GpuCurvesPanel = memo(function GpuCurvesPanel({
                 <>
                   <path
                     d={curvePaths.red}
-                    stroke="#ef4444"
+                    stroke="#dc2626"
                     strokeWidth={1.2}
                     fill="none"
                     opacity={0.35}
@@ -555,7 +555,7 @@ export const GpuCurvesPanel = memo(function GpuCurvesPanel({
                   />
                   <path
                     d={curvePaths.green}
-                    stroke="#22c55e"
+                    stroke="#16a34a"
                     strokeWidth={1.2}
                     fill="none"
                     opacity={0.35}
@@ -563,7 +563,7 @@ export const GpuCurvesPanel = memo(function GpuCurvesPanel({
                   />
                   <path
                     d={curvePaths.blue}
-                    stroke="#3b82f6"
+                    stroke="#2563eb"
                     strokeWidth={1.2}
                     fill="none"
                     opacity={0.35}
@@ -575,7 +575,7 @@ export const GpuCurvesPanel = memo(function GpuCurvesPanel({
               {activeChannel !== 'master' && (
                 <path
                   d={curvePaths.master}
-                  stroke="rgba(229,231,235,0.35)"
+                  stroke="rgba(11,31,51,0.3)"
                   strokeWidth={1.2}
                   fill="none"
                   strokeDasharray="5 4"
@@ -625,7 +625,7 @@ export const GpuCurvesPanel = memo(function GpuCurvesPanel({
                       rx={pointRadiusX}
                       ry={pointRadiusY}
                       fill={activeChannelMeta.color}
-                      stroke="rgba(3,7,18,0.95)"
+                      stroke="#ffffff"
                       strokeWidth={pointStrokeWidth}
                       className={effect.enabled ? 'cursor-move' : 'pointer-events-none'}
                       onMouseDown={(event) => handlePointMouseDown(event, index)}

@@ -258,9 +258,10 @@ function ProjectsIndex() {
 
   return (
     <>
-      <div className="min-h-screen bg-background">
+      {/* CapCut-style home: a pale cyan wash fading into the grey ground */}
+      <div className="min-h-screen bg-background bg-[linear-gradient(180deg,#d7f5fa_0%,#eaf8fb_180px,var(--background)_420px)] bg-no-repeat">
         {/* Header */}
-        <div className="panel-header border-b border-border" data-no-marquee>
+        <div data-no-marquee>
           <div className="max-w-[1920px] mx-auto px-6 py-5 flex items-center justify-between">
             <Link to="/">
               <ShreditorLogo
@@ -339,6 +340,18 @@ function ProjectsIndex() {
         ) : (
           /* Projects List */
           <div className="max-w-[1920px] mx-auto px-6 py-8">
+            {/* Big create tile, after CapCut's home */}
+            <Link
+              to="/projects/new"
+              className="group mb-8 flex h-36 items-center justify-center gap-4 rounded-2xl bg-card shadow-[0_1px_2px_rgb(29_33_41/0.04)] transition-[box-shadow,transform] hover:-translate-y-0.5 hover:shadow-float"
+            >
+              <span className="flex h-12 w-12 items-center justify-center rounded-full bg-primary text-primary-foreground transition-transform group-hover:scale-105">
+                <Plus className="h-6 w-6" strokeWidth={2.5} />
+              </span>
+              <span className="font-display text-2xl font-extrabold tracking-tight text-foreground">
+                {t('projects.newProject')}
+              </span>
+            </Link>
             <ProjectList onEditProject={handleEditProject} onImportProject={handleImportClick} />
             <TrashSection />
           </div>

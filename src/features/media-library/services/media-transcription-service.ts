@@ -74,6 +74,8 @@ interface InsertTranscriptAsCaptionsOptions {
   clipIds?: readonly string[]
   replaceExisting?: boolean
   selectUpdatedClips?: boolean
+  /** Do nothing for transcripts made by the automatic analysis pass. */
+  skipBackgroundTranscript?: boolean
 }
 
 interface InsertTranscriptAsCaptionsResult {
@@ -108,6 +110,8 @@ interface TranscriptionRequestOptions {
   quantization?: TranscribeOptions['quantization']
   onProgress?: TranscribeOptions['onProgress']
   onQueueStatusChange?: (state: QueueState) => void
+  /** Set by the automatic analysis pass; see `MediaTranscript.origin`. */
+  origin?: 'background'
 }
 
 interface QueuedTranscriptionListener {
@@ -129,6 +133,12 @@ interface QueuedTranscriptionJob {
   stream: { collect(): Promise<TranscriptSegment[]>; cancel(message?: string): void } | null
   cancelled: boolean
   cancelMessage: string
+  origin?: 'background'
+}
+
+/** A user request joining a background job makes it a user transcript. */
+function joinRequestOrigin(job: QueuedTranscriptionJob, origin: 'background' | undefined): void {
+  if (origin !== 'background') job.origin = undefined
 }
 
 function sanitizeTranscriptWord(word: NonNullable<TranscriptSegment['words']>[number]) {
@@ -392,6 +402,7 @@ class MediaTranscriptionService {
     const existingJob = this.findJobByKey(requestKey)
 
     if (existingJob) {
+      joinRequestOrigin(existingJob, options.origin)
       this.attachListener(existingJob, listener)
       return existingJob.promise
     }
@@ -404,6 +415,7 @@ class MediaTranscriptionService {
       language,
       listener,
     })
+    job.origin = options.origin
 
     if (this.activeJob) {
       this.queue.push(job)
@@ -595,6 +607,7 @@ class MediaTranscriptionService {
       quantization: job.quantization,
       text: joinTranscriptWords(segments.map((segment) => segment.text)),
       segments: segmentTranscriptForCaptions(segments),
+      ...(job.origin ? { origin: job.origin } : {}),
       createdAt: Date.now(),
       updatedAt: Date.now(),
     }
@@ -818,6 +831,9 @@ class MediaTranscriptionService {
     const transcript = await getTranscript(mediaId)
     if (!transcript) {
       throw new Error('No transcript found for this media item')
+    }
+    if (options.skipBackgroundTranscript && transcript.origin === 'background') {
+      return { updatedClipCount: 0, removedItemCount: 0 }
     }
 
     const timeline = useTimelineStore.getState()

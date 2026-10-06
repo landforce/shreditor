@@ -56,9 +56,9 @@ export const ScenePaletteSwatches = memo(function ScenePaletteSwatches({
         const isHighlighted =
           highlight && Boolean(palette[i]) && paletteMatchesFamily(palette[i]!, highlight)
         const commonClass = cn(
-          'block h-3 rounded-sm border border-white/10',
+          'block h-3 rounded-sm border border-foreground/10',
           isHighlighted && 'ring-2 ring-primary',
-          interactive && 'cursor-pointer hover:ring-1 hover:ring-white/30',
+          interactive && 'cursor-pointer hover:ring-1 hover:ring-foreground/30',
         )
         const style = { width: `${width}px`, backgroundColor: swatchColor(swatch) }
         if (!interactive) {

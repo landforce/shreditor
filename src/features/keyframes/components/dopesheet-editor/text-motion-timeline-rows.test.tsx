@@ -54,7 +54,7 @@ describe('TextMotionTimelineRows', () => {
     expect(screen.getByTestId('edit-text-motion-band-out')).toHaveAttribute('data-to-frame', '50')
     expect(screen.getByTestId('edit-text-motion-band-in-visual')).toHaveClass(
       'rounded-[2px]',
-      'bg-sky-400/40',
+      'bg-sky-500/30',
     )
     expect(screen.getByTestId('edit-text-motion-band-in-handle')).toHaveClass('bg-transparent')
 

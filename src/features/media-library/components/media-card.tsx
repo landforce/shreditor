@@ -53,7 +53,8 @@ import { isMediaPreparationBlocked } from '@/shared/utils/media-compatibility'
 import { getSharedProxyKey } from '../utils/proxy-key'
 import { useMediaLibraryStore } from '../stores/media-library-store'
 import { useMediaPreparationStore } from '../stores/media-preparation-store'
-import { CARD_GRID_BASE, CARD_LIST_BASE, CARD_PERF_STYLE } from './card-styles'
+import { CARD_GRID_FLOW_BASE, CARD_LIST_BASE, CARD_PERF_STYLE } from './card-styles'
+import { getMediaCardAspect } from './media-grid-constants'
 import { setMediaDragData, clearMediaDragData } from '../utils/drag-data-cache'
 import { proxyService } from '../services/proxy-service'
 import { frameInterpolationService } from '../services/frame-interpolation-service'
@@ -1636,11 +1637,11 @@ const MediaCardInternal = memo(function MediaCardInternal({
       case 'video':
         return <Video className="w-5 h-5 text-primary" />
       case 'audio':
-        return <FileAudio className="w-5 h-5 text-green-500" />
+        return <FileAudio className="w-5 h-5 text-timeline-audio" />
       case 'image':
-        return <ImageIcon className="w-5 h-5 text-blue-500" />
+        return <ImageIcon className="w-5 h-5 text-timeline-image" />
       case 'lottie':
-        return <FileJson className="w-5 h-5 text-purple-500" />
+        return <FileJson className="w-5 h-5 text-purple-600" />
       default:
         return <Video className="w-5 h-5 text-muted-foreground" />
     }
@@ -1812,7 +1813,7 @@ const MediaCardInternal = memo(function MediaCardInternal({
           <div
             style={CARD_PERF_STYLE}
             className={`
-        ${CARD_GRID_BASE} cursor-pointer
+        ${CARD_GRID_FLOW_BASE} cursor-pointer
         ${
           selected
             ? 'border-primary ring-2 ring-primary/20'
@@ -1837,10 +1838,11 @@ const MediaCardInternal = memo(function MediaCardInternal({
             <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-secondary via-muted to-secondary" />
             <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-secondary via-muted to-secondary" />
 
-            {/* Thumbnail - takes most of square space */}
+            {/* Thumbnail - sized to the media's own aspect ratio */}
             <div
               ref={thumbnailContainerRef}
-              className="flex-1 bg-secondary relative overflow-hidden min-h-0"
+              className="bg-secondary relative overflow-hidden"
+              style={{ aspectRatio: getMediaCardAspect(media) }}
               onPointerEnter={handleThumbnailPointerEnter}
               onPointerMove={handleThumbnailPointerMove}
               onPointerLeave={handleThumbnailPointerLeave}
@@ -1850,7 +1852,7 @@ const MediaCardInternal = memo(function MediaCardInternal({
                   ref={thumbnailRef}
                   src={thumbnailUrl}
                   alt={media.fileName}
-                  className="w-full h-full object-contain transition-transform duration-500 group-hover:scale-105"
+                  className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                 />
               ) : (
                 <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-secondary to-panel-bg">

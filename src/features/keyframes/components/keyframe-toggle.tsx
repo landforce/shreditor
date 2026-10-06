@@ -160,8 +160,8 @@ function getToggleKeyframeColorClass(
   isInTransition: boolean,
 ): string {
   if (isInTransition) return 'text-muted-foreground/50'
-  if (hasKeyframe) return 'text-amber-500'
-  if (hasAnyKeyframes) return 'text-amber-500/50'
+  if (hasKeyframe) return 'text-amber-600'
+  if (hasAnyKeyframes) return 'text-amber-600/50'
   return 'text-muted-foreground'
 }
 

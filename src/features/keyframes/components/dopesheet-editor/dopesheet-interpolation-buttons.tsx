@@ -25,7 +25,7 @@ export function DopesheetInterpolationButtons({
 
   return (
     <div
-      className="flex items-center gap-0.5 rounded-md border border-border/80 bg-muted/20 px-0.5 py-0.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]"
+      className="flex items-center gap-0.5 rounded-md border border-border/80 bg-muted/20 px-0.5 py-0.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.6)]"
       aria-label={t('timeline.keyframeEditor.interpolationControls', {
         defaultValue: 'Interpolation controls',
       })}
@@ -40,7 +40,7 @@ export function DopesheetInterpolationButtons({
             className={cn(
               'h-6 w-6 p-0 text-muted-foreground/80 hover:bg-background/60 hover:text-foreground',
               isActive &&
-                'bg-background text-foreground shadow-[inset_0_0_0_1px_rgba(255,255,255,0.08)] hover:bg-background hover:text-foreground',
+                'bg-card text-foreground shadow-[inset_0_0_0_1px_rgba(11,31,51,0.12)] hover:bg-card hover:text-foreground',
             )}
             onClick={() => onSelect?.(option.value)}
             disabled={disabled || !onSelect}

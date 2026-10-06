@@ -12,7 +12,8 @@ interface UseAutoTranscriptCaptionsParams {
 
 /**
  * Auto-enables transcript-backed captions for a video/audio clip the first time
- * its media has a transcript and no captions yet. Runs once per item+media pair
+ * its media has a transcript and no captions yet. Transcripts made by the
+ * automatic analysis pass are skipped - only user-requested ones caption clips. Runs once per item+media pair
  * (tracked by a ref) and stays silent on failure — the explicit "Generate
  * Captions" action remains the user-facing fallback.
  */
@@ -47,6 +48,7 @@ export function useAutoTranscriptCaptions({
         clipIds: [item.id],
         replaceExisting: false,
         selectUpdatedClips: false,
+        skipBackgroundTranscript: true,
       })
       .catch(() => {
         // Keep this silent: the explicit Generate Captions action remains the user-facing fallback.

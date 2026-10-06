@@ -62,6 +62,8 @@ export interface TranscriptPayload {
   modelVariant: MediaTranscriptModel
   text: string
   segments: Array<{ text: string; start: number; end: number }>
+  /** `background` when made by the automatic analysis pass. */
+  origin?: 'background'
   /**
    * `'whisper.cpp'` when the local bridge transcribed the media on import
    * (`server/transcription.mjs`, envelope service `whisper.cpp`, `params.auto`).
@@ -145,6 +147,7 @@ export function transcriptFromLegacy(record: MediaTranscript): AiOutput<'transcr
       modelVariant: record.model,
       text: record.text,
       segments: record.segments,
+      ...(record.origin ? { origin: record.origin } : {}),
     },
   }
 }
@@ -159,6 +162,11 @@ export function transcriptToLegacy(envelope: AiOutput<'transcript'>): MediaTrans
     quantization: envelope.data.quantization,
     text: envelope.data.text,
     segments: envelope.data.segments,
+    // Native auto transcripts (whisper.cpp in the bridge) are background work
+    // too: neither kind auto-enables captions on timeline clips.
+    ...(envelope.data.origin || envelope.data.source === 'whisper.cpp'
+      ? { origin: 'background' as const }
+      : {}),
     createdAt: envelope.createdAt,
     updatedAt: envelope.updatedAt,
   }

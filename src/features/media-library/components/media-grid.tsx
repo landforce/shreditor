@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, useEffect, useCallback, memo } from 'react'
+import { useState, useMemo, useRef, useEffect, useCallback, memo, type CSSProperties } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Loader2, Upload, AlertTriangle } from 'lucide-react'
 import { createLogger } from '@/shared/logging/logger'
@@ -24,7 +24,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 
-import { GRID_MIN_SIZE_PX, GRID_GAP_BY_SIZE } from './media-grid-constants'
+import { GRID_GAP_BY_SIZE, GRID_ROW_HEIGHT_PX, getMediaCardAspect } from './media-grid-constants'
 import {
   showMediaFilePicker,
   getSupportedMediaFormatLabels,
@@ -50,6 +50,34 @@ export const ListMediaGrid = memo(function ListMediaGrid(props: MediaGridProps) 
   return <MediaGridBase {...props} layout="list" />
 })
 
+/**
+ * Justified rows: each cell grows in proportion to its aspect so every card in
+ * a row lands on the same height while keeping its own shape.
+ */
+function getJustifiedCellStyle(
+  layout: MediaGridBaseProps['layout'],
+  media: MediaMetadata,
+  itemSize: number,
+): CSSProperties | undefined {
+  if (layout !== 'grid') return undefined
+  const aspect = getMediaCardAspect(media)
+  const rowHeight = GRID_ROW_HEIGHT_PX[itemSize] ?? GRID_ROW_HEIGHT_PX[3]!
+  return {
+    flex: `${aspect} 1 ${aspect * rowHeight}px`,
+    minWidth: 0,
+    // A row holding one wide card must not balloon to the panel width
+    maxWidth: `${aspect * rowHeight * 1.4}px`,
+  }
+}
+
+function getGridContainerClass(layout: MediaGridBaseProps['layout'], itemSize: number): string {
+  return layout === 'grid'
+    ? `flex flex-wrap ${GRID_GAP_BY_SIZE[itemSize] ?? GRID_GAP_BY_SIZE[3]} after:content-[''] after:grow-[1000000]`
+    : 'space-y-1'
+}
+
+// Pre-existing size (cyclomatic 14 on main, 12 here); covered by media-grid.test.tsx
+// fallow-ignore-next-line complexity
 const MediaGridBase = memo(function MediaGridBase({
   onMediaSelect,
   layout,
@@ -273,26 +301,16 @@ const MediaGridBase = memo(function MediaGridBase({
           </button>
         </div>
       ) : (
-        <div
-          className={
-            layout === 'grid'
-              ? `grid ${GRID_GAP_BY_SIZE[itemSize] ?? GRID_GAP_BY_SIZE[3]}`
-              : 'space-y-1'
-          }
-          style={
-            layout === 'grid'
-              ? {
-                  gridTemplateColumns: `repeat(auto-fill, minmax(min(${GRID_MIN_SIZE_PX[itemSize] ?? GRID_MIN_SIZE_PX[3]}px, 100%), 1fr))`,
-                }
-              : undefined
-          }
-        >
+        <div className={getGridContainerClass(layout, itemSize)}>
           {filteredItems.map((media) => {
             const handlers = cardHandlersById.get(media.id)
             const Card = layout === 'grid' ? GridMediaCard : ListMediaCard
-
             return (
-              <div key={media.id} data-media-id={media.id}>
+              <div
+                key={media.id}
+                data-media-id={media.id}
+                style={getJustifiedCellStyle(layout, media, itemSize)}
+              >
                 <Card
                   media={media}
                   selected={selectedMediaIdSet.has(media.id)}
@@ -329,10 +347,10 @@ const MediaGridBase = memo(function MediaGridBase({
                 </p>
                 {affectedMediaImpact.totalReferenceCount > 0 && (
                   <div className="flex items-start gap-2 p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-md">
-                    <AlertTriangle className="w-4 h-4 text-yellow-500 flex-shrink-0 mt-0.5" />
-                    <div className="text-sm text-yellow-600 dark:text-yellow-400">
+                    <AlertTriangle className="w-4 h-4 text-yellow-600 flex-shrink-0 mt-0.5" />
+                    <div className="text-sm text-yellow-700">
                       <p className="font-medium">{t('media.deleteDialog.timelineClipsRemoved')}</p>
-                      <p className="text-xs mt-1 text-yellow-600/80 dark:text-yellow-400/80">
+                      <p className="text-xs mt-1 text-yellow-700/80">
                         {t('media.deleteDialog.timelineClipsDetail', {
                           count: affectedMediaImpact.totalReferenceCount,
                         })}

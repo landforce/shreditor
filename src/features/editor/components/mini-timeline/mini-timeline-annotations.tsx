@@ -64,13 +64,13 @@ export const MiniTimelineAnnotations = memo(function MiniTimelineAnnotations({
           >
             <span
               className={`absolute bottom-0 top-4 left-1/2 w-px -translate-x-1/2 ${
-                selected ? 'bg-white' : 'bg-white/45'
+                selected ? 'bg-foreground' : 'bg-foreground/40'
               }`}
               aria-hidden="true"
             />
             <span
               className="absolute left-1/2 top-0 h-0 w-0 -translate-x-1/2 border-x-[6px] border-t-[9px] border-x-transparent drop-shadow"
-              style={{ borderTopColor: selected ? '#ffffff' : marker.color }}
+              style={{ borderTopColor: selected ? '#1d2129' : marker.color }}
               aria-hidden="true"
             />
             {selected ? (

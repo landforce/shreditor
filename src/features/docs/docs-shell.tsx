@@ -350,12 +350,12 @@ const NOTE_STYLES = {
   tip: {
     icon: Lightbulb,
     className: 'border-emerald-500/30 bg-emerald-500/5',
-    iconClass: 'text-emerald-500',
+    iconClass: 'text-emerald-600',
   },
   warning: {
     icon: AlertTriangle,
     className: 'border-amber-500/30 bg-amber-500/5',
-    iconClass: 'text-amber-500',
+    iconClass: 'text-amber-600',
   },
   info: { icon: Info, className: 'border-primary/30 bg-primary/5', iconClass: 'text-primary' },
 } as const

@@ -222,13 +222,13 @@ function Chip({ tone, icon, label, hint }: ChipProps) {
   const cls = (() => {
     switch (tone) {
       case 'keyword':
-        return 'bg-amber-400/15 text-amber-300 border-amber-400/30'
+        return 'bg-amber-500/10 text-amber-700 border-amber-500/30'
       case 'text':
-        return 'bg-sky-400/15 text-sky-300 border-sky-400/30'
+        return 'bg-sky-500/10 text-sky-700 border-sky-500/30'
       case 'visual':
-        return 'bg-purple-400/15 text-purple-300 border-purple-400/30'
+        return 'bg-purple-500/10 text-purple-700 border-purple-500/30'
       case 'palette':
-        return 'bg-emerald-400/15 text-emerald-300 border-emerald-400/30'
+        return 'bg-emerald-500/10 text-emerald-700 border-emerald-500/30'
       case 'top':
         return 'bg-primary/15 text-primary border-primary/40'
     }
@@ -263,9 +263,9 @@ export const SceneMatchStrength = memo(function SceneMatchStrength({
 }) {
   if (signals.ranker === 'keyword') {
     return (
-      <div className="h-0.5 w-full overflow-hidden rounded-full bg-amber-400/10">
+      <div className="h-0.5 w-full overflow-hidden rounded-full bg-amber-500/15">
         <div
-          className="h-full bg-amber-400/70"
+          className="h-full bg-amber-500/80"
           style={{ width: `${Math.max(20, Math.min(100, score * 100))}%` }}
         />
       </div>
@@ -284,11 +284,11 @@ export const SceneMatchStrength = memo(function SceneMatchStrength({
 
   return (
     <div className="flex h-0.5 w-full gap-0.5">
-      <div className="flex-1 overflow-hidden rounded-full bg-sky-400/10">
-        <div className="h-full bg-sky-400/70" style={{ width: `${textPct * 100}%` }} />
+      <div className="flex-1 overflow-hidden rounded-full bg-sky-500/15">
+        <div className="h-full bg-sky-500/80" style={{ width: `${textPct * 100}%` }} />
       </div>
-      <div className="flex-1 overflow-hidden rounded-full bg-purple-400/10">
-        <div className="h-full bg-purple-400/70" style={{ width: `${imagePct * 100}%` }} />
+      <div className="flex-1 overflow-hidden rounded-full bg-purple-500/15">
+        <div className="h-full bg-purple-500/80" style={{ width: `${imagePct * 100}%` }} />
       </div>
     </div>
   )

@@ -128,8 +128,8 @@ function updateLargeAltDragCanvas(
   const { canvas, context, entries, dpr } = state
   context.setTransform(dpr, 0, 0, dpr, 0, 0)
   context.clearRect(0, 0, canvas.width / dpr, canvas.height / dpr)
-  context.fillStyle = 'rgba(59, 130, 246, 0.2)'
-  context.strokeStyle = 'rgba(96, 165, 250, 0.95)'
+  context.fillStyle = 'rgba(0, 181, 201, 0.16)'
+  context.strokeStyle = 'rgba(0, 181, 201, 0.9)'
   context.lineWidth = 2
   context.setLineDash([6, 4])
 

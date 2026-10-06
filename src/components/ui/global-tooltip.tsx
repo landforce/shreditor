@@ -226,7 +226,7 @@ export function GlobalTooltip() {
         role="tooltip"
         aria-hidden={!state.visible}
         data-visible={state.visible}
-        className="overflow-hidden rounded-md bg-primary px-3 py-1.5 text-xs text-primary-foreground opacity-0 scale-[0.97] transition-[opacity,transform] ease-out-strong data-[visible=true]:opacity-100 data-[visible=true]:scale-100"
+        className="overflow-hidden rounded-md bg-ink px-2.5 py-1 text-xs text-ink-foreground shadow-float opacity-0 scale-[0.97] transition-[opacity,transform] ease-out-strong data-[visible=true]:opacity-100 data-[visible=true]:scale-100"
         style={{
           transformOrigin: origins[state.side],
           transitionDuration: state.instant ? '0ms' : '125ms',

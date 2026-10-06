@@ -41,10 +41,10 @@ export const MiniFilmTile = memo(function MiniFilmTile({
       type="button"
       data-testid={testId}
       data-clip-id={dataClipId}
-      className={`group grid shrink-0 grid-rows-[20px_1fr_16px] overflow-hidden rounded-[3px] border bg-[#17181d] text-left shadow-sm transition-colors ${
+      className={`group grid shrink-0 grid-rows-[20px_1fr_16px] overflow-hidden rounded-[3px] border bg-card text-left shadow-sm transition-colors ${
         selected
-          ? 'border-orange-500 shadow-[0_0_0_1px_rgba(249,115,22,0.65)]'
-          : 'border-zinc-700 hover:border-zinc-500'
+          ? 'border-primary shadow-[0_0_0_1px_rgba(37,81,163,0.65)]'
+          : 'border-border hover:border-muted-foreground/60'
       }`}
       style={{ width: MINI_FILM_TILE_WIDTH, height: MINI_FILM_TILE_HEIGHT }}
       onClick={(event) => {
@@ -60,18 +60,18 @@ export const MiniFilmTile = memo(function MiniFilmTile({
       }}
       title={label}
     >
-      <span className="flex min-w-0 items-center gap-1 border-b border-black/40 bg-[#24252b] px-1.5 text-[10px] font-semibold text-zinc-200">
+      <span className="flex min-w-0 items-center gap-1 border-b border-border bg-panel-header px-1.5 text-[10px] font-semibold text-foreground">
         <span
           className={`rounded-[2px] border px-1 leading-3 ${
             selected
-              ? 'border-lime-300/80 bg-indigo-700 text-lime-200'
-              : 'border-indigo-400/70 bg-zinc-800 text-zinc-200'
+              ? 'border-primary bg-primary text-primary-foreground'
+              : 'border-primary/40 bg-secondary text-foreground'
           }`}
         >
           {clipNumber}
         </span>
         <span className="font-mono">{timecodeText}</span>
-        <span className="ml-auto text-[9px] text-zinc-400">{trackName}</span>
+        <span className="ml-auto text-[9px] text-muted-foreground">{trackName}</span>
       </span>
 
       <span className="relative block min-h-0 overflow-hidden bg-black">
@@ -89,7 +89,7 @@ export const MiniFilmTile = memo(function MiniFilmTile({
         {overlay}
       </span>
 
-      <span className="truncate border-t border-black/40 bg-[#202127] px-1.5 text-[10px] font-medium text-zinc-300">
+      <span className="truncate border-t border-border bg-card px-1.5 text-[10px] font-medium text-foreground">
         {label}
       </span>
     </button>

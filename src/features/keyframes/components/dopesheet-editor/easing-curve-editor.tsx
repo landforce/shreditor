@@ -332,24 +332,24 @@ function CurveCanvas({
     <svg
       ref={svgRef}
       viewBox={`0 0 ${SIZE} ${SIZE}`}
-      className="block h-full w-full touch-none rounded-md border border-border/60 bg-black/40"
+      className="block h-full w-full touch-none rounded-md border border-border/60 bg-secondary"
       aria-hidden
     >
       {dots.map((d) => {
         const [cx, cy] = d.split(',')
-        return <circle key={d} cx={cx} cy={cy} r={0.7} className="fill-white/15" />
+        return <circle key={d} cx={cx} cy={cy} r={0.7} className="fill-foreground/20" />
       })}
       <line
         x1={xToPx(0)}
         y1={yToPx(0)}
         x2={xToPx(1)}
         y2={yToPx(1)}
-        className="stroke-white/10"
+        className="stroke-foreground/15"
         strokeWidth={1}
       />
       <path
         d={curvePath(config)}
-        className="fill-none stroke-white"
+        className="fill-none stroke-foreground"
         strokeWidth={2}
         pointerEvents="none"
       />
@@ -361,13 +361,25 @@ function CurveCanvas({
           y1={yToPx(h.ay)}
           x2={xToPx(h.hx)}
           y2={yToPx(h.hy)}
-          className="stroke-blue-500"
+          className="stroke-primary"
           strokeWidth={1}
           pointerEvents="none"
         />
       ))}
-      <circle cx={xToPx(0)} cy={yToPx(0)} r={2.5} className="fill-white/70" pointerEvents="none" />
-      <circle cx={xToPx(1)} cy={yToPx(1)} r={2.5} className="fill-white/70" pointerEvents="none" />
+      <circle
+        cx={xToPx(0)}
+        cy={yToPx(0)}
+        r={2.5}
+        className="fill-foreground/60"
+        pointerEvents="none"
+      />
+      <circle
+        cx={xToPx(1)}
+        cy={yToPx(1)}
+        r={2.5}
+        className="fill-foreground/60"
+        pointerEvents="none"
+      />
       {handles.map((h) => (
         <g key={`h-${h.key}`} className="cursor-grab" onPointerDown={startDrag(h.key)}>
           {/* Larger transparent hit target for easier grabbing. */}
@@ -376,7 +388,7 @@ function CurveCanvas({
             cx={xToPx(h.hx)}
             cy={yToPx(h.hy)}
             r={drag === h.key ? 5 : 4}
-            className="fill-blue-500"
+            className="fill-primary"
           />
         </g>
       ))}
@@ -550,12 +562,12 @@ function PositionPreview({ config, duration }: { config: EasingConfig; duration:
             : t('timeline.keyframeEditor.play', { defaultValue: 'Play' })}
         </button>
       </div>
-      <div className="relative flex h-20 items-center justify-center overflow-hidden rounded-md border border-border/60 bg-black/40">
+      <div className="relative flex h-20 items-center justify-center overflow-hidden rounded-md border border-border/60 bg-secondary">
         {mode === 'position' ? (
           <>
-            <div className="absolute inset-x-3 top-1/2 border-t border-dashed border-white/20" />
+            <div className="absolute inset-x-3 top-1/2 border-t border-dashed border-foreground/20" />
             <div
-              className="absolute top-1/2 h-3.5 w-3.5 -translate-y-1/2 rounded-full bg-orange-400"
+              className="absolute top-1/2 h-3.5 w-3.5 -translate-y-1/2 rounded-full bg-orange-500"
               // pos 0→1 spans the full dashed track (dot center hits each end);
               // clamp keeps small spring overshoot inside the box instead of clipping.
               style={{
@@ -566,14 +578,14 @@ function PositionPreview({ config, duration }: { config: EasingConfig; duration:
         ) : mode === 'rotate' ? (
           // Rounded square + orientation pip so the spin is actually visible.
           <div
-            className="relative size-9 rounded-[5px] bg-orange-400"
+            className="relative size-9 rounded-[5px] bg-orange-500"
             style={{ transform: `rotate(${pos * 180}deg)` }}
           >
             <span className="absolute left-1/2 top-1 size-1.5 -translate-x-1/2 rounded-full bg-black/40" />
           </div>
         ) : (
           <div
-            className="size-9 rounded-full bg-orange-400"
+            className="size-9 rounded-full bg-orange-500"
             style={
               mode === 'scale'
                 ? { transform: `scale(${Math.max(0, pos)})` }

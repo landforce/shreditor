@@ -89,6 +89,8 @@
       "uiSoundPreview": "Önizleme"
     },
     "ai": {
+      "autoAnalyzeOnOpen": "Proje açıldığında medyayı analiz et",
+      "autoAnalyzeOnOpenDescription": "Yeni videoları arka planda yazıya döker ve görsel olarak analiz eder; böylece medya paneli klipleri Konuşmacı ve B-roll olarak ayırır.",
       "captionSampleInterval": "Altyazı örnekleme aralığı",
       "captionSampleIntervalDescription": "YZ ile Analiz et sırasında altyazı için karelerin ne sıklıkta örnekleneceği.",
       "seconds": "Saniye",

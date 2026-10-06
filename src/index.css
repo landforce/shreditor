@@ -23,61 +23,89 @@ body.canvas-translate-cursor-not-allowed * {
   --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1); /* iOS-like drawer/panel slide */
 }
 
+/* UI type (Inter). Named apart from "Inter" so composition/caption fonts that
+   load Inter by name are never shadowed by the editor chrome's copy. */
+@font-face {
+  font-display: swap;
+  font-family: 'Shreditor UI';
+  font-style: normal;
+  font-weight: 100 900;
+  src: url('/fonts/InterVariable.woff2') format('woff2');
+}
+
 @layer base {
   :root {
-    /* Professional Video Editor Dark Theme - OKLCH Colors */
-    /* Inspired by Premiere Pro & DaVinci Resolve */
+    /* Light CapCut - modelled on CapCut's light (mobile) surfaces mapped onto
+       its desktop editor layout: white rounded panels on a pale grey ground,
+       near-black text, one cyan accent, heavy bold headings. */
 
-    /* Base - Very dark, reduced eye strain */
-    --background: oklch(0.15 0 0); /* #262626 - Main canvas */
-    --foreground: oklch(0.95 0 0); /* #f2f2f2 - Primary text */
+    /* Ground the panels float on */
+    --background: #f2f3f5;
+    --foreground: #1d2129;
 
-    /* Panels - Layered depth */
-    --card: oklch(0.18 0 0); /* #2e2e2e - Panel backgrounds */
-    --card-foreground: oklch(0.92 0 0); /* #ebebeb - Panel text */
+    /* Panels */
+    --card: #ffffff;
+    --card-foreground: #1d2129;
 
-    --popover: oklch(0.16 0 0); /* #292929 - Dropdowns */
-    --popover-foreground: oklch(0.92 0 0);
+    --popover: #ffffff;
+    --popover-foreground: #1d2129;
 
-    /* Primary - Orange accent (playback, active states) */
-    --primary: oklch(0.68 0.19 45); /* #FF8C3A - Vibrant orange */
-    --primary-foreground: oklch(0.12 0 0); /* Dark text on primary */
+    /* Primary - CapCut cyan (Export, selection, active tools) */
+    --primary: #00b5c9;
+    --primary-foreground: #ffffff;
+    /* Cyan dark enough for text and icons on white */
+    --primary-text: #0094a6;
+    /* Selected-item wash (cyan border + this fill) */
+    --primary-soft: #e3f9fb;
 
-    /* Secondary - Subtle panel variation */
-    --secondary: oklch(0.22 0 0); /* #383838 - Secondary surfaces */
-    --secondary-foreground: oklch(0.88 0 0);
+    /* Secondary - grey fills */
+    --secondary: #f2f3f5;
+    --secondary-foreground: #4e5969;
 
-    /* Muted - Backgrounds and disabled states */
-    --muted: oklch(0.2 0 0); /* #333333 - Muted backgrounds */
-    --muted-foreground: oklch(0.6 0 0); /* #999999 - Muted text */
+    /* Muted - quiet fills and secondary text */
+    --muted: #f2f3f5;
+    --muted-foreground: #6b7785;
 
-    /* Accent - Hover states and highlights */
-    --accent: oklch(0.24 0 0); /* #3d3d3d - Hover backgrounds */
-    --accent-foreground: oklch(0.95 0 0);
+    /* Accent - hover fills */
+    --accent: #e8eaed;
+    --accent-foreground: #1d2129;
 
-    /* Destructive - Red for delete/errors */
-    --destructive: oklch(0.58 0.22 25); /* #E53E3E - Error red */
-    --destructive-foreground: oklch(0.98 0 0);
+    --destructive: #f53f3f;
+    --destructive-foreground: #ffffff;
 
-    /* Borders - Subtle separators */
-    --border: oklch(0.25 0 0); /* #404040 - Borders */
-    --input: oklch(0.24 0 0); /* #3d3d3d - Input borders */
-    --ring: oklch(0.68 0.19 45); /* Orange focus ring */
+    /* Hairlines */
+    --border: #e5e6eb;
+    --input: #dcdfe5;
+    --ring: #00c8dc;
 
-    /* Panel system - Layered depth */
-    --panel-bg: oklch(0.18 0 0); /* #2e2e2e - Panels */
-    --panel-header: oklch(0.14 0 0); /* #242424 - Panel headers */
-    --timeline-bg: oklch(0.12 0 0); /* #1f1f1f - Timeline darker */
+    /* Panel system */
+    --panel-bg: #ffffff;
+    --panel-header: #ffffff;
+    --timeline-bg: #ffffff;
 
-    /* Sidebar */
-    --sidebar: oklch(0.18 0 0);
-    --sidebar-foreground: oklch(0.92 0 0);
-    --sidebar-primary: oklch(0.68 0.19 45);
-    --sidebar-primary-foreground: oklch(0.12 0 0);
-    --sidebar-accent: oklch(0.22 0 0);
-    --sidebar-accent-foreground: oklch(0.92 0 0);
-    --sidebar-border: oklch(0.25 0 0);
-    --sidebar-ring: oklch(0.68 0.19 45);
+    --sidebar: #ffffff;
+    --sidebar-foreground: #1d2129;
+    --sidebar-primary: #00b5c9;
+    --sidebar-primary-foreground: #ffffff;
+    --sidebar-accent: #e8eaed;
+    --sidebar-accent-foreground: #1d2129;
+    --sidebar-border: #e5e6eb;
+    --sidebar-ring: #00c8dc;
+
+    /* Near-black for tooltips and the strongest controls */
+    --ink: #1d2129;
+    --ink-foreground: #ffffff;
+
+    /* CapCut panels are flat; only floating layers cast a shadow */
+    --shadow-panel: 0 1px 2px rgb(29 33 41 / 0.04);
+    --shadow-float: 0 4px 10px rgb(29 33 41 / 0.08), 0 12px 32px rgb(29 33 41 / 0.12);
+
+    /* Gap between the editor's floating panels */
+    --panel-gap: 4px;
+    --panel-radius: 8px;
+
+    --font-ui: 'Shreditor UI', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    --font-display: 'Shreditor UI', -apple-system, BlinkMacSystemFont, sans-serif;
 
     --radius: 0.5rem;
   }
@@ -96,12 +124,8 @@ body.canvas-translate-cursor-not-allowed * {
 
   body {
     @apply bg-background text-foreground;
-    font-family:
-      'IBM Plex Sans',
-      -apple-system,
-      BlinkMacSystemFont,
-      'Segoe UI',
-      sans-serif;
+    font-family: var(--font-ui);
+    font-feature-settings: 'cv11', 'ss01';
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     user-select: none;
@@ -110,9 +134,17 @@ body.canvas-translate-cursor-not-allowed * {
     -ms-user-select: none;
   }
 
-  /* Force dark mode always */
   html {
-    color-scheme: dark;
+    color-scheme: light;
+  }
+
+  /* Heavy headings, after CapCut */
+  h1,
+  h2,
+  h3,
+  .font-display {
+    font-family: var(--font-display);
+    letter-spacing: -0.01em;
   }
 
   /* Monospace for technical data */
@@ -135,21 +167,23 @@ body.canvas-translate-cursor-not-allowed * {
   }
 
   ::-webkit-scrollbar-track {
-    background: oklch(0.15 0 0);
+    background: transparent;
   }
 
   ::-webkit-scrollbar-thumb {
-    background: oklch(0.3 0 0);
+    background: rgb(29 33 41 / 0.16);
     border-radius: 6px;
-    border: 2px solid oklch(0.15 0 0);
+    border: 3px solid transparent;
+    background-clip: padding-box;
   }
 
   ::-webkit-scrollbar-thumb:hover {
-    background: oklch(0.35 0 0);
+    background: rgb(29 33 41 / 0.28);
+    background-clip: padding-box;
   }
 
   ::-webkit-scrollbar-corner {
-    background: oklch(0.15 0 0);
+    background: transparent;
   }
 
   /* Timeline keyframe sheets reserve a custom overlay rail matching the main
@@ -200,32 +234,54 @@ body.canvas-translate-cursor-not-allowed * {
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
+
+  /* Light CapCut extras */
+  --color-primary-text: var(--primary-text);
+  --color-primary-soft: var(--primary-soft);
+  --color-ink: var(--ink);
+  --color-ink-foreground: var(--ink-foreground);
+  --shadow-panel: var(--shadow-panel);
+  --shadow-float: var(--shadow-float);
+  --font-display: var(--font-display);
 }
 
 /* Professional video editor utility classes */
 @layer utilities {
+  /* CapCut-style floating panel: a rounded white card on the grey ground */
+  .editor-panel {
+    background-color: var(--card);
+    border-radius: var(--panel-radius);
+    overflow: hidden;
+  }
+
+  /* Cyan text/icons use the deeper cyan so they stay legible on white;
+     fills (bg-primary) keep the bright CapCut cyan. */
+  .text-primary {
+    color: var(--primary-text);
+  }
+
   .panel-bg {
-    background-color: oklch(var(--panel-bg));
+    background-color: var(--panel-bg);
   }
 
   .panel-header {
-    background-color: oklch(var(--panel-header));
+    background-color: var(--panel-header);
   }
 
   .timeline-bg {
-    background-color: oklch(var(--timeline-bg));
+    background-color: var(--timeline-bg);
   }
 
   /* Subtle glow for active elements */
   .glow-primary {
-    box-shadow: 0 0 12px oklch(var(--primary) / 0.3);
+    box-shadow: 0 0 12px color-mix(in oklab, var(--primary) 30%, transparent);
   }
 
   .glow-primary-sm {
-    box-shadow: 0 0 6px oklch(var(--primary) / 0.25);
+    box-shadow: 0 0 6px color-mix(in oklab, var(--primary) 25%, transparent);
   }
 
-  /* Text shadows for better readability on dark */
+  /* Text shadow for labels drawn over footage */
   .text-shadow {
     text-shadow: 0 1px 2px oklch(0 0 0 / 0.8);
   }
@@ -296,8 +352,8 @@ body.canvas-translate-cursor-not-allowed * {
 }
 
 [data-media-id].media-marquee-preview > * {
-  border-color: oklch(var(--primary));
-  box-shadow: 0 0 0 1px oklch(var(--primary) / 0.2);
+  border-color: var(--primary);
+  box-shadow: 0 0 0 1px color-mix(in oklab, var(--primary) 20%, transparent);
 }
 
 [data-composition-id].composition-marquee-preview {

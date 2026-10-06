@@ -89,6 +89,8 @@
       "uiSoundPreview": "Preview"
     },
     "ai": {
+      "autoAnalyzeOnOpen": "Analyze media when a project opens",
+      "autoAnalyzeOnOpenDescription": "Transcribe and visually analyze new video in the background so the media pane can sort clips into Speaker and B-roll.",
       "captionSampleInterval": "Caption sample interval",
       "captionSampleIntervalDescription": "How often Analyze with AI samples a frame for captioning.",
       "seconds": "Seconds",

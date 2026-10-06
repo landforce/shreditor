@@ -215,8 +215,7 @@ export const AudioMeterPanel = memo(function AudioMeterPanel() {
   const audioGraphItems = useItemsStore(
     useShallow((state) =>
       state.items.filter(
-        (item) =>
-          item.type === 'audio' || item.type === 'video' || item.type === 'composition',
+        (item) => item.type === 'audio' || item.type === 'video' || item.type === 'composition',
       ),
     ),
   )
@@ -1103,7 +1102,7 @@ export const AudioMeterPanel = memo(function AudioMeterPanel() {
   const segmentMask =
     'repeating-linear-gradient(to top, black 0px, black 3px, transparent 3px, transparent 4px)'
   const unlitLedBg =
-    'repeating-linear-gradient(to top, rgba(255,255,255,0.03) 0px, rgba(255,255,255,0.03) 3px, transparent 3px, transparent 4px)'
+    'repeating-linear-gradient(to top, rgba(11,31,51,0.06) 0px, rgba(11,31,51,0.06) 3px, transparent 3px, transparent 4px)'
   const isScanningMeter = estimate.unresolvedSourceCount > 0 && estimate.resolvedSourceCount === 0
 
   return (
@@ -1111,7 +1110,7 @@ export const AudioMeterPanel = memo(function AudioMeterPanel() {
       {detachedEqPanel}
       {floatingMixer}
       <aside
-        className="panel-bg border-l border-border flex h-full flex-col overflow-hidden"
+        className="bg-panel-bg border-l border-border flex h-full flex-col overflow-hidden"
         style={{ width: EDITOR_LAYOUT_CSS_VALUES.timelineMeterWidth }}
         aria-label={t('editor.audioMeters.audioMeter')}
       >
@@ -1119,14 +1118,14 @@ export const AudioMeterPanel = memo(function AudioMeterPanel() {
           className="flex min-w-0 items-center justify-between gap-1 border-b border-border bg-secondary/20 px-1.5"
           style={{ height: EDITOR_LAYOUT_CSS_VALUES.timelineTracksHeaderHeight }}
         >
-          <span className="min-w-0 text-xs text-muted-foreground font-mono uppercase tracking-[0.12em]">
+          <span className="min-w-0 text-[13px] font-semibold text-foreground">
             {t('editor.audioMeters.meters')}
           </span>
           {modeDropdown}
         </div>
 
         <div className="flex-1 px-2 py-3 min-h-0">
-          <div className="h-full rounded-md border border-border/50 bg-black/30 px-2 py-3 shadow-[inset_0_1px_4px_rgba(0,0,0,0.4)]">
+          <div className="h-full rounded-md border border-border bg-card px-2 py-3 shadow-panel">
             <div className="mb-3 text-center text-[10px] uppercase tracking-[0.22em] text-muted-foreground font-mono">
               Master
             </div>
@@ -1138,7 +1137,7 @@ export const AudioMeterPanel = memo(function AudioMeterPanel() {
                   const bottom = `${dbMarkToPercent(mark)}%`
                   return (
                     <div key={mark} className="absolute inset-x-0" style={{ bottom }}>
-                      <div className="absolute left-0 right-5 h-px bg-border/30" />
+                      <div className="absolute left-0 right-5 h-px bg-border" />
                       <span className="absolute right-0 -translate-y-1/2 text-[10px] font-mono text-muted-foreground">
                         {mark}
                       </span>
@@ -1151,7 +1150,7 @@ export const AudioMeterPanel = memo(function AudioMeterPanel() {
               <div className="flex flex-col items-center">
                 <div ref={meterVisualRootRef} className="flex flex-1 gap-[3px]">
                   {/* Left channel */}
-                  <div className="relative w-[14px] rounded-[2px] border border-border/50 bg-[#08090b] shadow-[inset_0_1px_2px_rgba(0,0,0,0.5)] overflow-hidden">
+                  <div className="relative w-[14px] rounded-[2px] border border-border bg-secondary shadow-[inset_0_1px_2px_rgba(11,31,51,0.12)] overflow-hidden">
                     {/* Unlit LED backdrop */}
                     <div
                       className="absolute inset-0 pointer-events-none"
@@ -1159,7 +1158,7 @@ export const AudioMeterPanel = memo(function AudioMeterPanel() {
                     />
                     {/* Active fill with segment mask */}
                     <div
-                      className={`absolute inset-x-0 bottom-0 bg-gradient-to-t from-[#1be255] via-[#f5e146] to-[#ff6633] transition-[height] duration-75 ease-out ${isScanningMeter ? 'opacity-50' : ''}`}
+                      className={`absolute inset-x-0 bottom-0 bg-gradient-to-t from-green-600 via-yellow-500 to-red-600 transition-[height] duration-75 ease-out ${isScanningMeter ? 'opacity-50' : ''}`}
                       style={{
                         height: 'var(--meter-l, 0%)',
                         maskImage: segmentMask,
@@ -1168,7 +1167,7 @@ export const AudioMeterPanel = memo(function AudioMeterPanel() {
                     />
                     {/* Peak hold ââ‚¬” single bright segment */}
                     <div
-                      className="absolute inset-x-0 h-[3px] bg-white/85 shadow-[0_0_5px_rgba(255,255,255,0.5)] transition-[bottom] duration-100 ease-out"
+                      className="absolute inset-x-0 h-[3px] bg-foreground/80 transition-[bottom] duration-100 ease-out"
                       style={{
                         bottom: 'calc(var(--meter-l-peak, 0%) - 1px)',
                         maskImage: segmentMask,
@@ -1177,7 +1176,7 @@ export const AudioMeterPanel = memo(function AudioMeterPanel() {
                     />
                   </div>
                   {/* Right channel */}
-                  <div className="relative w-[14px] rounded-[2px] border border-border/50 bg-[#08090b] shadow-[inset_0_1px_2px_rgba(0,0,0,0.5)] overflow-hidden">
+                  <div className="relative w-[14px] rounded-[2px] border border-border bg-secondary shadow-[inset_0_1px_2px_rgba(11,31,51,0.12)] overflow-hidden">
                     {/* Unlit LED backdrop */}
                     <div
                       className="absolute inset-0 pointer-events-none"
@@ -1185,7 +1184,7 @@ export const AudioMeterPanel = memo(function AudioMeterPanel() {
                     />
                     {/* Active fill with segment mask */}
                     <div
-                      className={`absolute inset-x-0 bottom-0 bg-gradient-to-t from-[#1be255] via-[#f5e146] to-[#ff6633] transition-[height] duration-75 ease-out ${isScanningMeter ? 'opacity-50' : ''}`}
+                      className={`absolute inset-x-0 bottom-0 bg-gradient-to-t from-green-600 via-yellow-500 to-red-600 transition-[height] duration-75 ease-out ${isScanningMeter ? 'opacity-50' : ''}`}
                       style={{
                         height: 'var(--meter-r, 0%)',
                         maskImage: segmentMask,
@@ -1194,7 +1193,7 @@ export const AudioMeterPanel = memo(function AudioMeterPanel() {
                     />
                     {/* Peak hold ââ‚¬” single bright segment */}
                     <div
-                      className="absolute inset-x-0 h-[3px] bg-white/85 shadow-[0_0_5px_rgba(255,255,255,0.5)] transition-[bottom] duration-100 ease-out"
+                      className="absolute inset-x-0 h-[3px] bg-foreground/80 transition-[bottom] duration-100 ease-out"
                       style={{
                         bottom: 'calc(var(--meter-r-peak, 0%) - 1px)',
                         maskImage: segmentMask,

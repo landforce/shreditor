@@ -51,7 +51,7 @@ export function TrimInfoOverlay({
 
   return createPortal(
     <div
-      className="pointer-events-none fixed z-[10000] min-w-[58px] rounded-sm bg-neutral-950/90 px-1.5 py-0.5 text-center font-mono text-[11px] font-semibold leading-tight text-white shadow-[0_2px_8px_rgba(0,0,0,0.45)] ring-1 ring-white/15 tabular-nums"
+      className="pointer-events-none fixed z-[10000] min-w-[58px] rounded-sm bg-ink px-1.5 py-0.5 text-center font-mono text-[11px] font-semibold leading-tight text-ink-foreground shadow-float tabular-nums"
       style={{
         left: position.x,
         top: position.y,
@@ -60,7 +60,7 @@ export function TrimInfoOverlay({
       }}
     >
       <div>{delta}</div>
-      <div className="text-white/80">{duration}</div>
+      <div className="text-ink-foreground/80">{duration}</div>
     </div>,
     document.body,
   )

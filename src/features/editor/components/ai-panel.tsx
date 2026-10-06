@@ -573,7 +573,7 @@ export const AiPanel = memo(function AiPanel() {
 
           <CollapsibleContent className="space-y-4 pt-3">
             {!isTtsSupported && (
-              <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-100">
+              <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-800">
                 {ttsEngine === 'kokoro'
                   ? t('editor.tts.kokoroUnsupported')
                   : ttsEngine === 'moss'
@@ -858,7 +858,7 @@ const GenerationRow = memo(function GenerationRow({
       {/* Actions */}
       <div className="flex flex-wrap items-center gap-1.5">
         {saved ? (
-          <span className="flex items-center gap-1 text-[11px] text-emerald-400">
+          <span className="flex items-center gap-1 text-[11px] text-emerald-700">
             <CheckCircle2 className="h-3 w-3" />
             {t('editor.aiPanel.saved')}
           </span>

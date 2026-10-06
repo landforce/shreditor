@@ -45,7 +45,7 @@ export const MiniTimelineTrackLanes = memo(function MiniTimelineTrackLanes({
   return (
     <div className="relative" style={{ height: trackAreaHeight }}>
       <div
-        className="absolute left-0 top-0 h-full border-r border-black/35 text-[9px] font-semibold text-zinc-400"
+        className="absolute left-0 top-0 h-full border-r border-border text-[9px] font-semibold text-muted-foreground"
         style={{ width: labelWidth }}
       >
         {tracks.length > 0 ? (
@@ -66,7 +66,7 @@ export const MiniTimelineTrackLanes = memo(function MiniTimelineTrackLanes({
         {tracks.map((track, index) => (
           <div
             key={track.id}
-            className="absolute left-0 right-0 border-t border-zinc-700/70"
+            className="absolute left-0 right-0 border-t border-border"
             style={{ top: index * rowHeight }}
           />
         ))}
@@ -78,10 +78,10 @@ export const MiniTimelineTrackLanes = memo(function MiniTimelineTrackLanes({
             rowHeight >= 10 ? Math.max(8, Math.min(16, rowHeight - 4)) : Math.max(4, rowHeight - 2)
           const clipTop = laneIndex * rowHeight + Math.max(1, (rowHeight - clipHeight) / 2)
           const clipTone = selected
-            ? 'border-orange-500 bg-orange-500/20 shadow-[0_0_0_1px_rgba(249,115,22,0.45)]'
+            ? 'border-primary bg-primary/70 shadow-[0_0_0_1px_rgba(37,81,163,0.45)]'
             : muted
-              ? 'border-zinc-600/60 bg-zinc-500/20 opacity-70 hover:opacity-100'
-              : 'border-sky-500/70 bg-sky-500/45 hover:border-sky-300'
+              ? 'border-muted-foreground/50 bg-muted-foreground/15 opacity-70 hover:opacity-100'
+              : 'border-timeline-video/60 bg-timeline-video/25 hover:border-timeline-video'
           return (
             <button
               key={`${clip.id}-mini`}

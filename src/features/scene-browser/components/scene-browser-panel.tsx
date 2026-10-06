@@ -188,7 +188,7 @@ export function SceneBrowserPanel({ className }: SceneBrowserPanelProps) {
 
       <div className="flex items-center justify-between border-b border-border/30 px-3 py-1.5 text-[11px] text-muted-foreground">
         <span className="flex items-center gap-1.5">
-          <Sparkles className="h-3 w-3 text-purple-400" />
+          <Sparkles className="h-3 w-3 text-purple-600" />
           {isFiltered
             ? `${t('sceneBrowser.counts.match', { count: scenes.length })} · ${scopeLabel}`
             : scopeLabel}
@@ -265,7 +265,7 @@ function SemanticIndexBanner({
         total: progress.indexTotal,
       })
   return (
-    <div className="flex items-center gap-2 rounded-md border border-purple-400/20 bg-purple-400/5 px-3 py-2 text-[11px] text-purple-300/90">
+    <div className="flex items-center gap-2 rounded-md border border-purple-500/25 bg-purple-500/5 px-3 py-2 text-[11px] text-purple-700/90">
       <BrainCircuit className="h-3 w-3 shrink-0 animate-pulse" />
       <span className="truncate">{label}</span>
     </div>
@@ -471,7 +471,7 @@ function EmptyState({
   if (!hasAnyCaptions) {
     return (
       <div className="flex flex-col items-center gap-2 px-6 py-12 text-center text-muted-foreground">
-        <Sparkles className="h-6 w-6 text-purple-400/60" />
+        <Sparkles className="h-6 w-6 text-purple-600/60" />
         <p className="text-[12px]">{t('sceneBrowser.empty.noCaptionsTitle')}</p>
         <p className="max-w-xs text-[11px] text-muted-foreground/80">
           {t('sceneBrowser.empty.noCaptionsPrefix')}{' '}
