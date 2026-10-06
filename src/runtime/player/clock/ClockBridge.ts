@@ -7,4 +7,5 @@ export {
   useBridgedSetTimelineFrame,
   useBridgedActualFirstFrame,
   useBridgedActualLastFrame,
+  useBridgedPlaybackLastFrame,
 } from './clock-bridge-context'

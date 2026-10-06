@@ -16,6 +16,7 @@ import {
   useBridgedSetTimelineContext,
   useBridgedSetTimelineFrame,
   useBridgedActualLastFrame,
+  useBridgedPlaybackLastFrame,
   useBridgedActualFirstFrame,
 } from './clock'
 
@@ -77,6 +78,7 @@ export function usePlayer(
 
   // Calculate boundaries
   const lastFrame = useBridgedActualLastFrame(durationInFrames)
+  const playbackLastFrame = useBridgedPlaybackLastFrame(durationInFrames)
   const firstFrame = useBridgedActualFirstFrame()
 
   // Sync frame ref with current frame from context
@@ -112,15 +114,15 @@ export function usePlayer(
 
     setHasPlayed(true)
 
-    // If at the last frame, restart from beginning
-    if (frameRef.current >= lastFrame) {
+    // At or past the end of the content, play from the beginning
+    if (frameRef.current >= playbackLastFrame) {
       seek(firstFrame)
     }
 
     imperativePlaying.current = true
     setPlaying(true)
     emitter.dispatchPlay()
-  }, [imperativePlaying, lastFrame, firstFrame, setPlaying, emitter, seek])
+  }, [imperativePlaying, playbackLastFrame, firstFrame, setPlaying, emitter, seek])
 
   /**
    * Pause the video

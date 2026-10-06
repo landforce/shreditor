@@ -74,6 +74,40 @@ describe('Clock playback timing', () => {
     clock.dispose()
   })
 
+  it('stops at the end of the content, not the padding after it', () => {
+    const ended = vi.fn()
+    const clock = new Clock({ fps: 30, durationInFrames: 600, initialFrame: 400, onEnded: ended })
+    clock.setPlaybackEnd(450)
+
+    clock.play()
+    runNextAnimationFrame(3000)
+
+    expect(clock.currentFrame).toBe(449)
+    expect(clock.isPlaying).toBe(false)
+    expect(ended).toHaveBeenCalledTimes(1)
+    clock.dispose()
+  })
+
+  it('plays from the start when play is pressed at or past the end of the content', () => {
+    const clock = new Clock({ fps: 30, durationInFrames: 600, initialFrame: 520 })
+    clock.setPlaybackEnd(450)
+
+    clock.play()
+
+    expect(clock.currentFrame).toBe(0)
+    clock.dispose()
+  })
+
+  it('still lets you seek into the padding after the content', () => {
+    const clock = new Clock({ fps: 30, durationInFrames: 600 })
+    clock.setPlaybackEnd(450)
+
+    clock.seekToFrame(560)
+
+    expect(clock.currentFrame).toBe(560)
+    clock.dispose()
+  })
+
   it('advances reverse shuttle at display cadence while skipping intermediate frames', () => {
     const clock = new Clock({
       fps: 30,

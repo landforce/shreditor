@@ -23,6 +23,8 @@ interface ClockBridgeProviderProps {
   initiallyMuted?: boolean
   inFrame?: number | null
   outFrame?: number | null
+  /** End of the content (exclusive): playback stops there; seeking can go past it. */
+  playbackEndFrame?: number | null
   initialPlaybackRate?: number
   loop?: boolean
   onEnded?: () => void
@@ -33,10 +35,12 @@ function ClockBridgeInner({
   children,
   inFrame,
   outFrame,
+  playbackEndFrame,
 }: {
   children: React.ReactNode
   inFrame: number | null
   outFrame: number | null
+  playbackEndFrame: number | null
 }) {
   const clock = useClock()
   const frame = useClockFrame()
@@ -55,6 +59,10 @@ function ClockBridgeInner({
   useEffect(() => {
     clock.setOutPoint(outFrame)
   }, [clock, outFrame])
+
+  useEffect(() => {
+    clock.setPlaybackEnd(playbackEndFrame)
+  }, [clock, playbackEndFrame])
 
   const setPlaybackRate = useCallback(
     (rate: number) => {
@@ -77,8 +85,9 @@ function ClockBridgeInner({
       rootId: 'player-comp',
       inFrame,
       outFrame,
+      playbackEndFrame,
     }
-  }, [inFrame, outFrame])
+  }, [inFrame, outFrame, playbackEndFrame])
 
   const setFrame = useCallback(
     (action: React.SetStateAction<Record<string, number>>) => {
@@ -140,6 +149,7 @@ export function ClockBridgeProvider({
   loop = false,
   inFrame = null,
   outFrame = null,
+  playbackEndFrame = null,
   onEnded,
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   initiallyMuted: _initiallyMuted,
@@ -171,7 +181,7 @@ export function ClockBridgeProvider({
       onEnded={onEnded}
       clock={clockRef.current}
     >
-      <ClockBridgeInner inFrame={inFrame} outFrame={outFrame}>
+      <ClockBridgeInner inFrame={inFrame} outFrame={outFrame} playbackEndFrame={playbackEndFrame}>
         {children}
       </ClockBridgeInner>
     </ClockProvider>

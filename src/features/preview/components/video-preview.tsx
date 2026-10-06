@@ -284,6 +284,7 @@ const VideoPreviewBase = memo(function VideoPreviewBase({
     fastScrubBoundaryFrames,
     fastScrubBoundarySources,
     totalFrames,
+    contentEndFrame,
     inputProps,
     playerRenderSize,
     renderSize,
@@ -971,6 +972,7 @@ const VideoPreviewBase = memo(function VideoPreviewBase({
       playerRenderSize={playerRenderSize}
       overlayRenderSize={renderSize}
       totalFrames={totalFrames}
+      contentEndFrame={contentEndFrame}
       fps={fps}
       initialFrame={initialPlayheadFrameRef.current ?? 0}
       isResolving={isResolving}

@@ -35,6 +35,7 @@ interface TimelineBoundsContextValue {
   rootId: string
   inFrame: number | null
   outFrame: number | null
+  playbackEndFrame?: number | null
 }
 
 export const BridgedTimelineFrameContext = createContext<number | null>(null)
@@ -121,4 +122,16 @@ export function useBridgedActualLastFrame(durationInFrames: number): number {
   }
   const { outFrame } = bounds
   return outFrame ?? durationInFrames - 1
+}
+
+/** Where play stops and restarts from: the out point, else the end of the content. */
+export function useBridgedPlaybackLastFrame(durationInFrames: number): number {
+  const bounds = useContext(BridgedTimelineBoundsContext)
+  if (!bounds) {
+    throw new Error('useBridgedPlaybackLastFrame must be used within a ClockBridgeProvider')
+  }
+  const { outFrame, playbackEndFrame } = bounds
+  if (outFrame !== null && outFrame !== undefined) return outFrame
+  const last = durationInFrames - 1
+  return playbackEndFrame ? Math.min(last, playbackEndFrame - 1) : last
 }

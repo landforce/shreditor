@@ -36,6 +36,9 @@ interface PlayerProps {
   /** Duration in frames */
   durationInFrames: number
 
+  /** End of the content (exclusive): playback stops there; seeking can go past it */
+  playbackEndFrame?: number | null
+
   /** Frames per second */
   fps: number
 
@@ -550,13 +553,23 @@ const PlayerInner = forwardRef<PlayerRef, PlayerProps>(
  * existing code that uses useTimelineContext().
  */
 const Player = forwardRef<PlayerRef, PlayerProps>((props, ref) => {
-  const { durationInFrames, fps, initialFrame, initiallyMuted, playbackRate, loop, onEnded } = props
+  const {
+    durationInFrames,
+    playbackEndFrame,
+    fps,
+    initialFrame,
+    initiallyMuted,
+    playbackRate,
+    loop,
+    onEnded,
+  } = props
 
   return (
     <PlayerEmitterProvider>
       <ClockBridgeProvider
         fps={fps}
         durationInFrames={durationInFrames}
+        playbackEndFrame={playbackEndFrame}
         initialFrame={initialFrame}
         initiallyMuted={initiallyMuted}
         initialPlaybackRate={playbackRate}

@@ -15,4 +15,5 @@ export {
   useBridgedSetTimelineFrame,
   useBridgedActualFirstFrame,
   useBridgedActualLastFrame,
+  useBridgedPlaybackLastFrame,
 } from './ClockBridge'

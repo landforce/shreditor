@@ -62,6 +62,7 @@ export class Clock {
   private _fps: number
   private _durationInFrames: number
   private _loop: boolean
+  private _playbackEndFrame: number | null = null
   private _onEnded?: () => void
 
   // State
@@ -186,6 +187,16 @@ export class Clock {
     return this._outFrame ?? this._durationInFrames - 1
   }
 
+  /**
+   * Where playback stops (and restarts from) when there's no out point: the
+   * end of the content. Seeking can still reach the padding after it.
+   */
+  get playbackLastFrame(): number {
+    if (this._outFrame !== null && this._outFrame !== undefined) return this._outFrame
+    const last = this._durationInFrames - 1
+    return this._playbackEndFrame === null ? last : Math.min(last, this._playbackEndFrame - 1)
+  }
+
   // ============================================
   // Setters
   // ============================================
@@ -256,6 +267,11 @@ export class Clock {
     }
   }
 
+  /** The end of the content (exclusive), where playback stops; null plays to the duration. */
+  setPlaybackEnd(endFrame: number | null): void {
+    this._playbackEndFrame = endFrame === null ? null : Math.max(1, Math.round(endFrame))
+  }
+
   setOutPoint(frame: number | null): void {
     if (frame !== null) {
       this._outFrame = Math.max(0, Math.min(frame, this._durationInFrames - 1))
@@ -279,13 +295,10 @@ export class Clock {
     }
 
     // Restart from the opposite boundary when replaying past the active edge.
-    if (this._playbackRate >= 0 && this._currentFrame >= this.actualLastFrame) {
+    if (this._playbackRate >= 0 && this._currentFrame >= this.playbackLastFrame) {
       this._currentFrame = this.actualFirstFrame
-    } else if (
-      this._playbackRate < 0 &&
-      this._currentFrame <= this.actualFirstFrame
-    ) {
-      this._currentFrame = this.actualLastFrame
+    } else if (this._playbackRate < 0 && this._currentFrame <= this.actualFirstFrame) {
+      this._currentFrame = this.playbackLastFrame
     }
 
     this._isPlaying = true
@@ -549,17 +562,18 @@ export class Clock {
     const newFrame = this._computeFrameAtTime(now)
 
     const hasReachedEnd =
-      this._playbackRate >= 0 ? newFrame > this.actualLastFrame : newFrame < this.actualFirstFrame
+      this._playbackRate >= 0 ? newFrame > this.playbackLastFrame : newFrame < this.actualFirstFrame
 
     if (hasReachedEnd) {
       if (this._loop) {
-        const targetFrame = this._playbackRate >= 0 ? this.actualFirstFrame : this.actualLastFrame
+        const targetFrame = this._playbackRate >= 0 ? this.actualFirstFrame : this.playbackLastFrame
         this._currentFrame = targetFrame
         this._playbackStartTime = now
         this._playbackStartFrame = targetFrame
         this._emit('framechange')
       } else {
-        this._currentFrame = this._playbackRate >= 0 ? this.actualLastFrame : this.actualFirstFrame
+        this._currentFrame =
+          this._playbackRate >= 0 ? this.playbackLastFrame : this.actualFirstFrame
         this._isPlaying = false
         this._emit('framechange')
         this._emit('ended')
