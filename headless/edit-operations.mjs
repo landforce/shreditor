@@ -401,6 +401,32 @@ const cases = [
     failure: { op: 'removeEffect', itemId: 'text-1', effectId: 'missing-effect' },
   },
   {
+    name: 'updateEffect',
+    setup: async (page) =>
+      (
+        await edit(page, baseProject(), [
+          { op: 'addEffect', itemId: 'text-1', gpuEffectType: 'gpu-exposure', params: {} },
+        ])
+      ).project,
+    opFrom: (project) => ({
+      op: 'updateEffect',
+      itemId: 'text-1',
+      effectId: item(project, 'text-1').effects[0].id,
+      params: { exposure: 0.5 },
+      enabled: false,
+    }),
+    op: { op: 'updateEffect', itemId: 'text-1', effectId: 'effect-id', params: { exposure: 0.5 } },
+    assert: (project) =>
+      assert.deepEqual(
+        [
+          item(project, 'text-1')?.effects?.[0]?.effect?.params?.exposure,
+          item(project, 'text-1')?.effects?.[0]?.enabled,
+        ],
+        [0.5, false],
+      ),
+    failure: { op: 'updateEffect', itemId: 'text-1', effectId: 'missing-effect', enabled: false },
+  },
+  {
     name: 'setTransform',
     op: { op: 'setTransform', id: 'text-1', transform: { opacity: 0.4, x: 12 } },
     assert: (project) =>

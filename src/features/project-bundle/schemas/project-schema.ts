@@ -855,6 +855,14 @@ type ValidatedSnapshot = z.infer<typeof snapshotSchema>
 /**
  * Validate a project object
  */
+/** First schema problem with a timeline item as "field: message", or null when it is valid. */
+export function timelineItemProblem(item: unknown): string | null {
+  const result = timelineItemSchema.safeParse(item)
+  if (result.success) return null
+  const issue = result.error.issues[0]
+  return `${issue?.path.join('.') || 'item'}: ${issue?.message ?? 'invalid'}`
+}
+
 export function validateProject(data: unknown): {
   success: boolean
   data?: ValidatedProject

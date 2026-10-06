@@ -40,7 +40,12 @@ const samples = {
     alignment: 0.4,
     properties: { intensity: 2 },
   },
-  updateTransition: { op: 'updateTransition', id: 't', presentation: 'wipe', direction: 'from-top' },
+  updateTransition: {
+    op: 'updateTransition',
+    id: 't',
+    presentation: 'wipe',
+    direction: 'from-top',
+  },
   removeTransition: { op: 'removeTransition', id: 't' },
   addTrack: { op: 'addTrack', kind: 'audio', order: 2 },
   removeTrack: { op: 'removeTrack', trackId: 'v', removeItems: true },
@@ -68,6 +73,7 @@ const samples = {
     params: { radius: 2 },
   },
   removeEffect: { op: 'removeEffect', itemId: 'i', effectId: 'e' },
+  updateEffect: { op: 'updateEffect', itemId: 'i', effectId: 'e', params: { amount: 0.2 } },
   setTransform: { op: 'setTransform', id: 'i', transform: { opacity: 0.5, rotation: 2 } },
 }
 
@@ -82,6 +88,10 @@ test('every published edit discriminator has a valid strict schema', () => {
     false,
   )
   assert.equal(editOpSchema.safeParse({ op: 'updateItem', id: 'i', updates: {} }).success, false)
+  assert.equal(
+    editOpSchema.safeParse({ op: 'updateEffect', itemId: 'i', effectId: 'e' }).success,
+    false,
+  )
   assert.equal(
     editOpSchema.safeParse({ op: 'setTransform', id: 'i', transform: {} }).success,
     false,
@@ -150,13 +160,15 @@ test('frame and layout requests reject invalid targets and frame options', () =>
     { project: 'p', height: 10.5 },
     { project: 'p', projectObject: {}, frame: 0 },
     { frame: 0 },
-  ]) assert.equal(frameRequestSchema.safeParse(invalid).success, false, JSON.stringify(invalid))
+  ])
+    assert.equal(frameRequestSchema.safeParse(invalid).success, false, JSON.stringify(invalid))
 
   for (const invalid of [
     { project: 'p', frame: '12' },
     { project: 'p', at: '1.5' },
     { project: 'p', format: 'png' },
-  ]) assert.equal(layoutRequestSchema.safeParse(invalid).success, false, JSON.stringify(invalid))
+  ])
+    assert.equal(layoutRequestSchema.safeParse(invalid).success, false, JSON.stringify(invalid))
 })
 
 test('validation errors and capabilities are machine-readable and bounded', () => {

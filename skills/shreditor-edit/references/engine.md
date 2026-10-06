@@ -44,7 +44,9 @@ What `shred apply` accepts and how the project behaves. Verified against the Shr
 | `removeItems` | `ids` | |
 | `addTransition` / `updateTransition` / `removeTransition` | | Crossfade between adjacent clips. Many styles forbid transitions; check the style skill. |
 | `addKeyframe` / `removeKeyframes` | `itemId`, `property`, `frame`, `value`, `easing?` | Keyframe frames count from the clip's start. |
-| `addEffect` / `removeEffect` | | GPU effects; see `GET /v1/capabilities`. |
+| `addEffect` | `itemId`, `gpuEffectType`, `params?` | Returns `detail.effectId`. Params are checked against the effect's ranges (`shred effects <id>`); omitted params take their defaults. |
+| `updateEffect` | `itemId`, `effectId`, `params?`, `enabled?` | Merges `params` into the effect; `enabled: false` bypasses it (handy for a before/after frame). |
+| `removeEffect` | `itemId`, `effectId` | |
 | `setTransformParent` | | Parent one item's transform to another. |
 
 `GET /v1/capabilities` (on the service) lists the exact ops and limits for the running version.
@@ -129,6 +131,27 @@ Typing is **one text item with the `typewriter` text motion**, not a run of item
 - If `durationFrames + staggerFrames × (characters − 1)` is longer than **half the clip**, the whole slot is squeezed to fit, so typing runs faster than asked. Make the clip long enough, or split the line.
 - To cue typing to exact frames, place the item at the frame typing should start and compute from the formula; there are no per-character keyframes.
 - The line is laid out at its final size from the first frame (centered text doesn't drift while it types). Verified on rendered frames: 2, 5, 8 then all 10 characters visible at frames 4, 13, 22, 30 with stagger 3.
+
+## Colour and sound, per clip
+
+Correction is a judgement, not a pipeline step: a clip gets it when you (or the user) can see or hear that it needs it, never by default. The user can open and change everything below in the editor (Effects and Color in the clip panel; Audio for volume, fades and EQ).
+
+**Find candidates.** `shred qc <mediaId...> | --project <id>` measures each clip's ORIGINAL file and prints prompts: noise in the pauses, rumble, pops, hiss or harsh S sounds, clipping; dark, clipped, flat/log-looking or colour-cast picture. Thresholds are loose on purpose. A prompt means look or listen, then decide. Clips from one camera in one scene should match each other before they match a look; the style skill decides the look.
+
+**Picture.** Colour is a GPU effect on the clip (`addEffect`), drawn in preview and export alike. `shred effects --category color` lists them with params, ranges and defaults.
+- `gpu-color-wheels` is the primary corrector and what the editor's Color panel edits: `exposure` (-3..3 stops), `contrast` (0..2, 1 = none) around `pivot`, `temperature` / `tint` (-100..100: negative is cooler / greener), `saturation` (-100..100), `lift` / `gamma` / `gain` / `offset`, and hue wheels (`shadowsHue`/`shadowsAmount`, `midtonesHue`/..., `highlightsHue`/...). One per clip is usually enough.
+- `gpu-curves`, `gpu-levels`, `gpu-vibrance`, `gpu-exposure`, `gpu-temperature` are there for specific jobs. `gpu-lut` takes a LUT the user loads in the editor; you can't load `.cube` files.
+- Work: `shred frames` before, `addEffect` with small moves, `shred frames` after (or `updateEffect … enabled:false` for the before) and open both. Fix the reason the qc prompt fired (a yellow cast → `temperature` negative, `tint` to taste; flat/log → contrast and saturation up), then stop. Highlights at white are gone: darken, don't expect detail.
+- Native export draws a clip with an effect in the browser (`shred export` prints the route).
+
+**Sound.** Audio settings are fields on the **audio** item: for video with sound, the linked audio item `addClip` created second (`detail/created/1/id`). Set them with `updateItem`; values outside the editor's ranges are rejected.
+- `volume` dB (-60..12), `audioFadeIn` / `audioFadeOut` seconds.
+- Low cut (rumble, handling, wind, most mic pops): `audioEqLowCutEnabled: true`, `audioEqLowCutFrequencyHz` (20..399; 80–100 for voice), `audioEqLowCutSlopeDbPerOct` (6, 12, 18, 24).
+- Four bands: `audioEqLow…`, `audioEqLowMid…`, `audioEqHighMid…`, `audioEqHigh…`, each with `…Enabled`, `…Type` (`low-shelf`, `peaking`, `high-shelf`, `notch`), `…FrequencyHz` (20..22000), `…GainDb` (-20..20) and `…Q` (0.3..10.3). E.g. muddy voice: `audioEqLowMidType: "peaking"`, `…FrequencyHz: 300`, `…GainDb: -3`; harsh S sounds: a high-mid cut around 6–8 kHz. Mains hum: a `notch` at 50 or 60 Hz.
+- High cut (hiss above the voice): `audioEqHighCutEnabled: true`, `audioEqHighCutFrequencyHz` (1400..22000; 10–12 kHz for voice), `audioEqHighCutSlopeDbPerOct`.
+- `audioEqOutputGainDb` trims after the EQ.
+- Listen to what you changed, or say you couldn't: render an `audioOnly` WAV of the range and check it with ffmpeg, and re-run `shred qc` on mastered files.
+- EQ or volume keyframes make native export take its audio from the browser mix (fine; it prints so).
 
 ## Loudness
 

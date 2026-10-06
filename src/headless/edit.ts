@@ -52,9 +52,11 @@ import {
   removeKeyframesForProperty,
   addEffect,
   removeEffect,
+  updateEffect,
   updateItemTransform,
 } from '@/features/timeline/stores/timeline-actions'
 import { getGpuEffect } from '@/infrastructure/gpu-effects'
+import { timelineItemProblem } from '@/features/project-bundle/schemas/project-schema'
 import {
   assertItemPlacement,
   assertNoTrackOverlap,
@@ -85,6 +87,7 @@ export type EditOperationName =
   | 'setTransformParent'
   | 'addEffect'
   | 'removeEffect'
+  | 'updateEffect'
   | 'setTransform'
 
 /** A wire operation. Node validates its discriminator and fields before this browser boundary. */
@@ -171,6 +174,50 @@ const asNumber = (value: unknown, fallback?: number): number | undefined =>
 
 function tracks(): TimelineTrack[] {
   return useItemsStore.getState().tracks
+}
+
+type EffectParamSpec = NonNullable<ReturnType<typeof getGpuEffect>>['params'][string]
+
+const EFFECT_PARAM_CHECKS: Record<
+  EffectParamSpec['type'],
+  (value: unknown, spec: EffectParamSpec) => string | null
+> = {
+  number: (value, spec) => {
+    if (typeof value !== 'number' || !Number.isFinite(value)) return 'must be a number'
+    if (
+      (spec.min !== undefined && value < spec.min) ||
+      (spec.max !== undefined && value > spec.max)
+    ) {
+      return `must be between ${spec.min} and ${spec.max}`
+    }
+    return null
+  },
+  boolean: (value) => (typeof value === 'boolean' ? null : 'must be true or false'),
+  select: (value, spec) =>
+    spec.options?.some((option) => option.value === value)
+      ? null
+      : `must be one of ${spec.options?.map((option) => option.value).join(', ')}`,
+  color: (value) => (typeof value === 'string' ? null : 'must be a colour string'),
+  point: () => null,
+  json: (value) => (typeof value === 'string' ? null : 'must be a JSON string'),
+  text: (value) => (typeof value === 'string' ? null : 'must be a string'),
+}
+
+/** Reject unknown params and out-of-range values the way the editor's controls would. */
+function validateEffectParams(gpuEffectType: string, params: unknown): void {
+  const definition = getGpuEffect(gpuEffectType)
+  if (!definition) throw new Error(`gpuEffectType: unknown GPU effect "${gpuEffectType}"`)
+  if (!params || typeof params !== 'object') throw new Error('params must be an object')
+  for (const [key, value] of Object.entries(params)) {
+    const spec = definition.params[key]
+    if (!spec) {
+      throw new Error(
+        `params.${key}: ${gpuEffectType} has no such param (has ${Object.keys(definition.params).join(', ')})`,
+      )
+    }
+    const problem = EFFECT_PARAM_CHECKS[spec.type](value, spec)
+    if (problem) throw new Error(`params.${key}: ${problem}`)
+  }
 }
 
 function requireItem(id: string, field = 'id'): TimelineItem {
@@ -382,6 +429,8 @@ function applyOp(op: EditOp): unknown {
           durationInFrames: asNumber(updates.durationInFrames),
         })
       }
+      const problem = timelineItemProblem({ ...item, ...updates })
+      if (problem) throw new Error(`updates.${problem}`)
       updateItem(id, updates)
       return { id }
     }
@@ -681,8 +730,10 @@ function applyOp(op: EditOp): unknown {
       if (typeof gpuEffectType !== 'string' || !getGpuEffect(gpuEffectType)) {
         throw new Error(`gpuEffectType: unknown GPU effect "${String(gpuEffectType)}"`)
       }
+      validateEffectParams(gpuEffectType, (effect as { params?: unknown }).params ?? {})
       addEffect(itemId, effect as VisualEffect)
-      return { itemId }
+      const added = requireItem(itemId, 'itemId').effects?.at(-1)
+      return { itemId, effectId: added?.id }
     }
     case 'removeEffect': {
       const itemId = asString(op.itemId)
@@ -693,6 +744,32 @@ function applyOp(op: EditOp): unknown {
         throw new Error(`effectId: effect "${effectId}" does not exist on item "${itemId}"`)
       }
       removeEffect(itemId, effectId)
+      return { itemId, effectId }
+    }
+    case 'updateEffect': {
+      const itemId = asString(op.itemId)
+      const effectId = asString(op.effectId)
+      if (!itemId || !effectId) throw new Error('updateEffect requires `itemId` and `effectId`')
+      const entry = requireItem(itemId, 'itemId').effects?.find(
+        (candidate) => candidate.id === effectId,
+      )
+      if (!entry)
+        throw new Error(`effectId: effect "${effectId}" does not exist on item "${itemId}"`)
+      const updates: Partial<{ effect: VisualEffect; enabled: boolean }> = {}
+      if (op.params !== undefined) {
+        if (entry.effect.type !== 'gpu-effect')
+          throw new Error('updateEffect: only GPU effects take params')
+        validateEffectParams(entry.effect.gpuEffectType, op.params)
+        updates.effect = {
+          ...entry.effect,
+          params: {
+            ...entry.effect.params,
+            ...(op.params as Record<string, number | boolean | string>),
+          },
+        }
+      }
+      if (typeof op.enabled === 'boolean') updates.enabled = op.enabled
+      updateEffect(itemId, effectId, updates)
       return { itemId, effectId }
     }
     case 'setTransform': {

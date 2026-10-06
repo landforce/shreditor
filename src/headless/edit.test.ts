@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vite-plus/test'
 import type { Project, ProjectTimeline } from '@/types/project'
 import type { MediaMetadata } from '@/types/storage'
+import type { ItemEffect } from '@/types/effects'
 import { editProject, type EditOp } from './edit'
 
 /**
@@ -420,6 +421,62 @@ describe('editProject', () => {
     expect(rotation.keyframes[0]).toMatchObject({
       easing: 'spring',
       easingConfig: { type: 'spring', spring: { tension: 300, friction: 10, mass: 1 } },
+    })
+  })
+
+  describe('per-clip look and sound', () => {
+    const withText = (ops: EditOp[]) =>
+      editProject({
+        project: baseProject(),
+        ops: [{ op: 'addText', text: 'Look', from: 0, callerId: 'txt' } as EditOp, ...ops],
+      })
+
+    it('addEffect returns the effect id and updateEffect merges params and toggles it', async () => {
+      const result = await withText([
+        {
+          op: 'addEffect',
+          itemId: { $ref: 'txt#/detail/id' },
+          gpuEffectType: 'gpu-color-wheels',
+          params: { exposure: 0.3, temperature: -10 },
+          callerId: 'grade',
+        } as EditOp,
+        {
+          op: 'updateEffect',
+          itemId: { $ref: 'txt#/detail/id' },
+          effectId: { $ref: 'grade#/detail/effectId' },
+          params: { temperature: 12 },
+          enabled: false,
+        } as EditOp,
+      ])
+      const [entry] = (result.project.timeline!.items[0] as { effects?: ItemEffect[] }).effects!
+      expect(entry).toMatchObject({ enabled: false })
+      expect(entry!.effect).toMatchObject({ params: { exposure: 0.3, temperature: 12 } })
+    })
+
+    it('effect params outside the control ranges, or unknown, are rejected', async () => {
+      const add = (params: Record<string, unknown>) =>
+        withText([
+          {
+            op: 'addEffect',
+            itemId: { $ref: 'txt#/detail/id' },
+            gpuEffectType: 'gpu-exposure',
+            params,
+          } as EditOp,
+        ])
+      await expect(add({ exposure: 9 })).rejects.toThrow(
+        /params\.exposure: must be between -3 and 3/,
+      )
+      await expect(add({ brightness: 1 })).rejects.toThrow(
+        /params\.brightness: gpu-exposure has no such param/,
+      )
+    })
+
+    it('updateItem rejects audio settings outside the editor ranges', async () => {
+      await expect(
+        withText([
+          { op: 'updateItem', id: { $ref: 'txt#/detail/id' }, updates: { volume: 40 } } as EditOp,
+        ]),
+      ).rejects.toThrow(/updates\.volume: /)
     })
   })
 

@@ -28,6 +28,12 @@
 //                                        working-copy state (ready/preparing NN%/failed), category with
 //                                        who set it ([speaker auto] = the editor's unconfirmed suggestion)
 //                                        and transcript state
+//   shred qc <mediaId...> | --project <id> [--json]
+//                                        measure each clip's sound (noise in pauses, rumble, pops, hiss,
+//                                        clipping) and picture (exposure, contrast, colour cast) from the
+//                                        original, with hints; whether a clip gets a fix is your call
+//   shred effects [--category color] [<effectId>]
+//                                        the GPU effects with their params, ranges and defaults
 //   shred categorize <mediaId>=<category>... | --category <c> <mediaId>...
 //                                        set what each media is for (as the agent: the editor never
 //                                        changes it; re-setting an auto suggestion confirms it)
@@ -68,6 +74,7 @@ import {
 } from '../../../formats/registry.mjs'
 import { describeTarget, scoreProject, trackRole } from '../../../formats/scorecard.mjs'
 import { suggestFormat } from '../../../formats/suggest.mjs'
+import { qcMedia } from './qc.mjs'
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..')
 const SERVICE = process.env.SHRED_SERVICE || 'http://127.0.0.1:8787'
@@ -118,7 +125,9 @@ const [command, ...args] = positionals
 function workspace() {
   if (process.env.SHRED_WORKSPACE) return path.resolve(process.env.SHRED_WORKSPACE)
   try {
-    const config = JSON.parse(fs.readFileSync(path.join(os.homedir(), '.shreditor/config.json'), 'utf8'))
+    const config = JSON.parse(
+      fs.readFileSync(path.join(os.homedir(), '.shreditor/config.json'), 'utf8'),
+    )
     if (config.workspace) return config.workspace
   } catch {}
   return path.join(os.homedir(), 'Movies', 'Shreditor')
@@ -138,8 +147,12 @@ async function call(method, route, body, headers = {}) {
   const data = await res.json()
   if (!res.ok || data.ok === false) {
     const e = data.error ?? {}
-    const fields = (e.fields ?? []).map((f) => `  ${f.path?.join?.('.') ?? f.path}: ${f.message}`).join('\n')
-    throw new Error(`${method} ${route}: ${e.code ?? res.status} ${e.message ?? ''}${fields ? `\n${fields}` : ''}`)
+    const fields = (e.fields ?? [])
+      .map((f) => `  ${f.path?.join?.('.') ?? f.path}: ${f.message}`)
+      .join('\n')
+    throw new Error(
+      `${method} ${route}: ${e.code ?? res.status} ${e.message ?? ''}${fields ? `\n${fields}` : ''}`,
+    )
   }
   return data
 }
@@ -193,7 +206,12 @@ const portAnswers = async () => {
 }
 const gitHead = () => {
   try {
-    const [sha, time] = execFileSync('git', ['log', '-1', '--format=%h %ct', 'HEAD'], { cwd: REPO, encoding: 'utf8' }).trim().split(' ')
+    const [sha, time] = execFileSync('git', ['log', '-1', '--format=%h %ct', 'HEAD'], {
+      cwd: REPO,
+      encoding: 'utf8',
+    })
+      .trim()
+      .split(' ')
     return { sha, time: Number(time) }
   } catch {
     return null
@@ -204,7 +222,10 @@ function build(reason) {
   const log = path.join(os.tmpdir(), 'shreditor-build.log')
   say(`Building Shreditor (${reason})…`)
   try {
-    execFileSync('npm', ['run', 'build'], { cwd: REPO, stdio: ['ignore', fs.openSync(log, 'w'), fs.openSync(log, 'a')] })
+    execFileSync('npm', ['run', 'build'], {
+      cwd: REPO,
+      stdio: ['ignore', fs.openSync(log, 'w'), fs.openSync(log, 'a')],
+    })
   } catch {
     throw new Error(`Build failed; see ${log}`)
   }
@@ -215,7 +236,8 @@ function staleBuild() {
   const index = path.join(REPO, 'dist', 'index.html')
   if (!fs.existsSync(index)) return 'no build yet'
   const head = gitHead()
-  if (head && fs.statSync(index).mtimeMs / 1000 < head.time) return `build is older than ${head.sha}`
+  if (head && fs.statSync(index).mtimeMs / 1000 < head.time)
+    return `build is older than ${head.sha}`
   return null
 }
 
@@ -230,19 +252,31 @@ async function editorState(id) {
   }
 }
 const ago = (t) => `${Math.max(0, Math.round((Date.now() - t) / 1000))}s ago`
-const CONFLICT = 'The editor is showing a conflict banner for this project (it changed on disk while the user had unsaved edits). Ask the user to pick a version, then run shred sync again.'
+const CONFLICT =
+  'The editor is showing a conflict banner for this project (it changed on disk while the user had unsaved edits). Ask the user to pick a version, then run shred sync again.'
 async function warnUnsaved(id) {
   const s = await editorState(id)
   if (!s?.dirty && !s?.conflict) return null
-  const line = s.conflict ? `WARNING: ${CONFLICT}` : `WARNING: The editor has unsaved edits (last edit ${s.lastEditAt ? ago(s.lastEditAt) : 'just now'}); run shred sync ${id} first. Below is the saved state only.`
+  const line = s.conflict
+    ? `WARNING: ${CONFLICT}`
+    : `WARNING: The editor has unsaved edits (last edit ${s.lastEditAt ? ago(s.lastEditAt) : 'just now'}); run shred sync ${id} first. Below is the saved state only.`
   if (opt.json) process.stderr.write(`${line}\n`)
   else say(`${line}\n`)
   return { unsaved: Boolean(s.dirty), conflict: Boolean(s.conflict), lastEditAt: s.lastEditAt }
 }
 
-const slug = (t) => t.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 60) || 'footage'
-const MEDIA_EXT = /\.(mov|mp4|m4v|mkv|webm|avi|mts|mxf|wav|mp3|m4a|aac|aif|aiff|flac|png|jpe?g|webp|heic|gif)$/i
-const WHISPER_MODEL = path.join(os.homedir(), 'Library/Application Support/whisper.cpp/models/ggml-large-v3-turbo.bin')
+const slug = (t) =>
+  t
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '')
+    .slice(0, 60) || 'footage'
+const MEDIA_EXT =
+  /\.(mov|mp4|m4v|mkv|webm|avi|mts|mxf|wav|mp3|m4a|aac|aif|aiff|flac|png|jpe?g|webp|heic|gif)$/i
+const WHISPER_MODEL = path.join(
+  os.homedir(),
+  'Library/Application Support/whisper.cpp/models/ggml-large-v3-turbo.bin',
+)
 const which = (bin) => {
   try {
     return execFileSync('which', [bin], { encoding: 'utf8' }).trim()
@@ -255,9 +289,30 @@ const which = (bin) => {
 // on a green screen read well above GREEN_SCREEN_SHARE.
 function greenShare(file, duration) {
   try {
-    const raw = execFileSync('ffmpeg', ['-v', 'error', '-ss', String(Math.max(0, duration / 2)), '-i', file, '-frames:v', '1', '-vf', 'scale=36:64', '-f', 'rawvideo', '-pix_fmt', 'rgb24', '-'], { maxBuffer: 1 << 20 })
+    const raw = execFileSync(
+      'ffmpeg',
+      [
+        '-v',
+        'error',
+        '-ss',
+        String(Math.max(0, duration / 2)),
+        '-i',
+        file,
+        '-frames:v',
+        '1',
+        '-vf',
+        'scale=36:64',
+        '-f',
+        'rawvideo',
+        '-pix_fmt',
+        'rgb24',
+        '-',
+      ],
+      { maxBuffer: 1 << 20 },
+    )
     let green = 0
-    for (let i = 0; i + 2 < raw.length; i += 3) if (raw[i + 1] > 90 && raw[i + 1] > raw[i] * 1.4 && raw[i + 1] > raw[i + 2] * 1.4) green += 1
+    for (let i = 0; i + 2 < raw.length; i += 3)
+      if (raw[i + 1] > 90 && raw[i + 1] > raw[i] * 1.4 && raw[i + 1] > raw[i + 2] * 1.4) green += 1
     return raw.length ? Math.round((green / (raw.length / 3)) * 100) / 100 : 0
   } catch {
     return undefined
@@ -265,13 +320,42 @@ function greenShare(file, duration) {
 }
 
 // Whisper invents these on non-speech audio (music, typing, room tone).
-const WHISPER_PHANTOMS = new Set(['thank you', 'thanks', 'thank you very much', 'thanks for watching', 'thank you for watching', 'you', 'bye', 'bye bye', 'music', 'applause', 'laughter', 'silence', 'subtitles by the amara org community', 'please subscribe'])
+const WHISPER_PHANTOMS = new Set([
+  'thank you',
+  'thanks',
+  'thank you very much',
+  'thanks for watching',
+  'thank you for watching',
+  'you',
+  'bye',
+  'bye bye',
+  'music',
+  'applause',
+  'laughter',
+  'silence',
+  'subtitles by the amara org community',
+  'please subscribe',
+])
 const isPhantomSpeech = (text, seconds) => {
-  const t = text.toLowerCase().replace(/\[[^\]]*\]|\([^)]*\)/g, ' ').replace(/[^a-z' ]+/g, ' ').replace(/\s+/g, ' ').trim()
+  const t = text
+    .toLowerCase()
+    .replace(/\[[^\]]*\]|\([^)]*\)/g, ' ')
+    .replace(/[^a-z' ]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
   if (!t) return true
   if (WHISPER_PHANTOMS.has(t)) return true
   // "Thank you. Thank you." on a music bed: every sentence a phantom.
-  const sentences = text.toLowerCase().split(/[.!?]+/).map((x) => x.replace(/[^a-z' ]+/g, ' ').replace(/\s+/g, ' ').trim()).filter(Boolean)
+  const sentences = text
+    .toLowerCase()
+    .split(/[.!?]+/)
+    .map((x) =>
+      x
+        .replace(/[^a-z' ]+/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim(),
+    )
+    .filter(Boolean)
   if (sentences.length && sentences.every((x) => WHISPER_PHANTOMS.has(x))) return true
   const words = t.split(' ').length
   return words <= 2 && seconds > 3
@@ -280,7 +364,10 @@ const isPhantomSpeech = (text, seconds) => {
 // Built-in transcripts (server/transcription.mjs), read straight from the workspace.
 const transcription = () => import(pathToFileURL(path.join(REPO, 'server/transcription.mjs')).href)
 const shreditorCli = (args) => {
-  const r = spawnSync(process.execPath, [path.join(REPO, 'bin/shreditor.mjs'), ...args], { stdio: 'inherit', env: { ...process.env, SHREDITOR_WORKSPACE: workspace(), SHREDITOR_PORT: new URL(EDITOR).port } })
+  const r = spawnSync(process.execPath, [path.join(REPO, 'bin/shreditor.mjs'), ...args], {
+    stdio: 'inherit',
+    env: { ...process.env, SHREDITOR_WORKSPACE: workspace(), SHREDITOR_PORT: new URL(EDITOR).port },
+  })
   if (r.status) process.exitCode = r.status
 }
 
@@ -313,7 +400,10 @@ const formatTitle = (format) => `${format.name}${format.variant ? ` (${format.va
 const repoPath = (file) => path.join(REPO, file)
 
 function formatOrThrow(id, variant) {
-  if (!getFormat(id)) throw new Error(`Unknown format "${id}". Formats: ${FORMATS.map((f) => f.id).join(', ')} (shred format list)`)
+  if (!getFormat(id))
+    throw new Error(
+      `Unknown format "${id}". Formats: ${FORMATS.map((f) => f.id).join(', ')} (shred format list)`,
+    )
   return resolveFormat(id, variant)
 }
 
@@ -328,7 +418,9 @@ function projectFormatOrNull(project) {
 
 function listFormats() {
   for (const f of FORMATS) {
-    const variants = f.variants.map((v) => `${v.id}${v.id === f.defaultVariant ? ' (default)' : ''}`).join(', ')
+    const variants = f.variants
+      .map((v) => `${v.id}${v.id === f.defaultVariant ? ' (default)' : ''}`)
+      .join(', ')
     say(`${f.id.padEnd(12)} ${f.name}${variants ? `  [variants: ${variants}]` : ''}`)
     say(`${''.padEnd(12)} ${f.tagline}`)
     say(`${''.padEnd(12)} use when: ${f.useWhen}`)
@@ -339,7 +431,9 @@ function listFormats() {
 function printFormat(format) {
   const c = format.canvas
   const r = format.rules
-  say(`${formatTitle(format)}  [${format.id}${format.variant ? ` --variant ${format.variant.id}` : ''}]`)
+  say(
+    `${formatTitle(format)}  [${format.id}${format.variant ? ` --variant ${format.variant.id}` : ''}]`,
+  )
   say(format.description)
   for (const v of format.variants) say(`  variant ${v.id.padEnd(9)} ${v.description}`)
   say(`canvas    ${c.width}x${c.height} @${c.fps}`)
@@ -349,13 +443,18 @@ function printFormat(format) {
   for (const t of format.tracks) say(`  ${t.name.padEnd(14)} ${t.kind.padEnd(6)} role ${t.role}`)
   say('\nRules')
   const hold = describeTarget({ ...r.titleHook.holdSec, ideal: null, unit: 's' })
-  say(`  ${'title hook'.padEnd(12)} ${r.titleHook.required ? 'required' : 'optional'} from ${r.titleHook.fromSec} s, held ${hold}${r.titleHook.allowFullHold ? ' or all video' : ''}`)
-  for (const k of ['captions', 'speech', 'voiceover', 'music', 'sfx', 'syncSound', 'transitions']) say(`  ${k.padEnd(12)} ${r[k]}`)
+  say(
+    `  ${'title hook'.padEnd(12)} ${r.titleHook.required ? 'required' : 'optional'} from ${r.titleHook.fromSec} s, held ${hold}${r.titleHook.allowFullHold ? ' or all video' : ''}`,
+  )
+  for (const k of ['captions', 'speech', 'voiceover', 'music', 'sfx', 'syncSound', 'transitions'])
+    say(`  ${k.padEnd(12)} ${r[k]}`)
   say('\nTargets (fail = must fix or explain; warn = starting point)')
   for (const t of format.targets) {
     const banded = t.min !== null || t.max !== null
     const ideal = t.ideal !== null && banded ? `  ideal ~${t.ideal}` : ''
-    say(`  ${t.label.padEnd(42)} ${describeTarget(t).padEnd(16)} ${(banded ? t.severity : 'info').padEnd(5)}${t.source.padEnd(9)}${ideal}${t.note ? `  (${t.note})` : ''}`)
+    say(
+      `  ${t.label.padEnd(42)} ${describeTarget(t).padEnd(16)} ${(banded ? t.severity : 'info').padEnd(5)}${t.source.padEnd(9)}${ideal}${t.note ? `  (${t.note})` : ''}`,
+    )
   }
   say('\nChecklist')
   for (const line of format.checklist) say(`  - ${line}`)
@@ -365,12 +464,15 @@ function printTracks(project, format) {
   const tracks = [...(project?.timeline?.tracks ?? [])].sort((a, b) => a.order - b.order)
   for (const t of tracks) {
     const role = format ? trackRole(t, format) : null
-    say(`${t.name.padEnd(format ? 14 : 3)} ${t.id}  (${t.kind ?? 'video'}${role ? `, role ${role}` : ', default track: reuse it'})`)
+    say(
+      `${t.name.padEnd(format ? 14 : 3)} ${t.id}  (${t.kind ?? 'video'}${role ? `, role ${role}` : ', default track: reuse it'})`,
+    )
   }
 }
 
 async function setFormat(id, formatId) {
-  if (!id || !formatId) throw new Error('Usage: shred format set <projectId> <formatId> [--variant v]')
+  if (!id || !formatId)
+    throw new Error('Usage: shred format set <projectId> <formatId> [--variant v]')
   const format = formatOrThrow(formatId, opt.variant)
   const { project, revision } = await getProject(id)
   const empty = !project.timeline?.items?.length
@@ -378,20 +480,45 @@ async function setFormat(id, formatId) {
   const m = project.metadata ?? {}
   const canvasDiffers = m.width !== c.width || m.height !== c.height || m.fps !== c.fps
   const choice = { id: format.id, ...(format.variant ? { variant: format.variant.id } : {}) }
-  const updates = { format: choice, ...(empty && canvasDiffers ? { width: c.width, height: c.height, fps: c.fps } : {}) }
-  const updated = await call('PATCH', `/v1/projects/${id}`, { updates, expectedRevision: revision }, { 'Idempotency-Key': key('format') })
-  if (!updated.project?.format) throw new Error('The service ignored the format; restart it on this build (shred start --build)')
+  const updates = {
+    format: choice,
+    ...(empty && canvasDiffers ? { width: c.width, height: c.height, fps: c.fps } : {}),
+  }
+  const updated = await call(
+    'PATCH',
+    `/v1/projects/${id}`,
+    { updates, expectedRevision: revision },
+    { 'Idempotency-Key': key('format') },
+  )
+  if (!updated.project?.format)
+    throw new Error(
+      'The service ignored the format; restart it on this build (shred start --build)',
+    )
   say(`${id}: format ${formatTitle(format)}`)
   if (empty) {
     // An empty timeline takes the format's canvas and named tracks.
-    const timeline = { ...(updated.project.timeline ?? {}), tracks: createFormatTracks(format), items: [] }
-    const saved = await call('PUT', `/v1/projects/${id}`, { project: { ...updated.project, timeline }, expectedRevision: updated.revision }, { 'Idempotency-Key': key('format-tracks') })
+    const timeline = {
+      ...(updated.project.timeline ?? {}),
+      tracks: createFormatTracks(format),
+      items: [],
+    }
+    const saved = await call(
+      'PUT',
+      `/v1/projects/${id}`,
+      { project: { ...updated.project, timeline }, expectedRevision: updated.revision },
+      { 'Idempotency-Key': key('format-tracks') },
+    )
     if (canvasDiffers) say(`canvas   ${c.width}x${c.height} @${c.fps}`)
     say('Track layout applied (the timeline was empty):')
     printTracks(saved.project, format)
   } else {
-    if (canvasDiffers) say(`warning: the canvas is ${m.width}x${m.height} @${m.fps}, the format's is ${c.width}x${c.height} @${c.fps}; left as is (the timeline has items).`)
-    say('Tracks left as they are (the timeline has items). Roles come from item formatRole, media categories, then track names:')
+    if (canvasDiffers)
+      say(
+        `warning: the canvas is ${m.width}x${m.height} @${m.fps}, the format's is ${c.width}x${c.height} @${c.fps}; left as is (the timeline has items).`,
+      )
+    say(
+      'Tracks left as they are (the timeline has items). Roles come from item formatRole, media categories, then track names:',
+    )
     printTracks(project, format)
   }
   say(`Read the guide before planning: ${repoPath(format.guide.path)}`)
@@ -427,12 +554,26 @@ function printScorecard(card, project) {
   const fps = project.metadata?.fps ?? 30
   const format = resolveFormat(card.format, card.variant)
   const s = card.summary
-  say(`Scorecard: ${formatTitle(format)}, ${card.durationSec} s  (${s.pass} pass, ${s.warn} warn, ${s.fail} fail)`)
+  say(
+    `Scorecard: ${formatTitle(format)}, ${card.durationSec} s  (${s.pass} pass, ${s.warn} warn, ${s.fail} fail)`,
+  )
   const sec = (frame) => (frame / fps).toFixed(2)
   for (const c of card.checks) {
-    const value = c.value === null ? '-' : typeof c.value === 'boolean' ? (c.value ? 'yes' : 'no') : String(c.value)
-    say(`  ${TAG[c.status].padEnd(4)}  ${c.label.padEnd(42)} ${value.padStart(6)}  target ${c.target}${c.detail ? `  (${c.detail})` : ''}`)
-    if (c.ranges.length) say(`        frames ${c.ranges.map((r) => `${r.startFrame}-${r.endFrame} [${sec(r.startFrame)}-${sec(r.endFrame)} s]`).join(', ')}`)
+    const value =
+      c.value === null
+        ? '-'
+        : typeof c.value === 'boolean'
+          ? c.value
+            ? 'yes'
+            : 'no'
+          : String(c.value)
+    say(
+      `  ${TAG[c.status].padEnd(4)}  ${c.label.padEnd(42)} ${value.padStart(6)}  target ${c.target}${c.detail ? `  (${c.detail})` : ''}`,
+    )
+    if (c.ranges.length)
+      say(
+        `        frames ${c.ranges.map((r) => `${r.startFrame}-${r.endFrame} [${sec(r.startFrame)}-${sec(r.endFrame)} s]`).join(', ')}`,
+      )
   }
   if (s.fail) say('Fix every FAIL before publishing, or tell the user why it stays.')
 }
@@ -443,11 +584,18 @@ const commands = {
     if (info) {
       // Never kill or replace a running editor: the user may be mid-edit in it.
       const kind = await editorKind(info)
-      const what = { dev: 'dev server (reloads on source edits)', preview: 'built preview' }[kind] ?? 'unknown kind'
+      const what =
+        { dev: 'dev server (reloads on source edits)', preview: 'built preview' }[kind] ??
+        'unknown kind'
       say(`Editor   ${EDITOR}  already running: ${what}; left as is`)
-      if (opt.dev ? kind === 'preview' : kind === 'dev') say(`         (stop it yourself to switch to ${opt.dev ? 'the dev server' : 'a built preview'})`)
+      if (opt.dev ? kind === 'preview' : kind === 'dev')
+        say(
+          `         (stop it yourself to switch to ${opt.dev ? 'the dev server' : 'a built preview'})`,
+        )
     } else if (await portAnswers()) {
-      throw new Error(`Something other than the Shreditor editor is serving ${EDITOR}. Stop it, or set SHRED_EDITOR to a free port.`)
+      throw new Error(
+        `Something other than the Shreditor editor is serving ${EDITOR}. Stop it, or set SHRED_EDITOR to a free port.`,
+      )
     } else {
       const port = new URL(EDITOR).port
       if (!opt.dev) {
@@ -455,17 +603,29 @@ const commands = {
         if (reason) build(reason)
       }
       const log = path.join(os.tmpdir(), 'shreditor-editor.log')
-      const child = spawn('npm', ['run', opt.dev ? 'dev' : 'preview', '--', '--port', port, '--strictPort'], {
-        cwd: REPO,
-        // An overridden workspace is pinned for the editor too; otherwise it follows the config.
-        env: { ...process.env, ...(process.env.SHRED_WORKSPACE ? { SHREDITOR_WORKSPACE: process.env.SHRED_WORKSPACE } : {}) },
-        detached: true,
-        stdio: ['ignore', fs.openSync(log, 'a'), fs.openSync(log, 'a')],
-      })
+      const child = spawn(
+        'npm',
+        ['run', opt.dev ? 'dev' : 'preview', '--', '--port', port, '--strictPort'],
+        {
+          cwd: REPO,
+          // An overridden workspace is pinned for the editor too; otherwise it follows the config.
+          env: {
+            ...process.env,
+            ...(process.env.SHRED_WORKSPACE
+              ? { SHREDITOR_WORKSPACE: process.env.SHRED_WORKSPACE }
+              : {}),
+          },
+          detached: true,
+          stdio: ['ignore', fs.openSync(log, 'a'), fs.openSync(log, 'a')],
+        },
+      )
       child.unref()
-      for (let i = 0; i < 120 && !(await editorUp()); i++) await new Promise((r) => setTimeout(r, 1000))
+      for (let i = 0; i < 120 && !(await editorUp()); i++)
+        await new Promise((r) => setTimeout(r, 1000))
       if (!(await editorUp())) throw new Error(`Editor did not start; see ${log}`)
-      say(`Editor   ${EDITOR}  ${opt.dev ? 'dev server (reloads on source edits)' : `built preview of ${gitHead()?.sha ?? 'this checkout'}`}`)
+      say(
+        `Editor   ${EDITOR}  ${opt.dev ? 'dev server (reloads on source edits)' : `built preview of ${gitHead()?.sha ?? 'this checkout'}`}`,
+      )
     }
     await commands.start()
   },
@@ -473,13 +633,25 @@ const commands = {
   async sync([id]) {
     if (!id) throw new Error('Pass a project id')
     const first = await editorState(id)
-    if (!first) return say(`No editor answering at ${EDITOR} (or it predates shred sync); the saved state is all there is.`)
+    if (!first)
+      return say(
+        `No editor answering at ${EDITOR} (or it predates shred sync); the saved state is all there is.`,
+      )
     if (!first.open) return say(`No editor open on ${id}; the saved state is current.`)
     if (first.conflict) throw new Error(CONFLICT)
     // Clean, not saving, and holding the revision that is on disk.
-    const settled = (s) => s.editors.every((e) => !e.dirty && !e.saving && (!e.revision || e.revision === s.diskRevision))
-    if (settled(first)) return say(`Editor has no unsaved edits (revision ${String(first.diskRevision).slice(0, 19)}…).`)
-    const res = await fetch(`${EDITOR}/__shreditor/editor-state/save?project=${encodeURIComponent(id)}`, { method: 'POST' })
+    const settled = (s) =>
+      s.editors.every(
+        (e) => !e.dirty && !e.saving && (!e.revision || e.revision === s.diskRevision),
+      )
+    if (settled(first))
+      return say(
+        `Editor has no unsaved edits (revision ${String(first.diskRevision).slice(0, 19)}…).`,
+      )
+    const res = await fetch(
+      `${EDITOR}/__shreditor/editor-state/save?project=${encodeURIComponent(id)}`,
+      { method: 'POST' },
+    )
     if (!res.ok) throw new Error(`Save request failed: HTTP ${res.status}`)
     const seconds = Number(opt.timeout ?? 20)
     const deadline = Date.now() + seconds * 1000
@@ -487,12 +659,20 @@ const commands = {
     while (Date.now() < deadline) {
       await new Promise((r) => setTimeout(r, 250))
       const s = await editorState(id)
-      if (!s?.open) return say('The editor closed while syncing; the saved state is all there is (shred changes shows it).')
+      if (!s?.open)
+        return say(
+          'The editor closed while syncing; the saved state is all there is (shred changes shows it).',
+        )
       if (s.conflict) throw new Error(CONFLICT)
-      if (settled(s)) return say(`Saved: the editor's edits are on disk (revision ${String(s.diskRevision).slice(0, 19)}…).`)
+      if (settled(s))
+        return say(
+          `Saved: the editor's edits are on disk (revision ${String(s.diskRevision).slice(0, 19)}…).`,
+        )
       last = s
     }
-    throw new Error(`Timed out after ${seconds}s: the editor still has unsaved edits (last edit ${last.lastEditAt ? ago(last.lastEditAt) : 'unknown'}). The user may be mid-drag or in a dialog; ask them to save (Cmd+S), then run shred sync again.`)
+    throw new Error(
+      `Timed out after ${seconds}s: the editor still has unsaved edits (last edit ${last.lastEditAt ? ago(last.lastEditAt) : 'unknown'}). The user may be mid-drag or in a dialog; ask them to save (Cmd+S), then run shred sync again.`,
+    )
   },
 
   async new() {
@@ -506,15 +686,22 @@ const commands = {
       name: opt.name,
       ...(width ? { width, height } : {}),
       ...(fps ? { fps } : {}),
-      ...(format ? { format: { id: format.id, ...(format.variant ? { variant: format.variant.id } : {}) } } : {}),
+      ...(format
+        ? { format: { id: format.id, ...(format.variant ? { variant: format.variant.id } : {}) } }
+        : {}),
     }
     const created = await call('POST', '/v1/projects', body, { 'Idempotency-Key': key('new') })
-    fs.mkdirSync(path.join(workspace(), 'projects', created.id, 'agent', 'passes'), { recursive: true })
+    fs.mkdirSync(path.join(workspace(), 'projects', created.id, 'agent', 'passes'), {
+      recursive: true,
+    })
     say(created.id)
     say(`${EDITOR}/editor/${created.id}`)
     const meta = created.project?.metadata ?? {}
     if (format) {
-      if (!created.project?.format) throw new Error('The service ignored --format; restart it on this build (shred start --build)')
+      if (!created.project?.format)
+        throw new Error(
+          'The service ignored --format; restart it on this build (shred start --build)',
+        )
       say(`${formatTitle(format)}  ${meta.width}x${meta.height} @${meta.fps}`)
       say(`Read the guide before planning: ${path.join(REPO, format.guide.path)}`)
     }
@@ -533,7 +720,9 @@ const commands = {
     const format = resolveFormat(project.format.id, opt.variant ?? project.format.variant)
     printFormat(format)
     if (project.format.reviewedHash && project.format.reviewedHash !== format.guide.reviewedHash) {
-      say(`\nNote: the format's guide changed since this project chose it (${project.format.reviewedHash.slice(0, 19)}…); re-read it.`)
+      say(
+        `\nNote: the format's guide changed since this project chose it (${project.format.reviewedHash.slice(0, 19)}…); re-read it.`,
+      )
     }
   },
 
@@ -541,7 +730,10 @@ const commands = {
     if (!id) throw new Error('Pass a project id')
     const editor = await warnUnsaved(id)
     const { project, revision } = await getProject(id)
-    if (!project.format) throw new Error(`${id} has no format. Choose one (shred format list), then: shred format set ${id} <format>`)
+    if (!project.format)
+      throw new Error(
+        `${id} has no format. Choose one (shred format list), then: shred format set ${id} <format>`,
+      )
     const card = scoreProject(project, await scoringInputs(project))
     if (opt.json) say(JSON.stringify({ revision, ...card, ...(editor ? { editor } : {}) }, null, 2))
     else printScorecard(card, project)
@@ -553,7 +745,11 @@ const commands = {
     const files = inputs.flatMap((p) => {
       const full = path.resolve(p.replace(/^~(?=\/|$)/, os.homedir()))
       if (fs.statSync(full).isDirectory()) {
-        return fs.readdirSync(full).filter((f) => MEDIA_EXT.test(f) && !f.startsWith('.')).sort().map((f) => path.join(full, f))
+        return fs
+          .readdirSync(full)
+          .filter((f) => MEDIA_EXT.test(f) && !f.startsWith('.'))
+          .sort()
+          .map((f) => path.join(full, f))
       }
       return [full]
     })
@@ -568,7 +764,13 @@ const commands = {
       const base = slug(path.basename(file))
       let probe
       try {
-        probe = JSON.parse(execFileSync('ffprobe', ['-v', 'error', '-show_format', '-show_streams', '-of', 'json', file], { encoding: 'utf8', maxBuffer: 16 * 1024 * 1024 }))
+        probe = JSON.parse(
+          execFileSync(
+            'ffprobe',
+            ['-v', 'error', '-show_format', '-show_streams', '-of', 'json', file],
+            { encoding: 'utf8', maxBuffer: 16 * 1024 * 1024 },
+          ),
+        )
       } catch {
         entries.push({ file, error: 'ffprobe could not read it' })
         continue
@@ -577,12 +779,22 @@ const commands = {
       const a = probe.streams.find((x) => x.codec_type === 'audio')
       const duration = Number(probe.format?.duration ?? 0)
       const [fn, fd] = (v?.r_frame_rate ?? '0/1').split('/').map(Number)
-      const isStill = Boolean(v) && (!duration || /png|mjpeg|jpe?g|webp|heic|gif/i.test(v.codec_name) && duration < 0.2)
+      const isStill =
+        Boolean(v) &&
+        (!duration || (/png|mjpeg|jpe?g|webp|heic|gif/i.test(v.codec_name) && duration < 0.2))
       const entry = {
         file,
         kind: v ? (isStill ? 'image' : 'video') : 'audio',
         duration: Math.round(duration * 1000) / 1000,
-        ...(v ? { width: v.width, height: v.height, fps: fd ? Math.round((fn / fd) * 1000) / 1000 : 0, codec: v.codec_name, alpha: /^(yuva|rgba|argb|bgra|abgr|gbrap|ya)/.test(v.pix_fmt ?? '') } : {}),
+        ...(v
+          ? {
+              width: v.width,
+              height: v.height,
+              fps: fd ? Math.round((fn / fd) * 1000) / 1000 : 0,
+              codec: v.codec_name,
+              alpha: /^(yuva|rgba|argb|bgra|abgr|gbrap|ya)/.test(v.pix_fmt ?? ''),
+            }
+          : {}),
         ...(a ? { audio: a.codec_name } : {}),
         browserPlayable: true,
       }
@@ -591,16 +803,33 @@ const commands = {
       if (v && !isStill) {
         try {
           const plan = compatibilityPolicy(probe)
-          if (plan) Object.assign(entry, { browserPlayable: false, workingCopy: `${plan.action}: ${plan.detail}` })
+          if (plan)
+            Object.assign(entry, {
+              browserPlayable: false,
+              workingCopy: `${plan.action}: ${plan.detail}`,
+            })
         } catch (error) {
           Object.assign(entry, { browserPlayable: false, workingCopy: `none: ${error.message}` })
         }
       }
       if (v) {
         const sheet = path.join(dir, 'sheets', `${base}.jpg`)
-        const vf = isStill ? 'scale=320:-2' : `fps=8/${Math.max(duration, 0.5)},scale=180:320:force_original_aspect_ratio=decrease,pad=180:320:-1:-1:color=gray,tile=8x1:padding=3`
+        const vf = isStill
+          ? 'scale=320:-2'
+          : `fps=8/${Math.max(duration, 0.5)},scale=180:320:force_original_aspect_ratio=decrease,pad=180:320:-1:-1:color=gray,tile=8x1:padding=3`
         try {
-          execFileSync('ffmpeg', ['-v', 'error', '-y', '-i', file, '-vf', vf, '-frames:v', '1', sheet])
+          execFileSync('ffmpeg', [
+            '-v',
+            'error',
+            '-y',
+            '-i',
+            file,
+            '-vf',
+            vf,
+            '-frames:v',
+            '1',
+            sheet,
+          ])
           entry.sheet = sheet
         } catch {}
       }
@@ -610,7 +839,11 @@ const commands = {
       const imported = transcriptForFile(workspace(), file)
       if (imported) {
         entry.mediaId = imported.mediaId
-        if (imported.category) Object.assign(entry, { category: imported.category, categorySource: imported.categorySource ?? 'explicit' })
+        if (imported.category)
+          Object.assign(entry, {
+            category: imported.category,
+            categorySource: imported.categorySource ?? 'explicit',
+          })
       }
       const builtIn = a ? imported : null
       if (builtIn?.envelope) {
@@ -622,13 +855,35 @@ const commands = {
         entry.speech = null
         entry.speechNote = `no clear speech (built-in transcription: ${builtIn.status.reason ?? 'none'})`
       }
-      if (transcribe && a && duration > 1 && !builtIn?.envelope && builtIn?.status?.status !== 'none') {
+      if (
+        transcribe &&
+        a &&
+        duration > 1 &&
+        !builtIn?.envelope &&
+        builtIn?.status?.status !== 'none'
+      ) {
         const wav = path.join(os.tmpdir(), `shred-${crypto.randomUUID()}.wav`)
         const outBase = path.join(dir, 'transcripts', base)
         fs.mkdirSync(path.dirname(outBase), { recursive: true })
         try {
-          execFileSync('ffmpeg', ['-v', 'error', '-y', '-i', file, '-vn', '-ac', '1', '-ar', '16000', wav])
-          execFileSync('whisper-cli', ['-m', WHISPER_MODEL, '-f', wav, '-oj', '-osrt', '-of', outBase, '-np'], { stdio: 'ignore' })
+          execFileSync('ffmpeg', [
+            '-v',
+            'error',
+            '-y',
+            '-i',
+            file,
+            '-vn',
+            '-ac',
+            '1',
+            '-ar',
+            '16000',
+            wav,
+          ])
+          execFileSync(
+            'whisper-cli',
+            ['-m', WHISPER_MODEL, '-f', wav, '-oj', '-osrt', '-of', outBase, '-np'],
+            { stdio: 'ignore' },
+          )
           const segs = JSON.parse(fs.readFileSync(`${outBase}.json`, 'utf8')).transcription ?? []
           const text = segs.map((x) => x.text.trim()).join(' ')
           if (isPhantomSpeech(text, duration)) {
@@ -647,19 +902,32 @@ const commands = {
       // Talking heads: how much of a frame is green screen (format choice).
       if (entry.kind === 'video' && entry.speech) entry.greenShare = greenShare(file, duration)
       entries.push(entry)
-      say(`${entry.kind.padEnd(5)} ${String(entry.duration).padStart(7)}s  ${path.basename(file)}${entry.category ? `  [${entry.category} ${entry.categorySource}]` : ''}${entry.browserPlayable ? '' : `  (import makes a working copy: ${entry.workingCopy})`}${entry.speechNote ? '  (no speech)' : ''}${entry.speech ? `  "${entry.speech.slice(0, 60)}…"` : ''}`)
+      say(
+        `${entry.kind.padEnd(5)} ${String(entry.duration).padStart(7)}s  ${path.basename(file)}${entry.category ? `  [${entry.category} ${entry.categorySource}]` : ''}${entry.browserPlayable ? '' : `  (import makes a working copy: ${entry.workingCopy})`}${entry.speechNote ? '  (no speech)' : ''}${entry.speech ? `  "${entry.speech.slice(0, 60)}…"` : ''}`,
+      )
     }
     const out = path.join(dir, 'catalog.json')
     const suggestedFormat = suggestFormat(entries)
-    fs.writeFileSync(out, `${JSON.stringify({ name, createdAt: new Date().toISOString(), sources: inputs.map((p) => path.resolve(p)), ...(suggestedFormat ? { suggestedFormat } : {}), entries }, null, 2)}\n`)
+    fs.writeFileSync(
+      out,
+      `${JSON.stringify({ name, createdAt: new Date().toISOString(), sources: inputs.map((p) => path.resolve(p)), ...(suggestedFormat ? { suggestedFormat } : {}), entries }, null, 2)}\n`,
+    )
     say(`\n${entries.length} items → ${out}`)
     if (suggestedFormat) {
       const also = suggestedFormat.alternatives.map((a) => getFormat(a).name).join(', ')
-      say(`Suggested format: ${suggestedFormat.name} (${suggestedFormat.id}): ${suggestedFormat.reason}${also ? `. Also consider: ${also}` : ''}.`)
-      say('A suggestion only: propose it to the user with the reason and let them pick (shred format list).')
+      say(
+        `Suggested format: ${suggestedFormat.name} (${suggestedFormat.id}): ${suggestedFormat.reason}${also ? `. Also consider: ${also}` : ''}.`,
+      )
+      say(
+        'A suggestion only: propose it to the user with the reason and let them pick (shred format list).',
+      )
     } else say('No format suggestion from this footage (shred format list; ask the user).')
-    say(`Contact sheets in ${path.join(dir, 'sheets')}: open them and write what each shot shows into catalog.json ("content", "usable").`)
-    say('Import the original files: import makes a working copy automatically where browserPlayable is false (originals are untouched).')
+    say(
+      `Contact sheets in ${path.join(dir, 'sheets')}: open them and write what each shot shows into catalog.json ("content", "usable").`,
+    )
+    say(
+      'Import the original files: import makes a working copy automatically where browserPlayable is false (originals are untouched).',
+    )
   },
 
   async transcript([id]) {
@@ -668,24 +936,52 @@ const commands = {
     const stored = readStoredTranscript(workspace(), id)
     const status = readTranscriptionStatus(workspace(), id)
     if (!stored) {
-      const why = status ? `${status.status}${status.reason ? ` (${status.reason})` : ''}${status.error ? `: ${status.error}` : ''}${status.hint ? `\n${status.hint}` : ''}` : 'never transcribed (run: shred transcribe ' + id + ')'
-      if (opt.json) return say(JSON.stringify({ mediaId: id, transcription: status, transcript: null }, null, 2))
+      const why = status
+        ? `${status.status}${status.reason ? ` (${status.reason})` : ''}${status.error ? `: ${status.error}` : ''}${status.hint ? `\n${status.hint}` : ''}`
+        : 'never transcribed (run: shred transcribe ' + id + ')'
+      if (opt.json)
+        return say(
+          JSON.stringify({ mediaId: id, transcription: status, transcript: null }, null, 2),
+        )
       say(`No transcript for ${id}: ${why}`)
       process.exitCode = status?.status === 'none' ? 0 : 1
       return
     }
     const data = stored.data
-    const source = stored.service === 'whisper.cpp' ? `whisper.cpp ${stored.model}` : `made in the app (${data.modelVariant ?? data.model ?? 'unknown model'})`
-    if (opt.json) return say(JSON.stringify({ mediaId: id, language: data.language, source, transcription: status, text: data.text, segments: data.segments }, null, 2))
+    const source =
+      stored.service === 'whisper.cpp'
+        ? `whisper.cpp ${stored.model}`
+        : `made in the app (${data.modelVariant ?? data.model ?? 'unknown model'})`
+    if (opt.json)
+      return say(
+        JSON.stringify(
+          {
+            mediaId: id,
+            language: data.language,
+            source,
+            transcription: status,
+            text: data.text,
+            segments: data.segments,
+          },
+          null,
+          2,
+        ),
+      )
     say(`${id}  ${data.language ?? '?'}  ${source}`)
     for (const seg of data.segments ?? []) {
       say(`\n[${seg.start.toFixed(2)}-${seg.end.toFixed(2)}] ${seg.text}`)
-      for (const w of seg.words ?? []) say(`  ${w.start.toFixed(3).padStart(8)} ${w.end.toFixed(3).padStart(8)}  ${w.text}`)
+      for (const w of seg.words ?? [])
+        say(`  ${w.start.toFixed(3).padStart(8)} ${w.end.toFixed(3).padStart(8)}  ${w.text}`)
     }
   },
 
   async transcribe(ids) {
-    shreditorCli(['transcribe', ...ids, ...(opt.project ? ['--project', opt.project] : []), ...(opt.force ? ['--force'] : [])])
+    shreditorCli([
+      'transcribe',
+      ...ids,
+      ...(opt.project ? ['--project', opt.project] : []),
+      ...(opt.force ? ['--force'] : []),
+    ])
   },
 
   async setup() {
@@ -695,14 +991,25 @@ const commands = {
   async changes([id]) {
     const editor = await warnUnsaved(id)
     const dir = path.join(workspace(), 'projects', id, 'agent', 'passes')
-    const passes = fs.existsSync(dir) ? fs.readdirSync(dir).filter((f) => f.endsWith('.json')).sort() : []
+    const passes = fs.existsSync(dir)
+      ? fs
+          .readdirSync(dir)
+          .filter((f) => f.endsWith('.json'))
+          .sort()
+      : []
     if (!passes.length) return say('No published passes yet.')
     const last = JSON.parse(fs.readFileSync(path.join(dir, passes.at(-1)), 'utf8'))
     const { revision, project } = await getProject(id)
-    if (revision === last.resultRevision) return say(`No changes since pass #${Number(last.id)} "${last.label}".`)
+    if (revision === last.resultRevision)
+      return say(`No changes since pass #${Number(last.id)} "${last.label}".`)
     const diff = diffTimelines(last.timeline, project.timeline)
-    if (opt.json) return say(JSON.stringify({ since: last.id, revision, diff, ...(editor ? { editor } : {}) }, null, 2))
-    say(`Since pass #${Number(last.id)} "${last.label}" the user changed ${countChanges(diff)}. Treat these as decisions:`)
+    if (opt.json)
+      return say(
+        JSON.stringify({ since: last.id, revision, diff, ...(editor ? { editor } : {}) }, null, 2),
+      )
+    say(
+      `Since pass #${Number(last.id)} "${last.label}" the user changed ${countChanges(diff)}. Treat these as decisions:`,
+    )
     for (const d of diff) say(`  ${describeChange(d)}`)
     const notes = path.join(workspace(), 'projects', id, 'agent', 'notes.json')
     if (fs.existsSync(notes)) say(`Notes from the user: ${notes}`)
@@ -713,12 +1020,17 @@ const commands = {
     const ws = workspace()
     const log = path.join(os.tmpdir(), 'shreditor-service.log')
     // The service renders and edits through the built app; rebuild after code changes.
-    if (!built && (opt.build || !fs.existsSync(path.join(REPO, 'dist', 'headless.html')))) build(opt.build ? 'requested' : 'no build yet')
-    const child = spawn(process.execPath, [path.join(REPO, 'headless/serve.mjs'), '--workspace', ws, '--port', new URL(SERVICE).port], {
-      cwd: REPO,
-      detached: true,
-      stdio: ['ignore', fs.openSync(log, 'a'), fs.openSync(log, 'a')],
-    })
+    if (!built && (opt.build || !fs.existsSync(path.join(REPO, 'dist', 'headless.html'))))
+      build(opt.build ? 'requested' : 'no build yet')
+    const child = spawn(
+      process.execPath,
+      [path.join(REPO, 'headless/serve.mjs'), '--workspace', ws, '--port', new URL(SERVICE).port],
+      {
+        cwd: REPO,
+        detached: true,
+        stdio: ['ignore', fs.openSync(log, 'a'), fs.openSync(log, 'a')],
+      },
+    )
     child.unref()
     for (let i = 0; i < 240; i++) {
       await new Promise((r) => setTimeout(r, 1000))
@@ -732,26 +1044,39 @@ const commands = {
     const ws = workspace()
     say(`workspace  ${ws}`)
     say(`editor     ${(await editorUp()) ? EDITOR : 'down (run: shred up)'}`)
-    say(`service    ${h ? `up, GPU ${h.gpu?.available ? 'yes' : 'no'}` : 'down (run: shred start)'}`)
+    say(
+      `service    ${h ? `up, GPU ${h.gpu?.available ? 'yes' : 'no'}` : 'down (run: shred start)'}`,
+    )
     const lock = path.join(ws, '.freecut-headless', 'writer.lock')
-    say(`writer     ${fs.existsSync(lock) ? 'locked by the service (imports go through `shred import`)' : 'free'}`)
+    say(
+      `writer     ${fs.existsSync(lock) ? 'locked by the service (imports go through `shred import`)' : 'free'}`,
+    )
   },
 
   async project([id]) {
     const editor = await warnUnsaved(id)
     const { revision, project } = await getProject(id)
     const s = summarize(project)
-    if (opt.json) return say(JSON.stringify({ revision, ...s, ...(editor ? { editor } : {}) }, null, 2))
-    say(`${project.name}  ${project.metadata?.width}x${project.metadata?.height} @${s.fps}  ${s.end} frames (${(s.end / s.fps).toFixed(2)}s)`)
+    if (opt.json)
+      return say(JSON.stringify({ revision, ...s, ...(editor ? { editor } : {}) }, null, 2))
+    say(
+      `${project.name}  ${project.metadata?.width}x${project.metadata?.height} @${s.fps}  ${s.end} frames (${(s.end / s.fps).toFixed(2)}s)`,
+    )
     say(`revision ${revision}`)
     const format = projectFormatOrNull(project)
-    say(format ? `format   ${formatTitle(format)} (shred format ${id})` : 'format   none (shred format list)')
+    say(
+      format
+        ? `format   ${formatTitle(format)} (shred format ${id})`
+        : 'format   none (shred format list)',
+    )
     for (const t of [...s.tracks].sort((x, y) => x.order - y.order)) {
       const role = format ? trackRole(t, format) : null
       say(`\n${t.name} (${t.kind ?? 'track'} ${t.id}${role ? `, role ${role}` : ''})`)
       for (const i of s.items.filter((x) => x.trackId === t.id).sort((x, y) => x.from - y.from)) {
         const src = i.sourceStart !== undefined ? `  src ${i.sourceStart}-${i.sourceEnd}` : ''
-        say(`  ${String(i.from).padStart(5)}-${String(i.from + i.durationInFrames).padEnd(5)} ${i.type.padEnd(6)} ${(i.type === 'text' ? JSON.stringify(i.text) : i.label) ?? ''}${src}  [${i.id}]`)
+        say(
+          `  ${String(i.from).padStart(5)}-${String(i.from + i.durationInFrames).padEnd(5)} ${i.type.padEnd(6)} ${(i.type === 'text' ? JSON.stringify(i.text) : i.label) ?? ''}${src}  [${i.id}]`,
+        )
       }
     }
   },
@@ -760,23 +1085,108 @@ const commands = {
     if (!files.length) throw new Error('Pass one or more file paths')
     const cli = path.join(REPO, 'bin/shreditor.mjs')
     // Streams progress while working copies are made (unless --no-wait).
-    const result = spawnSync(process.execPath, [cli, 'import', ...files, ...(opt.project ? ['--project', opt.project] : []), ...(opt.link ? ['--link'] : []), ...(opt.category ? ['--category', opt.category] : []), ...(opt['no-wait'] ? ['--no-wait'] : [])], { stdio: 'inherit', env: { ...process.env, SHREDITOR_WORKSPACE: workspace(), SHREDITOR_PORT: new URL(EDITOR).port } })
+    const result = spawnSync(
+      process.execPath,
+      [
+        cli,
+        'import',
+        ...files,
+        ...(opt.project ? ['--project', opt.project] : []),
+        ...(opt.link ? ['--link'] : []),
+        ...(opt.category ? ['--category', opt.category] : []),
+        ...(opt['no-wait'] ? ['--no-wait'] : []),
+      ],
+      {
+        stdio: 'inherit',
+        env: {
+          ...process.env,
+          SHREDITOR_WORKSPACE: workspace(),
+          SHREDITOR_PORT: new URL(EDITOR).port,
+        },
+      },
+    )
     if (result.status) process.exitCode = result.status
   },
 
   async media(ids) {
-    if (!ids.length && !opt.project) throw new Error('Pass one or more media ids, or --project <id>')
+    if (!ids.length && !opt.project)
+      throw new Error('Pass one or more media ids, or --project <id>')
     const cli = path.join(REPO, 'bin/shreditor.mjs')
-    const result = spawnSync(process.execPath, [cli, 'media', ...ids, ...(opt.project ? ['--project', opt.project] : []), ...(opt.wait ? ['--wait'] : []), ...(opt.retry ? ['--retry'] : []), ...(opt.json ? ['--json'] : [])], { stdio: 'inherit', env: { ...process.env, SHREDITOR_WORKSPACE: workspace() } })
+    const result = spawnSync(
+      process.execPath,
+      [
+        cli,
+        'media',
+        ...ids,
+        ...(opt.project ? ['--project', opt.project] : []),
+        ...(opt.wait ? ['--wait'] : []),
+        ...(opt.retry ? ['--retry'] : []),
+        ...(opt.json ? ['--json'] : []),
+      ],
+      { stdio: 'inherit', env: { ...process.env, SHREDITOR_WORKSPACE: workspace() } },
+    )
     if (result.status) process.exitCode = result.status
+  },
+
+  async qc(ids) {
+    const { collectMediaIds, loadProject, readMediaMetadata, resolveMediaFile } =
+      await import('../../../headless/lib/workspace.mjs')
+    const mediaIds = ids.length
+      ? ids
+      : opt.project
+        ? collectMediaIds(loadProject(workspace(), opt.project).project)
+        : []
+    if (!mediaIds.length) throw new Error('Pass one or more media ids, or --project <id>')
+    const rows = mediaIds.map((id) => {
+      const meta = readMediaMetadata(workspace(), id)
+      const file = resolveMediaFile(workspace(), id, { original: true })
+      return { mediaId: id, name: meta?.fileName ?? path.basename(file), ...qcMedia(meta, file) }
+    })
+    if (opt.json) return say(JSON.stringify(rows, null, 2))
+    for (const r of rows) printQc(r)
+    say(
+      'Hints are prompts to look or listen, not instructions. Fix only what you can see or hear; say what you changed in the pass summary.',
+    )
+  },
+
+  async effects([effectId]) {
+    const catalog = JSON.parse(
+      fs.readFileSync(path.join(REPO, 'headless/lib/effect-catalog.json'), 'utf8'),
+    )
+    const pick = catalog.filter((e) =>
+      effectId ? e.id === effectId : !opt.category || e.category === opt.category,
+    )
+    if (!pick.length)
+      throw new Error(
+        effectId
+          ? `No effect "${effectId}" (shred effects --category color)`
+          : `No effects in category "${opt.category}"`,
+      )
+    if (opt.json) return say(JSON.stringify(pick, null, 2))
+    for (const e of pick) {
+      say(`${e.id.padEnd(26)} ${e.category.padEnd(8)} ${e.name}`)
+      if (!effectId && !opt.category) continue
+      for (const [key, p] of Object.entries(e.params)) {
+        const range =
+          p.min !== undefined ? ` ${p.min}..${p.max}` : p.options ? ` ${p.options.join('|')}` : ''
+        say(
+          `    ${key.padEnd(22)} ${p.type.padEnd(7)} default ${p.type === 'json' ? '(editor-managed)' : JSON.stringify(p.default)}${range}  ${p.label}`,
+        )
+      }
+    }
   },
 
   // Through the editor's bridge when it's up, else the same code in-process.
   async categorize(pairs) {
-    if (!pairs.length) throw new Error('Pass <mediaId>=<category>... or --category <category> <mediaId>...')
+    if (!pairs.length)
+      throw new Error('Pass <mediaId>=<category>... or --category <category> <mediaId>...')
     if (!(await editorUp())) {
       const cli = path.join(REPO, 'bin/shreditor.mjs')
-      const out = execFileSync(process.execPath, [cli, 'categorize', ...pairs, ...(opt.category ? ['--category', opt.category] : [])], { encoding: 'utf8' })
+      const out = execFileSync(
+        process.execPath,
+        [cli, 'categorize', ...pairs, ...(opt.category ? ['--category', opt.category] : [])],
+        { encoding: 'utf8' },
+      )
       return say(out.trim())
     }
     const clear = (c) => (c === 'none' || c === '' ? null : c)
@@ -786,54 +1196,121 @@ const commands = {
       if (at < 1) throw new Error(`Expected <mediaId>=<category>, got ${arg}`)
       return { mediaId: arg.slice(0, at), category: clear(arg.slice(at + 1)) }
     })
-    const res = await fetch(`${EDITOR}/__shreditor/media/category`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ items, source: 'agent' }) })
+    const res = await fetch(`${EDITOR}/__shreditor/media/category`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ items, source: 'agent' }),
+    })
     const body = await res.json()
     if (!res.ok) throw new Error(body.message ?? `HTTP ${res.status}`)
     const label = (category, source) => `${category ?? 'none'}${source ? ` (${source})` : ''}`
-    for (const c of body.changed) say(`set     ${c.mediaId}  ${label(c.from, c.fromSource)} -> ${label(c.to, c.source)}`)
+    for (const c of body.changed)
+      say(`set     ${c.mediaId}  ${label(c.from, c.fromSource)} -> ${label(c.to, c.source)}`)
     for (const u of body.unchanged) say(`same    ${u.mediaId}  ${label(u.category, u.source)}`)
   },
 
   async draft([id]) {
     const { project, revision } = await getProject(id)
-    const created = await call('POST', '/v1/projects', { name: `${project.name} (draft)`.slice(0, 100), width: project.metadata?.width, height: project.metadata?.height, fps: project.metadata?.fps }, { 'Idempotency-Key': key('draft') })
+    const created = await call(
+      'POST',
+      '/v1/projects',
+      {
+        name: `${project.name} (draft)`.slice(0, 100),
+        width: project.metadata?.width,
+        height: project.metadata?.height,
+        fps: project.metadata?.fps,
+      },
+      { 'Idempotency-Key': key('draft') },
+    )
     const fresh = await getProject(created.id)
-    const copy = { ...fresh.project, ...(project.format ? { format: project.format } : {}), timeline: project.timeline }
-    await call('PUT', `/v1/projects/${created.id}`, { project: copy, expectedRevision: fresh.revision }, { 'Idempotency-Key': key('draft-copy') })
-    writeDrafts({ ...readDrafts(), [created.id]: { targetId: id, baseRevision: revision, createdAt: new Date().toISOString() } })
+    const copy = {
+      ...fresh.project,
+      ...(project.format ? { format: project.format } : {}),
+      timeline: project.timeline,
+    }
+    await call(
+      'PUT',
+      `/v1/projects/${created.id}`,
+      { project: copy, expectedRevision: fresh.revision },
+      { 'Idempotency-Key': key('draft-copy') },
+    )
+    writeDrafts({
+      ...readDrafts(),
+      [created.id]: { targetId: id, baseRevision: revision, createdAt: new Date().toISOString() },
+    })
     say(created.id)
   },
 
   async apply([id, file]) {
     const body = JSON.parse(fs.readFileSync(file, 'utf8'))
-    const ops = (Array.isArray(body) ? body : body.ops).map((op, i) => ({ callerId: `op${i}`, ...op }))
+    const ops = (Array.isArray(body) ? body : body.ops).map((op, i) => ({
+      callerId: `op${i}`,
+      ...op,
+    }))
     const { revision } = await getProject(id)
     let res
     try {
-      res = await call('POST', `/v1/projects/${id}/edit`, { ops, expectedRevision: revision, persist: true }, { 'Idempotency-Key': key('apply') })
+      res = await call(
+        'POST',
+        `/v1/projects/${id}/edit`,
+        { ops, expectedRevision: revision, persist: true },
+        { 'Idempotency-Key': key('apply') },
+      )
     } catch (error) {
       const log = path.join(os.tmpdir(), 'shreditor-service.log')
-      const tail = fs.existsSync(log) ? fs.readFileSync(log, 'utf8').split('\n').filter((l) => /Error|failed/.test(l)).slice(-3).join('\n') : ''
-      throw new Error(`${error.message}${tail ? `\nservice log:\n${tail}` : ''}\nNothing was applied (batches are atomic).`)
+      const tail = fs.existsSync(log)
+        ? fs
+            .readFileSync(log, 'utf8')
+            .split('\n')
+            .filter((l) => /Error|failed/.test(l))
+            .slice(-3)
+            .join('\n')
+        : ''
+      throw new Error(
+        `${error.message}${tail ? `\nservice log:\n${tail}` : ''}\nNothing was applied (batches are atomic).`,
+      )
     }
     say(`applied ${res.applied} ops, revision ${res.revision}`)
-    for (const w of res.warnings ?? []) say(`warning: ${typeof w === 'string' ? w : JSON.stringify(w)}`)
+    for (const w of res.warnings ?? [])
+      say(`warning: ${typeof w === 'string' ? w : JSON.stringify(w)}`)
   },
 
   async frames([id]) {
     if (!opt.at) throw new Error('--at frame,frame,... is required')
     const [w, h] = (opt.size ?? '270x480').split('x').map(Number)
-    const at = opt.at.split(',').map((x) => Number(x.trim())).filter(Number.isFinite)
+    const at = opt.at
+      .split(',')
+      .map((x) => Number(x.trim()))
+      .filter(Number.isFinite)
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'shred-frames-'))
     const { revision } = await getProject(id)
     for (const frame of at) {
-      const bytes = await call('POST', '/frame', { project: id, frame, width: w, height: h, format: 'jpeg' })
+      const bytes = await call('POST', '/frame', {
+        project: id,
+        frame,
+        width: w,
+        height: h,
+        format: 'jpeg',
+      })
       fs.writeFileSync(path.join(dir, `f${String(frame).padStart(6, '0')}.jpg`), bytes)
     }
     const out = path.resolve(opt.out ?? path.join(dir, 'grid.jpg'))
     const cols = Math.min(at.length, 10)
     const rows = Math.ceil(at.length / cols)
-    execFileSync('ffmpeg', ['-v', 'error', '-y', '-pattern_type', 'glob', '-i', path.join(dir, 'f*.jpg'), '-vf', `tile=${cols}x${rows}:padding=4:color=gray`, '-frames:v', '1', out])
+    execFileSync('ffmpeg', [
+      '-v',
+      'error',
+      '-y',
+      '-pattern_type',
+      'glob',
+      '-i',
+      path.join(dir, 'f*.jpg'),
+      '-vf',
+      `tile=${cols}x${rows}:padding=4:color=gray`,
+      '-frames:v',
+      '1',
+      out,
+    ])
     say(`${out}  (frames ${at.join(', ')} of revision ${revision.slice(0, 19)}…; open it and look)`)
   },
 
@@ -843,22 +1320,57 @@ const commands = {
     const draft = await getProject(draftId)
     const target = await getProject(targetId)
     const origin = readDrafts()[draftId]
-    if (!origin || origin.targetId !== targetId) throw new Error(`${draftId} is not a draft of ${targetId} (make one with: shred draft ${targetId})`)
+    if (!origin || origin.targetId !== targetId)
+      throw new Error(
+        `${draftId} is not a draft of ${targetId} (make one with: shred draft ${targetId})`,
+      )
     if (origin.baseRevision !== target.revision) {
-      throw new Error('The project changed since this draft was taken (the user saved edits). Publishing would erase them.\nRe-read it (shred project), take a new draft, re-apply your ops on top, verify, then publish.')
+      throw new Error(
+        'The project changed since this draft was taken (the user saved edits). Publishing would erase them.\nRe-read it (shred project), take a new draft, re-apply your ops on top, verify, then publish.',
+      )
     }
     const changes = diffTimelines(target.project.timeline, draft.project.timeline)
-    const saved = await call('PUT', `/v1/projects/${targetId}`, { project: { ...target.project, timeline: draft.project.timeline }, expectedRevision: target.revision }, { 'Idempotency-Key': key('publish') })
+    const saved = await call(
+      'PUT',
+      `/v1/projects/${targetId}`,
+      {
+        project: { ...target.project, timeline: draft.project.timeline },
+        expectedRevision: target.revision,
+      },
+      { 'Idempotency-Key': key('publish') },
+    )
     const dir = path.join(workspace(), 'projects', targetId, 'agent', 'passes')
     fs.mkdirSync(dir, { recursive: true })
-    const n = String(fs.readdirSync(dir).filter((f) => f.endsWith('.json')).length + 1).padStart(3, '0')
+    const n = String(fs.readdirSync(dir).filter((f) => f.endsWith('.json')).length + 1).padStart(
+      3,
+      '0',
+    )
     // The format scorecard of what was published, kept with the pass.
     const published = { ...target.project, timeline: draft.project.timeline }
-    const scorecard = published.format ? scoreProject(published, await scoringInputs(published)) : null
-    const record = { id: n, label: opt.label, summary, by: 'agent', status: 'review', createdAt: new Date().toISOString(), draftId, baseRevision: target.revision, resultRevision: saved.revision, changes, ...(scorecard ? { scorecard } : {}), timeline: draft.project.timeline }
+    const scorecard = published.format
+      ? scoreProject(published, await scoringInputs(published))
+      : null
+    const record = {
+      id: n,
+      label: opt.label,
+      summary,
+      by: 'agent',
+      status: 'review',
+      createdAt: new Date().toISOString(),
+      draftId,
+      baseRevision: target.revision,
+      resultRevision: saved.revision,
+      changes,
+      ...(scorecard ? { scorecard } : {}),
+      timeline: draft.project.timeline,
+    }
     fs.writeFileSync(path.join(dir, `${n}.json`), `${JSON.stringify(record, null, 2)}\n`)
-    say(`Pass #${Number(n)} "${opt.label}" published to ${targetId}: ${changes.length} changes, revision ${saved.revision}`)
-    say(`Editor: ${EDITOR}/editor/${targetId}  (an open editor reloads it within a second; open this link if it isn't showing)`)
+    say(
+      `Pass #${Number(n)} "${opt.label}" published to ${targetId}: ${changes.length} changes, revision ${saved.revision}`,
+    )
+    say(
+      `Editor: ${EDITOR}/editor/${targetId}  (an open editor reloads it within a second; open this link if it isn't showing)`,
+    )
     if (scorecard) {
       say('')
       printScorecard(scorecard, published)
@@ -882,13 +1394,20 @@ const commands = {
       if (codec === 'prores') throw new Error('ProRes needs the native engine')
       const { project } = await getProject(id)
       const bytes = await call('POST', '/v1/render', { project: id, codec, quality })
-      const ext = { hevc: 'mp4', h265: 'mp4', vp9: 'webm', vp8: 'webm', av1: 'webm' }[codec] ?? 'mp4'
+      const ext =
+        { hevc: 'mp4', h265: 'mp4', vp9: 'webm', vp8: 'webm', av1: 'webm' }[codec] ?? 'mp4'
       fs.mkdirSync(dir, { recursive: true })
       output = path.join(dir, `${name ?? `${slug(project.name ?? id)}-browser`}.${ext}`)
       fs.writeFileSync(output, bytes)
       say('engine   browser (everything drawn in headless Chrome, media decoded by the browser)')
     } else {
-      const res = await call('POST', '/v1/render', { project: id, engine: opt.native ? 'native' : 'auto', codec, quality, ...(name ? { out: name } : {}) })
+      const res = await call('POST', '/v1/render', {
+        project: id,
+        engine: opt.native ? 'native' : 'auto',
+        codec,
+        quality,
+        ...(name ? { out: name } : {}),
+      })
       output = res.output
       if (res.engine === 'browser') {
         say('engine   browser (native export not possible):')
@@ -897,8 +1416,12 @@ const commands = {
         say(`engine   native (${res.codec}; ffmpeg from the original media)`)
         for (const line of res.summary ?? []) say(`  ${line}`)
         const v = res.verification
-        say(`checked  ${v.frames} frames, ${v.seconds.toFixed(3)}s, ${v.videoCodec} ${v.pixFmt} ${v.color.matrix}/${v.color.range}${v.audio ? `, ${v.audio.codec} ${v.audio.rate} Hz ${v.audio.seconds.toFixed(3)}s` : ', no audio'}`)
-        say(`time     ${res.timings.totalSeconds.toFixed(1)}s (overlays ${res.timings.overlaySeconds.toFixed(1)}s, encode ${res.timings.encodeSeconds.toFixed(1)}s)`)
+        say(
+          `checked  ${v.frames} frames, ${v.seconds.toFixed(3)}s, ${v.videoCodec} ${v.pixFmt} ${v.color.matrix}/${v.color.range}${v.audio ? `, ${v.audio.codec} ${v.audio.rate} Hz ${v.audio.seconds.toFixed(3)}s` : ', no audio'}`,
+        )
+        say(
+          `time     ${res.timings.totalSeconds.toFixed(1)}s (overlays ${res.timings.overlaySeconds.toFixed(1)}s, encode ${res.timings.encodeSeconds.toFixed(1)}s)`,
+        )
       }
     }
     if (opt.out && path.dirname(opt.out) !== '.') {
@@ -922,8 +1445,11 @@ const commands = {
     const tp = Number(opt.tp)
     if (!(lufs >= -70 && lufs <= -5)) throw new Error('--lufs must be between -70 and -5')
     if (!(tp >= -9 && tp <= 0)) throw new Error('--tp must be between -9 and 0')
-    const out = path.resolve(opt.out ?? path.join(path.dirname(src), `${path.parse(src).name}.mastered.wav`))
-    if (out === src) throw new Error('--out must differ from the input; the original is never overwritten')
+    const out = path.resolve(
+      opt.out ?? path.join(path.dirname(src), `${path.parse(src).name}.mastered.wav`),
+    )
+    if (out === src)
+      throw new Error('--out must differ from the input; the original is never overwritten')
     const before = measureLoudness(src)
     if (!Number.isFinite(before.i)) throw new Error(`No measurable audio in ${src}`)
     const runLoudnorm = (filter, outArgs) => {
@@ -933,7 +1459,24 @@ const commands = {
     const m = runLoudnorm(`loudnorm=I=${lufs}:TP=${tp}:LRA=11`, ['-f', 'null', '-'])
     // Linear mode needs a target range at least as wide as the source's.
     const lra = Math.min(50, Math.max(11, Math.ceil(Number(m.input_lra)) + 1))
-    const rate = Number(execFileSync('ffprobe', ['-v', 'error', '-select_streams', 'a:0', '-show_entries', 'stream=sample_rate', '-of', 'csv=p=0', src], { encoding: 'utf8' }).trim()) || 48000
+    const rate =
+      Number(
+        execFileSync(
+          'ffprobe',
+          [
+            '-v',
+            'error',
+            '-select_streams',
+            'a:0',
+            '-show_entries',
+            'stream=sample_rate',
+            '-of',
+            'csv=p=0',
+            src,
+          ],
+          { encoding: 'utf8' },
+        ).trim(),
+      ) || 48000
     // loudnorm limits at 192 kHz and its limiter costs a little loudness, so the file
     // can land a hair over the ceiling or under the target. Measure the result and
     // render again with the target and ceiling nudged by the miss (max 4 tries).
@@ -954,35 +1497,87 @@ const commands = {
       aimI = tenth(Math.min(-5, Math.max(-70, aimI + iMiss)))
       if (tpOver > 0) ceiling = tenth(Math.max(-9, ceiling - tpOver - 0.1))
     }
-    const row = (name, x) => `${name.padEnd(7)} ${x.i.toFixed(1).padStart(6)} LUFS integrated   ${x.tp.toFixed(1).padStart(5)} dBTP true peak   ${x.lra.toFixed(1)} LU range`
+    const row = (name, x) =>
+      `${name.padEnd(7)} ${x.i.toFixed(1).padStart(6)} LUFS integrated   ${x.tp.toFixed(1).padStart(5)} dBTP true peak   ${x.lra.toFixed(1)} LU range`
     say(row('before', before))
     say(row('after', after))
-    say(`target  ${lufs} LUFS, true peak <= ${tp} dBTP (loudnorm ${pass2.normalization_type ?? 'two-pass'}${aimI === lufs && ceiling === tp ? '' : `, aimed ${aimI} LUFS / ceiling ${ceiling}`}; measured with ebur128)`)
-    if (Math.abs(after.i - lufs) > 0.5) say(`warning: integrated is ${(after.i - lufs).toFixed(1)} LU off target (very short or very dynamic source?)`)
+    say(
+      `target  ${lufs} LUFS, true peak <= ${tp} dBTP (loudnorm ${pass2.normalization_type ?? 'two-pass'}${aimI === lufs && ceiling === tp ? '' : `, aimed ${aimI} LUFS / ceiling ${ceiling}`}; measured with ebur128)`,
+    )
+    if (Math.abs(after.i - lufs) > 0.5)
+      say(
+        `warning: integrated is ${(after.i - lufs).toFixed(1)} LU off target (very short or very dynamic source?)`,
+      )
     if (after.tp > tp) say(`warning: true peak ${after.tp.toFixed(1)} dBTP is above ${tp}`)
     say(`${out}  (original untouched; import this file)`)
   },
 }
 
+function printQc(r) {
+  say(`${r.mediaId}  ${r.name}${r.category ? `  [${r.category}]` : ''}`)
+  if (r.skipped) return say(`  (${r.skipped}: not measured)`)
+  const s = r.sound
+  say(
+    s
+      ? `  sound    peak ${s.peakDb.toFixed(1)} dBFS  voice ~${s.speechDb.toFixed(0)}  pauses ~${s.noiseFloorDb.toFixed(0)} dBFS  <80 Hz ${(s.lowRmsDb - s.rmsDb).toFixed(0)} dB  >5 kHz ${(s.airRmsDb - s.rmsDb).toFixed(0)} dB`
+      : '  sound    none',
+  )
+  const p = r.picture
+  if (p)
+    say(
+      `  picture  shadows ${p.shadows}  mids ${p.mids.toFixed(0)}  highlights ${p.highlights}  (16-235)  saturation ${p.saturation.toFixed(0)}  cast u ${p.u.toFixed(1)} v ${p.v.toFixed(1)}`,
+    )
+  for (const h of r.hints) say(`  - ${h}`)
+  if (!r.hints.length) say('  - nothing stands out')
+}
+
 function ffmpegLog(args) {
-  const r = spawnSync('ffmpeg', ['-hide_banner', '-nostats', ...args], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 })
-  if (r.status !== 0) throw new Error(`ffmpeg failed: ${r.stderr.trim().split('\n').slice(-3).join(' ')}`)
+  const r = spawnSync('ffmpeg', ['-hide_banner', '-nostats', ...args], {
+    encoding: 'utf8',
+    maxBuffer: 64 * 1024 * 1024,
+  })
+  if (r.status !== 0)
+    throw new Error(`ffmpeg failed: ${r.stderr.trim().split('\n').slice(-3).join(' ')}`)
   return r.stderr
 }
 
 /** Integrated loudness, true peak and loudness range from ffmpeg's ebur128 summary. */
 function measureLoudness(file) {
-  const log = ffmpegLog(['-i', file, '-vn', '-filter_complex', 'ebur128=peak=true', '-f', 'null', '-'])
+  const log = ffmpegLog([
+    '-i',
+    file,
+    '-vn',
+    '-filter_complex',
+    'ebur128=peak=true',
+    '-f',
+    'null',
+    '-',
+  ])
   const summary = log.slice(log.lastIndexOf('Summary:'))
   const num = (re) => Number(re.exec(summary)?.[1] ?? Number.NaN)
-  return { i: num(/I:\s+(-?[\d.]+|-inf) LUFS/), tp: num(/Peak:\s+(-?[\d.]+|-inf) dBFS/), lra: num(/LRA:\s+(-?[\d.]+) LU/) }
+  return {
+    i: num(/I:\s+(-?[\d.]+|-inf) LUFS/),
+    tp: num(/Peak:\s+(-?[\d.]+|-inf) dBFS/),
+    lra: num(/LRA:\s+(-?[\d.]+) LU/),
+  }
 }
 
 try {
   const fn = commands[command]
   if (!fn) {
-    const lines = fs.readFileSync(fileURLToPath(import.meta.url), 'utf8').split('\n').slice(1)
-    say(lines.slice(0, lines.findIndex((l) => !l.startsWith('//'))).map((l) => l.replace(/^\/\/ ?/, '')).join('\n'))
+    const lines = fs
+      .readFileSync(fileURLToPath(import.meta.url), 'utf8')
+      .split('\n')
+      .slice(1)
+    say(
+      lines
+        .slice(
+          0,
+          lines.findIndex((l) => !l.startsWith('//')),
+        )
+        .map((l) => l.replace(/^\/\/ ?/, ''))
+        .join('\n'),
+    )
     process.exit(command ? 1 : 0)
   }
   await fn(args)

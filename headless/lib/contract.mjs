@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { z } from 'zod'
 import { FORMAT_IDS, getFormat } from '../../formats/registry.mjs'
 
@@ -29,62 +30,12 @@ const projectFrameFields = {
 const hasExactlyOneProjectSource = (value) =>
   Boolean(value.project) !== Boolean(value.projectObject)
 
-const GPU_EFFECT_TYPES = [
-  'gpu-ascii',
-  'gpu-block-glitch',
-  'gpu-blocks',
-  'gpu-box-blur',
-  'gpu-brightness',
-  'gpu-bulge',
-  'gpu-chroma-key',
-  'gpu-color-glitch',
-  'gpu-color-wheels',
-  'gpu-contrast',
-  'gpu-crt',
-  'gpu-curves',
-  'gpu-dither',
-  'gpu-droste',
-  'gpu-edge-detect',
-  'gpu-exposure',
-  'gpu-fluted-glass',
-  'gpu-gaussian-blur',
-  'gpu-glass-mosaic',
-  'gpu-glow',
-  'gpu-gradient-map',
-  'gpu-grain',
-  'gpu-grayscale',
-  'gpu-halftone',
-  'gpu-hue-shift',
-  'gpu-ink',
-  'gpu-invert',
-  'gpu-kaleidoscope',
-  'gpu-levels',
-  'gpu-lut',
-  'gpu-mirror',
-  'gpu-motion-blur',
-  'gpu-pixelate',
-  'gpu-pixel-sort',
-  'gpu-pixel-sort-hq',
-  'gpu-posterize',
-  'gpu-power-window',
-  'gpu-radial-blur',
-  'gpu-rgb-split',
-  'gpu-ripple-glass',
-  'gpu-saturation',
-  'gpu-scanlines',
-  'gpu-secondary-qualifier',
-  'gpu-sepia',
-  'gpu-sharpen',
-  'gpu-temperature',
-  'gpu-threshold',
-  'gpu-trigger-wave',
-  'gpu-twirl',
-  'gpu-vhs',
-  'gpu-vibrance',
-  'gpu-vignette',
-  'gpu-wave',
-  'gpu-zoom-blur',
-]
+// Generated from the GPU effect registry (effect-catalog.test.ts keeps it in sync);
+// `shred effects` prints it with params and ranges.
+const EFFECT_CATALOG = JSON.parse(
+  readFileSync(new URL('./effect-catalog.json', import.meta.url), 'utf8'),
+)
+const GPU_EFFECT_TYPES = EFFECT_CATALOG.map((entry) => entry.id)
 
 const ANIMATABLE_PROPERTIES = [
   'x',
@@ -290,6 +241,19 @@ const opSchemas = [
   z.object({ op: z.literal('removeEffect'), itemId: id, effectId: id }).strict(),
   z
     .object({
+      op: z.literal('updateEffect'),
+      itemId: id,
+      effectId: id,
+      params: params.optional(),
+      enabled: z.boolean().optional(),
+    })
+    .strict()
+    .refine(
+      (value) => value.params !== undefined || value.enabled !== undefined,
+      'updateEffect needs `params` or `enabled`',
+    ),
+  z
+    .object({
       op: z.literal('setTransform'),
       id,
       transform: transform.refine(
@@ -320,6 +284,7 @@ export const EDIT_OPERATION_NAMES = [
   'setTransformParent',
   'addEffect',
   'removeEffect',
+  'updateEffect',
   'setTransform',
 ]
 const EDIT_OPERATION_DESCRIPTIONS = Object.fromEntries(
@@ -347,6 +312,7 @@ function samplesDescription(name) {
     setTransformParent: 'Parent an item transform to another item (null detaches)',
     addEffect: 'Add a registered GPU effect',
     removeEffect: 'Remove an existing item effect',
+    updateEffect: "Change an effect's params (merged) or turn it on/off",
     setTransform: 'Update an item transform',
   }
   return descriptions[name]
