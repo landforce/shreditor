@@ -42,6 +42,17 @@
 //   shred grade apply <id> <itemId...> --preset <name|id>
 //                                        give clips a saved grade the way the editor does: their colour
 //                                        effects are replaced by the preset's, the rest kept (one batch)
+//   shred styles list [--project <id>] [--json]
+//                                        the text style library (or a project's copies: items using each,
+//                                        and whether the library moved on)
+//   shred styles show <name|id> [--project <id>]   a style's definition
+//   shred styles use <projectId> <name|id...>       copy library styles into a project (again = update
+//                                        the project copy from the library; restyles its items)
+//   shred styles save <projectId> <itemId> --name "..." --role title|caption|label|lower-third|other
+//                                        an item's look as a style, in the project (item linked) and library
+//   shred styles import <pack.json> | export [<name|id...>] [--project <id>] [--out f.json] [--name kit]
+//                                        style packs: a brand kit's title, caption and label styles in one file
+//   shred styles remove <name|id>        delete from the library (projects keep their copies)
 //   shred categorize <mediaId>=<category>... | --category <c> <mediaId>...
 //                                        set what each media is for (as the agent: the editor never
 //                                        changes it; re-setting an auto suggestion confirms it)
@@ -83,6 +94,7 @@ import {
 import { describeTarget, scoreProject, trackRole } from '../../../formats/scorecard.mjs'
 import { suggestFormat } from '../../../formats/suggest.mjs'
 import { qcMedia } from './qc.mjs'
+import { stylesCommands } from './styles.mjs'
 import {
   LUTS_DIR,
   MAX_LUT_BYTES,
@@ -133,6 +145,7 @@ const { values: opt, positionals } = parseArgs({
     browser: { type: 'boolean' },
     codec: { type: 'string' },
     quality: { type: 'string' },
+    role: { type: 'string' },
     preset: { type: 'string' },
   },
 })
@@ -1308,6 +1321,13 @@ const commands = {
     const body = JSON.parse(fs.readFileSync(file, 'utf8'))
     const { revision } = await getProject(id)
     await applyBatch(id, Array.isArray(body) ? body : body.ops, revision)
+  },
+
+  async styles([sub, ...rest]) {
+    const run = stylesCommands({ say, opt, workspace, getProject, applyBatch })[sub ?? 'list']
+    if (!run)
+      throw new Error('Usage: shred styles list|show|use|save|import|export|remove (see shred help)')
+    await run(rest)
   },
 
   async lut([sub, ...rest]) {
