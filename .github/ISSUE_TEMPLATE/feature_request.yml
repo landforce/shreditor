@@ -1,5 +1,5 @@
 name: Feature Request
-description: Suggest an improvement or a new capability for FreeCut.
+description: Suggest an improvement or a new capability for Shreditor.
 title: "[Feature]: "
 body:
   - type: markdown
@@ -20,7 +20,7 @@ body:
     id: solution
     attributes:
       label: Proposed solution
-      description: Describe how you would like FreeCut to address the problem.
+      description: Describe how you would like Shreditor to address the problem.
       placeholder: Explain the behavior or experience you have in mind.
     validations:
       required: true

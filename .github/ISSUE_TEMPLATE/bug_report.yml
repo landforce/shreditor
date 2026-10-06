@@ -5,7 +5,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        Thanks for helping improve FreeCut. Please include enough detail for us to reproduce the problem.
+        Thanks for helping improve Shreditor. Please include enough detail for us to reproduce the problem.
 
   - type: textarea
     id: description
@@ -56,9 +56,9 @@ body:
   - type: input
     id: version
     attributes:
-      label: FreeCut version
-      description: Share the deployed version, release, or commit when known.
-      placeholder: "freecut.net, release tag, or commit SHA"
+      label: Shreditor version
+      description: Share the commit you are running when known.
+      placeholder: "Commit SHA"
 
   - type: checkboxes
     id: checks
