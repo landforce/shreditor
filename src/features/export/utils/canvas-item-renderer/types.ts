@@ -159,6 +159,8 @@ export interface ItemRenderContext {
   ) => boolean
   isActivePreviewFrameSuperseded?: (frame: number) => boolean
   isActivePreviewFrameCurrent?: (frame: number) => boolean
+  /** Whether a scrub fallback may stand in for `frame` (pointer still moving). */
+  isActivePreviewFallbackAllowed?: (frame: number) => boolean
   isActivePreviewFrameDecodeReady?: (frame: number) => boolean
   isActivePreviewSourceTarget?: (
     src: string,

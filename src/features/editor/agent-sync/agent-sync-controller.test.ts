@@ -72,6 +72,18 @@ describe('AgentSyncController', () => {
     s.controller.stop()
   })
 
+  it('holds autosave while an agent is mid-pass (watch mode), then saves', async () => {
+    let paused = true
+    const s = setup({ isPaused: () => paused })
+    edit(s)
+    await vi.advanceTimersByTimeAsync(AUTOSAVE_DELAY_MS * 4)
+    expect(s.save).not.toHaveBeenCalled()
+    paused = false
+    await vi.advanceTimersByTimeAsync(1100)
+    expect(s.save).toHaveBeenCalledTimes(1)
+    s.controller.stop()
+  })
+
   it('never autosaves during a conflict', async () => {
     const s = setup()
     s.state.status = 'conflict'

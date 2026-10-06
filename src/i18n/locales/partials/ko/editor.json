@@ -874,6 +874,18 @@
     "colorPanel": {
       "emptyState": "색 보정할 클립을 선택하세요",
       "adjustmentLayerLabel": "색 보정"
+    },
+    "agentActivity": {
+      "working": "에이전트가 패스를 작업 중입니다: {{label}}",
+      "workingNoLabel": "에이전트가 패스를 작업 중입니다",
+      "watchMode": "재생, 스크럽, 살펴보기는 할 수 있습니다. 편집은 에이전트를 기다립니다.",
+      "editAnyway": "그래도 편집",
+      "stop": "에이전트 중지",
+      "stopping": "중지하는 중… 에이전트가 다음 단계에서 확인합니다",
+      "passReady": "패스 준비 완료: {{label}}",
+      "passReadyNoLabel": "패스 준비 완료",
+      "refused": "에이전트가 작업 중입니다. 기다리거나 '그래도 편집'을 선택하세요.",
+      "actionFailed": "편집기 브리지에 연결할 수 없습니다. 다시 시도하세요."
     }
   }
 }

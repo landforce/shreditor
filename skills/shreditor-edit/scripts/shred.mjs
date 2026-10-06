@@ -5,7 +5,7 @@
 //   shred up [--dev] [--build]           start the editor (5273, a built preview; --dev for live reload)
 //                                        and the agent service (8787)
 //   shred start                          start only the agent edit service
-//   shred status                         editor, service, workspace and writer-lock state
+//   shred status                         editor, service, workspace, writer-lock state and passes in progress
 //   shred catalog <folder|file...> --name <slug> [--no-transcribe]
 //                                        probe, contact-sheet and transcribe (import makes working copies)
 //                                        (reuses the built-in transcript of footage already imported)
@@ -61,7 +61,12 @@
 //   shred categorize <mediaId>=<category>... | --category <c> <mediaId>...
 //                                        set what each media is for (as the agent: the editor never
 //                                        changes it; re-setting an auto suggestion confirms it)
-//   shred draft <id>                     copy a project to a private draft; prints the draft id
+//   shred draft <id> [--label "..."]     copy a project to a private draft; prints the draft id. The
+//                                        open editor shows the user you're working (--label: a few
+//                                        words on what the pass does) and holds their edits until you
+//                                        publish; every shred command on the draft or project keeps
+//                                        that alive (it lapses after 10 minutes without one)
+//   shred done <draftId|id>              end the pass without publishing (the editor lets the user edit)
 //   shred apply <id> <ops.json>          apply an op batch atomically (revision-checked)
 //   shred frames <id> --at 30,95,... [--out grid.jpg] [--size 270x480]
 //                                        render saved frames and tile them for review
@@ -142,6 +147,7 @@ import {
   readCubeFileHeader,
 } from '../../../headless/lib/luts.mjs'
 import { templatesCommand } from './templates.mjs'
+import { createActivity } from './activity.mjs'
 import { runBuild, gitHead, staleBuild } from '../../../server/install/build-state.mjs'
 import { DEFAULT_LABEL_PREFIX, jobLabel, jobStatus } from '../../../server/install/launchd.mjs'
 import { logFile, spawnEditor, spawnService } from '../../../server/install/processes.mjs'
@@ -261,6 +267,15 @@ const editorUp = async () => {
     return false
   }
 }
+// The editor's "agent is working" banner for a pass (see activity.mjs).
+const activity = createActivity({
+  workspace,
+  editor: EDITOR,
+  editorUp,
+  readDrafts,
+  writeDrafts,
+  warn: (line) => process.stderr.write(`${line}\n`),
+})
 const editorInfo = async () => {
   try {
     const res = await fetch(`${EDITOR}/__shreditor/info`)
@@ -1276,6 +1291,8 @@ const commands = {
     say(
       `login      ${items.length ? items.map((j) => `${j.label} ${j.state}${j.pid ? ` pid ${j.pid}` : ''}`).join(', ') : 'none (npx shreditor install keeps both running)'}`,
     )
+    const passes = await activity.statusLines()
+    say(`passes     ${passes.length ? passes.join('\n           ') : 'none in progress'}`)
   },
 
   async project([id]) {
@@ -1475,7 +1492,14 @@ const commands = {
       ...readDrafts(),
       [created.id]: { targetId: id, baseRevision: revision, createdAt: new Date().toISOString() },
     })
+    await activity.start(id, created.id, opt.label)
     say(created.id)
+  },
+
+  async done([id]) {
+    if (!id) throw new Error('Pass the draft id (or the project id)')
+    const { targetId } = await activity.done(id)
+    say(`Pass on ${targetId} ended without publishing; the editor lets the user edit again.`)
   },
 
   async apply([id, file]) {
@@ -1528,14 +1552,16 @@ const commands = {
   async publish([draftId, targetId]) {
     if (!opt.label) throw new Error('--label is required (one line naming the pass)')
     const summary = opt.summary ? fs.readFileSync(opt.summary, 'utf8').trim() : ''
-    const draft = await getProject(draftId)
-    const target = await getProject(targetId)
     const origin = readDrafts()[draftId]
     if (!origin || origin.targetId !== targetId)
       throw new Error(
         `${draftId} is not a draft of ${targetId} (make one with: shred draft ${targetId})`,
       )
+    await activity.beforePublish(draftId, targetId)
+    const draft = await getProject(draftId)
+    const target = await getProject(targetId)
     if (origin.baseRevision !== target.revision) {
+      await activity.refused(draftId, targetId)
       throw new Error(
         'The project changed since this draft was taken (the user saved edits). Publishing would erase them.\nRe-read it (shred project), take a new draft, re-apply your ops on top, verify, then publish.',
       )
@@ -1549,7 +1575,11 @@ const commands = {
         expectedRevision: target.revision,
       },
       { 'Idempotency-Key': key('publish') },
-    )
+    ).catch(async (error) => {
+      await activity.refused(draftId, targetId)
+      throw error
+    })
+    await activity.published(draftId, targetId, opt.label)
     const dir = path.join(workspace(), 'projects', targetId, 'agent', 'passes')
     fs.mkdirSync(dir, { recursive: true })
     const n = String(fs.readdirSync(dir).filter((f) => f.endsWith('.json')).length + 1).padStart(
@@ -1959,6 +1989,7 @@ try {
     )
     process.exit(command ? 1 : 0)
   }
+  await activity.preflight(command, [...args, opt.project])
   await fn(args)
 } catch (error) {
   process.stderr.write(`shred: ${error.message}\n`)

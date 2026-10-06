@@ -10,6 +10,7 @@ import crypto from 'node:crypto'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
+import { createAgentActivityRoutes } from './agent-activity.mjs'
 import { createEditorStateRoutes } from './editor-state.mjs'
 import { createMediaRoutes } from './media-bridge.mjs'
 import { createTemplateRoutes } from './template-bridge.mjs'
@@ -164,6 +165,8 @@ export function createWorkspaceBridge({ mode = 'dev' } = {}) {
   const mediaRoutes = createMediaRoutes({ resolveInside, sendJson, readBody, serveFile })
   // Unsaved-edit heartbeat and save requests (see editor-state.mjs).
   const editorStateRoutes = createEditorStateRoutes({ resolveInside, sendJson, readBody })
+  // Whether an agent is mid-pass on a project (see agent-activity.mjs).
+  const agentActivityRoutes = createAgentActivityRoutes({ sendJson, readBody })
   // Native background transcription after imports (see transcription.mjs).
   const transcriptionRoutes = createTranscriptionRoutes({ sendJson, readBody })
   // Motion template library change stamp (see template-bridge.mjs).
@@ -179,6 +182,7 @@ export function createWorkspaceBridge({ mode = 'dev' } = {}) {
       if (await transcriptionRoutes(req, res, { route, rel, root, query: url.searchParams })) return
       if (await mediaRoutes(req, res, { route, rel, root, query: url.searchParams })) return
       if (await editorStateRoutes(req, res, { route, root, url })) return
+      if (await agentActivityRoutes(req, res, { route, root, url })) return
       if (await templateRoutes(req, res, { route, root })) return
       switch (route) {
         case 'GET info': {

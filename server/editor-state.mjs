@@ -8,10 +8,15 @@
 //   GET  editor-state?project=<id>         live tabs for a project plus the revision on disk
 //   POST editor-state/save?project=<id>    ask every open tab of that project to save now
 //
+// Both editor-state replies carry `agentActivity`, the project's agent-activity
+// record (see agent-activity.mjs), so an open editor learns about a pass on its
+// next heartbeat.
+//
 // State is in memory only. A tab that has not reported for STALE_MS is gone.
 import crypto from 'node:crypto'
 import fs from 'node:fs'
 import path from 'node:path'
+import { effectiveActivity, readActivity } from './agent-activity.mjs'
 
 export const STALE_MS = 5000
 const SAVE_REQUEST_TTL_MS = 60_000
@@ -96,18 +101,27 @@ function diskRevision(root, resolveInside, projectId) {
   }
 }
 
+/** The project's agent-activity record as it reads now (idle when missing or unreadable). */
+const activityOf = (root, projectId) => effectiveActivity(readActivity(root, projectId))
+
 export function createEditorStateRoutes({ resolveInside, sendJson, readBody }) {
   const store = createEditorStateStore()
   return async function editorStateRoutes(req, res, { route, root, url }) {
     if (!route.endsWith(' editor-state') && !route.endsWith(' editor-state/save')) return false
     const projectId = url.searchParams.get('project') ?? ''
     switch (route) {
-      case 'POST editor-state':
-        sendJson(res, 200, store.report(JSON.parse((await readBody(req)).toString() || '{}')))
+      case 'POST editor-state': {
+        const input = JSON.parse((await readBody(req)).toString() || '{}')
+        sendJson(res, 200, { ...store.report(input), agentActivity: activityOf(root, input.projectId) })
         return true
+      }
       case 'GET editor-state':
         if (!projectId) throw Object.assign(new Error('project is required'), { status: 400, name: 'TypeError' })
-        sendJson(res, 200, { ...store.query(projectId), diskRevision: diskRevision(root, resolveInside, projectId) })
+        sendJson(res, 200, {
+          ...store.query(projectId),
+          diskRevision: diskRevision(root, resolveInside, projectId),
+          agentActivity: activityOf(root, projectId),
+        })
         return true
       case 'POST editor-state/save':
         if (!projectId) throw Object.assign(new Error('project is required'), { status: 400, name: 'TypeError' })

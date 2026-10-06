@@ -874,6 +874,18 @@
     "colorPanel": {
       "emptyState": "グレーディングするクリップを選択してください",
       "adjustmentLayerLabel": "グレーディング"
+    },
+    "agentActivity": {
+      "working": "エージェントがパスを作業中: {{label}}",
+      "workingNoLabel": "エージェントがパスを作業中",
+      "watchMode": "再生、スクラブ、確認はできます。編集はエージェントの完了を待ちます。",
+      "editAnyway": "それでも編集",
+      "stop": "エージェントを停止",
+      "stopping": "停止中… エージェントは次のステップで気づきます",
+      "passReady": "パスの準備完了: {{label}}",
+      "passReadyNoLabel": "パスの準備完了",
+      "refused": "エージェントが作業中です。完了を待つか、「それでも編集」を選んでください。",
+      "actionFailed": "エディターのブリッジに接続できません。もう一度お試しください。"
     }
   }
 }

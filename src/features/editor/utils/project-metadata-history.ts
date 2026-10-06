@@ -1,5 +1,6 @@
 import { captureSnapshot, useTimelineCommandStore } from '@/features/editor/deps/timeline-store'
 import type { Project } from '@/types/project'
+import { refuseEditWhileAgentWorks } from '@/shared/state/agent-edit-lock'
 
 type ProjectMetadataUpdates = {
   width?: number
@@ -47,6 +48,8 @@ export async function commitProjectMetadataChange({
   if (!hasProjectMetadataChanges(project, updates)) {
     return null
   }
+  // An agent is mid-pass (watch mode): this writes project.json at once.
+  if (refuseEditWhileAgentWorks()) return null
 
   const beforeSnapshot = captureSnapshot()
   const updatedProject = await updateProject(project.id, updates)
