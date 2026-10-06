@@ -30,7 +30,7 @@ const MOTION_TEMPLATE_CONTROL_PROPERTIES = Object.freeze([
 export const MOTION_TEMPLATES_DIR = ['app', 'templates']
 export const MOTION_TEMPLATE_FILE = 'template.json'
 /** The thumbnail of a format 1 (single variant) template. */
-export const MOTION_TEMPLATE_THUMBNAIL = 'thumbnail.jpg'
+const MOTION_TEMPLATE_THUMBNAIL = 'thumbnail.jpg'
 /** A variant's thumbnail file: transparent WebP, shown on a checkerboard. */
 export const variantThumbnailFile = (aspect) => `thumbnail-${String(aspect).replace(':', 'x')}.webp`
 
@@ -507,7 +507,7 @@ export function templateVariant(template, aspect) {
 }
 
 /** Why a template cannot go into a canvas of this aspect, with the way to fix it. */
-export function missingVariantMessage(template, aspect) {
+function missingVariantMessage(template, aspect) {
   const have = templateAspects(template).join(', ')
   return (
     `"${template.name}" has no ${aspect} version (it has ${have}). ` +

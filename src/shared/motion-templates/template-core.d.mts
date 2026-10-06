@@ -101,7 +101,6 @@ export interface MotionTemplateControlInput {
 export const MOTION_TEMPLATE_CATEGORIES: readonly MotionTemplateCategory[]
 export const MOTION_TEMPLATES_DIR: string[]
 export const MOTION_TEMPLATE_FILE: string
-export const MOTION_TEMPLATE_THUMBNAIL: string
 export function variantThumbnailFile(aspect: string): string
 
 export function compositionClosure<T extends { id: string; items: readonly unknown[] }>(
@@ -146,7 +145,6 @@ export function templateVariant(
   template: MotionTemplate,
   aspect: string,
 ): MotionTemplateVariantView | null
-export function missingVariantMessage(template: MotionTemplate, aspect: string): string
 export function chooseTemplateVariant(
   template: MotionTemplate,
   canvas: { width: number; height: number },

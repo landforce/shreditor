@@ -47,7 +47,7 @@ import { clearMediaDragData, setMediaDragData, useMediaLibraryStore } from '../d
 const THUMBNAIL_EDGE = 480
 
 /** The open project's canvas (templates pick the variant with its aspect ratio). */
-export function projectCanvas(): { width: number; height: number } {
+function projectCanvas(): { width: number; height: number } {
   const metadata = useProjectStore.getState().currentProject?.metadata
   return {
     width: metadata?.width ?? DEFAULT_PROJECT_WIDTH,

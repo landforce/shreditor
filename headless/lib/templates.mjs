@@ -141,8 +141,16 @@ const isThumbnailFile = (name) => /^thumbnail(-[0-9]+x[0-9]+)?\.(jpg|webp)$/.tes
 /** Thumbnails no variant names any more (a re-rendered format 1 thumbnail.jpg). */
 function pruneThumbnails(dir, template) {
   const kept = new Set(Object.values(template.variants).map((variant) => variant.thumbnail))
-  for (const name of fs.existsSync(dir) ? fs.readdirSync(dir) : [])
-    if (isThumbnailFile(name) && !kept.has(name)) fs.rmSync(path.join(dir, name), { force: true })
+  const stale = fs.readdirSync(dir).filter((name) => isThumbnailFile(name) && !kept.has(name))
+  for (const name of stale) fs.rmSync(path.join(dir, name), { force: true })
+}
+
+/** [file name, bytes] for each new thumbnail a variant names. */
+function thumbnailWrites(template, thumbnails) {
+  return Object.entries(thumbnails).flatMap(([aspect, bytes]) => {
+    const name = template.variants[aspect]?.thumbnail
+    return bytes && name ? [[path.basename(name), bytes]] : []
+  })
 }
 
 /**
@@ -151,10 +159,8 @@ function pruneThumbnails(dir, template) {
  */
 export function writeTemplate(workspace, template, thumbnails = {}) {
   const dir = templateDir(workspace, template.id)
-  for (const [aspect, bytes] of Object.entries(thumbnails ?? {})) {
-    const name = template.variants[aspect]?.thumbnail
-    if (bytes && name) writeFileAtomic(path.join(dir, path.basename(name)), bytes)
-  }
+  for (const [file, bytes] of thumbnailWrites(template, thumbnails))
+    writeFileAtomic(path.join(dir, file), bytes)
   writeFileAtomic(path.join(dir, MOTION_TEMPLATE_FILE), `${JSON.stringify(template, null, 2)}\n`)
   pruneThumbnails(dir, template)
   return dir
@@ -191,6 +197,8 @@ function findProjectComposition(project, ref) {
  * (its variant for the composition's aspect is replaced), else one with the same
  * name; null makes a new template.
  */
+const firstDefined = (...values) => values.find((value) => value !== undefined)
+
 function previousTemplate(templates, composition, name) {
   const source = composition.templateId
     ? templates.find((template) => template.id === composition.templateId)
@@ -208,19 +216,20 @@ export function buildTemplateFromProject(
   workspace,
   project,
   ref,
-  { name, category, role, hold },
+  options,
   mediaFileName = (mediaId) => mediaId,
 ) {
   const composition = findProjectComposition(project, ref)
   const templates = listTemplates(workspace).entries.map((entry) => entry.template)
-  const previous = previousTemplate(templates, composition, name)
+  const previous = previousTemplate(templates, composition, options.name)
+  const before = previous ?? {}
   return buildMotionTemplate({
     rootCompositionId: composition.id,
     compositions: project.timeline.compositions,
-    name: name ?? previous?.name ?? composition.name,
-    category: category ?? previous?.category ?? 'other',
-    role: role ?? previous?.role,
-    hold,
+    name: firstDefined(options.name, before.name, composition.name),
+    category: firstDefined(options.category, before.category, 'other'),
+    role: firstDefined(options.role, before.role),
+    hold: options.hold,
     previous,
     mediaFileName,
   })

@@ -4,7 +4,7 @@
 // keyed by it.
 
 /** The aspect ratios Shreditor names; a canvas within 1% of one gets its key. */
-export const NAMED_ASPECTS = Object.freeze(['9:16', '16:9', '1:1', '4:5'])
+const NAMED_ASPECTS = Object.freeze(['9:16', '16:9', '1:1', '4:5'])
 const SNAP_TOLERANCE = 0.01
 
 const gcd = (a, b) => {
