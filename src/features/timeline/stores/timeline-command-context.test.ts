@@ -99,4 +99,15 @@ describe('timeline-command-store per-context history', () => {
     cmd.getState().setActiveContext(null) // already root
     expect(cmd.getState().undoStack).toHaveLength(1)
   })
+
+  it('a command run inside another is one undo step', () => {
+    const cmd = useTimelineCommandStore
+    cmd.getState().execute({ type: 'OUTER' }, () => {
+      recordChange('nested-1')
+      recordChange('nested-2')
+    })
+    expect(cmd.getState().undoStack.map((e) => e.command.type)).toEqual(['OUTER'])
+    cmd.getState().undo()
+    expect(useItemsStore.getState().items).toEqual([])
+  })
 })

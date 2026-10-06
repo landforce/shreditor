@@ -28,6 +28,9 @@ interface HistoryStacks {
   redoStack: CommandEntry[]
 }
 
+/** Depth of `execute` calls in progress; nested commands join the outermost one. */
+let executeDepth = 0
+
 /** A new undo entry on top of the active stack, within the history limit; redo is dropped. */
 function pushUndoEntry(undoStack: CommandEntry[], entry: CommandEntry) {
   const maxHistory = useSettingsStore.getState().maxUndoHistory
@@ -162,10 +165,18 @@ export const useTimelineCommandStore = create<CommandStoreState & CommandStoreAc
 
     // Execute a command
     execute: <T>(command: TimelineCommand, action: () => T): T => {
+      // A command run inside another is part of it: one gesture, one undo step.
+      if (executeDepth > 0) return action()
       const beforeSnapshot = captureSnapshot()
 
       // Execute the action
-      const result = action()
+      let result: T
+      executeDepth += 1
+      try {
+        result = action()
+      } finally {
+        executeDepth -= 1
+      }
 
       // Capture after state to check if anything changed
       const afterSnapshot = captureSnapshot()
@@ -261,6 +272,8 @@ export const useTimelineCommandStore = create<CommandStoreState & CommandStoreAc
 
     // Add pre-captured snapshot to undo stack (for drag operations)
     addUndoEntry: (command: TimelineCommand, beforeSnapshot: TimelineSnapshot) => {
+      // Inside a running command, the outer command records the whole change.
+      if (executeDepth > 0) return
       const afterSnapshot = captureSnapshot()
 
       // Only add to history if state actually changed

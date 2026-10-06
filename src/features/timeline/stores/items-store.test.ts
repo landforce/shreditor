@@ -801,3 +801,16 @@ describe('rolling edit', () => {
     expect(updatedLeft.from + updatedLeft.durationInFrames).toBe(updatedRight.from)
   })
 })
+
+describe('items-store transforms on clips made outside the editor', () => {
+  beforeEach(() => resetTimelineItemsTestState())
+
+  it('applies a transform edit to a visual clip that has no transform yet', () => {
+    useItemsStore.getState().setItems([makeVideoItem(), makeAudioItem({ id: 'audio-1' })])
+    useItemsStore.getState()._updateItemsTransform(['clip-1', 'audio-1'], { rotation: 45 })
+    useItemsStore.getState()._updateItemTransform('clip-1', { opacity: 0.5 })
+    const [video, audio] = useItemsStore.getState().items
+    expect(video?.transform).toEqual({ rotation: 45, opacity: 0.5 })
+    expect(audio?.transform).toBeUndefined()
+  })
+})

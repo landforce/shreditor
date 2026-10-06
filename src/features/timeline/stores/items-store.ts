@@ -122,6 +122,15 @@ interface ItemsActions {
   _setItemEffects: (updates: Array<{ itemId: string; effects: ItemEffect[] }>) => void
 }
 
+/**
+ * Whether a transform edit applies to this item. Items made outside the editor
+ * (the agent service) carry no `transform` until one is set; visual items take
+ * one anyway (unset fields keep their render-time defaults).
+ */
+function takesTransform(item: TimelineItem): boolean {
+  return 'transform' in item || item.type !== 'audio'
+}
+
 function updateVisualItemEffects(
   state: ItemsState,
   itemId: string,
@@ -741,7 +750,7 @@ export const useItemsStore = create<ItemsState & ItemsActions>()((set, get) => (
     set((state) => {
       const nextItems = state.items.map((item) => {
         if (item.id !== id) return item
-        if (!('transform' in item)) return item
+        if (!takesTransform(item)) return item
 
         return recordTextStyleOverrides(item, {
           ...item,
@@ -757,7 +766,7 @@ export const useItemsStore = create<ItemsState & ItemsActions>()((set, get) => (
     set((state) => {
       const nextItems = state.items.map((item) => {
         if (item.id !== id) return item
-        if (!('transform' in item)) return item
+        if (!takesTransform(item)) return item
 
         const updatedItem = {
           ...item,
@@ -780,7 +789,7 @@ export const useItemsStore = create<ItemsState & ItemsActions>()((set, get) => (
       const idsSet = new Set(ids)
       const nextItems = state.items.map((item) => {
         if (!idsSet.has(item.id)) return item
-        if (!('transform' in item)) return item
+        if (!takesTransform(item)) return item
 
         return recordTextStyleOverrides(item, {
           ...item,
@@ -801,7 +810,7 @@ export const useItemsStore = create<ItemsState & ItemsActions>()((set, get) => (
         const updatedItem = updates
           ? normalizeFrameFields({ ...item, ...normalizeItemUpdates(updates) } as typeof item)
           : item
-        if (!transform || !('transform' in item)) {
+        if (!transform || !takesTransform(item)) {
           return recordTextStyleOverrides(item, updatedItem, updates)
         }
 
