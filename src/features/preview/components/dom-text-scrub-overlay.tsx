@@ -67,8 +67,11 @@ export const DomTextScrubOverlay = memo(function DomTextScrubOverlay({
         displayedFrame: usePreviewBridgeStore.getState().displayedFrame,
       })
     }
+    // Seek before paint: the overlay kept its last frame while hidden, so a
+    // deferred seek would show that stale text for one frame.
     let resolvedFrame = getVisibleFrame()
-    queueFrame(resolvedFrame)
+    pendingFrameRef.current = Math.max(0, Math.round(resolvedFrame))
+    flushFrame()
 
     const syncVisibleFrame = () => {
       const frame = getVisibleFrame()
@@ -98,6 +101,10 @@ export const DomTextScrubOverlay = memo(function DomTextScrubOverlay({
       style={{
         zIndex: 6,
         visibility: visible ? 'visible' : 'hidden',
+        // Composition track layers set `visibility: visible` explicitly, which
+        // overrides an inherited `hidden`. Opacity can't be overridden by
+        // descendants, so the hidden overlay's stale text never shows through.
+        opacity: visible ? 1 : 0,
         contain: 'layout paint style',
       }}
     >
