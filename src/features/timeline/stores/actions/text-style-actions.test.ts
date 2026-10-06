@@ -20,15 +20,51 @@ import {
 const CANVAS = { width: 1080, height: 1920 }
 const track = makeTimelineTrack({ id: 'v1', name: 'V1', kind: 'video', order: 0 })
 
+const vertical = {
+  aspect: '9:16',
+  style: { fontFamily: 'Inter', fontSize: 100, color: '#ffffff' },
+  layout: { yRatio: -0.25 },
+}
+const landscape = { ...vertical, aspect: '16:9', style: { ...vertical.style, fontSize: 90 } }
+
 const titleStyle: TextStyleDefinition = {
   id: 'title',
   name: 'Title',
   role: 'title',
-  style: { fontFamily: 'Inter', fontSize: 100, color: '#ffffff' },
-  layout: { yRatio: -0.25 },
+  variants: [vertical, landscape],
   version: 1,
   updatedAt: 1,
 }
+
+/** The style with its 9:16 look changed (the 16:9 one as it is). */
+const withVertical = (
+  changes: Partial<typeof vertical>,
+  version = 2,
+  style: TextStyleDefinition = titleStyle,
+): TextStyleDefinition => ({
+  ...style,
+  variants: style.variants.map((variant) =>
+    variant.aspect === '9:16' ? { ...variant, ...changes } : variant,
+  ),
+  version,
+})
+
+function addLandscapeComposition(items: TextItem[]): void {
+  useCompositionsStore.getState().addComposition({
+    id: 'comp',
+    name: 'Comp',
+    tracks: [track],
+    items,
+    transitions: [],
+    keyframes: [],
+    fps: 30,
+    width: 1920,
+    height: 1080,
+    durationInFrames: 30,
+  })
+}
+
+const inner = () => useCompositionsStore.getState().getComposition('comp')?.items[0] as TextItem
 
 function text(id: string, from: number): TextItem {
   return {
@@ -81,12 +117,10 @@ describe('text style actions', () => {
     expect(item('a').textStyleOverrides).toBeUndefined()
 
     const updated = upsertProjectTextStyle(
-      {
-        ...titleStyle,
-        style: { ...titleStyle.style, color: '#ffd400', fontSize: 140 },
+      withVertical({
+        style: { ...vertical.style, color: '#ffd400', fontSize: 140 },
         layout: { yRatio: 0.1 },
-        version: 2,
-      },
+      }),
       CANVAS,
     )
     expect(updated.sort()).toEqual(['a', 'b', 'c'])
@@ -103,10 +137,7 @@ describe('text style actions', () => {
 
   it('undoes a style edit and its propagation as one step', () => {
     seedThreeStyledTitles()
-    upsertProjectTextStyle(
-      { ...titleStyle, style: { ...titleStyle.style, fontSize: 150 }, version: 2 },
-      CANVAS,
-    )
+    upsertProjectTextStyle(withVertical({ style: { ...vertical.style, fontSize: 150 } }), CANVAS)
     expect(item('a').fontSize).toBe(150)
     useTimelineCommandStore.getState().undo()
     expect(item('a').fontSize).toBe(100)
@@ -133,24 +164,38 @@ describe('text style actions', () => {
     expect(item('a')).toMatchObject({ color: '#ffffff', fontSize: 100 })
   })
 
-  it('restyles items inside compositions with the composition canvas', () => {
+  it("restyles items inside compositions with the composition canvas's variant", () => {
     seedThreeStyledTitles()
-    useCompositionsStore.getState().addComposition({
-      id: 'comp',
-      name: 'Comp',
-      tracks: [track],
-      items: [{ ...text('inner', 0), textStyleId: 'title' }],
-      transitions: [],
-      keyframes: [],
-      fps: 30,
-      width: 1920,
-      height: 1080,
-      durationInFrames: 30,
-    })
+    addLandscapeComposition([{ ...text('inner', 0), textStyleId: 'title' }])
     upsertProjectTextStyle({ ...titleStyle, version: 2 }, CANVAS)
-    const inner = useCompositionsStore.getState().getComposition('comp')?.items[0] as TextItem
-    expect(inner).toMatchObject({ color: '#ffffff', fontSize: 100 })
-    expect(inner.transform?.y).toBe(-270)
+    expect(inner()).toMatchObject({ color: '#ffffff', fontSize: 90 })
+    expect(inner().transform?.y).toBe(-270)
+  })
+
+  it('an edit to one variant restyles only the items on canvases of its aspect', () => {
+    seedThreeStyledTitles()
+    addLandscapeComposition([{ ...text('inner', 0), textStyleId: 'title' }])
+    upsertProjectTextStyle({ ...titleStyle, version: 2 }, CANVAS)
+    const before = inner()
+    const changed = upsertProjectTextStyle(
+      withVertical({ style: { ...vertical.style, fontSize: 160 } }, 3),
+      CANVAS,
+    )
+    expect(item('a').fontSize).toBe(160)
+    expect(inner()).toEqual(before)
+    // Its fields came out the same, so it was not rewritten.
+    expect(changed).not.toContain('inner')
+  })
+
+  it('leaves items on a canvas the style has no variant for as they are', () => {
+    seedThreeStyledTitles()
+    const original = { ...text('inner', 0), textStyleId: 'title' }
+    addLandscapeComposition([original])
+    const verticalOnly = { ...titleStyle, variants: [vertical], version: 2 }
+    expect(upsertProjectTextStyle(verticalOnly, CANVAS)).not.toContain('inner')
+    expect(inner()).toEqual(original)
+    applyTextStyleToItems(['inner'], verticalOnly, CANVAS)
+    expect(inner()).toEqual(original)
   })
 
   it('round-trips styles and links through save and load', async () => {
@@ -172,6 +217,28 @@ describe('text style actions', () => {
     await hydrateTimelineStoresFromProject(project)
     expect(useProjectTextStylesStore.getState().styles).toEqual(timeline.textStyles)
     expect(item('b')).toMatchObject({ textStyleId: 'title', textStyleOverrides: ['color'] })
+  })
+
+  it("loads an old single-look style as a variant for the project's aspect", async () => {
+    const { variants: _variants, ...identity } = titleStyle
+    await hydrateTimelineStoresFromProject({
+      id: 'old',
+      name: 'old',
+      description: '',
+      createdAt: 0,
+      updatedAt: 0,
+      duration: 1,
+      metadata: { width: 1280, height: 720, fps: 30 },
+      timeline: {
+        tracks: [track],
+        items: [{ ...text('x', 0), textStyleId: 'title' }],
+        textStyles: [{ ...identity, style: { fontSize: 70 } } as never],
+      },
+    })
+    expect(useProjectTextStylesStore.getState().styles[0]?.variants).toEqual([
+      { aspect: '16:9', style: { fontSize: 70 } },
+    ])
+    expect(buildTimelineFromStores().textStyles?.[0]).toHaveProperty('variants')
   })
 
   it('loads projects made before styles with none', async () => {

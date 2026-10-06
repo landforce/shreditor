@@ -3,12 +3,22 @@
  * `timeline.textStyles`, styles the agent sends in an op, and the workspace
  * library file. Field rules mirror the timeline item schema so a resolved
  * style always makes a valid item.
+ *
+ * Stored styles are families (one variant per aspect ratio). Old single-look
+ * styles still load: they become a one-variant family (see
+ * text-style-family.mjs) and are written back in the family shape.
  */
 
 import { z } from 'zod'
 import { TEXT_STYLE_ROLES, type TextStyleDefinition } from '@/types/text-style'
 import type { TextMotionSpec } from '@/types/text-motion'
 import { sanitizeTextMotion } from '@/shared/projects/migrations/sanitize-text-motion'
+import {
+  LEGACY_TEXT_STYLE_ASPECT,
+  mergeTextStyleFamilies,
+  parseAspect,
+  toTextStyleFamily,
+} from './text-style-family.mjs'
 
 const TEXT_STYLE_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/
 
@@ -88,56 +98,124 @@ const textMotionSchema = z.unknown().transform((value, ctx): TextMotionSpec => {
   return sanitized
 })
 
-const definitionFields = {
-  name: z.string().trim().min(1).max(80),
-  role: z.enum(TEXT_STYLE_ROLES),
-  description: z.string().max(500).optional(),
+const ASPECT_KEY = /^[1-9]\d{0,4}:[1-9]\d{0,4}$/
+
+/** The look parts of a style, as one variant or an old single-look style holds them. */
+const lookFields = {
   style: lookSchema,
   layout: layoutSchema.optional(),
   textMotion: textMotionSchema.optional(),
   spanStyles: z.array(spanStyleSchema).max(8).optional(),
-  defaultDurationFrames: z.number().int().min(1).max(216_000).optional(),
   caption: captionRulesSchema.optional(),
 }
 
-/** A stored style: everything required. */
+const variantSchema = z.object({ aspect: z.string().regex(ASPECT_KEY), ...lookFields }).strict()
+
+const variantsSchema = z
+  .array(variantSchema)
+  .min(1)
+  .max(16)
+  .refine((variants) => new Set(variants.map((v) => v.aspect)).size === variants.length, {
+    message: 'one variant per aspect',
+  })
+
+const sharedFields = {
+  name: z.string().trim().min(1).max(80),
+  role: z.enum(TEXT_STYLE_ROLES),
+  description: z.string().max(500).optional(),
+  defaultDurationFrames: z.number().int().min(1).max(216_000).optional(),
+}
+
+const storedIdentity = {
+  id: z.string().regex(TEXT_STYLE_ID_PATTERN),
+  version: z.number().int().min(1),
+  updatedAt: z.number().int().min(0),
+}
+
+/** A stored style: a family with every field required. */
 export const textStyleDefinitionSchema = z
+  .object({ ...storedIdentity, ...sharedFields, variants: variantsSchema })
+  .strict()
+
+/** An old single-look style, as projects and libraries saved before variants. */
+const legacyTextStyleSchema = z
+  .object({ ...storedIdentity, ...sharedFields, ...lookFields })
+  .strict()
+
+/** A style as a project may store it: a family, or an old single-look style. */
+export const storedTextStyleSchema = z.union([textStyleDefinitionSchema, legacyTextStyleSchema])
+
+const inputIdentity = {
+  id: z.string().regex(TEXT_STYLE_ID_PATTERN).optional(),
+  version: z.number().int().min(1).optional(),
+  updatedAt: z.number().int().min(0).optional(),
+}
+
+/**
+ * A style as written by a person or the agent (id, version and time are
+ * filled in): a family with `variants`, or one look with an optional
+ * `aspect` (default: the canvas it is written on).
+ */
+const familyInputSchema = z
+  .object({ ...inputIdentity, ...sharedFields, variants: variantsSchema })
+  .strict()
+const lookInputSchema = z
   .object({
-    id: z.string().regex(TEXT_STYLE_ID_PATTERN),
-    ...definitionFields,
-    version: z.number().int().min(1),
-    updatedAt: z.number().int().min(0),
+    ...inputIdentity,
+    ...sharedFields,
+    aspect: z.string().min(1).max(32).optional(),
+    ...lookFields,
   })
   .strict()
 
-/** A style as written by a person or the agent: id, version and time are filled in. */
-const textStyleInputSchema = z
-  .object({
-    id: z.string().regex(TEXT_STYLE_ID_PATTERN).optional(),
-    ...definitionFields,
-    version: z.number().int().min(1).optional(),
-    updatedAt: z.number().int().min(0).optional(),
-  })
-  .strict()
+const hasVariants = (value: unknown) =>
+  typeof value === 'object' && value !== null && 'variants' in value
 
 function firstProblem(error: z.ZodError): string {
   const issue = error.issues[0]
   return `${issue?.path.join('.') || 'style'}: ${issue?.message ?? 'invalid'}`
 }
 
-/** Parse a style someone wrote; throws with the first problem as "field: message". */
-export function parseTextStyleInput(value: unknown): z.output<typeof textStyleInputSchema> {
-  const result = textStyleInputSchema.safeParse(value)
+type ParsedTextStyleInput = Omit<TextStyleDefinition, 'id' | 'version' | 'updatedAt'> &
+  Partial<Pick<TextStyleDefinition, 'id' | 'version' | 'updatedAt'>>
+
+/**
+ * Parse a style someone wrote into the family shape; one look becomes the
+ * variant for its `aspect`, else `aspect` (the canvas it is written on).
+ * Throws with the first problem as "field: message".
+ */
+export function parseTextStyleInput(
+  value: unknown,
+  aspect = LEGACY_TEXT_STYLE_ASPECT,
+): ParsedTextStyleInput {
+  const result = (hasVariants(value) ? familyInputSchema : lookInputSchema).safeParse(value)
   if (!result.success) throw new Error(`style.${firstProblem(result.error)}`)
-  return result.data
+  const data = result.data as Record<string, unknown>
+  const own = typeof data.aspect === 'string' ? parseAspectField(data.aspect) : aspect
+  return toTextStyleFamily({ ...data, aspect: own }) as unknown as ParsedTextStyleInput
 }
 
-/** The valid styles in a list (a project copy or the library file); bad entries are dropped. */
-export function sanitizeTextStyles(value: unknown): TextStyleDefinition[] {
+function parseAspectField(text: string): string {
+  try {
+    return parseAspect(text)
+  } catch (error) {
+    throw new Error(`style.aspect: ${(error as Error).message}`)
+  }
+}
+
+/**
+ * The valid styles in a list (a project copy or the library file) in the
+ * family shape; bad entries are dropped. Old single-look styles become a
+ * variant for `legacyAspect` (a project's own aspect for its copies).
+ */
+export function sanitizeTextStyles(
+  value: unknown,
+  legacyAspect = LEGACY_TEXT_STYLE_ASPECT,
+): TextStyleDefinition[] {
   if (!Array.isArray(value)) return []
   const seen = new Set<string>()
   return value.flatMap((entry) => {
-    const result = textStyleDefinitionSchema.safeParse(entry)
+    const result = textStyleDefinitionSchema.safeParse(toTextStyleFamily(entry, legacyAspect))
     if (!result.success || seen.has(result.data.id)) return []
     seen.add(result.data.id)
     return [result.data as TextStyleDefinition]
@@ -181,20 +259,27 @@ export function findTextStyle<T extends Pick<TextStyleDefinition, 'id' | 'name'>
 
 /**
  * Turn written input into a stored definition. An input matching an existing
- * style (by id, else name) replaces it and bumps its version; otherwise it
- * gets a fresh id from its name.
+ * style (by id, else name) is laid over it and bumps its version: its
+ * variants replace those for the same aspects and the others stay. Otherwise
+ * it gets a fresh id from its name. One look is the variant for `aspect`.
  */
 export function normalizeTextStyleInput(
   input: unknown,
   existing: readonly TextStyleDefinition[],
-  now = Date.now(),
+  options: { aspect?: string; now?: number } = {},
 ): TextStyleDefinition {
-  const parsed = parseTextStyleInput(input)
+  const parsed = parseTextStyleInput(input, options.aspect)
   const match = parsed.id
     ? existing.find((style) => style.id === parsed.id)
     : findTextStyle(existing, parsed.name)
   const id =
     parsed.id ?? match?.id ?? uniqueTextStyleId(parsed.name, new Set(existing.map((s) => s.id)))
   const version = Math.max(parsed.version ?? 1, match ? match.version + 1 : 1)
-  return { ...parsed, id, version, updatedAt: parsed.updatedAt ?? now } as TextStyleDefinition
+  const merged = match ? mergeTextStyleFamilies(match, { ...match, ...parsed }) : parsed
+  return {
+    ...merged,
+    id,
+    version,
+    updatedAt: parsed.updatedAt ?? options.now ?? Date.now(),
+  } as TextStyleDefinition
 }

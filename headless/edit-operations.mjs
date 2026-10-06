@@ -123,15 +123,21 @@ function baseProject() {
   }
 }
 
+const KIT_TITLE_LOOK = { style: { fontFamily: 'Anton', fontSize: 120, color: '#ffffff' } }
+// The harness project is 1280x720: the style's 16:9 version applies there.
 const KIT_TITLE = {
   id: 'kit-title',
   name: 'Kit Title',
   role: 'title',
-  style: { fontFamily: 'Anton', fontSize: 120, color: '#ffffff' },
-  layout: { yRatio: -0.3 },
+  variants: [
+    { aspect: '9:16', ...KIT_TITLE_LOOK, layout: { yRatio: -0.3 } },
+    { aspect: '16:9', ...KIT_TITLE_LOOK, layout: { yRatio: -0.2 } },
+  ],
   version: 1,
   updatedAt: 1,
 }
+// Only a vertical version: unusable on the 16:9 harness project until cloned.
+const VERTICAL_ONLY = { ...KIT_TITLE, variants: [KIT_TITLE.variants[0]] }
 
 const item = (project, id) => project.timeline.items.find((candidate) => candidate.id === id)
 const roundTrip = (project) => JSON.parse(JSON.stringify(project))
@@ -461,9 +467,11 @@ const cases = [
         project.timeline.textStyles.map((style) => style.id),
         ['kit-title'],
       )
+      const { textStyleId, fontFamily, fontSize, transform } = item(project, 'text-1')
+      // The 16:9 version, scaled from 1920x1080 to the 1280x720 project.
       assert.deepEqual(
-        [item(project, 'text-1')?.textStyleId, item(project, 'text-1')?.fontFamily],
-        ['kit-title', 'Anton'],
+        [textStyleId, fontFamily, fontSize, transform.y],
+        ['kit-title', 'Anton', 80, -144],
       )
     },
     failure: { op: 'applyTextStyle', ids: ['text-1'], styleId: 'missing-style' },
@@ -474,16 +482,25 @@ const cases = [
       { op: 'applyTextStyle', ids: ['text-1'], styleId: 'kit-title' },
       {
         op: 'upsertTextStyle',
-        style: { ...KIT_TITLE, style: { ...KIT_TITLE.style, color: '#00e5ff' } },
+        style: {
+          ...KIT_TITLE,
+          variants: KIT_TITLE.variants.map((variant) => ({
+            ...variant,
+            style: { ...variant.style, color: '#00e5ff' },
+          })),
+        },
       },
     ],
     op: { op: 'upsertTextStyle', style: KIT_TITLE },
     input: { textStyleLibrary: [KIT_TITLE] },
-    assert: (project) =>
+    assert: (project) => {
+      const [style] = project.timeline.textStyles
+      const colors = style.variants.map((variant) => variant.style.color)
       assert.deepEqual(
-        [project.timeline.textStyles[0]?.version, item(project, 'text-1')?.color],
-        [2, '#00e5ff'],
-      ),
+        [style.version, item(project, 'text-1').color, colors],
+        [2, '#00e5ff', ['#00e5ff', '#00e5ff']],
+      )
+    },
     failure: { op: 'upsertTextStyle', fromItemId: 'clip-left', name: 'Not text', role: 'title' },
   },
   {
@@ -608,6 +625,23 @@ async function main() {
       }
       process.stdout.write(`  PASS  ${testCase.name}\n`)
     }
+
+    // A style with no version for the project's aspect fails, naming the way out.
+    await assert.rejects(
+      edit(
+        page,
+        baseProject(),
+        [{ op: 'applyTextStyle', ids: ['text-1'], styleId: 'kit-title' }],
+        [],
+        [],
+        null,
+        {
+          textStyleLibrary: [VERTICAL_ONLY],
+        },
+      ),
+      /no 16:9 version \(it has 9:16\)\. Make one from the closest: shred styles clone kit-title --aspect 16:9 --project edit-contract/,
+    )
+    process.stdout.write('  PASS  applyTextStyle without a version for the aspect\n')
   } finally {
     await browser.close()
     await server.close()

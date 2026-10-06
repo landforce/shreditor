@@ -15,13 +15,17 @@ import type { TransformProperties } from '@/types/transform'
 import { useProjectTextStylesStore } from '@/shared/state/text-styles'
 import {
   buildApplyTextStyleUpdates,
+  canvasAspect,
   deriveTextStyleFromItem,
   mergeTextStyleOverrides,
+  requireTextStyleVariant,
 } from '@/shared/typography/text-styles/text-style-resolve'
 import {
   findTextStyle,
   normalizeTextStyleInput,
+  sanitizeTextStyles,
 } from '@/shared/typography/text-styles/text-style-schema'
+import { referenceCanvasForAspect } from '@/shared/typography/text-styles/text-style-family.mjs'
 import { useItemsStore } from '@/features/timeline/stores/items-store'
 import {
   addItems,
@@ -44,6 +48,8 @@ type Op = Record<string, unknown> & { op: string }
 
 export interface TextStyleEditInput {
   canvas: { width: number; height: number }
+  /** The project being edited, named in the "make a version" hint. */
+  projectId?: string
   /** Library styles the ops may name (the Node side reads app/text-styles.json). */
   library?: TextStyleDefinition[]
   /** Built-in transcripts by media id, for addCaptions. */
@@ -53,7 +59,8 @@ export interface TextStyleEditInput {
 let input: TextStyleEditInput = { canvas: { width: 1920, height: 1080 } }
 
 export function setTextStyleEditInput(next: TextStyleEditInput): void {
-  input = next
+  // Library styles arrive in the family shape; an old single-look one is 9:16.
+  input = { ...next, library: next.library ? sanitizeTextStyles(next.library) : undefined }
 }
 
 const str = (value: unknown) => (typeof value === 'string' && value ? value : undefined)
@@ -62,8 +69,22 @@ function projectStyles(): TextStyleDefinition[] {
   return useProjectTextStylesStore.getState().styles
 }
 
-/** A style by id or name: the project's copy first, then the library's. */
+/**
+ * A style by id or name (the project's copy first, then the library's) that
+ * has a look for the project's aspect. A style without one fails with the
+ * aspects it has and the command that clones the closest.
+ */
 function resolveStyle(idOrName: unknown, field = 'styleId'): TextStyleDefinition {
+  const style = findStyle(idOrName, field)
+  try {
+    requireTextStyleVariant(style, input.canvas, input.projectId)
+  } catch (error) {
+    throw new Error(`${field}: ${(error as Error).message}`)
+  }
+  return style
+}
+
+function findStyle(idOrName: unknown, field: string): TextStyleDefinition {
   const wanted = str(idOrName)
   if (!wanted) throw new Error(`${field} is required`)
   const style = findTextStyle(projectStyles(), wanted) ?? findTextStyle(input.library ?? [], wanted)
@@ -175,6 +196,7 @@ function upsertTextStyleOp(op: Op): unknown {
   const style = normalizeTextStyleInput(
     fromItemId ? styleInputFromItem(op) : op.style,
     projectStyles(),
+    { aspect: canvasAspect(input.canvas) },
   )
   const probe = {
     id: 'probe',
@@ -186,7 +208,14 @@ function upsertTextStyleOp(op: Op): unknown {
     text: '',
     color: '#fff',
   } as TextItem
-  assertValidItem({ ...probe, ...buildApplyTextStyleUpdates(probe, style, input.canvas) }, 'style')
+  // Every variant must make a valid item on its own canvas.
+  for (const variant of style.variants) {
+    const canvas = referenceCanvasForAspect(variant.aspect)
+    assertValidItem(
+      { ...probe, ...buildApplyTextStyleUpdates(probe, style, canvas) },
+      `style (${variant.aspect})`,
+    )
+  }
   const updatedItems = fromItemId
     ? saveTextStyleFromItems(style, [fromItemId], input.canvas)
     : upsertProjectTextStyle(style, input.canvas)
@@ -206,11 +235,17 @@ function captionTrackFor(op: Op, clip: TimelineItem): string {
   const formatTrack = tracks.find((track) => track.formatRole === 'captions' && !track.isGroup)
   if (formatTrack) return formatTrack.id
   const clipOrder = tracks.find((track) => track.id === clip.trackId)?.order ?? 0
+  // Saved projects need whole track orders: take the clip track's place and
+  // move it and the tracks under it down one.
   const created: TimelineTrack = {
     ...buildCaptionTrackAbove(tracks, clipOrder),
+    order: clipOrder,
     formatRole: 'captions',
   }
-  setTracks([...tracks, created])
+  const shifted = tracks.map((track) =>
+    track.order >= clipOrder ? { ...track, order: track.order + 1 } : track,
+  )
+  setTracks([...shifted, created])
   return created.id
 }
 

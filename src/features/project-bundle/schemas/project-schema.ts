@@ -7,7 +7,7 @@
 
 import { z } from 'zod'
 import { TEXT_STYLE_PRESET_IDS } from '@/shared/typography/text-style-preset-ids'
-import { textStyleDefinitionSchema } from '@/shared/typography/text-styles/text-style-schema'
+import { storedTextStyleSchema } from '@/shared/typography/text-styles/text-style-schema'
 import { FORMAT_ROLES, getFormat, type FormatRole } from '@formats/registry.mjs'
 import { SNAPSHOT_VERSION } from '../types/snapshot'
 import {
@@ -736,7 +736,7 @@ const timelineSchema = z
     topLevelSequenceIds: z.array(z.string()).optional(),
     compositions: z.array(compositionSchema).optional(),
     keyframes: z.array(itemKeyframesSchema).optional(),
-    textStyles: z.array(textStyleDefinitionSchema).optional(),
+    textStyles: z.array(storedTextStyleSchema).optional(),
   })
   .passthrough()
 

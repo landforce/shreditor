@@ -1,13 +1,16 @@
 /**
  * Captions made with a caption style: a clip's transcript, mapped through the
- * clip's source window (trim and speed), chunked by the style's rules and
- * written as caption text items that use the style.
+ * clip's source window (trim and speed), chunked by the rules of the style's
+ * variant for the canvas and written as caption text items that use the style.
  */
 
 import type { MediaTranscriptSegment } from '@/types/storage'
 import type { AudioItem, TextItem, VideoItem } from '@/types/timeline'
 import type { CaptionChunkRules, TextStyleDefinition } from '@/types/text-style'
-import { buildApplyTextStyleUpdates } from '@/shared/typography/text-styles/text-style-resolve'
+import {
+  buildApplyTextStyleUpdates,
+  requireTextStyleVariant,
+} from '@/shared/typography/text-styles/text-style-resolve'
 import { buildCaptionTextItems, getClipSourceBounds } from './caption-items'
 import {
   DEFAULT_CAPTION_CHUNK_LIMITS,
@@ -101,7 +104,7 @@ export function buildStyledCaptionItems({
   timelineFps,
   canvas,
 }: BuildStyledCaptionItemsOptions): TextItem[] {
-  const rules = style.caption ?? DEFAULT_CAPTION_RULES
+  const rules = requireTextStyleVariant(style, canvas).caption ?? DEFAULT_CAPTION_RULES
   const bounds = getClipSourceBounds(clip, timelineFps)
   const spoken = wordsInWindow(
     segments,

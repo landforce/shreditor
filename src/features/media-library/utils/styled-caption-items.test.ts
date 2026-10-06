@@ -16,13 +16,20 @@ const segments: MediaTranscriptSegment[] = [
   },
 ]
 
-const style = (caption: TextStyleDefinition['caption']): TextStyleDefinition => ({
+type CaptionRules = TextStyleDefinition['variants'][number]['caption']
+
+const style = (caption: CaptionRules): TextStyleDefinition => ({
   id: 'caps',
   name: 'Caps',
   role: 'caption',
-  style: { fontFamily: 'Anton', fontSize: 70, color: '#ffffff' },
-  layout: { yRatio: 0.3, widthRatio: 0.8 },
-  caption,
+  variants: [
+    {
+      aspect: '9:16',
+      style: { fontFamily: 'Anton', fontSize: 70, color: '#ffffff' },
+      layout: { yRatio: 0.3, widthRatio: 0.8 },
+      caption,
+    },
+  ],
   version: 1,
   updatedAt: 1,
 })
@@ -45,7 +52,7 @@ function clip(overrides: Partial<VideoItem> = {}): VideoItem {
   }
 }
 
-const build = (rules: TextStyleDefinition['caption'], clipOverrides: Partial<VideoItem> = {}) =>
+const build = (rules: CaptionRules, clipOverrides: Partial<VideoItem> = {}) =>
   buildStyledCaptionItems({
     clip: clip(clipOverrides),
     segments,

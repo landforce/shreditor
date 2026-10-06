@@ -45,6 +45,7 @@
 //   shred styles list [--project <id>] [--json]
 //                                        the text style library (or a project's copies: items using each,
 //                                        and whether the library moved on)
+//                                        (a style has one look per aspect ratio: 9:16, 16:9, ...)
 //   shred styles show <name|id> [--project <id>]   a style's definition
 //   shred styles use <projectId> <name|id...>       copy library styles into a project (again = update
 //                                        the project copy from the library; restyles its items)
@@ -52,6 +53,10 @@
 //                                        an item's look as a style, in the project (item linked) and library
 //   shred styles import <pack.json> | export [<name|id...>] [--project <id>] [--out f.json] [--name kit]
 //                                        style packs: a brand kit's title, caption and label styles in one file
+//   shred styles clone <name|id> --aspect 16:9 [--from 9:16] [--project <id>]
+//                                        add a look for another aspect, cloned from the closest
+//                                        (sizes kept, positions keep their edge): library, or the
+//                                        project's copy and the library; then adjust it
 //   shred styles remove <name|id>        delete from the library (projects keep their copies)
 //   shred categorize <mediaId>=<category>... | --category <c> <mediaId>...
 //                                        set what each media is for (as the agent: the editor never
@@ -156,6 +161,8 @@ const { values: opt, positionals } = parseArgs({
     quality: { type: 'string' },
     role: { type: 'string' },
     preset: { type: 'string' },
+    aspect: { type: 'string' },
+    from: { type: 'string' },
   },
 })
 const [command, ...args] = positionals
@@ -1347,7 +1354,7 @@ const commands = {
     const run = stylesCommands({ say, opt, workspace, getProject, applyBatch })[sub ?? 'list']
     if (!run)
       throw new Error(
-        'Usage: shred styles list|show|use|save|import|export|remove (see shred help)',
+        'Usage: shred styles list|show|use|save|clone|import|export|remove (see shred help)',
       )
     await run(rest)
   },

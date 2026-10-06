@@ -2,9 +2,13 @@ import { describe, expect, it } from 'vite-plus/test'
 import type { Project, ProjectTimeline } from '@/types/project'
 import type { TextItem } from '@/types/timeline'
 import type { TextStyleDefinition } from '@/types/text-style'
+import { validateProject } from '@/features/project-bundle/schemas/project-schema'
 import { editProject, type EditOp, type HeadlessEditInput } from './edit'
 
-function project(timeline: Partial<ProjectTimeline> = {}): Project {
+function project(
+  timeline: Partial<ProjectTimeline> = {},
+  canvas = { width: 1080, height: 1920 },
+): Project {
   return {
     id: 'p',
     name: 'styles',
@@ -13,7 +17,7 @@ function project(timeline: Partial<ProjectTimeline> = {}): Project {
     updatedAt: 0,
     duration: 10,
     schemaVersion: 14,
-    metadata: { width: 1080, height: 1920, fps: 30 },
+    metadata: { ...canvas, fps: 30 },
     timeline: {
       tracks: [
         {
@@ -73,22 +77,30 @@ function project(timeline: Partial<ProjectTimeline> = {}): Project {
   } as Project
 }
 
-const library: TextStyleDefinition[] = [
+const LANDSCAPE = { width: 1920, height: 1080 }
+
+const kitTitleLook = {
+  aspect: '9:16',
+  style: {
+    fontFamily: 'Anton',
+    fontSize: 130,
+    color: '#ffffff',
+    stroke: { width: 4, color: '#000000' },
+  },
+  layout: { yRatio: -0.3, widthRatio: 0.9 },
+}
+
+const library = [
   {
     id: 'kit-title',
     name: 'Kit Title',
     role: 'title',
-    style: {
-      fontFamily: 'Anton',
-      fontSize: 130,
-      color: '#ffffff',
-      stroke: { width: 4, color: '#000000' },
-    },
-    layout: { yRatio: -0.3, widthRatio: 0.9 },
+    variants: [kitTitleLook],
     defaultDurationFrames: 75,
     version: 1,
     updatedAt: 1,
   },
+  // An old single-look style, as libraries saved before variants: a 9:16 look.
   {
     id: 'kit-captions',
     name: 'Kit Captions',
@@ -105,7 +117,7 @@ const library: TextStyleDefinition[] = [
     version: 1,
     updatedAt: 1,
   },
-]
+] as unknown as TextStyleDefinition[]
 
 const words = 'so here is the thing about styles that you reuse'.split(' ')
 const transcripts = [
@@ -178,7 +190,12 @@ describe('headless text style ops', () => {
           op: 'upsertTextStyle',
           style: {
             ...library[0],
-            style: { ...library[0]!.style, color: '#00e5ff', fontSize: 150 },
+            variants: [
+              {
+                ...kitTitleLook,
+                style: { ...kitTitleLook.style, color: '#00e5ff', fontSize: 150 },
+              },
+            ],
           },
         },
       ],
@@ -228,7 +245,7 @@ describe('headless text style ops', () => {
     expect(style).toMatchObject({
       id: 'my-label',
       role: 'label',
-      style: { fontSize: 90, color: '#123456' },
+      variants: [{ aspect: '9:16', style: { fontSize: 90, color: '#123456' } }],
     })
     expect(byId(result.project, 'look')).toMatchObject({
       textStyleId: 'my-label',
@@ -251,6 +268,21 @@ describe('headless text style ops', () => {
       color: '#ffd400',
       from: 0,
     })
+  })
+
+  it('addCaptions adds a captions track above the clip with whole track orders', async () => {
+    const base = project()
+    base.timeline!.tracks = base.timeline!.tracks.filter((track) => track.id === 'v1')
+    const result = await run([{ op: 'addCaptions', clipId: 'clip', styleId: 'kit-captions' }], base)
+    const tracks = result.project.timeline!.tracks
+    const { trackId } = result.results[0]?.detail as { trackId: string }
+    expect(
+      tracks.map((track) => [track.id === trackId ? 'captions' : track.id, track.order]),
+    ).toEqual([
+      ['captions', 1],
+      ['v1', 2],
+    ])
+    expect(validateProject(JSON.parse(JSON.stringify(result.project))).success).toBe(true)
   })
 
   it('addCaptions explains a missing transcript and a clip without speech', async () => {
@@ -280,5 +312,51 @@ describe('headless text style ops', () => {
         },
       ]),
     ).rejects.toThrow(/fontWeight/)
+  })
+
+  it('fails clearly in a project whose aspect a style has no version for', async () => {
+    const wide = project({}, LANDSCAPE)
+    const missing =
+      'no 16:9 version (it has 9:16). Make one from the closest: shred styles clone kit-title --aspect 16:9 --project p'
+    await expect(
+      run(
+        [{ op: 'addText', id: 't', text: 'x', styleId: 'Kit Title', trackId: 'txt', from: 0 }],
+        wide,
+      ),
+    ).rejects.toThrow(missing)
+    await expect(
+      run([{ op: 'addCaptions', clipId: 'clip', styleId: 'kit-captions' }], wide),
+    ).rejects.toThrow(/styleId: text style "Kit Captions" has no 16:9 version/)
+  })
+
+  it('a style given a 16:9 version is used in 16:9 and its 9:16 look is kept', async () => {
+    const wide = project({}, LANDSCAPE)
+    const landscapeLook = { ...kitTitleLook, aspect: '16:9', layout: { yRatio: -0.2 } }
+    const result = await run(
+      [
+        {
+          op: 'upsertTextStyle',
+          style: { ...library[0], variants: [kitTitleLook, landscapeLook] },
+        },
+        { op: 'addText', id: 't', text: 'x', styleId: 'kit-title', trackId: 'txt', from: 0 },
+        // One look without an aspect is the project's aspect.
+        {
+          op: 'upsertTextStyle',
+          style: {
+            name: 'Kit Title',
+            role: 'title',
+            style: { ...kitTitleLook.style, fontSize: 100 },
+          },
+        },
+      ],
+      wide,
+    )
+    const style = result.project.timeline?.textStyles?.[0]
+    expect(style?.variants.map((v) => [v.aspect, v.style.fontSize])).toEqual([
+      ['9:16', 130],
+      ['16:9', 100],
+    ])
+    expect(byId(result.project, 't')).toMatchObject({ textStyleId: 'kit-title', fontSize: 100 })
+    expect(byId(result.project, 't').transform?.y).toBe(-216)
   })
 })

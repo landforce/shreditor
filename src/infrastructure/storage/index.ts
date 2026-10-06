@@ -189,6 +189,7 @@ export {
 export {
   readTextStyleLibrary,
   readTextStyleLibraryStamp,
+  seedTextStyleLibrary,
   updateTextStyleLibrary,
   type TextStyleLibraryStamp,
 } from '@/infrastructure/storage/workspace-fs/text-styles'

@@ -868,6 +868,7 @@ export async function editProject(input: HeadlessEditInput): Promise<HeadlessEdi
   seedMediaLibrary(input.media)
   setTextStyleEditInput({
     canvas: editCanvas,
+    projectId: migrated.id,
     library: input.textStyleLibrary,
     transcripts: input.transcripts,
   })

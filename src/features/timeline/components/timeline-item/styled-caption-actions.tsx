@@ -11,6 +11,11 @@ import type { AudioItem, TextItem, TimelineItem, VideoItem } from '@/types/timel
 import type { TextStyleDefinition } from '@/types/text-style'
 import { useLibraryTextStylesStore, useProjectTextStylesStore } from '@/shared/state/text-styles'
 import { DEFAULT_PROJECT_HEIGHT, DEFAULT_PROJECT_WIDTH } from '@/shared/projects/defaults'
+import { aspectKey } from '@/shared/projects/aspect'
+import {
+  addClonedTextStyleVariant,
+  textStyleVariantFor,
+} from '@/shared/typography/text-styles/text-style-family.mjs'
 import { useItemsStore } from '../../stores/items-store'
 import { useTimelineSettingsStore } from '../../stores/timeline-settings-store'
 import { insertStyledCaptions } from '../../stores/actions/text-style-actions'
@@ -61,11 +66,21 @@ function captionTrackFor(clip: CaptionableClip, captions: TextItem[], replaced: 
   return { trackId: newTrack.id, newTrack }
 }
 
+/** The style with a version for the project's aspect (cloned from its closest when it has none). */
+function fitToProject(style: TextStyleDefinition): TextStyleDefinition {
+  const { width, height } = projectCanvas()
+  const aspect = aspectKey(width, height)
+  if (textStyleVariantFor(style, aspect)) return style
+  const { style: fitted } = addClonedTextStyleVariant(style, aspect)
+  return { ...fitted, version: style.version + 1, updatedAt: Date.now() }
+}
+
 /** Caption a clip from its stored transcript with a caption style. Returns the caption count. */
 async function addStyledCaptions(
   clip: CaptionableClip,
-  style: TextStyleDefinition,
+  picked: TextStyleDefinition,
 ): Promise<number> {
+  const style = fitToProject(picked)
   const transcript = clip.mediaId
     ? await mediaTranscriptionService.getTranscript(clip.mediaId)
     : null
@@ -90,7 +105,11 @@ async function addStyledCaptions(
   return built.length
 }
 
-/** "Captions with a style" in a clip's context menu: the caption styles of the project and library. */
+/**
+ * "Captions with a style" in a clip's context menu: the caption styles of the
+ * project and library. A style with no version for the project's aspect gets
+ * one, cloned from its closest, when it is used.
+ */
 export function StyledCaptionActions({ t, clip }: { t: TFunction; clip?: CaptionableClip }) {
   const projectStyles = useProjectTextStylesStore((s) => s.styles)
   const libraryStyles = useLibraryTextStylesStore((s) => s.styles)
@@ -102,6 +121,8 @@ export function StyledCaptionActions({ t, clip }: { t: TFunction; clip?: Caption
   }, [libraryStyles, projectStyles])
 
   if (!clip) return null
+  const { width, height } = projectCanvas()
+  const aspect = aspectKey(width, height)
   const run = (style: TextStyleDefinition) =>
     addStyledCaptions(clip, style)
       .then((count) =>
@@ -127,6 +148,11 @@ export function StyledCaptionActions({ t, clip }: { t: TFunction; clip?: Caption
         {styles.map((style) => (
           <ContextMenuItem key={style.id} onClick={() => void run(style)}>
             {style.name}
+            {textStyleVariantFor(style, aspect) ? null : (
+              <span className="ml-1 text-[10px] text-muted-foreground">
+                {t('textStyles.noVersion', { aspect })}
+              </span>
+            )}
           </ContextMenuItem>
         ))}
       </ContextMenuSubContent>

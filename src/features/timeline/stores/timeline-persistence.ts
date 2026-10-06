@@ -38,6 +38,7 @@ import { useKeyframesStore } from './keyframes-store'
 import { useMarkersStore } from './markers-store'
 import { useProjectTextStylesStore } from '@/shared/state/text-styles'
 import { sanitizeTextStyles } from '@/shared/typography/text-styles/text-style-schema'
+import { aspectKey } from '@/shared/projects/aspect'
 import { useTimelineSettingsStore } from './timeline-settings-store'
 import { ROOT_HISTORY_CONTEXT, useTimelineCommandStore } from './timeline-command-store'
 import { useCompositionsStore, type SubComposition } from './compositions-store'
@@ -112,6 +113,13 @@ async function scaleCanvasToBlob(
   outCtx.imageSmoothingQuality = 'high'
   outCtx.drawImage(current, 0, 0, targetW, targetH)
   return out.convertToBlob({ type: 'image/jpeg', quality })
+}
+
+/** A project's text styles; an old single-look one is a variant for the project's aspect. */
+function projectTextStyles(project: Project): TextStyleDefinition[] {
+  const width = project.metadata?.width || DEFAULT_PROJECT_WIDTH
+  const height = project.metadata?.height || DEFAULT_PROJECT_HEIGHT
+  return sanitizeTextStyles(project.timeline?.textStyles, aspectKey(width, height))
 }
 
 /** The library motion template a composition was copied from (absent on most). */
@@ -1157,7 +1165,7 @@ export async function hydrateTimelineStoresFromProject(project: Project): Promis
     useTimelineSettingsStore.getState().setScrollPosition(t.scrollPosition || 0)
     usePlaybackStore.getState().setBusAudioEq(t.busAudioEq)
     usePlaybackStore.getState().setMasterBusDb(t.masterBusDb ?? 0)
-    useProjectTextStylesStore.getState().setStyles(sanitizeTextStyles(t.textStyles))
+    useProjectTextStylesStore.getState().setStyles(projectTextStyles(project))
 
     // Restore sub-compositions
     if (t.compositions && t.compositions.length > 0) {
@@ -1233,7 +1241,7 @@ export async function hydrateTimelineStoresFromProject(project: Project): Promis
     useZoomStore.getState().setZoomLevel(1)
     usePlaybackStore.getState().setCurrentFrame(0)
     usePlaybackStore.getState().setBusAudioEq(undefined)
-    useProjectTextStylesStore.getState().setStyles(sanitizeTextStyles(project.timeline?.textStyles))
+    useProjectTextStylesStore.getState().setStyles(projectTextStyles(project))
   }
 
   // Common setup for both cases

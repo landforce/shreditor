@@ -12,15 +12,20 @@ import type { TextMotionSpec } from './text-motion'
  * Editing the project copy writes the resolved fields onto every item that
  * uses it (one undo step), skipping the fields an item overrides.
  *
- * Sizes are canvas-relative: lengths are stored as reference pixels for a
- * canvas whose SHORT side is 1080 (1080x1920 and 1920x1080 alike) and scale
- * with the short side elsewhere, so one style fits 9:16 and 16:9.
+ * A style is a family with one look per aspect ratio (a variant for 9:16,
+ * one for 16:9, ...): a vertical title can be bigger and sit elsewhere than
+ * its landscape twin, and items stay linked to the one style. An item uses
+ * the variant for the aspect of the canvas it is on; a style with no variant
+ * for it offers to clone the closest one (see text-style-family.mjs).
+ * Within a variant, lengths are pixels on its aspect's reference canvas
+ * (short side 1080: 1080x1920, 1920x1080, 1080x1350) and scale uniformly on
+ * other resolutions of that aspect.
  */
 
 export const TEXT_STYLE_ROLES = ['title', 'caption', 'label', 'lower-third', 'other'] as const
 export type TextStyleRole = (typeof TEXT_STYLE_ROLES)[number]
 
-/** The short side, in pixels, that a style's lengths are written for. */
+/** The short side, in pixels, of the canvas a variant's lengths are written for. */
 export const TEXT_STYLE_REFERENCE_SIZE = 1080
 
 /**
@@ -56,11 +61,8 @@ export interface CaptionChunkRules {
   punctuation?: CaptionPunctuation
 }
 
-export interface TextStyleDefinition {
-  id: string
-  name: string
-  role: TextStyleRole
-  description?: string
+/** The parts of a style that make up its look on one canvas. */
+export interface TextStyleLookParts {
   style: TextStyleLook
   layout?: TextStyleLayout
   textMotion?: TextMotionSpec
@@ -70,9 +72,24 @@ export interface TextStyleDefinition {
    * Lets a lower third keep its big name and small role line.
    */
   spanStyles?: Array<Omit<TextSpan, 'text'>>
+}
+
+/** A style's look for one aspect ratio. */
+export interface TextStyleVariant extends TextStyleLookParts {
+  /** Aspect key ("9:16", "16:9", "1:1", "4:5" or a reduced "W:H"). */
+  aspect: string
+  caption?: CaptionChunkRules
+}
+
+export interface TextStyleDefinition {
+  id: string
+  name: string
+  role: TextStyleRole
+  description?: string
+  /** One look per aspect ratio, at most one per aspect. */
+  variants: TextStyleVariant[]
   /** Length of a new item made with this style, in project frames. */
   defaultDurationFrames?: number
-  caption?: CaptionChunkRules
   /** Bumped on every change, so a project copy can tell the library moved on. */
   version: number
   updatedAt: number

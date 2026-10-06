@@ -150,6 +150,25 @@ test('text style ops validate styles at the wire', () => {
     assert.equal(editOpSchema.safeParse({ op: 'upsertTextStyle', style: bad }).success, false)
   assert.equal(editOpSchema.safeParse({ op: 'upsertTextStyle', name: 'x' }).success, false)
   assert.equal(editOpSchema.safeParse({ op: 'addCaptions', clipId: 'c' }).success, false)
+  // One look for a named aspect, or a family with one look per aspect.
+  const { style: look, layout } = style
+  const family = {
+    name: 'Kit Title',
+    role: 'title',
+    variants: [
+      { aspect: '9:16', style: look, layout },
+      { aspect: '16:9', style: { ...look, fontSize: 90 } },
+    ],
+  }
+  for (const good of [{ ...style, aspect: '16:9' }, { ...style, aspect: '1920x1080' }, family])
+    assert.equal(editOpSchema.safeParse({ op: 'upsertTextStyle', style: good }).success, true)
+  for (const bad of [
+    { ...style, aspect: 'wide' },
+    { ...family, variants: [] },
+    { ...family, variants: [{ aspect: 'tall', style: look }] },
+    { ...family, style: look },
+  ])
+    assert.equal(editOpSchema.safeParse({ op: 'upsertTextStyle', style: bad }).success, false)
 })
 
 test('every published edit discriminator has a valid strict schema', () => {

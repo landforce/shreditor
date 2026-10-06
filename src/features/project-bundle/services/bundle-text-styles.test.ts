@@ -37,17 +37,34 @@ const timeline: ProjectTimeline = {
       id: 'kit-title',
       name: 'Kit title',
       role: 'title',
-      style: {
-        fontFamily: 'Anton',
-        fontSize: 120,
-        stroke: { width: 3, color: '#000', join: 'miter' },
-      },
-      layout: { yRatio: -0.3 },
-      caption: { maxWordsPerChunk: 3, maxCharsPerLine: 20, maxLines: 2, minChunkFrames: 10 },
+      variants: [
+        {
+          aspect: '9:16',
+          style: {
+            fontFamily: 'Anton',
+            fontSize: 120,
+            stroke: { width: 3, color: '#000', join: 'miter' },
+          },
+          layout: { yRatio: -0.3 },
+          caption: { maxWordsPerChunk: 3, maxCharsPerLine: 20, maxLines: 2, minChunkFrames: 10 },
+        },
+        { aspect: '16:9', style: { fontFamily: 'Anton', fontSize: 90 }, layout: { yRatio: -0.2 } },
+      ],
       version: 2,
       updatedAt: 5,
     },
   ],
+}
+
+/** The same style as projects saved it before variants: one look. */
+const legacy = {
+  id: 'kit-title',
+  name: 'Kit title',
+  role: 'title',
+  style: { fontFamily: 'Anton', fontSize: 120 },
+  layout: { yRatio: -0.3 },
+  version: 1,
+  updatedAt: 1,
 }
 
 const project = (t: unknown) => ({
@@ -75,8 +92,24 @@ describe('text styles in project bundles', () => {
     expect(validateProject(project(restored)).success).toBe(true)
   })
 
+  it('keep an old single-look style valid through a bundle', () => {
+    const old = { ...timeline, textStyles: [legacy] } as unknown as ProjectTimeline
+    const restored = restoreTimelineFromBundle(
+      JSON.parse(JSON.stringify(convertTimelineForBundle(old))),
+      new Map(),
+    )
+    expect(restored?.textStyles).toEqual([legacy])
+    expect(validateProject(project(restored)).success).toBe(true)
+  })
+
   it('reject an invalid style in a project', () => {
     const broken = { ...timeline, textStyles: [{ ...timeline.textStyles![0], role: 'heading' }] }
     expect(validateProject(project(broken)).success).toBe(false)
+    const twice = timeline.textStyles![0]!.variants[0]!
+    const duplicate = {
+      ...timeline,
+      textStyles: [{ ...timeline.textStyles![0], variants: [twice, twice] }],
+    }
+    expect(validateProject(project(duplicate)).success).toBe(false)
   })
 })

@@ -1,7 +1,8 @@
 /**
- * Text style resolution: turn a canvas-relative style definition into the
- * concrete fields an item renders with, derive a style from an item, and tell
- * which fields an item has moved away from its style.
+ * Text style resolution: turn a style's variant for a canvas (the look for
+ * that aspect ratio) into the concrete fields an item renders with, derive a
+ * variant from an item, and tell which fields an item has moved away from
+ * its style.
  *
  * Resolved fields are WRITTEN onto items (see text-style-actions.ts), so the
  * preview, every export path and the scorecard never need to know styles exist.
@@ -16,9 +17,13 @@ import {
   type TextStyleFieldKey,
   type TextStyleLayout,
   type TextStyleLook,
+  type TextStyleLookParts,
   type TextStyleRole,
+  type TextStyleVariant,
 } from '@/types/text-style'
 import type { FormatRole } from '@formats/registry.mjs'
+import { aspectKey } from '@/shared/projects/aspect'
+import { missingTextStyleVariantMessage, textStyleVariantFor } from './text-style-family.mjs'
 
 interface StyleCanvas {
   width: number
@@ -87,6 +92,32 @@ function round2(value: number): number {
   return Math.round(value * 100) / 100
 }
 
+/** The aspect key of a canvas ("9:16", "16:9", ...). */
+export function canvasAspect(canvas: StyleCanvas): string {
+  return aspectKey(canvas.width, canvas.height)
+}
+
+/** The style's look for this canvas's aspect, or undefined when it has none. */
+export function textStyleVariantForCanvas(
+  style: Pick<TextStyleDefinition, 'variants'>,
+  canvas: StyleCanvas,
+): TextStyleVariant | undefined {
+  return textStyleVariantFor(style, canvasAspect(canvas))
+}
+
+/** The style's look for this canvas; throws a message naming the clone command. */
+export function requireTextStyleVariant(
+  style: TextStyleDefinition,
+  canvas: StyleCanvas,
+  projectId?: string,
+): TextStyleVariant {
+  const variant = textStyleVariantForCanvas(style, canvas)
+  if (!variant) {
+    throw new Error(missingTextStyleVariantMessage(style, canvasAspect(canvas), projectId))
+  }
+  return variant
+}
+
 /** Reference pixels -> canvas pixels (and back with `1 / scale`). */
 function textStyleScaleFor(canvas: StyleCanvas): number {
   return Math.min(canvas.width, canvas.height) / TEXT_STYLE_REFERENCE_SIZE
@@ -128,13 +159,21 @@ function pickSpanStyle(span: TextSpan): SpanStyle {
   return style
 }
 
-/** Every field key the style controls on an item. */
-export function getTextStyleControlledKeys(style: TextStyleDefinition): TextStyleFieldKey[] {
+/**
+ * Every field key the style controls on an item: on this canvas's variant,
+ * or on any variant when the canvas is not known.
+ */
+export function getTextStyleControlledKeys(
+  style: TextStyleDefinition,
+  canvas?: StyleCanvas,
+): TextStyleFieldKey[] {
+  const variant = canvas ? textStyleVariantForCanvas(style, canvas) : undefined
+  const parts: TextStyleLookParts[] = variant ? [variant] : style.variants
   const keys: TextStyleFieldKey[] = [...TEXT_STYLE_LOOK_KEYS, 'textMotion']
   for (const axis of LAYOUT_AXES) {
-    if (style.layout?.[axis.ratio] !== undefined) keys.push(axis.key)
+    if (parts.some((part) => part.layout?.[axis.ratio] !== undefined)) keys.push(axis.key)
   }
-  if (style.spanStyles?.length) keys.push('textSpans')
+  if (parts.some((part) => part.spanStyles?.length)) keys.push('textSpans')
   return keys
 }
 
@@ -177,15 +216,17 @@ function resolveSpans(
 }
 
 /**
- * The item fields a style sets on this canvas. Fields in `overrides` are left
+ * The item fields a style sets on this canvas (from its variant for the
+ * canvas's aspect; throws when it has none). Fields in `overrides` are left
  * out. Fields the style has no value for come back as `undefined` so they are
  * cleared, which is why callers spread the result over the item.
  */
 export function resolveTextStyleUpdates(
-  style: TextStyleDefinition,
+  family: TextStyleDefinition,
   canvas: StyleCanvas,
   options: ResolveOptions = {},
 ): Partial<TextItem> {
+  const style = requireTextStyleVariant(family, canvas)
   const skip = new Set(options.overrides ?? [])
   const look = scaleLook(style.style, textStyleScaleFor(canvas))
   const updates: Partial<TextItem> = {}
@@ -239,6 +280,12 @@ function sameValue(left: unknown, right: unknown): boolean {
   return left === right
 }
 
+/** Whether spreading `updates` over the item would change anything. */
+export function textStyleUpdatesChangeItem(item: TextItem, updates: Partial<TextItem>): boolean {
+  const current = item as Record<string, unknown>
+  return Object.entries(updates).some(([key, value]) => !sameValue(current[key], value))
+}
+
 function spanStylesOf(spans: readonly TextSpan[] | undefined): SpanStyle[] {
   return (spans ?? []).map(pickSpanStyle)
 }
@@ -272,14 +319,18 @@ export function changedTextStyleFields(
   )
 }
 
-/** Controlled fields where the item no longer matches its style on this canvas. */
+/**
+ * Controlled fields where the item no longer matches its style on this
+ * canvas (none when the style has no look for the canvas's aspect).
+ */
 export function textStyleDifferences(
   item: TextItem,
   style: TextStyleDefinition,
   canvas: StyleCanvas,
 ): TextStyleFieldKey[] {
+  if (!textStyleVariantForCanvas(style, canvas)) return []
   const resolved = { ...item, ...buildApplyTextStyleUpdates(item, style, canvas) } as TextItem
-  return changedTextStyleFields(resolved, item, getTextStyleControlledKeys(style))
+  return changedTextStyleFields(resolved, item, getTextStyleControlledKeys(style, canvas))
 }
 
 /** Merge newly overridden fields into an item's override list (sorted, unique). */
@@ -314,17 +365,18 @@ function deriveLayout(
   return Object.keys(layout).length > 0 ? layout : undefined
 }
 
-/** The style parts an item carries: look, layout, motion and span looks. */
-export function deriveTextStyleFromItem(
-  item: TextItem,
-  canvas: StyleCanvas,
-): Pick<TextStyleDefinition, 'style' | 'layout' | 'textMotion' | 'spanStyles'> {
+/**
+ * The variant an item's look makes for its canvas's aspect: look, layout,
+ * motion and span looks, lengths in reference pixels.
+ */
+export function deriveTextStyleFromItem(item: TextItem, canvas: StyleCanvas): TextStyleVariant {
   const scale = textStyleScaleFor(canvas)
   const layout = deriveLayout(item.transform, canvas)
   const spanStyles = item.textSpans?.length
     ? item.textSpans.map((span) => scaleSpanStyle(pickSpanStyle(span), 1 / scale))
     : undefined
   return {
+    aspect: canvasAspect(canvas),
     style: invertLook(item, scale),
     ...(layout ? { layout } : {}),
     ...(item.textMotion ? { textMotion: structuredClone(item.textMotion) } : {}),

@@ -6,10 +6,19 @@
  * read earlier: every change re-reads the file and applies one edit to what
  * is there now (see {@link updateTextStyleLibrary}), and the editor re-reads
  * it when its stamp changes ({@link readTextStyleLibraryStamp}).
+ *
+ * Styles are stored as families (one variant per aspect ratio); old
+ * single-look entries are read as a 9:16 variant and written back as
+ * families. `seeded` records that the built-in styles were added once.
  */
 
 import type { TextStyleDefinition } from '@/types/text-style'
 import { sanitizeTextStyles } from '@/shared/typography/text-styles/text-style-schema'
+import {
+  TEXT_STYLE_LIBRARY_SEED,
+  seedTextStyles,
+  textStyleLibraryNeedsSeed,
+} from '@/shared/typography/text-styles/text-style-family.mjs'
 import { createLogger } from '@/shared/logging/logger'
 
 import { requireWorkspaceRoot } from './root'
@@ -21,7 +30,9 @@ const logger = createLogger('WorkspaceFS:TextStyles')
 const TEXT_STYLES_PATH = ['app', 'text-styles.json']
 
 interface TextStyleLibraryFile {
-  version: 1
+  version: 2
+  /** The built-ins were added (see TEXT_STYLE_LIBRARY_SEED). */
+  seeded?: number
   styles: TextStyleDefinition[]
 }
 
@@ -31,13 +42,19 @@ export interface TextStyleLibraryStamp {
   size: number
 }
 
-export async function readTextStyleLibrary(): Promise<TextStyleDefinition[]> {
+interface TextStyleLibraryRead {
+  styles: TextStyleDefinition[]
+  /** False when the file is missing or was never seeded with the built-ins. */
+  seeded: boolean
+}
+
+export async function readTextStyleLibrary(): Promise<TextStyleLibraryRead> {
   try {
     const file = await readJson<TextStyleLibraryFile>(requireWorkspaceRoot(), TEXT_STYLES_PATH)
-    return sanitizeTextStyles(file?.styles)
+    return { styles: sanitizeTextStyles(file?.styles), seeded: !textStyleLibraryNeedsSeed(file) }
   } catch (error) {
     logger.warn('readTextStyleLibrary failed', error)
-    return []
+    return { styles: [], seeded: false }
   }
 }
 
@@ -55,6 +72,30 @@ export async function readTextStyleLibraryStamp(): Promise<TextStyleLibraryStamp
   }
 }
 
+async function writeLibrary(
+  change: (
+    styles: TextStyleDefinition[],
+    file: TextStyleLibraryFile | null,
+  ) => {
+    styles: TextStyleDefinition[]
+    seeded?: number
+  } | null,
+): Promise<TextStyleDefinition[] | null> {
+  return withKeyLock('text-style-library', async () => {
+    const root = requireWorkspaceRoot()
+    const file = await readJson<TextStyleLibraryFile>(root, TEXT_STYLES_PATH)
+    const next = change(sanitizeTextStyles(file?.styles), file)
+    if (!next) return null
+    const seeded = next.seeded ?? file?.seeded
+    await writeJsonAtomic(root, TEXT_STYLES_PATH, {
+      version: 2,
+      ...(seeded ? { seeded } : {}),
+      styles: next.styles,
+    } satisfies TextStyleLibraryFile)
+    return next.styles
+  })
+}
+
 /**
  * Apply one change to the library as it is on disk now, and write it
  * atomically. Returns the styles that were written.
@@ -62,12 +103,19 @@ export async function readTextStyleLibraryStamp(): Promise<TextStyleLibraryStamp
 export async function updateTextStyleLibrary(
   change: (styles: TextStyleDefinition[]) => TextStyleDefinition[],
 ): Promise<TextStyleDefinition[]> {
-  return withKeyLock('text-style-library', async () => {
-    const root = requireWorkspaceRoot()
-    const file = await readJson<TextStyleLibraryFile>(root, TEXT_STYLES_PATH)
-    const styles = change(sanitizeTextStyles(file?.styles))
-    const next: TextStyleLibraryFile = { version: 1, styles }
-    await writeJsonAtomic(root, TEXT_STYLES_PATH, next)
-    return styles
-  })
+  return (await writeLibrary((styles) => ({ styles: change(styles) }))) ?? []
+}
+
+/**
+ * Add the built-in styles to a library that was never seeded (or has no file
+ * yet) and mark it seeded. Returns null when it already was.
+ */
+export async function seedTextStyleLibrary(
+  builtins: readonly TextStyleDefinition[],
+): Promise<TextStyleDefinition[] | null> {
+  return writeLibrary((styles, file) =>
+    textStyleLibraryNeedsSeed(file)
+      ? { styles: seedTextStyles(styles, builtins), seeded: TEXT_STYLE_LIBRARY_SEED }
+      : null,
+  )
 }

@@ -5,6 +5,9 @@
  * (Main, every composition, and timelines stashed by navigation), skipping the
  * fields each item overrides, as ONE undo step. Items always carry their
  * resolved look, so rendering and export never resolve styles.
+ *
+ * Each item takes the style's variant for the aspect of the canvas it is on;
+ * an item on a canvas the style has no variant for is left as it is.
  */
 
 import type { TextItem, TimelineItem, TimelineTrack } from '@/types/timeline'
@@ -13,7 +16,13 @@ import { useProjectTextStylesStore } from '@/shared/state/text-styles'
 import {
   buildApplyTextStyleUpdates,
   resolveTextStyleUpdates,
+  textStyleUpdatesChangeItem,
+  textStyleVariantForCanvas,
 } from '@/shared/typography/text-styles/text-style-resolve'
+import {
+  mergeTextStyleFamilies,
+  textStyleVariantFor,
+} from '@/shared/typography/text-styles/text-style-family.mjs'
 import { useItemsStore } from '../items-store'
 import { useCompositionsStore } from '../compositions-store'
 import { useCompositionNavigationStore } from '../composition-navigation-store'
@@ -101,18 +110,17 @@ function putStyle(style: TextStyleDefinition): void {
     )
 }
 
+/** Restyle the style's items; one whose fields come out the same is not rewritten. */
 function restyle(style: TextStyleDefinition): ItemMapper {
-  return (item, canvas) =>
-    item.textStyleId === style.id
-      ? ({
-          ...item,
-          ...resolveTextStyleUpdates(style, canvas, {
-            overrides: item.textStyleOverrides,
-            baseTransform: item.transform,
-            spans: item.textSpans,
-          }),
-        } as TextItem)
-      : null
+  return (item, canvas) => {
+    if (item.textStyleId !== style.id || !textStyleVariantForCanvas(style, canvas)) return null
+    const updates = resolveTextStyleUpdates(style, canvas, {
+      overrides: item.textStyleOverrides,
+      baseTransform: item.transform,
+      spans: item.textSpans,
+    })
+    return textStyleUpdatesChangeItem(item, updates) ? ({ ...item, ...updates } as TextItem) : null
+  }
 }
 
 function upsertStyleInStores(style: TextStyleDefinition, canvas: TextStyleCanvas): string[] {
@@ -127,7 +135,7 @@ function linkItems(
 ): string[] {
   const wanted = new Set(ids)
   return mapTextItemsEverywhere(canvas, (item, itemCanvas) =>
-    wanted.has(item.id)
+    wanted.has(item.id) && textStyleVariantForCanvas(style, itemCanvas)
       ? ({ ...item, ...buildApplyTextStyleUpdates(item, style, itemCanvas) } as TextItem)
       : null,
   )
@@ -161,7 +169,8 @@ export function upsertProjectTextStyle(
 /**
  * Link items to a style and give them its full look (their overrides are
  * cleared). The style is copied into the project when it is not there yet.
- * Only the given ids change; non-text items are skipped.
+ * Only the given ids change; non-text items, and items on a canvas the style
+ * has no variant for, are skipped.
  */
 export function applyTextStyleToItems(
   ids: readonly string[],
@@ -202,7 +211,7 @@ export function resetItemsToTextStyle(ids: readonly string[], canvas: TextStyleC
         const style = wanted.has(item.id)
           ? styles.find((entry) => entry.id === item.textStyleId)
           : undefined
-        return style
+        return style && textStyleVariantForCanvas(style, itemCanvas)
           ? ({ ...item, ...buildApplyTextStyleUpdates(item, style, itemCanvas) } as TextItem)
           : null
       })
@@ -253,8 +262,26 @@ export function removeProjectTextStyle(styleId: string, canvas: TextStyleCanvas)
 }
 
 /**
+ * The project's copy of `style` given the versions only `style` has (a
+ * version just made for this aspect), or `style` itself when the project has
+ * none; null when the project's copy already has them all.
+ */
+function styleToPut(style: TextStyleDefinition): TextStyleDefinition | null {
+  const own = useProjectTextStylesStore.getState().styles.find((entry) => entry.id === style.id)
+  if (!own) return style
+  const added = style.variants.filter((variant) => !textStyleVariantFor(own, variant.aspect))
+  if (added.length === 0) return null
+  return {
+    ...mergeTextStyleFamilies(own, { ...own, variants: added }),
+    version: own.version + 1,
+    updatedAt: Date.now(),
+  }
+}
+
+/**
  * Put captions made with a style on the timeline in one undo step: the style
- * is copied into the project when needed, `replaceIds` (the clip's previous
+ * is copied into the project when needed (or the version made for this
+ * aspect added to the project's copy), `replaceIds` (the clip's previous
  * styled captions) are removed and `newTrack` is added when given.
  */
 export function insertStyledCaptions(
@@ -264,9 +291,8 @@ export function insertStyledCaptions(
   replaceIds: readonly string[],
 ): void {
   inUndoStep('ADD_STYLED_CAPTIONS', { styleId: style.id, count: captions.length }, () => {
-    if (!useProjectTextStylesStore.getState().styles.some((entry) => entry.id === style.id)) {
-      putStyle(style)
-    }
+    const put = styleToPut(style)
+    if (put) putStyle(put)
     const items = useItemsStore.getState()
     if (replaceIds.length > 0) items._removeItems([...replaceIds])
     if (newTrack) items.setTracks([...items.tracks, newTrack])
