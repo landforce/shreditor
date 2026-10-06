@@ -77,3 +77,14 @@ describe('project schema: formats', () => {
     expect(validateProject(baseProject({ timeline })).success).toBe(false)
   })
 })
+
+describe('project schema: tracks', () => {
+  it('accepts a track order between two others (the editor inserts caption tracks that way)', () => {
+    const timeline = formatTimeline()
+    timeline.tracks = [
+      ...timeline.tracks,
+      { ...timeline.tracks[0]!, id: 'track-captions-x', order: 1.5 },
+    ]
+    expect(validateProject(baseProject({ timeline })).success).toBe(true)
+  })
+})

@@ -657,7 +657,8 @@ const trackSchema = z
     muted: z.boolean(),
     solo: z.boolean(),
     color: z.string().optional(),
-    order: z.number().int(),
+    // A sort key: the editor places new tracks between two others (e.g. 1.5).
+    order: z.number().finite(),
     parentTrackId: z.string().optional(),
     isGroup: z.boolean().optional(),
     isCollapsed: z.boolean().optional(),
