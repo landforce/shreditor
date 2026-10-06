@@ -70,13 +70,17 @@ function wordsInWindow(
   })
 }
 
-/** Hold each caption at least `minFrames`, never into the next one or past the clip. */
-function holdMinimum(items: TextItem[], minFrames: number, clipEnd: number): void {
+/**
+ * Captions follow each other on one track: end each one where the next
+ * starts (word timing rounds outward, so neighbours can share a frame), then
+ * hold each at least `minFrames`, never into the next one or past the clip.
+ */
+function fitCaptionTimes(items: TextItem[], minFrames: number, clipEnd: number): void {
   items.sort((a, b) => a.from - b.from)
   items.forEach((item, index) => {
-    if (item.durationInFrames >= minFrames) return
     const limit = Math.min(items[index + 1]?.from ?? clipEnd, clipEnd)
-    item.durationInFrames = Math.max(item.durationInFrames, Math.min(minFrames, limit - item.from))
+    const fitted = Math.min(item.durationInFrames, limit - item.from)
+    item.durationInFrames = Math.max(1, fitted, Math.min(minFrames, limit - item.from))
   })
 }
 
@@ -124,6 +128,6 @@ export function buildStyledCaptionItems({
       formatRole: 'captions',
     }),
   )
-  holdMinimum(items, rules.minChunkFrames, clip.from + clip.durationInFrames)
+  fitCaptionTimes(items, rules.minChunkFrames, clip.from + clip.durationInFrames)
   return items
 }

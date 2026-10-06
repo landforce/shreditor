@@ -126,6 +126,30 @@ describe('buildStyledCaptionItems', () => {
     expect(items[0]?.durationInFrames).toBe(15)
   })
 
+  it('never lets neighbouring captions share a frame', () => {
+    // Word ends round up and starts round down: 0.4 s -> 12, 0.5 s -> 15 here,
+    // but 1/3 s steps would collide without the fit.
+    const thirds: MediaTranscriptSegment[] = [
+      {
+        text: 'a b c d',
+        start: 0,
+        end: 1.34,
+        words: ['a', 'b', 'c', 'd'].map((text, i) => ({ text, start: i / 3, end: i / 3 + 0.34 })),
+      },
+    ]
+    const items = buildStyledCaptionItems({
+      clip: clip(),
+      segments: thirds,
+      style: style({ maxWordsPerChunk: 1, maxCharsPerLine: 40, maxLines: 1, minChunkFrames: 0 }),
+      trackId: 'captions',
+      timelineFps: 30,
+      canvas: { width: 1080, height: 1920 },
+    })
+    items.slice(1).forEach((item, i) => {
+      expect(item.from).toBeGreaterThanOrEqual(items[i]!.from + items[i]!.durationInFrames)
+    })
+  })
+
   it('captions only the trimmed source window, starting at the clip', () => {
     // Source 2.0 s to 4.0 s: words five..eight.
     const items = build(

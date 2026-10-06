@@ -213,7 +213,7 @@ function LinkedStyleControls({
           </span>
         )}
       </div>
-      <div className="grid grid-cols-2 gap-1.5">
+      <div className="grid grid-cols-1 gap-1.5">
         <Button
           variant="outline"
           size="sm"
