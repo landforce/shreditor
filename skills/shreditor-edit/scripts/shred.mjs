@@ -61,12 +61,23 @@
 //   shred categorize <mediaId>=<category>... | --category <c> <mediaId>...
 //                                        set what each media is for (as the agent: the editor never
 //                                        changes it; re-setting an auto suggestion confirms it)
-//   shred draft <id> [--label "..."]     copy a project to a private draft; prints the draft id. The
+//   shred draft <id> [--label "..."] [--no-plan]
+//                                        copy a project to a private draft; prints the draft id. The
 //                                        open editor shows the user you're working (--label: a few
 //                                        words on what the pass does) and holds their edits until you
 //                                        publish; every shred command on the draft or project keeps
-//                                        that alive (it lapses after 10 minutes without one)
+//                                        that alive (it lapses after 10 minutes without one). A
+//                                        project's first draft needs a validated plan (shred plan);
+//                                        --no-plan only on a timeline the user built by hand
 //   shred done <draftId|id>              end the pass without publishing (the editor lets the user edit)
+//   shred plan <projectId> [--file plan.json]
+//                                        validate the beat plan (agent/plan.json) and print its beat sheet,
+//                                        with the format's targets estimated; records its hash. The
+//                                        first draft of a project needs a plan that validated clean
+//   shred build <draftId> [--plan file] [--replace]
+//                                        the first assembly from the plan, one atomic batch: clips, sync
+//                                        sound per the format, planned text, a marker per beat
+//   shred build <projectId> --markers-only   only the beat markers, on the user's project (plan review)
 //   shred apply <id> <ops.json>          apply an op batch atomically (revision-checked)
 //   shred frames <id> --at 30,95,... [--out grid.jpg] [--size 270x480]
 //                                        render saved frames and tile them for review
@@ -75,6 +86,8 @@
 //                                        can fail (exit 1); --frames renders every flagged frame into one
 //                                        contact sheet with what each is for
 //                                        (a project with a Video Style Kit adds the kit's rules: Kit section)
+//                                        (a project with a plan adds a Plan section: beats missing or out of
+//                                        order, length drift; warnings only)
 //   shred kit apply <kit.json|folder> --project <id> [--force]
 //                                        a Video Style Kit: its titles, captions and overlays become
 //                                        kit:* text styles (project and library), the kit is recorded on
@@ -148,6 +161,7 @@ import {
 } from '../../../headless/lib/luts.mjs'
 import { templatesCommand } from './templates.mjs'
 import { createActivity } from './activity.mjs'
+import { draftPlanGate, planCheck, planCommands, printPlanCheck } from './plan.mjs'
 import { runBuild, gitHead, staleBuild } from '../../../server/install/build-state.mjs'
 import { DEFAULT_LABEL_PREFIX, jobLabel, jobStatus } from '../../../server/install/launchd.mjs'
 import { logFile, spawnEditor, spawnService } from '../../../server/install/processes.mjs'
@@ -202,6 +216,11 @@ const { values: opt, positionals } = parseArgs({
     from: { type: 'string' },
     hold: { type: 'string' },
     style: { type: 'string' },
+    file: { type: 'string' },
+    plan: { type: 'string' },
+    replace: { type: 'boolean' },
+    'markers-only': { type: 'boolean' },
+    'no-plan': { type: 'boolean' },
   },
 })
 const [command, ...args] = positionals
@@ -710,7 +729,7 @@ function writeJsonAtomic(file, value) {
  * A published pass as kept in `agent/passes/NNN.json`. `baseTimeline` is what
  * the pass started from, so `shred changes` can tell when the user undid it.
  */
-function passRecord({ n, draftId, target, saved, changes, draft, scorecard, kit }) {
+function passRecord({ n, draftId, origin, target, saved, changes, draft, scorecard, kit }) {
   return {
     id: n,
     label: opt.label,
@@ -724,6 +743,7 @@ function passRecord({ n, draftId, target, saved, changes, draft, scorecard, kit 
     changes,
     ...(scorecard ? { scorecard } : {}),
     ...(kit ? { kit } : {}),
+    ...(origin.plan ? { plan: origin.plan } : {}),
     timeline: draft.project.timeline,
     baseTimeline: target.project.timeline,
   }
@@ -858,6 +878,17 @@ async function printFlaggedFrames(id, card, kitCard) {
   for (const [i, f] of frames.entries())
     say(`  ${String(i + 1).padStart(2)}. frame ${f.frame}  ${f.ids.join(', ')}`)
 }
+
+const planDeps = () => ({
+  say,
+  opt,
+  workspace,
+  getProject,
+  applyBatch,
+  readDrafts,
+  writeDrafts,
+  warnUnsaved,
+})
 
 /** Did the user change the project since the draft was taken (saved, or unsaved in the editor)? */
 async function userChangedSince(origin, targetId) {
@@ -1012,10 +1043,17 @@ const commands = {
     const card = project.format
       ? scoreProject(project, { ...inputs, targetOverrides: kit?.overrides })
       : null
+    const plan = project.format ? planCheck({ workspace, readDrafts }, id, project) : null
     if (opt.json)
       say(
         JSON.stringify(
-          { revision, ...(card ?? {}), ...(kit ? { kit } : {}), ...(editor ? { editor } : {}) },
+          {
+            revision,
+            ...(card ?? {}),
+            ...(kit ? { kit } : {}),
+            ...(plan ? { plan } : {}),
+            ...(editor ? { editor } : {}),
+          },
           null,
           2,
         ),
@@ -1024,6 +1062,7 @@ const commands = {
       if (card) printScorecard(card, project)
       else say(`${id} has no format: kit rules only (shred format set ${id} <format>)`)
       printKitCheck(say, kit, project.metadata?.fps ?? 30)
+      printPlanCheck(say, plan)
       if (opt.frames) await printFlaggedFrames(id, card, kit?.card)
     }
     if (card?.summary.fail || kit?.card?.summary.fail) process.exitCode = 1
@@ -1511,6 +1550,8 @@ const commands = {
 
   async draft([id]) {
     const { project, revision } = await getProject(id)
+    // Before anything is created: a refused draft must not start a pass.
+    const plan = draftPlanGate({ say, opt, workspace }, id, project)
     const created = await call(
       'POST',
       '/v1/projects',
@@ -1537,10 +1578,23 @@ const commands = {
     )
     writeDrafts({
       ...readDrafts(),
-      [created.id]: { targetId: id, baseRevision: revision, createdAt: new Date().toISOString() },
+      [created.id]: {
+        targetId: id,
+        baseRevision: revision,
+        createdAt: new Date().toISOString(),
+        plan,
+      },
     })
     await activity.start(id, created.id, opt.label)
     say(created.id)
+  },
+
+  async plan(rest) {
+    await planCommands(planDeps()).plan(rest)
+  },
+
+  async build(rest) {
+    await planCommands(planDeps()).build(rest)
   },
 
   async done([id]) {
@@ -1630,7 +1684,7 @@ const commands = {
     const writeRecord = (extra = {}) =>
       writeJsonAtomic(
         recordPath,
-        passRecord({ n, draftId, target, saved, changes, draft, ...extra }),
+        passRecord({ n, draftId, origin, target, saved, changes, draft, ...extra }),
       )
     try {
       saved = await call(

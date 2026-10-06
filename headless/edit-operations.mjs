@@ -119,6 +119,7 @@ function baseProject() {
       transitions: [],
       keyframes: [],
       compositions: [],
+      markers: [{ id: 'marker-1', frame: 5, label: 'Note', color: '#3B82F6' }],
     },
   }
 }
@@ -203,6 +204,60 @@ const cases = [
     op: { op: 'removeItems', ids: ['text-1'] },
     assert: (project) => assert.equal(item(project, 'text-1'), undefined),
     failure: { op: 'removeItems', ids: ['missing'] },
+  },
+  {
+    name: 'unlinkItems',
+    ops: [
+      { op: 'updateItem', id: 'clip-left', updates: { linkedGroupId: 'pair' } },
+      {
+        op: 'addItem',
+        item: {
+          id: 'left-audio',
+          type: 'audio',
+          trackId: 'audio-1',
+          from: 0,
+          durationInFrames: 30,
+          label: 'Left audio',
+          mediaId: 'existing',
+          src: '',
+          volume: 0,
+          linkedGroupId: 'pair',
+          sourceStart: 0,
+          sourceEnd: 30,
+          sourceFps: 30,
+          speed: 1,
+        },
+      },
+      { op: 'unlinkItems', ids: ['left-audio'] },
+      // Unlinked, the audio goes alone; the video stays (its own audio muted).
+      { op: 'removeItems', ids: ['left-audio'], linked: false },
+    ],
+    op: { op: 'unlinkItems', ids: ['clip-left'] },
+    assert: (project) =>
+      assert.deepEqual(
+        [item(project, 'left-audio'), item(project, 'clip-left')?.embeddedAudioMuted],
+        [undefined, true],
+      ),
+    failure: { op: 'unlinkItems', ids: ['missing'] },
+  },
+  {
+    name: 'addMarker',
+    op: { op: 'addMarker', id: 'plan-b01', frame: 12, label: 'hook: the claim' },
+    assert: (project) =>
+      assert.deepEqual(
+        project.timeline.markers.map((m) => [m.id, m.frame, m.label]),
+        [
+          ['marker-1', 5, 'Note'],
+          ['plan-b01', 12, 'hook: the claim'],
+        ],
+      ),
+    failure: { op: 'addMarker', id: 'marker-1', frame: 0 },
+  },
+  {
+    name: 'removeMarkers',
+    op: { op: 'removeMarkers', ids: ['marker-1'] },
+    assert: (project) => assert.equal(project.timeline.markers?.length ?? 0, 0),
+    failure: { op: 'removeMarkers', ids: ['missing'] },
   },
   {
     name: 'split',

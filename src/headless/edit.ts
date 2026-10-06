@@ -75,6 +75,7 @@ import {
 } from './track-overlap'
 import { buildLutEffect, type HeadlessLutFile } from './lut-op'
 import { linkedTimingFollowers } from './linked-timing'
+import { removeItemsOp, runMarkerOp } from './marker-ops'
 
 const log = createLogger('HeadlessEdit')
 
@@ -101,6 +102,9 @@ export type EditOperationName =
   | 'updateEffect'
   | 'addLut'
   | 'setTransform'
+  | 'unlinkItems'
+  | 'addMarker'
+  | 'removeMarkers'
   | TemplateOperationName
   | 'applyTextStyle'
   | 'upsertTextStyle'
@@ -349,6 +353,21 @@ function createTrack(kind: 'video' | 'audio', order?: number): TimelineTrack {
   return track
 }
 
+/** `addTrack`: a new lane, optionally named and given its role in the project's format. */
+function addTrackOp(op: EditOp): { trackId: string; name: string } {
+  const track = createTrack(op.kind === 'audio' ? 'audio' : 'video', asNumber(op.order))
+  const name = asString(op.name)
+  const formatRole = asString(op.formatRole) as TimelineTrack['formatRole']
+  if (name || formatRole) {
+    setTracks(
+      tracks().map((t) =>
+        t.id === track.id ? { ...t, ...(name && { name }), ...(formatRole && { formatRole }) } : t,
+      ),
+    )
+  }
+  return { trackId: track.id, name: name ?? track.name }
+}
+
 /** Find a non-group track of the given kind, or create one. */
 function getOrCreateTrack(kind: 'video' | 'audio'): string {
   const existing = tracks().find((t) => !t.isGroup && (t.kind ?? 'video') === kind)
@@ -505,15 +524,8 @@ function applyOp(op: EditOp): unknown {
       moveItem(id, from, destination)
       return { id, from }
     }
-    case 'removeItems': {
-      const ids = Array.isArray(op.ids)
-        ? (op.ids.filter((x) => typeof x === 'string') as string[])
-        : []
-      if (ids.length === 0) throw new Error('removeItems requires non-empty `ids`')
-      for (const id of ids) requireItem(id, 'ids')
-      removeItems(ids)
-      return { removed: ids }
-    }
+    case 'removeItems':
+      return removeItemsOp(op)
     case 'split': {
       const id = asString(op.id)
       const frame = asNumber(op.frame)
@@ -611,10 +623,8 @@ function applyOp(op: EditOp): unknown {
       removeTransition(id)
       return { id }
     }
-    case 'addTrack': {
-      const track = createTrack(op.kind === 'audio' ? 'audio' : 'video', asNumber(op.order))
-      return { trackId: track.id, name: track.name }
-    }
+    case 'addTrack':
+      return addTrackOp(op)
     case 'removeTrack':
       return removeTrackOp(op)
     case 'addClip': {
@@ -849,7 +859,7 @@ function applyOp(op: EditOp): unknown {
       return { id }
     }
     default: {
-      const handled = runTextStyleOp(op, context)
+      const handled = runMarkerOp(op) ?? runTextStyleOp(op, context)
       if (handled) return handled.result
       return applyTemplateOp(op, { overlap: context, canvas: editCanvas })
     }

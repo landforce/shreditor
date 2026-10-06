@@ -55,6 +55,13 @@ const t = (key, label, unit, spec = {}) => ({
 
 const track = (name, kind, role) => ({ name, kind, role })
 
+// A story section from the guide's Structure (a plan's beat roles, `shred plan`).
+// Roles are shared across formats; `name` is the guide's word for it.
+const part = (role, name, note, required = true) => ({ role, name, required, note })
+
+/** Story roles a plan's beats can play, in story order. */
+export const STRUCTURE_ROLES = Object.freeze(['hook', 'setup', 'body', 'payoff', 'close'])
+
 const guide = (id, reviewedHash) => ({
   path: `formats/${id}/guide.md`,
   research: `formats/${id}/research.md`,
@@ -106,6 +113,11 @@ const graphicYap = {
         checklist: ['Large punch lines on the speaker shots, around the head.'],
       },
     },
+  ],
+  structure: [
+    part('hook', 'Hook', '0 to ~6 s: speech from 0, one declarative claim, first image by 2 s'),
+    part('body', 'Body', 'one image per point; lists loop: name it, show it, comment'),
+    part('close', 'Close', 'summary line, verbal CTA, or a gag or payoff shot; no end card'),
   ],
   tracks: [
     track('Title', 'video', 'title'),
@@ -194,6 +206,20 @@ const greenscreen = {
   canvas: VERTICAL,
   defaultVariant: null,
   variants: [],
+  structure: [
+    part(
+      'hook',
+      'Hook',
+      '0 to ~3.5 s: one spoken claim on the densest plate; change plate by ~3 s',
+    ),
+    part('setup', 'Setup', 'ends around 9 to 17 s'),
+    part(
+      'body',
+      'Body',
+      'a list (a run of plates per item) or a story: incident, evidence, context',
+    ),
+    part('close', 'Close', 'a line straight to the audience, or the thesis; no end card'),
+  ],
   tracks: [
     track('Title', 'video', 'title'),
     track('Captions', 'video', 'captions'),
@@ -315,6 +341,12 @@ const vlog = {
       },
     },
   ],
+  structure: [
+    part('hook', 'Hook', '0 to ~3 s: open on the payoff or the subject; first cut by ~1.5 s'),
+    part('body', 'Body', 'the picture shows exactly what the VO says'),
+    part('payoff', 'Payoff', 'the finished result or reveal, held longest'),
+    part('close', 'End', 'held reveal, bookend callback or part-two tease', false),
+  ],
   tracks: [
     track('Title', 'video', 'title'),
     track('Captions', 'video', 'captions'),
@@ -415,6 +447,13 @@ const tenShot = {
         checklist: ['Long opener, faster middle, slower closing hold on a summary image.'],
       },
     },
+  ],
+  structure: [
+    part('hook', 'Hook shot', '0 to ~1-3 s: the hero image, title on it from frame 0'),
+    part('setup', 'Premise setup', 'optional premise build: setup shots before the turn', false),
+    part('body', 'Montage body', 'one run, or 2 to 4 short topical blocks'),
+    part('payoff', 'Premise payoff', 'optional: the turn the setup builds to', false),
+    part('close', 'Ending', 'a closing hold on a summary image, or end at full speed'),
   ],
   tracks: [
     track('Title', 'video', 'title'),

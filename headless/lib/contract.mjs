@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { z } from 'zod'
-import { FORMAT_IDS, getFormat } from '../../formats/registry.mjs'
+import { FORMAT_IDS, FORMAT_ROLES, getFormat } from '../../formats/registry.mjs'
 import {
   TEXT_STYLE_OP_DESCRIPTIONS,
   TEXT_STYLE_OP_NAMES,
@@ -171,7 +171,14 @@ const opSchemas = [
     })
     .strict(),
   z.object({ op: z.literal('moveItem'), id, from: frame, trackId: id.optional() }).strict(),
-  z.object({ op: z.literal('removeItems'), ids: z.array(id).min(1) }).strict(),
+  z
+    .object({
+      op: z.literal('removeItems'),
+      ids: z.array(id).min(1),
+      // false: only the listed items (a video's own audio without the video).
+      linked: z.boolean().optional(),
+    })
+    .strict(),
   z.object({ op: z.literal('split'), id, frame }).strict(),
   z.object({ op: z.literal('trimStart'), id, amount: positiveFrames }).strict(),
   z.object({ op: z.literal('trimEnd'), id, amount: positiveFrames }).strict(),
@@ -207,6 +214,8 @@ const opSchemas = [
       op: z.literal('addTrack'),
       kind: z.enum(['video', 'audio']).optional(),
       order: finite.optional(),
+      name: id.optional(),
+      formatRole: z.enum(FORMAT_ROLES).optional(),
     })
     .strict(),
   z
@@ -285,6 +294,17 @@ const opSchemas = [
       ),
     })
     .strict(),
+  z.object({ op: z.literal('unlinkItems'), ids: z.array(id).min(1) }).strict(),
+  z
+    .object({
+      op: z.literal('addMarker'),
+      frame,
+      id: id.optional(),
+      label: z.string().optional(),
+      color: id.optional(),
+    })
+    .strict(),
+  z.object({ op: z.literal('removeMarkers'), ids: z.array(id).min(1) }).strict(),
   ...TEMPLATE_OP_SCHEMAS,
   ...TEXT_STYLE_OP_SCHEMAS,
 ]
@@ -312,6 +332,9 @@ export const EDIT_OPERATION_NAMES = [
   'updateEffect',
   'addLut',
   'setTransform',
+  'unlinkItems',
+  'addMarker',
+  'removeMarkers',
   ...TEMPLATE_OP_NAMES,
   ...TEXT_STYLE_OP_NAMES,
 ]
@@ -343,6 +366,9 @@ function samplesDescription(name) {
     updateEffect: "Change an effect's params (merged) or turn it on/off",
     addLut: 'Add a gpu-lut effect from a .cube file in the workspace luts/ folder',
     setTransform: 'Update an item transform',
+    unlinkItems: 'Unlink items from their linked group',
+    addMarker: 'Add a timeline marker',
+    removeMarkers: 'Remove markers by id',
     ...TEMPLATE_OP_DESCRIPTIONS,
     ...TEXT_STYLE_OP_DESCRIPTIONS,
   }
