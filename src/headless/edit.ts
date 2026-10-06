@@ -66,6 +66,7 @@ import {
   findFreeTrack,
   type OverlapContext,
 } from './track-overlap'
+import { buildLutEffect, type HeadlessLutFile } from './lut-op'
 
 const log = createLogger('HeadlessEdit')
 
@@ -90,6 +91,7 @@ export type EditOperationName =
   | 'addEffect'
   | 'removeEffect'
   | 'updateEffect'
+  | 'addLut'
   | 'setTransform'
   | 'applyTextStyle'
   | 'upsertTextStyle'
@@ -107,6 +109,8 @@ export interface HeadlessEditInput {
   textStyleLibrary?: TextStyleEditInput['library']
   /** Built-in transcripts of the media addCaptions captions. */
   transcripts?: TextStyleEditInput['transcripts']
+  /** Text of the workspace `luts/` files that addLut ops name (read by the Node side). */
+  luts?: HeadlessLutFile[]
 }
 
 export interface HeadlessEditResult {
@@ -177,6 +181,8 @@ function resolveOperationRefs(
 // Canvas of the project being edited (set per editProject call) — transform-parent
 // binds resolve world transforms against it.
 let editCanvas = { width: 1920, height: 1080, fps: 30 }
+// LUT files passed with the current editProject call, for addLut.
+let editLuts: readonly HeadlessLutFile[] = []
 
 const asString = (value: unknown, fallback?: string): string | undefined =>
   typeof value === 'string' ? value : fallback
@@ -407,6 +413,15 @@ function removeTrackOp(op: EditOp): unknown {
     name: track.name,
     removedItems: before.filter((item) => !remaining.has(item.id)).map((item) => item.id),
   }
+}
+
+/** Add a gpu-lut effect built from a workspace LUT file (see ./lut-op). */
+function addLutOp(op: EditOp): { itemId: string; effectId: string | undefined } {
+  const itemId = asString(op.itemId)
+  if (!itemId) throw new Error('addLut requires `itemId`')
+  requireItem(itemId, 'itemId')
+  addEffect(itemId, buildLutEffect(op, editLuts))
+  return { itemId, effectId: requireItem(itemId, 'itemId').effects?.at(-1)?.id }
 }
 
 /** Apply a single op by driving the real timeline action modules. Throws on bad input. */
@@ -783,6 +798,8 @@ function applyOp(op: EditOp): unknown {
       updateEffect(itemId, effectId, updates)
       return { itemId, effectId }
     }
+    case 'addLut':
+      return addLutOp(op)
     case 'setTransform': {
       const id = asString(op.id)
       if (!id || !op.transform || typeof op.transform !== 'object') {
@@ -845,6 +862,7 @@ export async function editProject(input: HeadlessEditInput): Promise<HeadlessEdi
     library: input.textStyleLibrary,
     transcripts: input.transcripts,
   })
+  editLuts = input.luts ?? []
 
   log.info('Headless edit starting', { ops: input.ops.length })
 

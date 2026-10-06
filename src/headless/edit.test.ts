@@ -701,3 +701,68 @@ describe('editProject', () => {
     })
   })
 })
+
+describe('editProject addLut', () => {
+  // 2x2x2 LUT that swaps red and blue (red fastest, as .cube orders entries).
+  const SWAP_RB = [
+    'TITLE "Swap RB"',
+    'LUT_3D_SIZE 2',
+    ...[0, 1].flatMap((b) => [0, 1].flatMap((g) => [0, 1].map((r) => `${b} ${g} ${r}`))),
+  ].join('\n')
+
+  const run = (ops: EditOp[], luts = [{ name: 'swap.cube', text: SWAP_RB }]) =>
+    editProject({
+      project: baseProject(),
+      ops: [{ op: 'addText', text: 'Look', from: 0, callerId: 'txt' } as EditOp, ...ops],
+      luts,
+    })
+
+  it('embeds the library LUT as a gpu-lut effect, named by its TITLE', async () => {
+    const result = await run([
+      {
+        op: 'addLut',
+        itemId: { $ref: 'txt#/detail/id' },
+        lut: 'swap.cube',
+        intensity: 0.75,
+        callerId: 'lut',
+      } as EditOp,
+    ])
+    const [entry] = (result.project.timeline!.items[0] as { effects?: ItemEffect[] }).effects!
+    expect(result.results[1]!.detail).toMatchObject({ effectId: entry!.id })
+    expect(entry).toMatchObject({ enabled: true })
+    expect(entry!.effect).toMatchObject({
+      type: 'gpu-effect',
+      gpuEffectType: 'gpu-lut',
+      params: { lutName: 'Swap RB', lutSize: '2', intensity: 0.75 },
+    })
+    const params = (entry!.effect as { params: Record<string, string> }).params
+    const data = Uint8Array.from(atob(params.lutData!), (c) => c.charCodeAt(0))
+    // Entry 1 is input (r=1,g=0,b=0): the LUT maps it to blue.
+    expect([...data.slice(4, 8)]).toEqual([0, 0, 255, 255])
+  })
+
+  it('defaults intensity to 1 and falls back to the file name without a TITLE', async () => {
+    const text = SWAP_RB.replace('TITLE "Swap RB"\n', '')
+    const result = await run(
+      [{ op: 'addLut', itemId: { $ref: 'txt#/detail/id' }, lut: 'Plain.cube' } as EditOp],
+      [{ name: 'Plain.cube', text }],
+    )
+    const [entry] = (result.project.timeline!.items[0] as { effects?: ItemEffect[] }).effects!
+    expect(entry!.effect).toMatchObject({ params: { lutName: 'Plain', intensity: 1 } })
+  })
+
+  it('fails clearly on a LUT that was not provided, a bad file or a missing item', async () => {
+    await expect(
+      run([{ op: 'addLut', itemId: { $ref: 'txt#/detail/id' }, lut: 'other.cube' } as EditOp]),
+    ).rejects.toThrow(/lut: "other\.cube" was not provided.*provided: swap\.cube/)
+    await expect(
+      run(
+        [{ op: 'addLut', itemId: { $ref: 'txt#/detail/id' }, lut: 'bad.cube' } as EditOp],
+        [{ name: 'bad.cube', text: 'LUT_1D_SIZE 2\n0 0 0\n1 1 1' }],
+      ),
+    ).rejects.toThrow(/luts\/bad\.cube is not a usable 3D LUT: 1D LUTs are not supported/)
+    await expect(
+      run([{ op: 'addLut', itemId: 'missing', lut: 'swap.cube' } as EditOp]),
+    ).rejects.toThrow(/itemId: item "missing" does not exist/)
+  })
+})

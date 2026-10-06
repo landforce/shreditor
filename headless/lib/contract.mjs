@@ -245,6 +245,14 @@ const opSchemas = [
   z.object({ op: z.literal('removeEffect'), itemId: id, effectId: id }).strict(),
   z
     .object({
+      op: z.literal('addLut'),
+      itemId: id,
+      lut: z.string().regex(/^[^/\\]+\.cube$/i, 'lut must be a .cube file name in luts/'),
+      intensity: z.number().min(0).max(1).optional(),
+    })
+    .strict(),
+  z
+    .object({
       op: z.literal('updateEffect'),
       itemId: id,
       effectId: id,
@@ -313,6 +321,7 @@ export const EDIT_OPERATION_NAMES = [
   'addEffect',
   'removeEffect',
   'updateEffect',
+  'addLut',
   'setTransform',
   'applyTextStyle',
   'upsertTextStyle',
@@ -344,6 +353,7 @@ function samplesDescription(name) {
     addEffect: 'Add a registered GPU effect',
     removeEffect: 'Remove an existing item effect',
     updateEffect: "Change an effect's params (merged) or turn it on/off",
+    addLut: 'Add a gpu-lut effect from a .cube file in the workspace luts/ folder',
     setTransform: 'Update an item transform',
     applyTextStyle: 'Link text items to a text style and give them its look',
     upsertTextStyle: "Add or replace a project text style (or save one from an item's look); restyles its items",

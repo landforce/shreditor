@@ -237,6 +237,11 @@
     "importTooltip": ".cube 形式の 3D LUT ファイルを読み込みます",
     "importFailed": "この .cube ファイルを読み込めませんでした",
     "intensity": "強度",
-    "unsupportedBrowser": "LUT の読み込みには Chromium ベースのブラウザが必要です"
+    "unsupportedBrowser": "LUT の読み込みには Chromium ベースのブラウザが必要です",
+    "library": "ライブラリ",
+    "libraryPlaceholder": "LUT を選択",
+    "libraryEmpty": "ライブラリに LUT はまだありません",
+    "libraryTooltip": "ワークスペースの luts フォルダーに保存された LUT。読み込んだ .cube ファイルは自動で追加されます。",
+    "libraryReadFailed": "ライブラリからこの LUT を読み込めませんでした"
   }
 }

@@ -237,6 +237,11 @@
     "importTooltip": "加载 .cube 3D LUT 文件",
     "importFailed": "无法读取此 .cube 文件",
     "intensity": "强度",
-    "unsupportedBrowser": "导入 LUT 需要基于 Chromium 的浏览器"
+    "unsupportedBrowser": "导入 LUT 需要基于 Chromium 的浏览器",
+    "library": "库",
+    "libraryPlaceholder": "选择 LUT",
+    "libraryEmpty": "库中还没有 LUT",
+    "libraryTooltip": "保存在工作区 luts 文件夹中的 LUT。导入的 .cube 文件会自动加入。",
+    "libraryReadFailed": "无法从库中读取此 LUT"
   }
 }

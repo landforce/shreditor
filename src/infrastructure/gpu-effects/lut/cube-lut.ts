@@ -16,6 +16,12 @@ const MIN_LUT_SIZE = 2
 const MAX_LUT_SIZE = 129
 const BASE64_CHUNK_SIZE = 8192
 
+/**
+ * Imported LUTs are resampled down to this grid to bound param/project size
+ * (~143KB rgba8). Shared by the editor's LUT panel and the agent's `addLut`.
+ */
+export const MAX_EMBEDDED_LUT_SIZE = 33
+
 function clamp01(value: number): number {
   if (value < 0) return 0
   if (value > 1) return 1
@@ -63,11 +69,15 @@ function parseDomainTriple(line: string, context: string, target: [number, numbe
   }
 }
 
+function parseTitleLine(line: string): string {
+  const match = line.match(/^TITLE\s+"(.*)"\s*$/)
+  return match?.[1] ?? line.slice('TITLE'.length).trim()
+}
+
 /** Handles header keywords. Returns true when the line was consumed. */
 function handleHeaderKeyword(line: string, state: CubeParseState): boolean {
   if (line.startsWith('TITLE')) {
-    const match = line.match(/^TITLE\s+"(.*)"\s*$/)
-    state.title = match?.[1] ?? line.slice('TITLE'.length).trim()
+    state.title = parseTitleLine(line)
     return true
   }
   if (line.startsWith('LUT_1D_SIZE')) {
@@ -264,4 +274,48 @@ export function createIdentityLutData(size: number): Uint8Array {
     }
   }
   return data
+}
+
+/** The `gpu-lut` params that embed a LUT: name, grid size and base64 rgba8 data. */
+export type EmbeddedLutParams = {
+  lutName: string
+  lutSize: string
+  lutData: string
+}
+
+/**
+ * Parse `.cube` text and embed it as `gpu-lut` params, exactly as the editor's
+ * LUT panel does: resampled to MAX_EMBEDDED_LUT_SIZE, named by its TITLE or,
+ * without one, by the file name minus `.cube`.
+ */
+export function embedCubeLut(text: string, fileName: string): EmbeddedLutParams {
+  const parsed = resampleCubeLut(parseCubeLut(text), MAX_EMBEDDED_LUT_SIZE)
+  return {
+    lutName: parsed.title ?? fileName.replace(/\.cube$/i, ''),
+    lutSize: String(parsed.size),
+    lutData: encodeLutData(parsed.data),
+  }
+}
+
+/** What a `.cube` header says, read without parsing the data. */
+export interface CubeLutHeader {
+  title: string | null
+  /** LUT_3D_SIZE, or null when the header has none (or the file is a 1D LUT). */
+  size: number | null
+}
+
+/** Read TITLE and LUT_3D_SIZE from the lines before the first data line. */
+export function readCubeLutHeader(text: string): CubeLutHeader {
+  const header: CubeLutHeader = { title: null, size: null }
+  for (const rawLine of text.split(/\r?\n/)) {
+    const line = rawLine.trim()
+    if (isCubeDataLine(line)) break
+    if (line.startsWith('TITLE')) {
+      header.title = parseTitleLine(line)
+    } else if (line.startsWith('LUT_3D_SIZE')) {
+      const size = Number.parseInt(line.split(/\s+/)[1] ?? '', 10)
+      header.size = Number.isFinite(size) ? size : null
+    }
+  }
+  return header
 }

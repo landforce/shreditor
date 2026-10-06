@@ -1,10 +1,12 @@
 import { resolveCompatibleMedia } from '../../server/media-compatibility.mjs'
+import { collectTextStyleInput } from './text-styles.mjs'
 // Read a FreeCut workspace folder from disk (plain fs, no File System Access
 // API). Locates a project's JSON and maps the media it references to source
 // files on disk, mirroring workspace-fs's `media/{id}/{filename}` layout.
 import fs from 'node:fs'
 import path from 'node:path'
 import { assertSinglePathComponent, HttpError, resolveContained } from './http-security.mjs'
+import { collectLuts } from './luts.mjs'
 
 // Files in media/{id}/ that are NOT the source blob (mirrors
 // NON_SOURCE_NAMES in workspace-fs/media-source.ts).
@@ -159,6 +161,22 @@ export function collectAddClipMedia(workspaceDir, ops) {
     if (notReady) throw new HttpError(409, 'MEDIA_NOT_READY', notReady)
     return { mediaId, metadata }
   })
+}
+
+/**
+ * Everything from the workspace an op batch needs besides the project, for
+ * the browser's edit input: metadata for addClip media and the text of the
+ * LUTs addLut ops name, plus (given the project) the library text styles and
+ * transcripts text style ops need. Every caller of window.freecut.editProject spreads
+ * this in, so none can forget a kind.
+ */
+export function collectEditResources(workspaceDir, ops, project = null) {
+  return {
+    media: collectAddClipMedia(workspaceDir, ops),
+    luts: collectLuts(workspaceDir, ops),
+    // Library text styles the ops name and transcripts for addCaptions.
+    ...collectTextStyleInput(workspaceDir, project, ops),
+  }
 }
 
 /**

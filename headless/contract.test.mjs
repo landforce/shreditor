@@ -74,8 +74,40 @@ const samples = {
   },
   removeEffect: { op: 'removeEffect', itemId: 'i', effectId: 'e' },
   updateEffect: { op: 'updateEffect', itemId: 'i', effectId: 'e', params: { amount: 0.2 } },
+  addLut: { op: 'addLut', itemId: 'i', lut: 'Warm Look.cube', intensity: 0.8 },
   setTransform: { op: 'setTransform', id: 'i', transform: { opacity: 0.5, rotation: 2 } },
+  applyTextStyle: { op: 'applyTextStyle', ids: ['i'], styleId: 'Kit Title' },
+  upsertTextStyle: {
+    op: 'upsertTextStyle',
+    style: {
+      name: 'Kit Title',
+      role: 'title',
+      style: { fontFamily: 'Anton', fontSize: 120, stroke: { width: 3, color: '#000', join: 'miter' } },
+      layout: { yRatio: -0.3, widthRatio: 0.9 },
+      defaultDurationFrames: 75,
+    },
+  },
+  addCaptions: { op: 'addCaptions', clipId: 'c', styleId: 'kit-captions', replace: true },
 }
+
+test('text style ops validate styles at the wire', () => {
+  assert.equal(editOpSchema.safeParse({ ...samples.addText, styleId: 'Kit Title' }).success, true)
+  assert.equal(
+    editOpSchema.safeParse({ op: 'upsertTextStyle', fromItemId: 'i', name: 'Mine', role: 'label' })
+      .success,
+    true,
+  )
+  const style = samples.upsertTextStyle.style
+  for (const bad of [
+    { ...style, role: 'heading' },
+    { ...style, style: { fontWeight: 'black' } },
+    { ...style, style: { surprise: 1 } },
+    { ...style, caption: { maxWordsPerChunk: 0, maxCharsPerLine: 20, maxLines: 1, minChunkFrames: 0 } },
+  ])
+    assert.equal(editOpSchema.safeParse({ op: 'upsertTextStyle', style: bad }).success, false)
+  assert.equal(editOpSchema.safeParse({ op: 'upsertTextStyle', name: 'x' }).success, false)
+  assert.equal(editOpSchema.safeParse({ op: 'addCaptions', clipId: 'c' }).success, false)
+})
 
 test('every published edit discriminator has a valid strict schema', () => {
   assert.deepEqual(Object.keys(samples), EDIT_OPERATION_NAMES)
@@ -96,6 +128,9 @@ test('every published edit discriminator has a valid strict schema', () => {
     editOpSchema.safeParse({ op: 'setTransform', id: 'i', transform: {} }).success,
     false,
   )
+  for (const lut of ['look.png', '../look.cube', 'sub/look.cube', ''])
+    assert.equal(editOpSchema.safeParse({ ...samples.addLut, lut }).success, false, lut)
+  assert.equal(editOpSchema.safeParse({ ...samples.addLut, intensity: 1.5 }).success, false)
 })
 
 test('edit request requires exactly one project source and nonempty valid ops', () => {

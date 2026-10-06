@@ -9,6 +9,8 @@ import { chromeLaunchArgs } from './lib/cli.mjs'
 import { EDIT_OPERATION_NAMES, editOpSchema } from './lib/contract.mjs'
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
+// 2x2x2 LUT that pushes everything warm.
+const WARM_CUBE = ['TITLE "Warm"', 'LUT_3D_SIZE 2', ...Array(8).fill('0.9 0.6 0.3')].join('\n')
 
 function baseProject() {
   return {
@@ -118,6 +120,16 @@ function baseProject() {
       compositions: [],
     },
   }
+}
+
+const KIT_TITLE = {
+  id: 'kit-title',
+  name: 'Kit Title',
+  role: 'title',
+  style: { fontFamily: 'Anton', fontSize: 120, color: '#ffffff' },
+  layout: { yRatio: -0.3 },
+  version: 1,
+  updatedAt: 1,
 }
 
 const item = (project, id) => project.timeline.items.find((candidate) => candidate.id === id)
@@ -427,6 +439,79 @@ const cases = [
     failure: { op: 'updateEffect', itemId: 'text-1', effectId: 'missing-effect', enabled: false },
   },
   {
+    name: 'addLut',
+    op: { op: 'addLut', itemId: 'text-1', lut: 'warm.cube', intensity: 0.5 },
+    luts: [{ name: 'warm.cube', text: WARM_CUBE }],
+    assert: (project) => {
+      const { gpuEffectType, params } = item(project, 'text-1').effects[0].effect
+      assert.deepEqual(
+        [gpuEffectType, params.lutName, params.lutSize, params.intensity],
+        ['gpu-lut', 'Warm', '2', 0.5],
+      )
+    },
+    failure: { op: 'addLut', itemId: 'text-1', lut: 'not-provided.cube' },
+  },
+  {
+    name: 'applyTextStyle',
+    op: { op: 'applyTextStyle', ids: ['text-1'], styleId: 'Kit Title' },
+    input: { textStyleLibrary: [KIT_TITLE] },
+    assert: (project) => {
+      assert.deepEqual(project.timeline.textStyles.map((style) => style.id), ['kit-title'])
+      assert.deepEqual(
+        [item(project, 'text-1')?.textStyleId, item(project, 'text-1')?.fontFamily],
+        ['kit-title', 'Anton'],
+      )
+    },
+    failure: { op: 'applyTextStyle', ids: ['text-1'], styleId: 'missing-style' },
+  },
+  {
+    name: 'upsertTextStyle',
+    ops: [
+      { op: 'applyTextStyle', ids: ['text-1'], styleId: 'kit-title' },
+      { op: 'upsertTextStyle', style: { ...KIT_TITLE, style: { ...KIT_TITLE.style, color: '#00e5ff' } } },
+    ],
+    op: { op: 'upsertTextStyle', style: KIT_TITLE },
+    input: { textStyleLibrary: [KIT_TITLE] },
+    assert: (project) =>
+      assert.deepEqual(
+        [project.timeline.textStyles[0]?.version, item(project, 'text-1')?.color],
+        [2, '#00e5ff'],
+      ),
+    failure: { op: 'upsertTextStyle', fromItemId: 'clip-left', name: 'Not text', role: 'title' },
+  },
+  {
+    name: 'addCaptions',
+    op: { op: 'addCaptions', clipId: 'clip-left', styleId: 'kit-title' },
+    input: {
+      textStyleLibrary: [KIT_TITLE],
+      transcripts: [
+        {
+          mediaId: 'existing',
+          segments: [
+            {
+              text: 'styles you reuse',
+              start: 0,
+              end: 0.9,
+              words: [
+                { text: 'styles', start: 0, end: 0.3 },
+                { text: 'you', start: 0.3, end: 0.6 },
+                { text: 'reuse', start: 0.6, end: 0.9 },
+              ],
+            },
+          ],
+        },
+      ],
+    },
+    assert: (project) => {
+      const captions = project.timeline.items.filter((candidate) => candidate.textRole === 'caption')
+      assert.deepEqual(
+        captions.map((caption) => [caption.text, caption.textStyleId, caption.formatRole]),
+        [['styles you reuse', 'kit-title', 'captions']],
+      )
+    },
+    failure: { op: 'addCaptions', clipId: 'clip-left', styleId: 'kit-title' },
+  },
+  {
     name: 'setTransform',
     op: { op: 'setTransform', id: 'text-1', transform: { opacity: 0.4, x: 12 } },
     assert: (project) =>
@@ -438,8 +523,14 @@ const cases = [
   },
 ]
 
-async function edit(page, project, ops, media) {
-  return page.evaluate((input) => window.freecut.editProject(input), { project, ops, media })
+async function edit(page, project, ops, media, luts, extra = {}) {
+  return page.evaluate((input) => window.freecut.editProject(input), {
+    project,
+    ops,
+    media,
+    luts,
+    ...extra,
+  })
 }
 
 async function main() {
@@ -473,7 +564,14 @@ async function main() {
     for (const testCase of cases) {
       const project = testCase.setup ? await testCase.setup(page) : baseProject()
       const operation = testCase.opFrom ? testCase.opFrom(project) : testCase.op
-      const result = await edit(page, project, testCase.ops ?? [operation], testCase.media)
+      const result = await edit(
+        page,
+        project,
+        testCase.ops ?? [operation],
+        testCase.media,
+        testCase.luts,
+        testCase.input,
+      )
       assert.equal(result.ok, true, `${testCase.name} reports success`)
       testCase.assert(roundTrip(result.project))
 

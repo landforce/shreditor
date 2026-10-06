@@ -34,6 +34,14 @@
 //                                        original, with hints; whether a clip gets a fix is your call
 //   shred effects [--category color] [<effectId>]
 //                                        the GPU effects with their params, ranges and defaults
+//   shred lut add <file.cube...> [--name x.cube] [--force]
+//                                        copy 3D .cube LUTs into <workspace>/luts/, the LUT library the
+//                                        editor's LUT panel and the addLut op share (1D LUTs are refused)
+//   shred lut list [--json]              the library: file name, LUT_3D_SIZE and TITLE
+//   shred grade list [--json]            the user's saved grade presets: name, id and their effects
+//   shred grade apply <id> <itemId...> --preset <name|id>
+//                                        give clips a saved grade the way the editor does: their colour
+//                                        effects are replaced by the preset's, the rest kept (one batch)
 //   shred categorize <mediaId>=<category>... | --category <c> <mediaId>...
 //                                        set what each media is for (as the agent: the editor never
 //                                        changes it; re-setting an auto suggestion confirms it)
@@ -75,6 +83,13 @@ import {
 import { describeTarget, scoreProject, trackRole } from '../../../formats/scorecard.mjs'
 import { suggestFormat } from '../../../formats/suggest.mjs'
 import { qcMedia } from './qc.mjs'
+import {
+  LUTS_DIR,
+  MAX_LUT_BYTES,
+  checkCubeText,
+  listLutNames,
+  readCubeFileHeader,
+} from '../../../headless/lib/luts.mjs'
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..')
 const SERVICE = process.env.SHRED_SERVICE || 'http://127.0.0.1:8787'
@@ -118,6 +133,7 @@ const { values: opt, positionals } = parseArgs({
     browser: { type: 'boolean' },
     codec: { type: 'string' },
     quality: { type: 'string' },
+    preset: { type: 'string' },
   },
 })
 const [command, ...args] = positionals
@@ -576,6 +592,53 @@ function printScorecard(card, project) {
       )
   }
   if (s.fail) say('Fix every FAIL before publishing, or tell the user why it stays.')
+}
+
+/**
+ * Apply an op batch to a project atomically at a known revision (ops get
+ * callerIds op0, op1, ... unless they carry their own). A revision the project
+ * has moved past fails the whole batch.
+ */
+async function applyBatch(id, batch, revision) {
+  const ops = batch.map((op, i) => ({ callerId: `op${i}`, ...op }))
+  const logStart = serviceLogSize()
+  let res
+  try {
+    res = await call(
+      'POST',
+      `/v1/projects/${id}/edit`,
+      { ops, expectedRevision: revision, persist: true },
+      { 'Idempotency-Key': key('apply') },
+    )
+  } catch (error) {
+    throw new Error(
+      `${error.message}${serviceLogTail(logStart)}\nNothing was applied (batches are atomic).`,
+    )
+  }
+  say(`applied ${res.applied} ops, revision ${res.revision}`)
+  for (const w of res.warnings ?? [])
+    say(`warning: ${typeof w === 'string' ? w : JSON.stringify(w)}`)
+  return res
+}
+
+const SERVICE_LOG = path.join(os.tmpdir(), 'shreditor-service.log')
+const serviceLogSize = () => fs.statSync(SERVICE_LOG, { throwIfNoEntry: false })?.size ?? 0
+
+/** Error lines the service logged since `from` (bytes), so another run's errors never show. */
+function serviceLogTail(from) {
+  const size = serviceLogSize()
+  if (size <= from) return ''
+  const fd = fs.openSync(SERVICE_LOG, 'r')
+  const buffer = Buffer.alloc(Math.min(size - from, 256 * 1024))
+  fs.readSync(fd, buffer, 0, buffer.length, size - buffer.length)
+  fs.closeSync(fd)
+  const tail = buffer
+    .toString('utf8')
+    .split('\n')
+    .filter((l) => /Error|failed/.test(l))
+    .slice(-3)
+    .join('\n')
+  return tail ? `\nservice log:\n${tail}` : ''
 }
 
 const commands = {
@@ -1243,36 +1306,24 @@ const commands = {
 
   async apply([id, file]) {
     const body = JSON.parse(fs.readFileSync(file, 'utf8'))
-    const ops = (Array.isArray(body) ? body : body.ops).map((op, i) => ({
-      callerId: `op${i}`,
-      ...op,
-    }))
     const { revision } = await getProject(id)
-    let res
-    try {
-      res = await call(
-        'POST',
-        `/v1/projects/${id}/edit`,
-        { ops, expectedRevision: revision, persist: true },
-        { 'Idempotency-Key': key('apply') },
-      )
-    } catch (error) {
-      const log = path.join(os.tmpdir(), 'shreditor-service.log')
-      const tail = fs.existsSync(log)
-        ? fs
-            .readFileSync(log, 'utf8')
-            .split('\n')
-            .filter((l) => /Error|failed/.test(l))
-            .slice(-3)
-            .join('\n')
-        : ''
+    await applyBatch(id, Array.isArray(body) ? body : body.ops, revision)
+  },
+
+  async lut([sub, ...rest]) {
+    const run = LUT_COMMANDS[sub]
+    if (!run)
+      throw new Error('Usage: shred lut add <file.cube...> [--name x.cube] | shred lut list')
+    await run(rest)
+  },
+
+  async grade([sub, ...rest]) {
+    const run = GRADE_COMMANDS[sub]
+    if (!run)
       throw new Error(
-        `${error.message}${tail ? `\nservice log:\n${tail}` : ''}\nNothing was applied (batches are atomic).`,
+        'Usage: shred grade list | shred grade apply <id> <itemId...> --preset <name|id>',
       )
-    }
-    say(`applied ${res.applied} ops, revision ${res.revision}`)
-    for (const w of res.warnings ?? [])
-      say(`warning: ${typeof w === 'string' ? w : JSON.stringify(w)}`)
+    await run(rest)
   },
 
   async frames([id]) {
@@ -1510,6 +1561,154 @@ const commands = {
       )
     if (after.tp > tp) say(`warning: true peak ${after.tp.toFixed(1)} dBTP is above ${tp}`)
     say(`${out}  (original untouched; import this file)`)
+  },
+}
+
+// ── LUT library (<workspace>/luts/) ─────────────────────────────────────────
+
+/**
+ * The library file name for `--name` or a source file: a plain name ending in
+ * .cube, with the characters the editor won't put in a file name replaced (as
+ * the editor's own import does).
+ */
+function lutTargetName(source) {
+  const unsafe = (c) => c.charCodeAt(0) < 32 || '<>:"/\\|?*'.includes(c)
+  const name = [...(opt.name ?? path.basename(source))].map((c) => (unsafe(c) ? '_' : c)).join('')
+  const withExt = /\.cube$/i.test(name) ? name : `${name}.cube`
+  if (withExt.startsWith('.')) throw new Error(`--name must be a plain file name, got "${name}"`)
+  return withExt
+}
+
+/** Read a .cube to add, refusing anything the editor couldn't load. */
+function readCubeToAdd(file) {
+  const stat = fs.statSync(file, { throwIfNoEntry: false })
+  if (!stat?.isFile()) throw new Error(`${file}: no such file`)
+  if (!/\.cube$/i.test(file)) throw new Error(`${file}: not a .cube file`)
+  if (stat.size > MAX_LUT_BYTES) throw new Error(`${file}: over ${MAX_LUT_BYTES} bytes`)
+  const text = fs.readFileSync(file, 'utf8')
+  try {
+    return { file, text, header: checkCubeText(text) }
+  } catch (error) {
+    throw new Error(`${file}: ${error.message}`)
+  }
+}
+
+function addLutFile({ file, text, header }, dir) {
+  const name = lutTargetName(file)
+  const target = path.join(dir, name)
+  const existing = fs.existsSync(target) ? fs.readFileSync(target, 'utf8') : null
+  if (existing === text) return say(`same     ${name}  (already in the library)`)
+  if (existing !== null && !opt.force)
+    throw new Error(
+      `luts/${name} exists with other content; pick another --name, or --force to replace it`,
+    )
+  fs.writeFileSync(target, text)
+  const title = header.title ? `  "${header.title}"` : ''
+  say(`${existing === null ? 'added   ' : 'replaced'} ${name}  ${header.size}³${title}`)
+}
+
+const LUT_COMMANDS = {
+  async add(files) {
+    if (!files.length) throw new Error('Pass one or more .cube files')
+    if (opt.name && files.length > 1) throw new Error('--name takes one file at a time')
+    const dir = path.join(workspace(), LUTS_DIR)
+    // Check every file before copying any.
+    const checked = files.map(readCubeToAdd)
+    fs.mkdirSync(dir, { recursive: true })
+    for (const lut of checked) addLutFile(lut, dir)
+    say(`Apply one with {"op":"addLut","itemId":"…","lut":"<name>","intensity":1}`)
+  },
+
+  async list() {
+    const dir = path.join(workspace(), LUTS_DIR)
+    const luts = listLutNames(workspace()).map((name) => ({
+      name,
+      ...readCubeFileHeader(path.join(dir, name)),
+    }))
+    if (opt.json) return say(JSON.stringify(luts, null, 2))
+    if (!luts.length) return say(`No LUTs in ${dir} (shred lut add <file.cube>)`)
+    for (const l of luts)
+      say(
+        `${l.name.padEnd(36)} ${(l.oneDimensional ? '1D' : `${l.size}³`).padEnd(6)} ${l.title ?? ''}`,
+      )
+  },
+}
+
+// ── Grade presets (<workspace>/app/effect-presets.json, owned by the editor) ──
+
+/** The colour (grade) effect ids: what the editor's grade presets replace. */
+function gradeEffectTypes() {
+  const catalog = JSON.parse(
+    fs.readFileSync(path.join(REPO, 'headless/lib/effect-catalog.json'), 'utf8'),
+  )
+  return new Set(catalog.filter((e) => e.category === 'color').map((e) => e.id))
+}
+
+function readGradePresets() {
+  const file = readJsonOrNull(path.join(workspace(), 'app', 'effect-presets.json'))
+  return (file?.presets ?? []).filter((p) => p?.id && p?.name && Array.isArray(p.effects))
+}
+
+function findGradePreset(wanted) {
+  const presets = readGradePresets()
+  const preset =
+    presets.find((p) => p.id === wanted) ??
+    presets.find((p) => p.name.toLowerCase() === wanted.toLowerCase())
+  if (preset) return preset
+  const have = presets.map((p) => `"${p.name}"`).join(', ') || 'none saved yet'
+  throw new Error(`No grade preset "${wanted}" (presets: ${have}; shred grade list)`)
+}
+
+const isGradeEffect = (effect, types) =>
+  effect?.type === 'gpu-effect' && types.has(effect.gpuEffectType)
+
+/** Ops that do to one item what the editor's applyGradePresetToEffectStack does. */
+function gradeOpsForItem(project, itemId, gradeEffects, types) {
+  const item = project.timeline?.items?.find((i) => i.id === itemId)
+  if (!item) throw new Error(`No item ${itemId} in this project (shred project <id>)`)
+  if (item.type === 'audio') throw new Error(`${itemId} is an audio item; grades go on picture`)
+  const removals = (item.effects ?? [])
+    .filter((entry) => isGradeEffect(entry.effect, types))
+    .map((entry) => ({ op: 'removeEffect', itemId, effectId: entry.id }))
+  const additions = gradeEffects.map((effect) => ({
+    op: 'addEffect',
+    itemId,
+    effect: {
+      type: 'gpu-effect',
+      gpuEffectType: effect.gpuEffectType,
+      params: effect.params ?? {},
+    },
+  }))
+  return [...removals, ...additions]
+}
+
+const GRADE_COMMANDS = {
+  async list() {
+    const types = gradeEffectTypes()
+    const presets = readGradePresets()
+    if (opt.json) return say(JSON.stringify(presets, null, 2))
+    if (!presets.length)
+      return say('No grade presets saved yet (the user saves them in the editor’s Color panel).')
+    for (const p of presets) {
+      const effects = p.effects.map((e) => e.gpuEffectType)
+      const grade = p.effects.some((e) => isGradeEffect(e, types))
+      say(
+        `${p.name.padEnd(28)} ${p.id}  ${effects.join(', ')}${grade ? '' : '  (no colour effects: nothing to apply)'}`,
+      )
+    }
+  },
+
+  async apply([id, ...itemIds]) {
+    if (!id || !itemIds.length || !opt.preset)
+      throw new Error('Usage: shred grade apply <id> <itemId...> --preset <name|id>')
+    const types = gradeEffectTypes()
+    const preset = findGradePreset(opt.preset)
+    const gradeEffects = preset.effects.filter((e) => isGradeEffect(e, types))
+    if (!gradeEffects.length) throw new Error(`Preset "${preset.name}" has no colour effects`)
+    const { project, revision } = await getProject(id)
+    const ops = itemIds.flatMap((itemId) => gradeOpsForItem(project, itemId, gradeEffects, types))
+    say(`preset "${preset.name}": ${gradeEffects.map((e) => e.gpuEffectType).join(', ')}`)
+    await applyBatch(id, ops, revision)
   },
 }
 

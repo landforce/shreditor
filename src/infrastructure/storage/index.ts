@@ -193,6 +193,14 @@ export {
   type TextStyleLibraryStamp,
 } from '@/infrastructure/storage/workspace-fs/text-styles'
 
+// Workspace LUT library (luts/*.cube)
+export {
+  listWorkspaceLuts,
+  readWorkspaceLut,
+  saveWorkspaceLut,
+  type WorkspaceLut,
+} from '@/infrastructure/storage/workspace-fs/luts'
+
 // Per-project animation presets
 export {
   readAnimationPresets,

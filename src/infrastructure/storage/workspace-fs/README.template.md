@@ -31,6 +31,8 @@ normal tools. AI coding agents can read them directly without a browser.
 |           |-- decoded-audio/ <- chunked PCM for preview playback
 |           |-- preview-audio.wav  <- conformed WAV for non-browser codecs
 |           `-- ai/            <- transcripts, captions, scene cuts, ...
+|-- luts/
+|   `-- <name>.cube            <- LUT library: the editor's LUT panel and the agent share it
 `-- content/
     |-- <hash[0:2]>/<hash>/    <- content-addressable source dedup (reserved)
     |   |-- refs.json

@@ -15,7 +15,7 @@ import {
 } from './lib/contract.mjs'
 import { prepareJob, renderJob, startHarness } from './lib/render-core.mjs'
 import { PageSession } from './lib/page-session.mjs'
-import { collectAddClipMedia, resolveMediaFile } from './lib/workspace.mjs'
+import { collectEditResources, resolveMediaFile } from './lib/workspace.mjs'
 import {
   acquireWriterLock,
   assertAtomicReplace,
@@ -230,7 +230,7 @@ async function run(argv = process.argv.slice(2)) {
         const edited = await page.evaluate((payload) => window.freecut.editProject(payload), {
           project: current.project,
           ops: body.ops,
-          media: collectAddClipMedia(workspace, body.ops),
+          ...collectEditResources(workspace, body.ops, current.project),
         })
         if (!body.persist) return edited
         return {

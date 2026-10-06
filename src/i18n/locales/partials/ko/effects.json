@@ -237,6 +237,11 @@
     "importTooltip": ".cube 3D LUT 파일을 불러옵니다",
     "importFailed": "이 .cube 파일을 읽을 수 없습니다",
     "intensity": "강도",
-    "unsupportedBrowser": "LUT 가져오기에는 Chromium 기반 브라우저가 필요합니다"
+    "unsupportedBrowser": "LUT 가져오기에는 Chromium 기반 브라우저가 필요합니다",
+    "library": "라이브러리",
+    "libraryPlaceholder": "LUT 선택",
+    "libraryEmpty": "라이브러리에 아직 LUT가 없습니다",
+    "libraryTooltip": "작업 공간의 luts 폴더에 저장된 LUT입니다. 가져온 .cube 파일은 자동으로 추가됩니다.",
+    "libraryReadFailed": "라이브러리에서 이 LUT를 읽을 수 없습니다"
   }
 }
