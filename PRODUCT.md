@@ -1,5 +1,7 @@
 # Product
 
+> **Note:** Shreditor is built on [FreeCut](https://github.com/walterlow/freecut). This document describes the editor it inherits from FreeCut. For Shreditor itself, see the [README](README.md).
+
 ## Register
 
 product
