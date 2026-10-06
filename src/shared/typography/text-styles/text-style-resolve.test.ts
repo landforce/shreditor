@@ -96,21 +96,34 @@ describe('buildApplyTextStyleUpdates', () => {
       title,
       VERTICAL,
     )
-    expect(updates).toMatchObject({ textStyleId: 'big-title', formatRole: 'title', color: '#ffffff' })
+    expect(updates).toMatchObject({
+      textStyleId: 'big-title',
+      formatRole: 'title',
+      color: '#ffffff',
+    })
     expect(updates.textStyleOverrides).toBeUndefined()
     expect(updates.textStylePresetId).toBeUndefined()
   })
 
   it('keeps a format role the item already has', () => {
-    expect(buildApplyTextStyleUpdates(textItem({ formatRole: 'labels' }), title, VERTICAL).formatRole)
-      .toBe('labels')
+    expect(
+      buildApplyTextStyleUpdates(textItem({ formatRole: 'labels' }), title, VERTICAL).formatRole,
+    ).toBe('labels')
   })
 })
 
 describe('overrides and differences', () => {
   it('reports styled fields an edit changed, never the text', () => {
-    const before = textItem({ ...resolveTextStyleUpdates(title, VERTICAL), textStyleId: 'big-title' })
-    const after = { ...before, text: 'Changed', color: '#00ff00', transform: { ...before.transform, y: 10 } }
+    const before = textItem({
+      ...resolveTextStyleUpdates(title, VERTICAL),
+      textStyleId: 'big-title',
+    })
+    const after = {
+      ...before,
+      text: 'Changed',
+      color: '#00ff00',
+      transform: { ...before.transform, y: 10 },
+    }
     expect(changedTextStyleFields(before, after, getTextStyleControlledKeys(title))).toEqual([
       'color',
       'transform.y',

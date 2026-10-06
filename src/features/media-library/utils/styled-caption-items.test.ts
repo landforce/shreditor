@@ -57,7 +57,12 @@ const build = (rules: TextStyleDefinition['caption'], clipOverrides: Partial<Vid
 
 describe('buildStyledCaptionItems', () => {
   it('chunks by the word limit and makes linked caption items', () => {
-    const items = build({ maxWordsPerChunk: 3, maxCharsPerLine: 40, maxLines: 1, minChunkFrames: 0 })
+    const items = build({
+      maxWordsPerChunk: 3,
+      maxCharsPerLine: 40,
+      maxLines: 1,
+      minChunkFrames: 0,
+    })
     expect(items.map((item) => item.text)).toEqual([
       'one two three',
       'four five six',
@@ -77,7 +82,12 @@ describe('buildStyledCaptionItems', () => {
   })
 
   it('wraps lines and never exceeds the line limit', () => {
-    const items = build({ maxWordsPerChunk: 10, maxCharsPerLine: 10, maxLines: 2, minChunkFrames: 0 })
+    const items = build({
+      maxWordsPerChunk: 10,
+      maxCharsPerLine: 10,
+      maxLines: 2,
+      minChunkFrames: 0,
+    })
     for (const item of items) {
       const lines = item.text.split('\n')
       expect(lines.length).toBeLessThanOrEqual(2)
@@ -99,12 +109,19 @@ describe('buildStyledCaptionItems', () => {
   })
 
   it('holds short chunks for the minimum without overlapping the next', () => {
-    const items = build({ maxWordsPerChunk: 1, maxCharsPerLine: 40, maxLines: 1, minChunkFrames: 20 })
+    const items = build({
+      maxWordsPerChunk: 1,
+      maxCharsPerLine: 40,
+      maxLines: 1,
+      minChunkFrames: 20,
+    })
     expect(items).toHaveLength(12)
     items.forEach((item, index) => {
       const next = items[index + 1]
       if (next) expect(item.from + item.durationInFrames).toBeLessThanOrEqual(next.from)
-      expect(item.durationInFrames).toBeGreaterThanOrEqual(next ? Math.min(20, next.from - item.from) : 1)
+      expect(item.durationInFrames).toBeGreaterThanOrEqual(
+        next ? Math.min(20, next.from - item.from) : 1,
+      )
     })
     expect(items[0]?.durationInFrames).toBe(15)
   })

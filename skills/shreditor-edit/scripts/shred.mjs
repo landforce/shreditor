@@ -1326,7 +1326,9 @@ const commands = {
   async styles([sub, ...rest]) {
     const run = stylesCommands({ say, opt, workspace, getProject, applyBatch })[sub ?? 'list']
     if (!run)
-      throw new Error('Usage: shred styles list|show|use|save|import|export|remove (see shred help)')
+      throw new Error(
+        'Usage: shred styles list|show|use|save|import|export|remove (see shred help)',
+      )
     await run(rest)
   },
 

@@ -62,7 +62,12 @@ describe('text style actions', () => {
   it('applies a style: copies it into the project and links the items', () => {
     seedThreeStyledTitles()
     expect(useProjectTextStylesStore.getState().styles.map((s) => s.id)).toEqual(['title'])
-    expect(item('a')).toMatchObject({ textStyleId: 'title', color: '#ffffff', fontSize: 100, formatRole: 'title' })
+    expect(item('a')).toMatchObject({
+      textStyleId: 'title',
+      color: '#ffffff',
+      fontSize: 100,
+      formatRole: 'title',
+    })
     expect(item('a').transform?.y).toBe(-480)
   })
 
@@ -76,11 +81,20 @@ describe('text style actions', () => {
     expect(item('a').textStyleOverrides).toBeUndefined()
 
     const updated = upsertProjectTextStyle(
-      { ...titleStyle, style: { ...titleStyle.style, color: '#ffd400', fontSize: 140 }, layout: { yRatio: 0.1 }, version: 2 },
+      {
+        ...titleStyle,
+        style: { ...titleStyle.style, color: '#ffd400', fontSize: 140 },
+        layout: { yRatio: 0.1 },
+        version: 2,
+      },
       CANVAS,
     )
     expect(updated.sort()).toEqual(['a', 'b', 'c'])
-    expect(item('a')).toMatchObject({ color: '#ffd400', fontSize: 140, text: 'Only the words changed' })
+    expect(item('a')).toMatchObject({
+      color: '#ffd400',
+      fontSize: 140,
+      text: 'Only the words changed',
+    })
     expect(item('a').transform?.y).toBe(192)
     expect(item('b')).toMatchObject({ color: '#00ff00', fontSize: 140 })
     expect(item('c').transform?.y).toBe(300)
@@ -89,7 +103,10 @@ describe('text style actions', () => {
 
   it('undoes a style edit and its propagation as one step', () => {
     seedThreeStyledTitles()
-    upsertProjectTextStyle({ ...titleStyle, style: { ...titleStyle.style, fontSize: 150 }, version: 2 }, CANVAS)
+    upsertProjectTextStyle(
+      { ...titleStyle, style: { ...titleStyle.style, fontSize: 150 }, version: 2 },
+      CANVAS,
+    )
     expect(item('a').fontSize).toBe(150)
     useTimelineCommandStore.getState().undo()
     expect(item('a').fontSize).toBe(100)

@@ -86,7 +86,9 @@ export function stylesCommands({ say, opt, workspace, getProject, applyBatch }) 
         : sameStyle(source, style)
           ? 'same as library'
           : `differs from library v${source.version} (shred styles use ${id} ${style.id} takes the library's)`
-      say(`  ${style.id.padEnd(22)} ${style.role.padEnd(11)} v${style.version}  ${used} item(s)  ${state}`)
+      say(
+        `  ${style.id.padEnd(22)} ${style.role.padEnd(11)} v${style.version}  ${used} item(s)  ${state}`,
+      )
     }
   }
 
@@ -96,9 +98,13 @@ export function stylesCommands({ say, opt, workspace, getProject, applyBatch }) 
       const styles = library()
       if (opt.json) return say(JSON.stringify(styles, null, 2))
       if (!styles.length)
-        return say('The text style library is empty (shred styles import <kit.json>, or save one from an item).')
+        return say(
+          'The text style library is empty (shred styles import <kit.json>, or save one from an item).',
+        )
       for (const style of styles)
-        say(`${style.id.padEnd(22)} ${style.role.padEnd(11)} v${style.version}  ${style.name}  (${summary(style)})`)
+        say(
+          `${style.id.padEnd(22)} ${style.role.padEnd(11)} v${style.version}  ${style.name}  (${summary(style)})`,
+        )
     },
 
     async show([name]) {
@@ -115,15 +121,23 @@ export function stylesCommands({ say, opt, workspace, getProject, applyBatch }) 
       if (!id || !names.length) throw new Error('Usage: shred styles use <projectId> <name|id...>')
       const styles = names.map(libraryStyle)
       const { revision } = await getProject(id)
-      const res = await applyBatch(id, styles.map((style) => ({ op: 'upsertTextStyle', style })), revision)
+      const res = await applyBatch(
+        id,
+        styles.map((style) => ({ op: 'upsertTextStyle', style })),
+        revision,
+      )
       for (const result of res.results ?? [])
-        say(`  ${result.detail.styleId} v${result.detail.version}: restyled ${result.detail.updatedItems.length} item(s)`)
+        say(
+          `  ${result.detail.styleId} v${result.detail.version}: restyled ${result.detail.updatedItems.length} item(s)`,
+        )
     },
 
     /** Save an item's look as a style, in the project (linking the item) and the library. */
     async save([id, itemId]) {
       if (!id || !itemId || !opt.name || !opt.role)
-        throw new Error('Usage: shred styles save <projectId> <itemId> --name "..." --role title|caption|label|lower-third|other')
+        throw new Error(
+          'Usage: shred styles save <projectId> <itemId> --name "..." --role title|caption|label|lower-third|other',
+        )
       const { revision } = await getProject(id)
       const res = await applyBatch(
         id,
@@ -140,13 +154,21 @@ export function stylesCommands({ say, opt, workspace, getProject, applyBatch }) 
       if (!file) throw new Error('Usage: shred styles import <pack.json>')
       const pack = readPack(file)
       const before = new Set(library().map((style) => style.id))
-      const styles = updateTextStyleLibrary(workspace(), (current) => mergeStyles(current, pack.styles))
+      const styles = updateTextStyleLibrary(workspace(), (current) =>
+        mergeStyles(current, pack.styles),
+      )
       const touched = styles.filter((style) =>
-        pack.styles.some((p) => p.id === style.id || p.name.toLowerCase() === style.name.toLowerCase()),
+        pack.styles.some(
+          (p) => p.id === style.id || p.name.toLowerCase() === style.name.toLowerCase(),
+        ),
       )
       for (const style of touched)
-        say(`  ${before.has(style.id) ? 'updated' : 'added  '} ${style.id} (${style.role}) v${style.version}`)
-      say(`${pack.name ? `${pack.name}: ` : ''}${touched.length} style(s) in the library. Use them in a project: shred styles use <projectId> <name...>`)
+        say(
+          `  ${before.has(style.id) ? 'updated' : 'added  '} ${style.id} (${style.role}) v${style.version}`,
+        )
+      say(
+        `${pack.name ? `${pack.name}: ` : ''}${touched.length} style(s) in the library. Use them in a project: shred styles use <projectId> <name...>`,
+      )
     },
 
     async export(names) {

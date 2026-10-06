@@ -30,7 +30,10 @@ export function StyledTextTemplates({ onAdd }: { onAdd: (style: TextStyleDefinit
             type="button"
             onClick={() => onAdd(style)}
             className="truncate rounded-md border border-border bg-secondary/30 px-2 py-2 text-[11px] transition-colors hover:border-primary/50 hover:bg-secondary/50"
-            style={{ fontFamily: style.style.fontFamily, fontWeight: style.style.fontWeight === 'bold' ? 700 : undefined }}
+            style={{
+              fontFamily: style.style.fontFamily,
+              fontWeight: style.style.fontWeight === 'bold' ? 700 : undefined,
+            }}
             title={style.description ?? style.name}
           >
             {style.name}

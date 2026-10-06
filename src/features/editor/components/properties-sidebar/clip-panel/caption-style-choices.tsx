@@ -20,7 +20,12 @@ interface CaptionStyleChoicesProps {
  * caption presets. Caption text items are linked to the style; subtitle
  * segments take a copy of its look.
  */
-export function CaptionStyleChoices({ items, canvasWidth, canvasHeight, onApplyPatch }: CaptionStyleChoicesProps) {
+export function CaptionStyleChoices({
+  items,
+  canvasWidth,
+  canvasHeight,
+  onApplyPatch,
+}: CaptionStyleChoicesProps) {
   const { t } = useTranslation()
   const projectStyles = useProjectTextStylesStore((s) => s.styles)
   const libraryStyles = useLibraryTextStylesStore((s) => s.styles)
@@ -37,7 +42,11 @@ export function CaptionStyleChoices({ items, canvasWidth, canvasHeight, onApplyP
     const textIds = items.filter((item) => item.type === 'text').map((item) => item.id)
     if (textIds.length > 0) applyTextStyleToItems(textIds, style, canvas)
     if (items.some((item) => item.type !== 'text')) {
-      const { textMotion: _motion, textSpans: _spans, ...look } = resolveTextStyleUpdates(style, canvas, {
+      const {
+        textMotion: _motion,
+        textSpans: _spans,
+        ...look
+      } = resolveTextStyleUpdates(style, canvas, {
         baseTransform: items[0]?.transform,
       })
       onApplyPatch(look as Partial<SubtitleSegmentItem>)

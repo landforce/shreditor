@@ -7,7 +7,16 @@ import { convertTimelineForBundle, restoreTimelineFromBundle } from './bundle-ti
 
 const timeline: ProjectTimeline = {
   tracks: [
-    { id: 't', name: 'V1', height: 80, locked: false, visible: true, muted: false, solo: false, order: 0 },
+    {
+      id: 't',
+      name: 'V1',
+      height: 80,
+      locked: false,
+      visible: true,
+      muted: false,
+      solo: false,
+      order: 0,
+    },
   ],
   items: [
     {
@@ -28,7 +37,11 @@ const timeline: ProjectTimeline = {
       id: 'kit-title',
       name: 'Kit title',
       role: 'title',
-      style: { fontFamily: 'Anton', fontSize: 120, stroke: { width: 3, color: '#000', join: 'miter' } },
+      style: {
+        fontFamily: 'Anton',
+        fontSize: 120,
+        stroke: { width: 3, color: '#000', join: 'miter' },
+      },
       layout: { yRatio: -0.3 },
       caption: { maxWordsPerChunk: 3, maxCharsPerLine: 20, maxLines: 2, minChunkFrames: 10 },
       version: 2,
@@ -55,7 +68,10 @@ describe('text styles in project bundles', () => {
       new Map(),
     )
     expect(restored?.textStyles).toEqual(timeline.textStyles)
-    expect(restored?.items[0]).toMatchObject({ textStyleId: 'kit-title', textStyleOverrides: ['color'] })
+    expect(restored?.items[0]).toMatchObject({
+      textStyleId: 'kit-title',
+      textStyleOverrides: ['color'],
+    })
     expect(validateProject(project(restored)).success).toBe(true)
   })
 

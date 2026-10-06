@@ -120,8 +120,6 @@ const textStyleInputSchema = z
   })
   .strict()
 
-export type TextStyleInput = z.input<typeof textStyleInputSchema>
-
 function firstProblem(error: z.ZodError): string {
   const issue = error.issues[0]
   return `${issue?.path.join('.') || 'style'}: ${issue?.message ?? 'invalid'}`
@@ -160,7 +158,7 @@ function slugify(name: string): string {
 }
 
 /** A readable id from the name that no style in `taken` has. */
-export function uniqueTextStyleId(name: string, taken: ReadonlySet<string>): string {
+function uniqueTextStyleId(name: string, taken: ReadonlySet<string>): string {
   const base = slugify(name)
   if (!taken.has(base)) return base
   for (let n = 2; ; n++) {

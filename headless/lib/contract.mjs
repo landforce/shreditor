@@ -274,7 +274,13 @@ const opSchemas = [
       ),
     })
     .strict(),
-  z.object({ op: z.literal('applyTextStyle'), ids: z.array(id).min(1), styleId: z.string().min(1) }).strict(),
+  z
+    .object({
+      op: z.literal('applyTextStyle'),
+      ids: z.array(id).min(1),
+      styleId: z.string().min(1),
+    })
+    .strict(),
   z.union([
     z.object({ op: z.literal('upsertTextStyle'), style: textStyleInputSchema }).strict(),
     z
@@ -283,7 +289,10 @@ const opSchemas = [
         fromItemId: id,
         name: z.string().trim().min(1).max(80),
         role: z.enum(TEXT_STYLE_ROLES),
-        id: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/).optional(),
+        id: z
+          .string()
+          .regex(/^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/)
+          .optional(),
         description: z.string().max(500).optional(),
         caption: captionRulesSchema.optional(),
       })
@@ -356,8 +365,9 @@ function samplesDescription(name) {
     addLut: 'Add a gpu-lut effect from a .cube file in the workspace luts/ folder',
     setTransform: 'Update an item transform',
     applyTextStyle: 'Link text items to a text style and give them its look',
-    upsertTextStyle: "Add or replace a project text style (or save one from an item's look); restyles its items",
-    addCaptions: "Caption a clip from its transcript with a caption style, on the captions track",
+    upsertTextStyle:
+      "Add or replace a project text style (or save one from an item's look); restyles its items",
+    addCaptions: 'Caption a clip from its transcript with a caption style, on the captions track',
   }
   return descriptions[name]
 }

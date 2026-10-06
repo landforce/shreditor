@@ -17,7 +17,7 @@ import {
 } from './caption-chunking'
 
 /** Rules for a caption style that has none of its own. */
-export const DEFAULT_CAPTION_RULES: CaptionChunkRules = {
+const DEFAULT_CAPTION_RULES: CaptionChunkRules = {
   maxWordsPerChunk: DEFAULT_CAPTION_CHUNK_LIMITS.maxWords,
   maxCharsPerLine: DEFAULT_CAPTION_CHUNK_LIMITS.maxCharsPerLine,
   maxLines: 2,

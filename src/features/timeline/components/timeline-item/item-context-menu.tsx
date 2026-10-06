@@ -631,7 +631,7 @@ function CaptionActions({
           ) : (
             <ContextMenuItem onClick={onOpenCaptionDialog}>{captionActionLabel}</ContextMenuItem>
           )}
-          {styledCaptionClip && <StyledCaptionActions t={t} clip={styledCaptionClip} />}
+          <StyledCaptionActions t={t} clip={styledCaptionClip} />
           <ContextMenuSeparator />
         </>
       )}

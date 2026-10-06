@@ -41,11 +41,36 @@ describe('text style picker model', () => {
 
   it('makes a new style from an item and refuses a taken name', () => {
     const item = {
-      id: 'i', type: 'text', trackId: 't', from: 0, durationInFrames: 45, label: '', text: 'x', color: '#abc', fontSize: 72,
+      id: 'i',
+      type: 'text',
+      trackId: 't',
+      from: 0,
+      durationInFrames: 45,
+      label: '',
+      text: 'x',
+      color: '#abc',
+      fontSize: 72,
     } as TextItem
-    const made = newTextStyleFromItem(item, { name: 'Hook', role: 'title' }, { width: 1080, height: 1920 }, [])
-    expect(made).toMatchObject({ id: 'hook', role: 'title', defaultDurationFrames: 45, style: { color: '#abc', fontSize: 72 } })
-    expect(() => newTextStyleFromItem(item, { name: 'hook', role: 'title' }, { width: 1080, height: 1920 }, [made])).toThrow()
-    expect(duplicateTextStyle(made, 'Hook copy', [made])).toMatchObject({ id: 'hook-copy', version: 1 })
+    const made = newTextStyleFromItem(
+      item,
+      { name: 'Hook', role: 'title' },
+      { width: 1080, height: 1920 },
+      [],
+    )
+    expect(made).toMatchObject({
+      id: 'hook',
+      role: 'title',
+      defaultDurationFrames: 45,
+      style: { color: '#abc', fontSize: 72 },
+    })
+    expect(() =>
+      newTextStyleFromItem(item, { name: 'hook', role: 'title' }, { width: 1080, height: 1920 }, [
+        made,
+      ]),
+    ).toThrow()
+    expect(duplicateTextStyle(made, 'Hook copy', [made])).toMatchObject({
+      id: 'hook-copy',
+      version: 1,
+    })
   })
 })

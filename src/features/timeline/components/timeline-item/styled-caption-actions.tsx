@@ -24,51 +24,75 @@ import {
 type CaptionableClip = AudioItem | VideoItem
 
 const overlaps = (items: TimelineItem[], trackId: string, from: number, to: number) =>
-  items.some((item) => item.trackId === trackId && item.from < to && item.from + item.durationInFrames > from)
+  items.some(
+    (item) =>
+      item.trackId === trackId && item.from < to && item.from + item.durationInFrames > from,
+  )
 
-/** Caption a clip from its stored transcript with a caption style. Returns the caption count. */
-async function addStyledCaptions(clip: CaptionableClip, style: TextStyleDefinition): Promise<number> {
-  const transcript = clip.mediaId ? await mediaTranscriptionService.getTranscript(clip.mediaId) : null
-  if (!transcript) throw new Error('no-transcript')
+function projectCanvas(): { width: number; height: number } {
   const metadata = useProjectStore.getState().currentProject?.metadata
-  const canvas = {
+  return {
     width: metadata?.width ?? DEFAULT_PROJECT_WIDTH,
     height: metadata?.height ?? DEFAULT_PROJECT_HEIGHT,
   }
+}
+
+/** The clip's earlier styled captions: regenerating replaces them. */
+function previousStyledCaptions(items: TimelineItem[], clipId: string): string[] {
+  return items
+    .filter(
+      (item) => item.type === 'text' && item.captionSource?.clipId === clipId && item.textStyleId,
+    )
+    .map((item) => item.id)
+}
+
+/** The format's Captions track when it is free for the captions, else a new one above the clip. */
+function captionTrackFor(clip: CaptionableClip, captions: TextItem[], replaced: Set<string>) {
   const { items, tracks } = useItemsStore.getState()
-  const previous = items.filter(
-    (item): item is TextItem =>
-      item.type === 'text' && item.captionSource?.clipId === clip.id && Boolean(item.textStyleId),
+  const remaining = items.filter((item) => !replaced.has(item.id))
+  const from = captions[0]!.from
+  const to = Math.max(...captions.map((item) => item.from + item.durationInFrames))
+  const free = tracks.find(
+    (track) =>
+      track.formatRole === 'captions' && !track.locked && !overlaps(remaining, track.id, from, to),
   )
-  const remaining = items.filter((item) => !previous.includes(item as TextItem))
+  if (free) return { trackId: free.id, newTrack: null }
+  const clipOrder = tracks.find((track) => track.id === clip.trackId)?.order ?? 0
+  const newTrack = { ...buildCaptionTrackAbove(tracks, clipOrder), formatRole: 'captions' as const }
+  return { trackId: newTrack.id, newTrack }
+}
+
+/** Caption a clip from its stored transcript with a caption style. Returns the caption count. */
+async function addStyledCaptions(
+  clip: CaptionableClip,
+  style: TextStyleDefinition,
+): Promise<number> {
+  const transcript = clip.mediaId
+    ? await mediaTranscriptionService.getTranscript(clip.mediaId)
+    : null
+  if (!transcript) throw new Error('no-transcript')
   const built = buildStyledCaptionItems({
     clip,
     segments: transcript.segments,
     style,
     trackId: '',
     timelineFps: useTimelineSettingsStore.getState().fps,
-    canvas,
+    canvas: projectCanvas(),
   })
   if (built.length === 0) return 0
-  const from = built[0]!.from
-  const to = Math.max(...built.map((item) => item.from + item.durationInFrames))
-  const formatTrack = tracks.find(
-    (track) => track.formatRole === 'captions' && !track.locked && !overlaps(remaining, track.id, from, to),
-  )
-  const clipOrder = tracks.find((track) => track.id === clip.trackId)?.order ?? 0
-  const newTrack = formatTrack ? null : { ...buildCaptionTrackAbove(tracks, clipOrder), formatRole: 'captions' as const }
-  const trackId = formatTrack?.id ?? newTrack!.id
+  const replaced = previousStyledCaptions(useItemsStore.getState().items, clip.id)
+  const { trackId, newTrack } = captionTrackFor(clip, built, new Set(replaced))
   insertStyledCaptions(
     built.map((item) => ({ ...item, trackId })),
     style,
     newTrack,
-    previous.map((item) => item.id),
+    replaced,
   )
   return built.length
 }
 
 /** "Captions with a style" in a clip's context menu: the caption styles of the project and library. */
-export function StyledCaptionActions({ t, clip }: { t: TFunction; clip: CaptionableClip }) {
+export function StyledCaptionActions({ t, clip }: { t: TFunction; clip?: CaptionableClip }) {
   const projectStyles = useProjectTextStylesStore((s) => s.styles)
   const libraryStyles = useLibraryTextStylesStore((s) => s.styles)
   const styles = useMemo(() => {
@@ -78,6 +102,7 @@ export function StyledCaptionActions({ t, clip }: { t: TFunction; clip: Captiona
     )
   }, [libraryStyles, projectStyles])
 
+  if (!clip) return null
   const run = (style: TextStyleDefinition) =>
     addStyledCaptions(clip, style)
       .then((count) =>

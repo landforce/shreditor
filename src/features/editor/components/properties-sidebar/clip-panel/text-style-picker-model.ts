@@ -23,7 +23,10 @@ export interface PickerEntry {
 function suggestFirst(styles: readonly TextStyleDefinition[], formatRole?: string): PickerEntry[] {
   return styles
     .map((style) => ({ style, suggested: textStyleRoleMatchesFormatRole(style.role, formatRole) }))
-    .sort((a, b) => Number(b.suggested) - Number(a.suggested) || a.style.name.localeCompare(b.style.name))
+    .sort(
+      (a, b) =>
+        Number(b.suggested) - Number(a.suggested) || a.style.name.localeCompare(b.style.name),
+    )
 }
 
 export function buildTextStylePickerGroups(
@@ -42,7 +45,7 @@ export function buildTextStylePickerGroups(
 }
 
 /** Same definition, version and time aside. */
-export function sameTextStyle(a: TextStyleDefinition, b: TextStyleDefinition): boolean {
+function sameTextStyle(a: TextStyleDefinition, b: TextStyleDefinition): boolean {
   const strip = ({ version: _version, updatedAt: _updatedAt, ...rest }: TextStyleDefinition) =>
     stableJson(rest)
   return strip(a) === strip(b)

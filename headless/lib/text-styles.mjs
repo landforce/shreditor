@@ -5,7 +5,6 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { z } from 'zod'
-import { readStoredTranscript } from '../../server/transcription.mjs'
 
 export const TEXT_STYLE_ROLES = ['title', 'caption', 'label', 'lower-third', 'other']
 const styleId = z.string().regex(/^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/)
@@ -90,7 +89,7 @@ export const textStylePackSchema = z
   .strict()
 
 const LIBRARY = ['app', 'text-styles.json']
-export const libraryPath = (workspace) => path.join(workspace, ...LIBRARY)
+const libraryPath = (workspace) => path.join(workspace, ...LIBRARY)
 
 /** The library's styles (valid entries only; an unreadable file reads as empty). */
 export function readTextStyleLibrary(workspace) {
@@ -144,26 +143,33 @@ export function findStyle(styles, idOrName) {
  * replaces it and keeps that id, so projects stay linked; others are added.
  */
 export function mergeStyles(library, incoming, now = Date.now()) {
-  const next = [...library]
-  for (const style of incoming) {
-    const index = next.findIndex(
-      (entry) =>
-        entry.id === style.id || entry.name.toLowerCase() === style.name.trim().toLowerCase(),
-    )
-    const current = index >= 0 ? next[index] : null
-    const taken = new Set(next.map((entry) => entry.id))
-    let id = current?.id ?? style.id ?? slug(style.name)
-    for (let n = 2; !current && taken.has(id); n++) id = `${style.id ?? slug(style.name)}-${n}`
-    const merged = {
-      ...style,
-      id,
-      version: Math.max(style.version ?? 1, current ? current.version + 1 : 1),
-      updatedAt: now,
-    }
-    if (current) next[index] = merged
-    else next.push(merged)
+  return incoming.reduce(
+    (next, style) => mergeOne(next, { version: 1, ...style }, now),
+    [...library],
+  )
+}
+
+function mergeOne(styles, style, now) {
+  const index = styles.findIndex((entry) => sameIdentity(entry, style))
+  if (index < 0) {
+    return [
+      ...styles,
+      { ...style, id: freeId(style.id || slug(style.name), styles), updatedAt: now },
+    ]
   }
-  return next
+  const current = styles[index]
+  const version = Math.max(style.version, current.version + 1)
+  return styles.with(index, { ...style, id: current.id, version, updatedAt: now })
+}
+
+const sameIdentity = (entry, style) =>
+  entry.id === style.id || entry.name.toLowerCase() === style.name.trim().toLowerCase()
+
+function freeId(base, styles) {
+  const taken = new Set(styles.map((entry) => entry.id))
+  let id = base
+  for (let n = 2; taken.has(id); n++) id = `${base}-${n}`
+  return id
 }
 
 const STYLE_OPS = new Set(['addText', 'applyTextStyle', 'addCaptions'])
@@ -181,29 +187,53 @@ function libraryStylesFor(workspace, project, ops) {
   return [...new Map(wanted.map((style) => [style.id, style])).values()]
 }
 
+function timelineItems(project) {
+  const timeline = { items: [], compositions: [], ...project?.timeline }
+  return [...timeline.items, ...timeline.compositions.flatMap((c) => c.items ?? [])]
+}
+
 /** Media whose transcript addCaptions needs: the clip's, or any clip the batch adds. */
 function captionMediaIds(project, ops) {
   const captions = ops.filter((op) => op.op === 'addCaptions')
   if (captions.length === 0) return []
-  const items = [
-    ...(project?.timeline?.items ?? []),
-    ...(project?.timeline?.compositions ?? []).flatMap((c) => c.items ?? []),
-  ]
-  const ids = new Set()
-  for (const op of captions) {
-    const clip = typeof op.clipId === 'string' ? items.find((item) => item.id === op.clipId) : null
-    if (clip?.mediaId) ids.add(clip.mediaId)
-    else for (const add of ops) if (add.op === 'addClip' && add.mediaId) ids.add(add.mediaId)
+  const mediaByItem = new Map(timelineItems(project).map((item) => [item.id, item.mediaId]))
+  const added = ops.filter((op) => op.op === 'addClip').map((op) => op.mediaId)
+  // A clip the batch adds is referenced with $ref, so take every media the batch adds.
+  const ids = captions.flatMap((op) => mediaByItem.get(op.clipId) ?? added)
+  return [...new Set(ids.filter(Boolean))]
+}
+
+const MEDIA_ID = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/
+
+/**
+ * The built-in transcript's segments (media/<id>/cache/ai/transcript.json, see
+ * server/transcription.mjs; the older cache/transcript.json too), or null.
+ */
+function readTranscriptSegments(workspace, mediaId) {
+  if (!MEDIA_ID.test(mediaId)) return null
+  const dir = path.join(workspace, 'media', mediaId, 'cache')
+  const found = [path.join(dir, 'ai', 'transcript.json'), path.join(dir, 'transcript.json')]
+    .map(segmentsIn)
+    .find(Array.isArray)
+  return found ?? null
+}
+
+/** `segments` of a stored transcript file (an envelope's `data`, or a legacy bare one). */
+function segmentsIn(file) {
+  try {
+    const stored = JSON.parse(fs.readFileSync(file, 'utf8'))
+    return (stored.data ?? stored).segments
+  } catch {
+    return undefined
   }
-  return [...ids]
 }
 
 /** The extra edit input text style ops need, or {} when the batch has none. */
 export function collectTextStyleInput(workspace, project, ops) {
   const textStyleLibrary = libraryStylesFor(workspace, project, ops)
   const transcripts = captionMediaIds(project, ops).flatMap((mediaId) => {
-    const stored = readStoredTranscript(workspace, mediaId)
-    return stored?.data?.segments ? [{ mediaId, segments: stored.data.segments }] : []
+    const segments = readTranscriptSegments(workspace, mediaId)
+    return segments ? [{ mediaId, segments }] : []
   })
   return {
     ...(textStyleLibrary.length ? { textStyleLibrary } : {}),

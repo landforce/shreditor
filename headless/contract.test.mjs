@@ -82,7 +82,11 @@ const samples = {
     style: {
       name: 'Kit Title',
       role: 'title',
-      style: { fontFamily: 'Anton', fontSize: 120, stroke: { width: 3, color: '#000', join: 'miter' } },
+      style: {
+        fontFamily: 'Anton',
+        fontSize: 120,
+        stroke: { width: 3, color: '#000', join: 'miter' },
+      },
       layout: { yRatio: -0.3, widthRatio: 0.9 },
       defaultDurationFrames: 75,
     },
@@ -102,7 +106,10 @@ test('text style ops validate styles at the wire', () => {
     { ...style, role: 'heading' },
     { ...style, style: { fontWeight: 'black' } },
     { ...style, style: { surprise: 1 } },
-    { ...style, caption: { maxWordsPerChunk: 0, maxCharsPerLine: 20, maxLines: 1, minChunkFrames: 0 } },
+    {
+      ...style,
+      caption: { maxWordsPerChunk: 0, maxCharsPerLine: 20, maxLines: 1, minChunkFrames: 0 },
+    },
   ])
     assert.equal(editOpSchema.safeParse({ op: 'upsertTextStyle', style: bad }).success, false)
   assert.equal(editOpSchema.safeParse({ op: 'upsertTextStyle', name: 'x' }).success, false)

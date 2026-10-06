@@ -26,7 +26,11 @@ interface TextStylesManagerDialogProps {
 }
 
 /** Rename, duplicate and delete project styles; remove library styles. */
-export function TextStylesManagerDialog({ open, onOpenChange, canvas }: TextStylesManagerDialogProps) {
+export function TextStylesManagerDialog({
+  open,
+  onOpenChange,
+  canvas,
+}: TextStylesManagerDialogProps) {
   const { t } = useTranslation()
   const projectStyles = useProjectTextStylesStore((s) => s.styles)
   const libraryStyles = useLibraryTextStylesStore((s) => s.styles)
@@ -46,7 +50,12 @@ export function TextStylesManagerDialog({ open, onOpenChange, canvas }: TextStyl
             <p className="text-xs text-muted-foreground">{t('textStyles.empty')}</p>
           ) : (
             projectStyles.map((style) => (
-              <ProjectStyleRow key={style.id} style={style} usedBy={usedBy(style.id)} canvas={canvas} />
+              <ProjectStyleRow
+                key={style.id}
+                style={style}
+                usedBy={usedBy(style.id)}
+                canvas={canvas}
+              />
             ))
           )}
         </div>
@@ -61,7 +70,9 @@ export function TextStylesManagerDialog({ open, onOpenChange, canvas }: TextStyl
               <div key={style.id} className="flex items-center justify-between gap-2 text-xs">
                 <span className="truncate">
                   {style.name}
-                  <span className="ml-1 text-muted-foreground">· {t(roleLabelKey(style.role))}</span>
+                  <span className="ml-1 text-muted-foreground">
+                    · {t(roleLabelKey(style.role))}
+                  </span>
                 </span>
                 <Button
                   variant="ghost"
@@ -99,7 +110,10 @@ function ProjectStyleRow({
   const rename = () => {
     const next = name.trim()
     if (!next || next === style.name) return setName(style.name)
-    upsertProjectTextStyle({ ...style, name: next, version: style.version + 1, updatedAt: Date.now() }, canvas)
+    upsertProjectTextStyle(
+      { ...style, name: next, version: style.version + 1, updatedAt: Date.now() },
+      canvas,
+    )
   }
   const duplicate = () => {
     const styles = useProjectTextStylesStore.getState().styles

@@ -26,7 +26,7 @@ interface StyleCanvas {
 }
 
 /** Look fields every style controls (a field a style leaves out is cleared). */
-export const TEXT_STYLE_LOOK_KEYS = [
+const TEXT_STYLE_LOOK_KEYS = [
   'fontSize',
   'fontFamily',
   'fontWeight',
@@ -74,7 +74,7 @@ const FORMAT_ROLE_BY_STYLE_ROLE: Record<TextStyleRole, FormatRole | undefined> =
   other: undefined,
 }
 
-export function formatRoleForTextStyle(role: TextStyleRole): FormatRole | undefined {
+function formatRoleForTextStyle(role: TextStyleRole): FormatRole | undefined {
   return FORMAT_ROLE_BY_STYLE_ROLE[role]
 }
 
@@ -88,14 +88,15 @@ function round2(value: number): number {
 }
 
 /** Reference pixels -> canvas pixels (and back with `1 / scale`). */
-export function textStyleScaleFor(canvas: StyleCanvas): number {
+function textStyleScaleFor(canvas: StyleCanvas): number {
   return Math.min(canvas.width, canvas.height) / TEXT_STYLE_REFERENCE_SIZE
 }
 
 /** Scale every length field of a look; everything else is copied as is. */
 function scaleLook(look: TextStyleLook, scale: number): TextStyleLook {
   const scaled: TextStyleLook = { ...look }
-  const len = (value: number | undefined) => (value === undefined ? undefined : round2(value * scale))
+  const len = (value: number | undefined) =>
+    value === undefined ? undefined : round2(value * scale)
   if (look.fontSize !== undefined) scaled.fontSize = len(look.fontSize)
   if (look.letterSpacing !== undefined) scaled.letterSpacing = len(look.letterSpacing)
   if (look.textPadding !== undefined) scaled.textPadding = len(look.textPadding)
@@ -223,49 +224,38 @@ export function buildApplyTextStyleUpdates(
   }
 }
 
+const isObject = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null
+
+function sameObject(left: Record<string, unknown>, right: Record<string, unknown>): boolean {
+  const keys = new Set([...Object.keys(left), ...Object.keys(right)])
+  return [...keys].every((key) => sameValue(left[key], right[key]))
+}
+
+/** Deep equality where numbers match within 0.01 px. */
 function sameValue(left: unknown, right: unknown): boolean {
   if (typeof left === 'number' && typeof right === 'number') return Math.abs(left - right) < 0.01
-  if (left === right) return true
-  if (!left || !right || typeof left !== 'object' || typeof right !== 'object') {
-    return left === undefined ? right === undefined : false
-  }
-  const keys = new Set([...Object.keys(left), ...Object.keys(right)])
-  for (const key of keys) {
-    if (
-      !sameValue(
-        (left as Record<string, unknown>)[key],
-        (right as Record<string, unknown>)[key],
-      )
-    ) {
-      return false
-    }
-  }
-  return true
+  if (isObject(left) && isObject(right)) return sameObject(left, right)
+  return left === right
 }
 
 function spanStylesOf(spans: readonly TextSpan[] | undefined): SpanStyle[] {
   return (spans ?? []).map(pickSpanStyle)
 }
 
+const TRANSFORM_FIELD = Object.fromEntries(
+  LAYOUT_AXES.map((axis) => [axis.key, axis.field]),
+) as Record<string, keyof TransformProperties>
+
 /** Read one controlled field off an item, in the shape the comparisons use. */
 function readControlledField(
   item: Pick<TextItem, 'transform' | 'textSpans' | 'textMotion'> & TextStyleFields,
   key: TextStyleFieldKey,
 ): unknown {
-  switch (key) {
-    case 'transform.x':
-      return item.transform?.x
-    case 'transform.y':
-      return item.transform?.y
-    case 'transform.width':
-      return item.transform?.width
-    case 'transform.height':
-      return item.transform?.height
-    case 'textSpans':
-      return spanStylesOf(item.textSpans)
-    default:
-      return (item as Record<string, unknown>)[key]
-  }
+  const transformField = TRANSFORM_FIELD[key]
+  if (transformField) return item.transform?.[transformField]
+  if (key === 'textSpans') return spanStylesOf(item.textSpans)
+  return (item as Record<string, unknown>)[key]
 }
 
 /**
@@ -318,7 +308,8 @@ function deriveLayout(
   const layout: TextStyleLayout = {}
   for (const axis of LAYOUT_AXES) {
     const value = transform[axis.field]
-    if (typeof value === 'number') layout[axis.ratio] = round2(value / canvas[axis.basis] * 1000) / 1000
+    if (typeof value === 'number')
+      layout[axis.ratio] = round2((value / canvas[axis.basis]) * 1000) / 1000
   }
   return Object.keys(layout).length > 0 ? layout : undefined
 }

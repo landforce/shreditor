@@ -63,22 +63,24 @@ function fitsText(words: readonly Word[], limits: CaptionChunkLimits): boolean {
   return wrapCaptionLines(texts, limits.maxCharsPerLine).length <= limits.maxLines
 }
 
+/** Adding `next` would take the chunk past a word, text or time limit. */
+function wouldOverflow(current: Word[], next: Word, limits: CaptionChunkLimits): boolean {
+  return (
+    current.length >= limits.maxWords ||
+    !fitsText([...current, next], limits) ||
+    next.end - current[0]!.start > limits.maxSeconds
+  )
+}
+
 function shouldBreak(current: Word[], next: Word, limits: CaptionChunkLimits): boolean {
-  const first = current[0]
   const previous = current.at(-1)
-  if (!first || !previous) return false
-  const longEnough = current.length >= limits.minWords
-  if (longEnough && next.start - previous.end >= limits.breakGapSeconds) return true
-  if (
-    longEnough &&
-    (current.length >= limits.maxWords ||
-      !fitsText([...current, next], limits) ||
-      next.end - first.start > limits.maxSeconds)
-  ) {
-    return true
+  if (!previous) return false
+  if (current.length >= limits.minWords) {
+    if (next.start - previous.end >= limits.breakGapSeconds) return true
+    if (wouldOverflow(current, next, limits)) return true
   }
   return (
-    previous.end - first.start >= limits.preferredSeconds &&
+    previous.end - current[0]!.start >= limits.preferredSeconds &&
     SENTENCE_END_PATTERN.test(previous.text)
   )
 }

@@ -456,7 +456,10 @@ const cases = [
     op: { op: 'applyTextStyle', ids: ['text-1'], styleId: 'Kit Title' },
     input: { textStyleLibrary: [KIT_TITLE] },
     assert: (project) => {
-      assert.deepEqual(project.timeline.textStyles.map((style) => style.id), ['kit-title'])
+      assert.deepEqual(
+        project.timeline.textStyles.map((style) => style.id),
+        ['kit-title'],
+      )
       assert.deepEqual(
         [item(project, 'text-1')?.textStyleId, item(project, 'text-1')?.fontFamily],
         ['kit-title', 'Anton'],
@@ -468,7 +471,10 @@ const cases = [
     name: 'upsertTextStyle',
     ops: [
       { op: 'applyTextStyle', ids: ['text-1'], styleId: 'kit-title' },
-      { op: 'upsertTextStyle', style: { ...KIT_TITLE, style: { ...KIT_TITLE.style, color: '#00e5ff' } } },
+      {
+        op: 'upsertTextStyle',
+        style: { ...KIT_TITLE, style: { ...KIT_TITLE.style, color: '#00e5ff' } },
+      },
     ],
     op: { op: 'upsertTextStyle', style: KIT_TITLE },
     input: { textStyleLibrary: [KIT_TITLE] },
@@ -503,7 +509,9 @@ const cases = [
       ],
     },
     assert: (project) => {
-      const captions = project.timeline.items.filter((candidate) => candidate.textRole === 'caption')
+      const captions = project.timeline.items.filter(
+        (candidate) => candidate.textRole === 'caption',
+      )
       assert.deepEqual(
         captions.map((caption) => [caption.text, caption.textStyleId, caption.formatRole]),
         [['styles you reuse', 'kit-title', 'captions']],

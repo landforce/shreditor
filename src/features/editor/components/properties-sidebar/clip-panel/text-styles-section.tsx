@@ -63,7 +63,8 @@ export function TextStylesSection({ items, canvas }: TextStylesSectionProps) {
     ? (first?.textStyleId ?? '')
     : MIXED
   const style = projectStyles.find((entry) => entry.id === sharedStyleId)
-  const formatRole = first?.formatRole ?? tracks.find((track) => track.id === first?.trackId)?.formatRole
+  const formatRole =
+    first?.formatRole ?? tracks.find((track) => track.id === first?.trackId)?.formatRole
   const groups = useMemo(
     () => buildTextStylePickerGroups(projectStyles, libraryStyles, formatRole),
     [formatRole, libraryStyles, projectStyles],
@@ -95,12 +96,22 @@ export function TextStylesSection({ items, canvas }: TextStylesSectionProps) {
         <Select value={style ? `project:${style.id}` : ''} onValueChange={pick}>
           <SelectTrigger className="h-7 w-full text-xs" aria-label={t('textStyles.section')}>
             <SelectValue
-              placeholder={sharedStyleId === MIXED ? t('textStyles.mixed') : t('textStyles.placeholder')}
+              placeholder={
+                sharedStyleId === MIXED ? t('textStyles.mixed') : t('textStyles.placeholder')
+              }
             />
           </SelectTrigger>
           <SelectContent>
-            <StyleGroup label={t('textStyles.groupProject')} kind="project" entries={groups.project} />
-            <StyleGroup label={t('textStyles.groupLibrary')} kind="library" entries={groups.library} />
+            <StyleGroup
+              label={t('textStyles.groupProject')}
+              kind="project"
+              entries={groups.project}
+            />
+            <StyleGroup
+              label={t('textStyles.groupLibrary')}
+              kind="library"
+              entries={groups.library}
+            />
             <SelectGroup>
               <SelectLabel className="text-[10px]">{t('textStyles.groupPresets')}</SelectLabel>
               {TEXT_STYLE_PRESETS.map((preset) => (
@@ -115,7 +126,12 @@ export function TextStylesSection({ items, canvas }: TextStylesSectionProps) {
           <LinkedStyleControls item={first} ids={ids} style={style} canvas={canvas} />
         ) : null}
         <SaveStyleForm item={first} ids={ids} canvas={canvas} />
-        <Button variant="ghost" size="sm" className="h-7 text-[11px]" onClick={() => setManaging(true)}>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-7 text-[11px]"
+          onClick={() => setManaging(true)}
+        >
           {t('textStyles.manage')}
         </Button>
       </div>
@@ -177,7 +193,10 @@ function LinkedStyleControls({
       .catch(() => toast.error(t('textStyles.libraryWriteFailed')))
 
   return (
-    <div className="space-y-1.5 rounded-md border border-border/70 p-2" data-testid="text-style-status">
+    <div
+      className="space-y-1.5 rounded-md border border-border/70 p-2"
+      data-testid="text-style-status"
+    >
       <div className="flex items-center justify-between gap-2 text-[11px]">
         <span className="truncate">{t('textStyles.linked', { name: style.name })}</span>
         {differences.length > 0 ? (
@@ -189,7 +208,9 @@ function LinkedStyleControls({
             {t('textStyles.differs', { count: differences.length })}
           </span>
         ) : (
-          <span className="shrink-0 text-[10px] text-muted-foreground">{t('textStyles.matches')}</span>
+          <span className="shrink-0 text-[10px] text-muted-foreground">
+            {t('textStyles.matches')}
+          </span>
         )}
       </div>
       <div className="grid grid-cols-2 gap-1.5">
@@ -207,11 +228,18 @@ function LinkedStyleControls({
           size="sm"
           className="h-7 text-[11px]"
           disabled={differences.length === 0}
-          onClick={() => saveTextStyleFromItems(textStyleUpdatedFromItem(style, item, canvas), [item.id], canvas)}
+          onClick={() =>
+            saveTextStyleFromItems(textStyleUpdatedFromItem(style, item, canvas), [item.id], canvas)
+          }
         >
           {t('textStyles.updateStyle')}
         </Button>
-        <Button variant="ghost" size="sm" className="h-7 text-[11px]" onClick={() => detachItemsFromTextStyle(ids, canvas)}>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-7 text-[11px]"
+          onClick={() => detachItemsFromTextStyle(ids, canvas)}
+        >
           {t('textStyles.detach')}
         </Button>
         {libraryState === 'same' ? (
@@ -219,7 +247,12 @@ function LinkedStyleControls({
             {t('textStyles.librarySame')}
           </span>
         ) : (
-          <Button variant="ghost" size="sm" className="h-7 text-[11px]" onClick={() => void saveToLibrary()}>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 text-[11px]"
+            onClick={() => void saveToLibrary()}
+          >
             {t('textStyles.saveToLibrary')}
           </Button>
         )}
@@ -230,7 +263,10 @@ function LinkedStyleControls({
           size="sm"
           className="h-7 w-full text-[11px]"
           onClick={() =>
-            upsertProjectTextStyle({ ...librarySource, version: Math.max(librarySource.version, style.version + 1) }, canvas)
+            upsertProjectTextStyle(
+              { ...librarySource, version: Math.max(librarySource.version, style.version + 1) },
+              canvas,
+            )
           }
         >
           {t('textStyles.updateFromLibrary', { version: librarySource.version })}
@@ -241,7 +277,15 @@ function LinkedStyleControls({
 }
 
 /** "Save as new style": a name and a role, then the items use the new style. */
-function SaveStyleForm({ item, ids, canvas }: { item: TextItem; ids: string[]; canvas: CanvasSettings }) {
+function SaveStyleForm({
+  item,
+  ids,
+  canvas,
+}: {
+  item: TextItem
+  ids: string[]
+  canvas: CanvasSettings
+}) {
   const { t } = useTranslation()
   const [open, setOpen] = useState(false)
   const [name, setName] = useState('')
@@ -249,7 +293,12 @@ function SaveStyleForm({ item, ids, canvas }: { item: TextItem; ids: string[]; c
 
   const save = () => {
     try {
-      const style = newTextStyleFromItem(item, { name: name.trim(), role }, canvas, useProjectTextStylesStore.getState().styles)
+      const style = newTextStyleFromItem(
+        item,
+        { name: name.trim(), role },
+        canvas,
+        useProjectTextStylesStore.getState().styles,
+      )
       saveTextStyleFromItems(style, ids, canvas)
       setOpen(false)
       setName('')
@@ -291,7 +340,12 @@ function SaveStyleForm({ item, ids, canvas }: { item: TextItem; ids: string[]; c
         </SelectContent>
       </Select>
       <div className="grid grid-cols-2 gap-1.5">
-        <Button variant="ghost" size="sm" className="h-7 text-[11px]" onClick={() => setOpen(false)}>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-7 text-[11px]"
+          onClick={() => setOpen(false)}
+        >
           {t('textStyles.cancel')}
         </Button>
         <Button size="sm" className="h-7 text-[11px]" disabled={!name.trim()} onClick={save}>

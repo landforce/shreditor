@@ -13,7 +13,14 @@ import {
 } from './lib/text-styles.mjs'
 import { collectEditResources } from './lib/workspace.mjs'
 
-const title = { id: 'kit-title', name: 'Kit Title', role: 'title', style: { fontSize: 120 }, version: 1, updatedAt: 1 }
+const title = {
+  id: 'kit-title',
+  name: 'Kit Title',
+  role: 'title',
+  style: { fontSize: 120 },
+  version: 1,
+  updatedAt: 1,
+}
 
 function workspace() {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'shred-styles-'))
@@ -29,7 +36,10 @@ test('the library is written atomically and re-read on every change', () => {
     onDisk.styles.push({ ...title, id: 'other', name: 'Other' })
     fs.writeFileSync(file, JSON.stringify(onDisk))
     updateTextStyleLibrary(root, (styles) => styles.filter((style) => style.id !== 'kit-title'))
-    assert.deepEqual(readTextStyleLibrary(root).map((style) => style.id), ['other'])
+    assert.deepEqual(
+      readTextStyleLibrary(root).map((style) => style.id),
+      ['other'],
+    )
     assert.deepEqual(fs.readdirSync(path.dirname(file)), ['text-styles.json'])
   } finally {
     fs.rmSync(root, { recursive: true, force: true })
@@ -54,8 +64,16 @@ test('merging a pack replaces by id or name, keeps ids and bumps versions', () =
     ],
   )
   assert.equal(findStyle(merged, 'KIT CAPTIONS')?.id, 'kit-captions')
-  assert.equal(textStylePackSchema.safeParse({ kind: 'shreditor-text-styles', version: 1, styles: [title] }).success, true)
-  assert.equal(textStylePackSchema.safeParse({ kind: 'shreditor-text-styles', version: 1, styles: [] }).success, false)
+  assert.equal(
+    textStylePackSchema.safeParse({ kind: 'shreditor-text-styles', version: 1, styles: [title] })
+      .success,
+    true,
+  )
+  assert.equal(
+    textStylePackSchema.safeParse({ kind: 'shreditor-text-styles', version: 1, styles: [] })
+      .success,
+    false,
+  )
 })
 
 test('style ops get the library styles they name and the clip transcripts', () => {
@@ -66,8 +84,13 @@ test('style ops get the library styles they name and the clip transcripts', () =
     const dir = path.join(root, 'media', mediaId, 'cache', 'ai')
     fs.mkdirSync(dir, { recursive: true })
     const segments = [{ text: 'hi', start: 0, end: 1, words: [{ text: 'hi', start: 0, end: 1 }] }]
-    fs.writeFileSync(path.join(dir, 'transcript.json'), JSON.stringify({ service: 'whisper.cpp', data: { segments } }))
-    const project = { timeline: { items: [{ id: 'clip', type: 'video', mediaId }], textStyles: [] } }
+    fs.writeFileSync(
+      path.join(dir, 'transcript.json'),
+      JSON.stringify({ service: 'whisper.cpp', data: { segments } }),
+    )
+    const project = {
+      timeline: { items: [{ id: 'clip', type: 'video', mediaId }], textStyles: [] },
+    }
     const ops = [
       { op: 'addText', text: 'x', styleId: 'Kit Title' },
       { op: 'addCaptions', clipId: 'clip', styleId: 'kit-title' },

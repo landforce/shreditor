@@ -51,8 +51,8 @@ export const useLibraryTextStylesStore = create<LibraryTextStylesState>()((set, 
         const stamp = await readTextStyleLibraryStamp()
         if (!options?.force && get().loaded && sameStamp(stamp, get().stamp)) return
         set({ styles: stamp ? await readTextStyleLibrary() : [], loaded: true, stamp })
-      } catch (error) {
-        getLog().warn('Failed to read the text style library', error)
+      } catch {
+        // No workspace open (yet), or the file is mid-write: the next poll retries.
       }
     },
     saveStyle: (style) =>

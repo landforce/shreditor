@@ -115,7 +115,14 @@ export function styleNewTextItem(item: TextItem, op: Op): TextItem {
   const style = resolveStyle(op.styleId)
   ensureInProject(style)
   const { width, height } = input.canvas
-  const base: TransformProperties = { x: 0, y: 0, width: width * 0.8, height: height * 0.3, rotation: 0, opacity: 1 }
+  const base: TransformProperties = {
+    x: 0,
+    y: 0,
+    width: width * 0.8,
+    height: height * 0.3,
+    rotation: 0,
+    opacity: 1,
+  }
   const explicit = EXPLICIT_TEXT_FIELDS.filter((key) => op[key] !== undefined)
   const styled: TextItem = {
     ...item,
@@ -133,7 +140,9 @@ export function styleNewTextItem(item: TextItem, op: Op): TextItem {
 }
 
 function applyTextStyleOp(op: Op): unknown {
-  const ids = Array.isArray(op.ids) ? op.ids.filter((id): id is string => typeof id === 'string') : []
+  const ids = Array.isArray(op.ids)
+    ? op.ids.filter((id): id is string => typeof id === 'string')
+    : []
   if (ids.length === 0) throw new Error('applyTextStyle requires non-empty `ids`')
   const style = resolveStyle(op.styleId)
   for (const id of ids) {
@@ -167,7 +176,16 @@ function upsertTextStyleOp(op: Op): unknown {
     fromItemId ? styleInputFromItem(op) : op.style,
     projectStyles(),
   )
-  const probe = { id: 'probe', type: 'text', trackId: 't', from: 0, durationInFrames: 1, label: '', text: '', color: '#fff' } as TextItem
+  const probe = {
+    id: 'probe',
+    type: 'text',
+    trackId: 't',
+    from: 0,
+    durationInFrames: 1,
+    label: '',
+    text: '',
+    color: '#fff',
+  } as TextItem
   assertValidItem({ ...probe, ...buildApplyTextStyleUpdates(probe, style, input.canvas) }, 'style')
   const updatedItems = fromItemId
     ? saveTextStyleFromItems(style, [fromItemId], input.canvas)
@@ -188,42 +206,67 @@ function captionTrackFor(op: Op, clip: TimelineItem): string {
   const formatTrack = tracks.find((track) => track.formatRole === 'captions' && !track.isGroup)
   if (formatTrack) return formatTrack.id
   const clipOrder = tracks.find((track) => track.id === clip.trackId)?.order ?? 0
-  const created: TimelineTrack = { ...buildCaptionTrackAbove(tracks, clipOrder), formatRole: 'captions' }
+  const created: TimelineTrack = {
+    ...buildCaptionTrackAbove(tracks, clipOrder),
+    formatRole: 'captions',
+  }
   setTracks([...tracks, created])
   return created.id
 }
 
-function addCaptionsOp(op: Op, context: OverlapContext): unknown {
-  const clipId = str(op.clipId)
+type CaptionClip = Extract<TimelineItem, { type: 'video' | 'audio' }>
+
+function requireCaptionClip(clipId: string | undefined): CaptionClip {
   if (!clipId) throw new Error('addCaptions requires `clipId`')
   const clip = useItemsStore.getState().itemById[clipId]
   if (!clip) throw new Error(`clipId: item "${clipId}" does not exist`)
   if ((clip.type !== 'video' && clip.type !== 'audio') || !clip.mediaId) {
-    throw new Error(`clipId: item "${clipId}" is ${clip.type}; captions come from a video or audio clip`)
-  }
-  const transcript = input.transcripts?.find((entry) => entry.mediaId === clip.mediaId)
-  if (!transcript) {
     throw new Error(
-      `addCaptions: media "${clip.mediaId}" has no transcript yet (shred transcribe ${clip.mediaId}, then retry)`,
+      `clipId: item "${clipId}" is ${clip.type}; captions come from a video or audio clip`,
     )
   }
+  return clip
+}
+
+function transcriptOf(mediaId: string): MediaTranscriptSegment[] {
+  const transcript = input.transcripts?.find((entry) => entry.mediaId === mediaId)
+  if (!transcript) {
+    throw new Error(
+      `addCaptions: media "${mediaId}" has no transcript yet (shred transcribe ${mediaId}, then retry)`,
+    )
+  }
+  return transcript.segments
+}
+
+/** `replace: true`: remove the captions made from this clip's transcript before. */
+function removePreviousCaptions(clipId: string): void {
+  const previous = findGeneratedCaptionItemsForClip(
+    useItemsStore.getState().items,
+    clipId,
+    'transcript',
+  )
+  if (previous.length > 0) removeItems(previous.map((item) => item.id))
+}
+
+function addCaptionsOp(op: Op, context: OverlapContext): unknown {
+  const clip = requireCaptionClip(str(op.clipId))
+  const segments = transcriptOf(clip.mediaId!)
   const style = resolveStyle(op.styleId)
   ensureInProject(style)
-  if (op.replace === true) {
-    const previous = findGeneratedCaptionItemsForClip(useItemsStore.getState().items, clip.id, 'transcript')
-    if (previous.length > 0) removeItems(previous.map((item) => item.id))
-  }
+  if (op.replace === true) removePreviousCaptions(clip.id)
   const trackId = captionTrackFor(op, clip)
   const items = buildStyledCaptionItems({
     clip,
-    segments: transcript.segments,
+    segments,
     style,
     trackId,
     timelineFps: useTimelineSettingsStore.getState().fps || 30,
     canvas: input.canvas,
   })
   if (items.length === 0) {
-    throw new Error(`addCaptions: no speech in the transcript of "${clip.mediaId}" within clip "${clip.id}"'s source range`)
+    throw new Error(
+      `addCaptions: no speech in the transcript of "${clip.mediaId}" within clip "${clip.id}"'s source range`,
+    )
   }
   for (const item of items) {
     assertValidItem(item, 'styleId')

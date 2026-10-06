@@ -29,14 +29,12 @@ import {
   useCompositionNavigationStore,
   useCompositionsStore,
   useTimelineStore,
-  upsertProjectTextStyle,
 } from '@/features/editor/deps/timeline-store'
 import { usePlaybackStore } from '@/shared/state/playback'
 import { useSelectionStore } from '@/shared/state/selection'
-import { useProjectTextStylesStore } from '@/shared/state/text-styles'
-import { buildApplyTextStyleUpdates } from '@/shared/typography/text-styles/text-style-resolve'
 import type { TextStyleDefinition } from '@/types/text-style'
 import { StyledTextTemplates } from './styled-text-templates'
+import { ensureTextStyleInProject, withTextStyle } from './styled-text-item'
 import { useProjectStore } from '@/features/editor/deps/projects'
 import { DEFAULT_PROJECT_HEIGHT, DEFAULT_PROJECT_WIDTH } from '@/shared/projects/defaults'
 import {
@@ -423,20 +421,10 @@ export const MediaSidebar = memo(function MediaSidebar() {
         textStylePresetId: presetId,
       })
       const canvas = { width: canvasWidth, height: canvasHeight }
-      const styledItem: TextItem = style
-        ? {
-            ...textItem,
-            ...buildApplyTextStyleUpdates(textItem, style, canvas),
-            label: style.name,
-            durationInFrames: style.defaultDurationFrames ?? textItem.durationInFrames,
-          }
-        : textItem
+      const styledItem = withTextStyle(textItem, style, canvas)
 
       addItemOnNewTrack(styledItem, newTrack.tracks)
-      // A library style is copied into the project on first use.
-      if (style && !useProjectTextStylesStore.getState().styles.some((s) => s.id === style.id)) {
-        upsertProjectTextStyle(style, canvas)
-      }
+      ensureTextStyleInProject(style, canvas)
       setActiveTrack(newTrack.trackId)
       selectItems([textItem.id])
     },
