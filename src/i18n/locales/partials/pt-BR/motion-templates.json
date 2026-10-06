@@ -1,0 +1,43 @@
+{
+  "motionTemplates": {
+    "tabLabel": "Modelos",
+    "saveAsTemplate": "Salvar como modelo…",
+    "search": "Buscar modelos",
+    "refresh": "Recarregar a biblioteca",
+    "category": "Categoria",
+    "allCategories": "Todas as categorias",
+    "empty": "Ainda não há modelos de motion graphics. Clique com o botão direito em um clipe composto (ou uma seleção) e escolha Salvar como modelo.",
+    "noMatches": "Nenhum modelo corresponde.",
+    "insert": "Inserir {{name}}",
+    "insertHint": "Clique para inserir no cursor de reprodução ou arraste para a linha do tempo",
+    "mediaMissingBadge": "Mídia ausente",
+    "missingMedia": "Não é possível inserir \"{{name}}\": este espaço de trabalho não tem {{files}}. Importe primeiro o pacote de modelos ou esses arquivos.",
+    "outdated": "Este projeto usa a versão {{projectVersion}} de \"{{name}}\"; a biblioteca tem a versão {{libraryVersion}}.",
+    "update": "Atualizar para a mais recente",
+    "updateFrom": "Atualizar da v{{version}}",
+    "updated": "\"{{name}}\" atualizado para a versão {{version}} ({{count}} na linha do tempo).",
+    "upToDate": "\"{{name}}\" já está na versão mais recente.",
+    "droppedControls": "Estes controles não existem mais, então seus valores foram descartados: {{names}}",
+    "saveTitle": "Salvar como modelo",
+    "saveDescription": "Salvo na biblioteca de modelos deste espaço de trabalho, para qualquer projeto reutilizar.",
+    "name": "Nome",
+    "newVersionHint": "Já existe um modelo chamado \"{{name}}\": isto salva a versão {{version}} dele.",
+    "role": "Papel no formato",
+    "noRole": "Nenhum",
+    "controls": "Campos editáveis",
+    "controlsHint": "Ative os textos e cores que cada instância pode mudar e dê nomes a eles.",
+    "noCandidates": "Nada nesta composição pode ser exposto (adicione uma camada de texto ou forma).",
+    "cancel": "Cancelar",
+    "save": "Salvar modelo",
+    "saveNewVersion": "Salvar nova versão",
+    "saved": "\"{{name}}\" salvo (versão {{version}}).",
+    "categories": {
+      "lower-third": "Terço inferior",
+      "title": "Título",
+      "callout": "Destaque",
+      "transition": "Transição",
+      "overlay": "Sobreposição",
+      "other": "Outro"
+    }
+  }
+}

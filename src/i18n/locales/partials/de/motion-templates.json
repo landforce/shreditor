@@ -1,0 +1,43 @@
+{
+  "motionTemplates": {
+    "tabLabel": "Vorlagen",
+    "saveAsTemplate": "Als Vorlage speichern…",
+    "search": "Vorlagen suchen",
+    "refresh": "Bibliothek neu laden",
+    "category": "Kategorie",
+    "allCategories": "Alle Kategorien",
+    "empty": "Noch keine Motion-Graphics-Vorlagen. Klicke mit der rechten Maustaste auf einen verschachtelten Clip (oder eine Auswahl) und wähle Als Vorlage speichern.",
+    "noMatches": "Keine Vorlage passt.",
+    "insert": "{{name}} einfügen",
+    "insertHint": "Klicken, um am Abspielkopf einzufügen, oder auf die Timeline ziehen",
+    "mediaMissingBadge": "Medien fehlen",
+    "missingMedia": "„{{name}}“ kann nicht eingefügt werden: In diesem Arbeitsbereich fehlt {{files}}. Importiere zuerst das Vorlagenpaket oder diese Dateien.",
+    "outdated": "Dieses Projekt nutzt Version {{projectVersion}} von „{{name}}“; die Bibliothek hat Version {{libraryVersion}}.",
+    "update": "Auf neueste aktualisieren",
+    "updateFrom": "Von v{{version}} aktualisieren",
+    "updated": "„{{name}}“ auf Version {{version}} aktualisiert ({{count}} in der Timeline).",
+    "upToDate": "„{{name}}“ ist bereits die neueste Version.",
+    "droppedControls": "Diese Steuerelemente gibt es nicht mehr, ihre Werte wurden verworfen: {{names}}",
+    "saveTitle": "Als Vorlage speichern",
+    "saveDescription": "Wird in der Vorlagenbibliothek dieses Arbeitsbereichs gespeichert, damit jedes Projekt sie nutzen kann.",
+    "name": "Name",
+    "newVersionHint": "Eine Vorlage namens „{{name}}“ existiert: Dies speichert ihre Version {{version}}.",
+    "role": "Formatrolle",
+    "noRole": "Keine",
+    "controls": "Bearbeitbare Felder",
+    "controlsHint": "Aktiviere die Texte und Farben, die jede Instanz ändern kann, und benenne sie.",
+    "noCandidates": "In dieser Komposition gibt es nichts freizugeben (füge eine Text- oder Formebene hinzu).",
+    "cancel": "Abbrechen",
+    "save": "Vorlage speichern",
+    "saveNewVersion": "Neue Version speichern",
+    "saved": "„{{name}}“ gespeichert (Version {{version}}).",
+    "categories": {
+      "lower-third": "Bauchbinde",
+      "title": "Titel",
+      "callout": "Hinweis",
+      "transition": "Übergang",
+      "overlay": "Overlay",
+      "other": "Sonstiges"
+    }
+  }
+}

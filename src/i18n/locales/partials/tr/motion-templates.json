@@ -1,0 +1,43 @@
+{
+  "motionTemplates": {
+    "tabLabel": "Şablonlar",
+    "saveAsTemplate": "Şablon olarak kaydet…",
+    "search": "Şablon ara",
+    "refresh": "Kitaplığı yeniden yükle",
+    "category": "Kategori",
+    "allCategories": "Tüm kategoriler",
+    "empty": "Henüz hareketli grafik şablonu yok. Bir bileşik klibe (veya bir seçime) sağ tıklayıp Şablon olarak kaydet'i seçin.",
+    "noMatches": "Eşleşen şablon yok.",
+    "insert": "{{name}} ekle",
+    "insertHint": "Oynatma kafasına eklemek için tıklayın veya zaman çizelgesine sürükleyin",
+    "mediaMissingBadge": "Medya eksik",
+    "missingMedia": "\"{{name}}\" eklenemiyor: bu çalışma alanında {{files}} yok. Önce şablon paketini veya bu dosyaları içe aktarın.",
+    "outdated": "Bu proje \"{{name}}\" şablonunun {{projectVersion}}. sürümünü kullanıyor; kitaplıkta {{libraryVersion}}. sürüm var.",
+    "update": "En son sürüme güncelle",
+    "updateFrom": "v{{version}} sürümünden güncelle",
+    "updated": "\"{{name}}\" {{version}}. sürüme güncellendi (zaman çizelgesinde {{count}}).",
+    "upToDate": "\"{{name}}\" zaten en son sürümde.",
+    "droppedControls": "Bu denetimler artık yok, bu yüzden değerleri atıldı: {{names}}",
+    "saveTitle": "Şablon olarak kaydet",
+    "saveDescription": "Bu çalışma alanının şablon kitaplığına kaydedilir, böylece her proje yeniden kullanabilir.",
+    "name": "Ad",
+    "newVersionHint": "\"{{name}}\" adlı bir şablon var: bu, onun {{version}}. sürümünü kaydeder.",
+    "role": "Format rolü",
+    "noRole": "Yok",
+    "controls": "Düzenlenebilir alanlar",
+    "controlsHint": "Her örneğin değiştirebileceği metinleri ve renkleri açın ve adlandırın.",
+    "noCandidates": "Bu kompozisyonda açılabilecek bir şey yok (bir metin veya şekil katmanı ekleyin).",
+    "cancel": "İptal",
+    "save": "Şablonu kaydet",
+    "saveNewVersion": "Yeni sürümü kaydet",
+    "saved": "\"{{name}}\" kaydedildi (sürüm {{version}}).",
+    "categories": {
+      "lower-third": "Alt bant",
+      "title": "Başlık",
+      "callout": "Vurgu",
+      "transition": "Geçiş",
+      "overlay": "Kaplama",
+      "other": "Diğer"
+    }
+  }
+}

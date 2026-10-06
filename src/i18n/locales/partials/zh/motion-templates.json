@@ -1,0 +1,43 @@
+{
+  "motionTemplates": {
+    "tabLabel": "模板",
+    "saveAsTemplate": "另存为模板…",
+    "search": "搜索模板",
+    "refresh": "重新加载模板库",
+    "category": "类别",
+    "allCategories": "所有类别",
+    "empty": "还没有动态图形模板。右键单击复合片段（或一组选中的项目），选择“另存为模板”。",
+    "noMatches": "没有匹配的模板。",
+    "insert": "插入 {{name}}",
+    "insertHint": "单击在播放头处插入，或拖到时间线上",
+    "mediaMissingBadge": "缺少媒体",
+    "missingMedia": "无法插入“{{name}}”：此工作区缺少 {{files}}。请先导入模板包或这些文件。",
+    "outdated": "此项目使用“{{name}}”的版本 {{projectVersion}}；模板库中是版本 {{libraryVersion}}。",
+    "update": "更新到最新版本",
+    "updateFrom": "从 v{{version}} 更新",
+    "updated": "已将“{{name}}”更新到版本 {{version}}（时间线上有 {{count}} 个）。",
+    "upToDate": "“{{name}}”已是最新版本。",
+    "droppedControls": "这些控件已不存在，其值已被丢弃：{{names}}",
+    "saveTitle": "另存为模板",
+    "saveDescription": "保存到此工作区的模板库，任何项目都可以重复使用。",
+    "name": "名称",
+    "newVersionHint": "已有名为“{{name}}”的模板：这将保存为它的版本 {{version}}。",
+    "role": "格式角色",
+    "noRole": "无",
+    "controls": "可编辑字段",
+    "controlsHint": "打开每个实例可以修改的文字和颜色，并为它们命名。",
+    "noCandidates": "此合成中没有可公开的内容（请添加文字或形状图层）。",
+    "cancel": "取消",
+    "save": "保存模板",
+    "saveNewVersion": "保存新版本",
+    "saved": "已保存“{{name}}”（版本 {{version}}）。",
+    "categories": {
+      "lower-third": "下三分之一字幕",
+      "title": "标题",
+      "callout": "标注",
+      "transition": "转场",
+      "overlay": "叠加",
+      "other": "其他"
+    }
+  }
+}

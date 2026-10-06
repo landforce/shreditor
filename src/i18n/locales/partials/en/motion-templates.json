@@ -1,0 +1,43 @@
+{
+  "motionTemplates": {
+    "tabLabel": "Templates",
+    "saveAsTemplate": "Save as Template…",
+    "search": "Search templates",
+    "refresh": "Reload the library",
+    "category": "Category",
+    "allCategories": "All categories",
+    "empty": "No motion templates yet. Right-click a compound clip (or a selection) and choose Save as Template.",
+    "noMatches": "No templates match.",
+    "insert": "Insert {{name}}",
+    "insertHint": "Click to insert at the playhead, or drag onto the timeline",
+    "mediaMissingBadge": "Media missing",
+    "missingMedia": "Can't insert \"{{name}}\": this workspace is missing {{files}}. Import the template pack or those files first.",
+    "outdated": "This project uses version {{projectVersion}} of \"{{name}}\"; the library has version {{libraryVersion}}.",
+    "update": "Update to latest",
+    "updateFrom": "Update from v{{version}}",
+    "updated": "Updated \"{{name}}\" to version {{version}} ({{count}} on the timeline).",
+    "upToDate": "\"{{name}}\" is already the latest version.",
+    "droppedControls": "These controls no longer exist, so their values were dropped: {{names}}",
+    "saveTitle": "Save as template",
+    "saveDescription": "Saved to this workspace's template library, so every project can reuse it.",
+    "name": "Name",
+    "newVersionHint": "A template named \"{{name}}\" exists: this saves version {{version}} of it.",
+    "role": "Format role",
+    "noRole": "None",
+    "controls": "Editable fields",
+    "controlsHint": "Turn on the text and colours each instance can change, and name them.",
+    "noCandidates": "Nothing in this composition can be exposed (add a text or shape layer).",
+    "cancel": "Cancel",
+    "save": "Save template",
+    "saveNewVersion": "Save new version",
+    "saved": "Saved \"{{name}}\" (version {{version}}).",
+    "categories": {
+      "lower-third": "Lower third",
+      "title": "Title",
+      "callout": "Callout",
+      "transition": "Transition",
+      "overlay": "Overlay",
+      "other": "Other"
+    }
+  }
+}
