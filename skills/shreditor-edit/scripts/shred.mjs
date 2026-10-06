@@ -6,11 +6,14 @@
 //                                        and the agent service (8787)
 //   shred start                          start only the agent edit service
 //   shred status                         editor, service, workspace and writer-lock state
-//   shred catalog <folder|file...> --name <slug> [--no-transcribe] [--no-proxies]
-//                                        probe, contact-sheet, transcribe, and make playable proxies
+//   shred catalog <folder|file...> --name <slug> [--no-transcribe]
+//                                        probe, contact-sheet and transcribe (import makes working copies)
 //   shred new --name "..." [--size 1080x1920] [--fps 30]   create a project; prints id and editor URL
 //   shred project <id>                   timeline summary (tracks, items, frames)
-//   shred import <file...> --project <id> [--category <c>]   bring footage in (clone/link in place)
+//   shred import <file...> --project <id> [--category <c>] [--no-wait]
+//                                        bring footage in (clone/link in place); video Chrome can't
+//                                        decode gets a playable working copy, and import waits for it
+//   shred media <mediaId...> [--wait] [--retry] [--json]   working-copy state (ready/preparing NN%/failed)
 //   shred categorize <mediaId>=<category>... | --category <c> <mediaId>...
 //                                        set what each media is for; the editor groups by it
 //   shred draft <id>                     copy a project to a private draft; prints the draft id
@@ -34,6 +37,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { parseArgs } from 'node:util'
 import { fileURLToPath } from 'node:url'
+import { compatibilityPolicy } from '../../../server/media-compatibility.mjs'
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..')
 const SERVICE = process.env.SHRED_SERVICE || 'http://127.0.0.1:8787'
@@ -58,7 +62,9 @@ const { values: opt, positionals } = parseArgs({
     name: { type: 'string' },
     fps: { type: 'string', default: '30' },
     'no-transcribe': { type: 'boolean' },
-    'no-proxies': { type: 'boolean' },
+    'no-wait': { type: 'boolean' },
+    wait: { type: 'boolean' },
+    retry: { type: 'boolean' },
     label: { type: 'string' },
     summary: { type: 'string' },
     link: { type: 'boolean' },
@@ -349,12 +355,12 @@ const commands = {
       const base = slug(path.basename(file))
       let probe
       try {
-        probe = JSON.parse(execFileSync('ffprobe', ['-v', 'error', '-show_entries', 'format=duration:stream=codec_type,codec_name,width,height,r_frame_rate,pix_fmt', '-of', 'json', file], { encoding: 'utf8' }))
+        probe = JSON.parse(execFileSync('ffprobe', ['-v', 'error', '-show_format', '-show_streams', '-of', 'json', file], { encoding: 'utf8', maxBuffer: 16 * 1024 * 1024 }))
       } catch {
         entries.push({ file, error: 'ffprobe could not read it' })
         continue
       }
-      const v = probe.streams.find((x) => x.codec_type === 'video')
+      const v = probe.streams.find((x) => x.codec_type === 'video' && !x.disposition?.attached_pic)
       const a = probe.streams.find((x) => x.codec_type === 'audio')
       const duration = Number(probe.format?.duration ?? 0)
       const [fn, fd] = (v?.r_frame_rate ?? '0/1').split('/').map(Number)
@@ -365,7 +371,17 @@ const commands = {
         duration: Math.round(duration * 1000) / 1000,
         ...(v ? { width: v.width, height: v.height, fps: fd ? Math.round((fn / fd) * 1000) / 1000 : 0, codec: v.codec_name, alpha: /^(yuva|rgba|argb|bgra|abgr|gbrap|ya)/.test(v.pix_fmt ?? '') } : {}),
         ...(a ? { audio: a.codec_name } : {}),
-        browserPlayable: !v || isStill || ['h264', 'hevc', 'vp9', 'av1', 'vp8'].includes(v.codec_name),
+        browserPlayable: true,
+      }
+      // The decision import makes (server/media-compatibility.mjs): what Chrome
+      // can't decode as it is gets a working copy automatically when imported.
+      if (v && !isStill) {
+        try {
+          const plan = compatibilityPolicy(probe)
+          if (plan) Object.assign(entry, { browserPlayable: false, workingCopy: `${plan.action}: ${plan.detail}` })
+        } catch (error) {
+          Object.assign(entry, { browserPlayable: false, workingCopy: `none: ${error.message}` })
+        }
       }
       if (v) {
         const sheet = path.join(dir, 'sheets', `${base}.jpg`)
@@ -374,23 +390,6 @@ const commands = {
           execFileSync('ffmpeg', ['-v', 'error', '-y', '-i', file, '-vf', vf, '-frames:v', '1', sheet])
           entry.sheet = sheet
         } catch {}
-      }
-      // Browsers can't decode ProRes, PNG-codec .mov and similar: make a playable copy.
-      // Transparent clips become VP9 WebM with alpha so they stay separate layers.
-      if (v && !isStill && !entry.browserPlayable && !opt['no-proxies']) {
-        const proxyDir = path.join(dir, 'proxies')
-        fs.mkdirSync(proxyDir, { recursive: true })
-        const even = 'scale=trunc(iw/2)*2:trunc(ih/2)*2'
-        const proxy = path.join(proxyDir, `${base}.${entry.alpha ? 'webm' : 'mp4'}`)
-        const args = entry.alpha
-          ? ['-c:v', 'libvpx-vp9', '-pix_fmt', 'yuva420p', '-b:v', '0', '-crf', '20', '-row-mt', '1', '-auto-alt-ref', '0', ...(a ? ['-c:a', 'libopus', '-b:a', '160k'] : ['-an'])]
-          : ['-c:v', 'libx264', '-crf', '16', '-preset', 'medium', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', ...(a ? ['-c:a', 'aac', '-b:a', '256k'] : ['-an'])]
-        try {
-          execFileSync('ffmpeg', ['-v', 'error', '-y', '-i', file, '-vf', even, ...args, proxy])
-          entry.proxy = proxy
-        } catch {
-          entry.proxyError = 'ffmpeg could not make a playable copy'
-        }
       }
       if (transcribe && a && duration > 1) {
         const wav = path.join(os.tmpdir(), `shred-${crypto.randomUUID()}.wav`)
@@ -415,13 +414,13 @@ const commands = {
         }
       }
       entries.push(entry)
-      say(`${entry.kind.padEnd(5)} ${String(entry.duration).padStart(7)}s  ${path.basename(file)}${entry.browserPlayable ? '' : entry.proxy ? `  → proxy ${path.basename(entry.proxy)}${entry.alpha ? ' (alpha)' : ''}` : '  (not playable; no proxy made)'}${entry.speechNote ? '  (no speech)' : ''}${entry.speech ? `  "${entry.speech.slice(0, 60)}…"` : ''}`)
+      say(`${entry.kind.padEnd(5)} ${String(entry.duration).padStart(7)}s  ${path.basename(file)}${entry.browserPlayable ? '' : `  (import makes a working copy: ${entry.workingCopy})`}${entry.speechNote ? '  (no speech)' : ''}${entry.speech ? `  "${entry.speech.slice(0, 60)}…"` : ''}`)
     }
     const out = path.join(dir, 'catalog.json')
     fs.writeFileSync(out, `${JSON.stringify({ name, createdAt: new Date().toISOString(), sources: inputs.map((p) => path.resolve(p)), entries }, null, 2)}\n`)
     say(`\n${entries.length} items → ${out}`)
     say(`Contact sheets in ${path.join(dir, 'sheets')}: open them and write what each shot shows into catalog.json ("content", "usable").`)
-    say('Import an entry\'s "proxy" instead of its file when it has one (originals are untouched).')
+    say('Import the original files: import makes a working copy automatically where browserPlayable is false (originals are untouched).')
   },
 
   async changes([id]) {
@@ -488,8 +487,16 @@ const commands = {
   async import(files) {
     if (!files.length) throw new Error('Pass one or more file paths')
     const cli = path.join(REPO, 'bin/shreditor.mjs')
-    const out = execFileSync(process.execPath, [cli, 'import', ...files, ...(opt.project ? ['--project', opt.project] : []), ...(opt.link ? ['--link'] : []), ...(opt.category ? ['--category', opt.category] : [])], { encoding: 'utf8', env: { ...process.env, SHREDITOR_WORKSPACE: workspace() } })
-    say(out.trim())
+    // Streams progress while working copies are made (unless --no-wait).
+    const result = spawnSync(process.execPath, [cli, 'import', ...files, ...(opt.project ? ['--project', opt.project] : []), ...(opt.link ? ['--link'] : []), ...(opt.category ? ['--category', opt.category] : []), ...(opt['no-wait'] ? ['--no-wait'] : [])], { stdio: 'inherit', env: { ...process.env, SHREDITOR_WORKSPACE: workspace() } })
+    if (result.status) process.exitCode = result.status
+  },
+
+  async media(ids) {
+    if (!ids.length) throw new Error('Pass one or more media ids')
+    const cli = path.join(REPO, 'bin/shreditor.mjs')
+    const result = spawnSync(process.execPath, [cli, 'media', ...ids, ...(opt.wait ? ['--wait'] : []), ...(opt.retry ? ['--retry'] : []), ...(opt.json ? ['--json'] : [])], { stdio: 'inherit', env: { ...process.env, SHREDITOR_WORKSPACE: workspace() } })
+    if (result.status) process.exitCode = result.status
   },
 
   // Through the editor's bridge when it's up, else the same code in-process.

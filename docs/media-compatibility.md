@@ -1,100 +1,111 @@
 # Media compatibility
 
-Shreditor uses Mediabunny/WebCodecs and its registered ProRes WASM decoder first.
-The local bridge prepares a full-resolution derivative when a workspace import
-uses a video/audio codec outside the preparation policy's browser candidate list,
-or when a workspace frame decoder explicitly requests native recovery. This is
-an independent Shreditor implementation built on the system FFmpeg.
+Preview runs in Chrome and export runs in headless Chrome, so a clip works only
+if Chrome (or the editor's own ProRes WASM decoder) decodes it. Anything that
+decodes as it is is never converted. For the rest, the local bridge makes a
+full-resolution **working copy** with the system FFmpeg; the original is never
+modified. Implementation: `server/media-compatibility.mjs` (policy, FFmpeg,
+verification) and `server/media-preparation.mjs` (background jobs, state).
 
-## Integration
+## Decision table
 
-- `server/media-compatibility.mjs`: FFmpeg policy, bounded process queue, cached
-  derivatives, source validation, and output decode verification.
-- `POST /__shreditor/media/prepare`: `{ mediaId, force?: boolean }`. Resolves an
-  existing workspace original; it does not accept arbitrary executable arguments.
-  Returns `{ prepared: false }` or `{ prepared: true, url, alpha, cached }`.
-  Disconnecting the owning request aborts its subprocess. Other callers wait for
-  a shared job and retry if its owner cancelled it.
-- Native path import prepares known unsupported video inputs automatically.
-  In-place Finder import calls the same service before browser metadata extraction.
-- `readMediaSource` (browser) and `resolveMediaFile` (headless) both use the
-  derivative manifest. `resolveMediaFile(..., { original: true })` explicitly
-  accesses the original, including linked footage.
-- `VideoFrameExtractor` switches from default acceleration to software, then
-  hardware hints after recoverable errors, at most once per alternative per
-  session. If those fail, a registered workspace source can request native
-  preparation. Disposing cancels native preparation and rejects late frames.
-- Browser metadata probes DOM file playback separately from custom frame-decoder
-  support. A failed or absent probe is unknown, never assumed supported.
+Measured with Chrome 154 on macOS: `<video>` playback (preview) and the export
+path (mediabunny + WebCodecs), headless.
 
-## File and color policy
+| Input | Result |
+| --- | --- |
+| H.264 8/10-bit 4:2:0/4:2:2/4:4:4, HEVC 8/10-bit (incl. PQ/HLG, 4:2:2, 4:4:4), VP8, VP9 (incl. alpha, 4:4:4, 10-bit), AV1 8/10-bit in MOV/MP4/MKV/WebM with AAC/MP3/Opus/Vorbis/FLAC/PCM | kept |
+| ProRes (any) | kept, decoded by the editor's ProRes WASM decoder (never `<video>`) |
+| Playable video in AVI, MPEG-TS/PS, MXF, ... or with AC-3/E-AC-3/ALAC/DTS/MP2 audio | `rewrap`: video stream copied, audio copied or decoded to PCM (same rate, channels, sample precision). MOV, or MKV for VP8/VP9/AV1 |
+| Other video, 10-bit or HDR/BT.2020 (DNxHR HQX, 10-bit MPEG-2, ...) | `hevc`: HEVC Main10 CRF 12, chroma layout and colour tags kept; HDR stays HDR |
+| Other video, 8-bit (PNG/QTRLE `.mov`, MJPEG, MPEG-4 Part 2, DNxHD, ...) | `h264`: H.264 CRF 12, chroma kept (4:4:4 for RGB, converted with BT.709 and tagged) |
+| Other video with alpha (PNG/QTRLE with alpha, ...) | `prores-alpha`: ProRes 4444 (10-bit, 16-bit alpha) + PCM, decoded by the WASM decoder |
+| A decode failure in the browser (`force`) | same rules for any codec; a ProRes alpha source becomes `vp9-alpha` (8-bit 4:2:0, noted) |
 
-Original media stays untouched. Derivatives live at
-`media/<id>/cache/compatibility/<key>.mp4|mov`, with an atomically written manifest.
-The cache key includes canonical source path, byte size, modification time, policy,
-and policy version. It is not a content hash. Replacing a source while preserving
-all those attributes is not detected; remove its compatibility cache in that case.
+Off macOS only plain H.264/VP8/VP9/AV1 4:2:0 are assumed; 10-bit becomes 8-bit
+H.264 (noted) and HDR that needs conversion is refused with
+`HDR_POLICY_REQUIRED` rather than tone-mapped. Not verified on other platforms.
 
-Opaque conversion uses full-resolution H.264/yuv420p (CRF 16) and AAC. Odd dimensions
-are padded by at most one pixel. Transparent conversion uses ProRes 4444 with alpha
-and PCM audio, decoded in the browser through the existing ProRes extension.
-These are encoding conversions, not lossless copies. Preview and final export use
-the same full-resolution derivative; low-resolution scrub proxies are separate.
+Conversion details: timestamps passed through (`-copyts -start_at_zero`,
+`-fps_mode passthrough`, source timescale in MOV), no B-frames (reordering broke
+VFR sample durations), decoded frames relabelled with the stream's colour tags
+before filtering (some decoders mislabel; FFmpeg would otherwise convert
+matrices), primaries/transfer carried and never invented, odd sizes padded by
+one pixel only where chroma needs it (noted). A stream copy whose timestamps
+come out in decode order (packed B-frames in AVI) is re-encoded instead (noted).
+Only the first video and first audio stream are prepared.
 
-FFmpeg preserves variable frame timestamps and relative A/V offsets with
-`-copyts -start_at_zero` and `-fps_mode passthrough`. FFmpeg's normal autorotation
-applies during conversion. Only the first video and first optional audio stream
-are prepared. Alternate audio tracks and subtitle tracks are not imported by this
-component.
+## State, UI and CLI
 
-When native preparation would be needed for HDR or BT.2020 input, it returns
-`HDR_POLICY_REQUIRED`. It does not silently tone-map or label the source SDR.
-Direct browser HDR decoding retains the browser's existing limitations.
+`media/<id>/metadata.json` `compatibility`: `status` (`preparing` with
+`progress` 0..1, `ready`, `failed` with `error`), `action`, `detail`,
+`original` and `derivative` (codec, profile, pix_fmt, bit depth, chroma, size,
+fps, timebase, colour tags, audio), `settings`, `notes` (bit depth or chroma
+reductions, audio offset changes, padding), `verification` (frame counts,
+duration delta, A/V offset delta). When ready, the top-level codec/size/mimeType
+describe the working copy.
 
-## Limits and failures
+- Editor: the media card shows "Making playable copy… NN%", a failure with
+  Retry, and a working-copy badge whose tooltip says from → to. Preparing or
+  failed media can't be dragged or dropped onto the timeline. The pane updates
+  through `useProjectMediaWatcher`.
+- `shred import` waits with progress (`--no-wait` returns; a detached worker
+  continues). `shred media <id> [--wait] [--retry] [--json]`. `shred catalog`
+  reports `browserPlayable` and `workingCopy` from the same policy; it makes no
+  proxies.
+- Agent service: `addClip` on preparing/failed media fails with
+  `MEDIA_NOT_READY` (409).
+- Bridge routes: `media/import` (`wait`), `media/ingest` (editor in-place
+  import), `media/prepare` (waits; frame-decoder safety net), `media/retry`.
 
-- Requires local `ffmpeg` and `ffprobe`, including `libx264` and `prores_ks` for
-  the corresponding conversion. A missing tool/encoder is an explicit failure.
-- Native preparation: two active jobs, sixteen queued jobs, a thirty-minute
-  encode deadline, and thirty-second probe/verification deadlines.
-- Frame decode waits: ten seconds; timed-out frames are closed when they arrive.
-- Native recovery is available for registered workspace sources in the local
-  editor. A standalone browser-only deployment has no native service. Existing
-  OPFS/file-handle-only sources must be brought into workspace storage to use it.
-- The native policy's codec list identifies candidates, not universal support
-  for every profile/device. Actual frame production can still fail.
-- Existing preview decoder-pool limits and prewarm scheduling remain in place;
-  this change does not introduce a new global decoded-byte memory budget.
-- Broken files can fail import/preparation. Outputs are published only after a
-  successful encode, stream probe, and first-frame decode. This is not a proof
-  of decoding every frame on every target device.
+Jobs: two at a time per process, a per-media lock (`job.json`, pid + heartbeat)
+across processes; a job whose process died is resumed by the editor's media
+poll (at most every 10 s) or `shred media --wait`.
+
+## Files and cache
+
+Working copies live at `media/<id>/cache/compatibility/<key>.mov|mp4|mkv` with
+an atomically written `manifest.json` (version 2). The key covers source path,
+size, mtime and the plan; replacing a source while keeping all three is not
+detected. `readMediaSource` (browser) and `resolveMediaFile` (headless) use the
+manifest; `resolveMediaFile(..., { original: true })` reads the original.
+
+## Quality evidence
+
+`node scripts/media-compat-quality.mjs [--assets <file>...]` imports a fixture
+per class (and optionally real files, read-only, sha256-checked) and reports
+SSIM/PSNR (Y'CbCr 4:4:4 10-bit; RGB PSNR for RGB/alpha; alpha composited over
+grey), frames and duration delta. Last run (1920x1080 fixtures):
+
+| Class | SSIM | PSNR dB |
+| --- | --- | --- |
+| h264 from RGB PNG (P3 tags kept) | 0.99918 | 49.5 (RGB 44.3) |
+| h264 from MJPEG 4:2:2 full range | 0.99903 | 54.5 |
+| hevc from DNxHR HQX 10-bit / HDR PQ | 0.99982 | 60.1 |
+| prores-alpha from PNG alpha | 0.99949 | 58.1 (VP9 alpha: 0.98542 / 34.3) |
+| rewrap AC-3 MP4, TS + MP2 | decoded frames bit-identical | |
+| forced ProRes 422 HQ -> hevc | 0.99985 | 60.3 |
+| forced ProRes 4444 12-bit alpha -> vp9-alpha | 0.99794 | 56.2 |
+
+All with equal frame counts and zero duration delta (rewraps 6-11 ms of container
+rounding). Real files: a PNG-codec P3 graphic 0.99992 / 58.5 dB; a ProRes 422 HQ
+clip and a ProRes 4444 alpha clip are kept (their forced fallbacks measure
+0.99875 / 57.8 dB and 0.99983 / 61.0 dB).
+
+## Limits
+
+- Requires local `ffmpeg`/`ffprobe` with libx264, libx265, prores_ks, libvpx.
+- Encode deadline thirty minutes; sixteen queued jobs per process.
+- Drag-and-drop copies into the browser (not bridge in-place import) are not
+  prepared up front; the frame decoder's native fallback covers them.
+- Clips already on the timeline whose media is re-prepared keep their item until
+  the editor re-resolves the source.
+- AVI with packed B-frames: frame timing follows FFmpeg's interpretation (the
+  first frame starts after the reorder delay); recorded in notes.
 
 ## Verification
 
-Use Node 22 or 24. Node 26's experimental `localStorage` behavior breaks unrelated
-existing store tests. Install dependencies in the checkout (`npm ci`); symlinking
-another checkout's dependencies can cause Vite to deny external WASM assets.
-
-```sh
-npm run check
-npm run test:run
-npm run headless:test:node
-npm run build
-npm run headless:test:compatibility
-```
-
-The native tests generate fixtures for cache reuse/invalidation, original
-preservation, broken/cancelled input, alpha preservation, VFR timestamps, and delayed
-audio. The Chrome test runs opaque MPEG-4 MOV and transparent PNG MOV through native
-import, forward/backward frame requests, Shreditor composition, and actual export,
-then checks rendered/exported pixels. Fixtures, browser processes, and temporary
-workspaces are cleaned up by the tests.
-
-Browser verification was run with Chrome on macOS. Other browser/OS combinations
-have not been verified by these checks.
-
-This branch passed 4,815 Vitest tests, 57 Node tests, the existing portable
-headless/browser/media checks, the compatibility browser checks, type/lint checks,
-production build, boundary checks, and changed-code health. Repository-wide unused
-export/member checks still report existing findings; the same findings were
-confirmed in a clean copy of base commit `ca2ac123`. This change introduces none.
+Use Node 22 or 24. `npm run headless:test:node` and
+`npm run headless:test:compatibility` (needs a build and Chrome; runs
+headless): every class through native import, export-path frames, `<video>`,
+composite and export; VFR frames around a timestamp gap in both paths.
