@@ -185,8 +185,9 @@ export function readStoredTranscript(root, mediaId) {
 
 /**
  * The workspace media imported from `file` (same name, size and modified time,
- * or a link to it) with its transcript and status, or null. Lets `shred
- * catalog` reuse the built-in transcript instead of running whisper again.
+ * or a link to it) with its transcript, status and category, or null. Lets
+ * `shred catalog` reuse the built-in transcript instead of running whisper
+ * again, and show the category (and whether it is only a suggestion).
  */
 export function transcriptForFile(root, file) {
   let real
@@ -211,7 +212,14 @@ export function transcriptForFile(root, file) {
     const same = link?.path === real || (metadata.fileName === name && metadata.fileSize === st.size && Math.round(metadata.fileLastModified ?? -1) === Math.round(st.mtimeMs))
     if (!same) continue
     const envelope = readStoredTranscript(root, entry.name)
-    return { mediaId: entry.name, status: metadata.transcription ?? null, envelope, path: envelope ? transcriptFile(root, entry.name) : null }
+    return {
+      mediaId: entry.name,
+      status: metadata.transcription ?? null,
+      envelope,
+      path: envelope ? transcriptFile(root, entry.name) : null,
+      category: metadata.category ?? null,
+      categorySource: metadata.categorySource ?? null,
+    }
   }
   return null
 }

@@ -4,7 +4,7 @@ import http from 'node:http'
 import os from 'node:os'
 import path from 'node:path'
 import test from 'node:test'
-import { importMediaByPath, projectMediaVersion, setMediaCategories } from './media-bridge.mjs'
+import { importMediaByPath, projectMediaCategories, projectMediaVersion, setMediaCategories } from './media-bridge.mjs'
 import { createWorkspaceBridge } from './workspace-bridge.mjs'
 
 function makeWorkspace(t) {
@@ -53,13 +53,81 @@ test('setMediaCategories sets, clears and reports what changed', (t) => {
     { mediaId: 'c', category: 'sfx' },
   ])
   assert.deepEqual(result.changed, [
-    { mediaId: 'a', from: null, to: 'speaker' },
-    { mediaId: 'b', from: 'music', to: null },
+    { mediaId: 'a', from: null, fromSource: null, to: 'speaker', source: 'agent' },
+    { mediaId: 'b', from: 'music', fromSource: null, to: null, source: 'agent' },
   ])
-  assert.deepEqual(result.unchanged, [{ mediaId: 'c', category: 'sfx' }])
+  // A category with no source is already explicit: re-setting it is a no-op.
+  assert.deepEqual(result.unchanged, [{ mediaId: 'c', category: 'sfx', source: null }])
+  assert.deepEqual(result.kept, [])
   assert.equal(ws.read('a').category, 'speaker')
+  assert.equal(ws.read('a').categorySource, 'agent')
   assert.ok(!('category' in ws.read('b')))
+  assert.equal(ws.read('b').categorySource, 'agent', 'cleared on purpose: auto leaves it')
   assert.equal(ws.read('a').fileName, 'a.mp4', 'other fields are kept')
+})
+
+test('setMediaCategories: an auto suggestion never replaces an explicit category', (t) => {
+  const ws = makeWorkspace(t)
+  ws.media('legacy', { category: 'b-roll' })
+  ws.media('user', { category: 'graphics', categorySource: 'user' })
+  ws.media('agent', { category: 'b-roll', categorySource: 'agent' })
+  ws.media('cleared', { categorySource: 'agent' })
+  ws.media('empty')
+  ws.media('auto', { category: 'speaker', categorySource: 'auto' })
+  const items = ['legacy', 'user', 'agent', 'cleared', 'empty', 'auto'].map((mediaId) => ({ mediaId, category: 'b-roll' }))
+  items[2].category = 'speaker'
+  const result = setMediaCategories(ws.root, items, { source: 'auto' })
+  assert.deepEqual(result.kept, [
+    { mediaId: 'legacy', category: 'b-roll', source: null },
+    { mediaId: 'user', category: 'graphics', source: 'user' },
+    { mediaId: 'agent', category: 'b-roll', source: 'agent' },
+    { mediaId: 'cleared', category: null, source: 'agent' },
+  ])
+  assert.deepEqual(result.changed.map((c) => [c.mediaId, c.to, c.source]), [
+    ['empty', 'b-roll', 'auto'],
+    ['auto', 'b-roll', 'auto'],
+  ])
+  assert.equal(ws.read('user').category, 'graphics')
+  assert.equal(ws.read('agent').category, 'b-roll')
+  assert.ok(!('category' in ws.read('cleared')))
+  assert.deepEqual([ws.read('empty').category, ws.read('empty').categorySource], ['b-roll', 'auto'])
+  // The same suggestion again changes nothing; auto can't clear.
+  assert.deepEqual(setMediaCategories(ws.root, [{ mediaId: 'empty', category: 'b-roll' }], { source: 'auto' }).unchanged, [
+    { mediaId: 'empty', category: 'b-roll', source: 'auto' },
+  ])
+  assert.throws(() => setMediaCategories(ws.root, [{ mediaId: 'empty', category: null }], { source: 'auto' }), (error) => error.status === 400)
+  assert.throws(() => setMediaCategories(ws.root, [{ mediaId: 'empty', category: 'sfx' }], { source: 'robot' }), (error) => error.status === 400)
+})
+
+test('setMediaCategories: the agent confirms or corrects a suggestion', (t) => {
+  const ws = makeWorkspace(t)
+  ws.media('a', { category: 'speaker', categorySource: 'auto' })
+  ws.media('b', { category: 'speaker', categorySource: 'auto' })
+  const result = setMediaCategories(ws.root, [
+    { mediaId: 'a', category: 'speaker' },
+    { mediaId: 'b', category: 'b-roll' },
+  ])
+  assert.deepEqual(result.changed, [
+    { mediaId: 'a', from: 'speaker', fromSource: 'auto', to: 'speaker', source: 'agent' },
+    { mediaId: 'b', from: 'speaker', fromSource: 'auto', to: 'b-roll', source: 'agent' },
+  ])
+  // Now explicit: a later suggestion (e.g. after the project is reopened) is kept out.
+  assert.equal(setMediaCategories(ws.root, [{ mediaId: 'a', category: 'b-roll' }], { source: 'auto' }).kept.length, 1)
+  assert.deepEqual([ws.read('a').category, ws.read('a').categorySource], ['speaker', 'agent'])
+})
+
+test('projectMediaCategories lists category, source and transcription state', (t) => {
+  const ws = makeWorkspace(t)
+  ws.project('p1')
+  ws.media('a', { category: 'speaker', categorySource: 'auto', mimeType: 'video/mp4', transcription: { status: 'done' } })
+  ws.media('b', { category: 'music', mimeType: 'audio/wav' })
+  ws.media('c', { mimeType: 'image/png' })
+  ws.link('p1', ['a', 'b', 'c', 'gone'])
+  assert.deepEqual(projectMediaCategories(ws.root, 'p1'), [
+    { mediaId: 'a', fileName: 'a.mp4', mimeType: 'video/mp4', category: 'speaker', categorySource: 'auto', transcription: 'done' },
+    { mediaId: 'b', fileName: 'b.mp4', mimeType: 'audio/wav', category: 'music', categorySource: 'explicit', transcription: null },
+    { mediaId: 'c', fileName: 'c.mp4', mimeType: 'image/png', category: null, categorySource: null, transcription: null },
+  ])
 })
 
 test('setMediaCategories validates every item before writing any', (t) => {
@@ -101,13 +169,14 @@ test('importMediaByPath writes the category, and rejects an unknown one', async 
   const [imported] = await importMediaByPath(ws.root, [file], { projectId: 'p1', category: 'graphics', mode: 'link' })
   assert.equal(imported.error, undefined)
   assert.equal(ws.read(imported.id).category, 'graphics')
+  assert.equal(ws.read(imported.id).categorySource, 'agent')
   // Importing the same file again with another category updates the existing media.
   const [again] = await importMediaByPath(ws.root, [file], { projectId: 'p1', category: 'overlay', mode: 'link' })
   assert.equal(again.duplicate, true)
   assert.equal(ws.read(imported.id).category, 'overlay')
 })
 
-test('bridge routes: POST media/category and GET media/version', async (t) => {
+test('bridge routes: POST media/category, GET media/categories and GET media/version', async (t) => {
   const ws = makeWorkspace(t)
   ws.project('p1')
   ws.media('a')
@@ -125,8 +194,15 @@ test('bridge routes: POST media/category and GET media/version', async (t) => {
   await new Promise((resolve) => setTimeout(resolve, 20))
   const ok = await post([{ mediaId: 'a', category: 'voiceover' }])
   assert.equal(ok.status, 200)
-  assert.deepEqual((await ok.json()).changed, [{ mediaId: 'a', from: null, to: 'voiceover' }])
+  assert.deepEqual((await ok.json()).changed, [{ mediaId: 'a', from: null, fromSource: null, to: 'voiceover', source: 'agent' }])
   assert.equal(ws.read('a').category, 'voiceover')
+  const suggestion = await fetch(`${base}/media/category`, {
+    method: 'POST',
+    body: JSON.stringify({ items: [{ mediaId: 'a', category: 'speaker' }], source: 'auto' }),
+  })
+  assert.deepEqual((await suggestion.json()).kept, [{ mediaId: 'a', category: 'voiceover', source: 'agent' }])
+  const listed = await (await fetch(`${base}/media/categories?projectId=p1`)).json()
+  assert.deepEqual(listed.media.map((m) => [m.mediaId, m.category, m.categorySource]), [['a', 'voiceover', 'agent']])
 
   const after = await (await fetch(`${base}/media/version?projectId=p1`)).json()
   assert.notEqual(after.version, before.version)

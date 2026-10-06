@@ -17,9 +17,13 @@
 //   shred import <file...> --project <id> [--category <c>] [--no-wait]
 //                                        bring footage in (clone/link in place); video Chrome can't
 //                                        decode gets a playable working copy, and import waits for it
-//   shred media <mediaId...> [--wait] [--retry] [--json]   working-copy state (ready/preparing NN%/failed)
+//   shred media <mediaId...> | --project <id> [--wait] [--retry] [--json]
+//                                        working-copy state (ready/preparing NN%/failed), category with
+//                                        who set it ([speaker auto] = the editor's unconfirmed suggestion)
+//                                        and transcript state
 //   shred categorize <mediaId>=<category>... | --category <c> <mediaId>...
-//                                        set what each media is for; the editor groups by it
+//                                        set what each media is for (as the agent: the editor never
+//                                        changes it; re-setting an auto suggestion confirms it)
 //   shred draft <id>                     copy a project to a private draft; prints the draft id
 //   shred apply <id> <ops.json>          apply an op batch atomically (revision-checked)
 //   shred frames <id> --at 30,95,... [--out grid.jpg] [--size 270x480]
@@ -390,8 +394,15 @@ const commands = {
           entry.sheet = sheet
         } catch {}
       }
-      // Footage already imported was transcribed on import: use that.
-      const builtIn = a ? transcriptForFile(workspace(), file) : null
+      // Footage already imported: its media id, its category (an `auto` one is
+      // the editor's suggestion: confirm or correct it with shred categorize),
+      // and its built-in transcript.
+      const imported = transcriptForFile(workspace(), file)
+      if (imported) {
+        entry.mediaId = imported.mediaId
+        if (imported.category) Object.assign(entry, { category: imported.category, categorySource: imported.categorySource ?? 'explicit' })
+      }
+      const builtIn = a ? imported : null
       if (builtIn?.envelope) {
         entry.mediaId = builtIn.mediaId
         entry.transcript = builtIn.path
@@ -424,7 +435,7 @@ const commands = {
         }
       }
       entries.push(entry)
-      say(`${entry.kind.padEnd(5)} ${String(entry.duration).padStart(7)}s  ${path.basename(file)}${entry.browserPlayable ? '' : `  (import makes a working copy: ${entry.workingCopy})`}${entry.speechNote ? '  (no speech)' : ''}${entry.speech ? `  "${entry.speech.slice(0, 60)}…"` : ''}`)
+      say(`${entry.kind.padEnd(5)} ${String(entry.duration).padStart(7)}s  ${path.basename(file)}${entry.category ? `  [${entry.category} ${entry.categorySource}]` : ''}${entry.browserPlayable ? '' : `  (import makes a working copy: ${entry.workingCopy})`}${entry.speechNote ? '  (no speech)' : ''}${entry.speech ? `  "${entry.speech.slice(0, 60)}…"` : ''}`)
     }
     const out = path.join(dir, 'catalog.json')
     fs.writeFileSync(out, `${JSON.stringify({ name, createdAt: new Date().toISOString(), sources: inputs.map((p) => path.resolve(p)), entries }, null, 2)}\n`)
@@ -533,9 +544,9 @@ const commands = {
   },
 
   async media(ids) {
-    if (!ids.length) throw new Error('Pass one or more media ids')
+    if (!ids.length && !opt.project) throw new Error('Pass one or more media ids, or --project <id>')
     const cli = path.join(REPO, 'bin/shreditor.mjs')
-    const result = spawnSync(process.execPath, [cli, 'media', ...ids, ...(opt.wait ? ['--wait'] : []), ...(opt.retry ? ['--retry'] : []), ...(opt.json ? ['--json'] : [])], { stdio: 'inherit', env: { ...process.env, SHREDITOR_WORKSPACE: workspace() } })
+    const result = spawnSync(process.execPath, [cli, 'media', ...ids, ...(opt.project ? ['--project', opt.project] : []), ...(opt.wait ? ['--wait'] : []), ...(opt.retry ? ['--retry'] : []), ...(opt.json ? ['--json'] : [])], { stdio: 'inherit', env: { ...process.env, SHREDITOR_WORKSPACE: workspace() } })
     if (result.status) process.exitCode = result.status
   },
 
@@ -554,11 +565,12 @@ const commands = {
       if (at < 1) throw new Error(`Expected <mediaId>=<category>, got ${arg}`)
       return { mediaId: arg.slice(0, at), category: clear(arg.slice(at + 1)) }
     })
-    const res = await fetch(`${EDITOR}/__shreditor/media/category`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ items }) })
+    const res = await fetch(`${EDITOR}/__shreditor/media/category`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ items, source: 'agent' }) })
     const body = await res.json()
     if (!res.ok) throw new Error(body.message ?? `HTTP ${res.status}`)
-    for (const c of body.changed) say(`set     ${c.mediaId}  ${c.from ?? 'none'} -> ${c.to ?? 'none'}`)
-    for (const u of body.unchanged) say(`same    ${u.mediaId}  ${u.category ?? 'none'}`)
+    const label = (category, source) => `${category ?? 'none'}${source ? ` (${source})` : ''}`
+    for (const c of body.changed) say(`set     ${c.mediaId}  ${label(c.from, c.fromSource)} -> ${label(c.to, c.source)}`)
+    for (const u of body.unchanged) say(`same    ${u.mediaId}  ${label(u.category, u.source)}`)
   },
 
   async draft([id]) {
