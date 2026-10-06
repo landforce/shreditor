@@ -810,7 +810,7 @@ export async function main(argv = process.argv.slice(2)) {
   // The default remains loopback-only because the render service has no auth.
   // Network exposure must be an explicit CLI/environment configuration choice.
   await new Promise((resolve) => server.listen(port, host, resolve))
-  console.log(`FreeCut render service on http://${host}:${port}  (workspace: ${workspace})`)
+  console.log(`Shreditor agent service on http://${host}:${port}  (workspace: ${workspace})`)
   console.log(
     `  GET /health  GET /capabilities  GET /projects  POST /render  POST /edit  POST /frame  POST /layout`,
   )
