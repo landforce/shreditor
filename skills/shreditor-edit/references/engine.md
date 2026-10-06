@@ -119,6 +119,10 @@ Clip `volume` is plain gain with no limiter, so a loudness target (e.g. -14 LUFS
 - `shred master <voiceover or final mix stem> [--lufs -14] [--tp -1.5] [--out file.wav]` writes `<name>.mastered.wav` next to the input (original untouched) with ffmpeg's two-pass `loudnorm` (measure, then normalize with the measured values; it limits true peak itself) and prints before/after integrated LUFS and true peak measured with `ebur128`. Import the mastered file.
 - Everything playing together adds up: a -14 LUFS VO plus b-roll audio lands louder. Measure the final export (render `audioOnly` WAV, or the exported video): `ffmpeg -nostats -i out.wav -filter_complex ebur128=peak=true -f null -` and read `I:` and `Peak:` in the summary. If it misses, lower the beds, or master the exported mix and use that as the only audio.
 
+## Export
+
+`shred export <id> [--native|--browser] [--codec h264|hevc|prores] [--quality low|medium|high|ultra] [--out name]` writes `<workspace>/projects/<id>/exports/<name>.mp4|mov` plus `<file>.export.json`. Default: native when the plan allows (ffmpeg renders video clips from the ORIGINAL files; text, shapes, images, effects, keyframed or transitioning clips are drawn by the browser as transparent overlays and composited in track order), else the browser render with the reasons. HDR sources refuse native and do not fall back; `--browser` is the explicit opt-in. It prints each item's route; read it. ProRes and HEVC keep 10 bits from 10-bit sources. Speed, EQ, ducking, pitch or volume keyframes make the audio come from the browser mix. Design and limits: `docs/native-export.md` in the Shreditor repo.
+
 ## Gotchas
 
 - **ProRes and other codecs browsers can't decode** will not play. `shred catalog` makes the playable copy for you (`proxy` in the catalog entry); import that. By hand: H.264 `-c:v libx264 -crf 16 -pix_fmt yuv420p`.

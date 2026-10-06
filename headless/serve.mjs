@@ -10,9 +10,11 @@
 // API:
 //   GET  /health                      -> { ok, harnessUrl }
 //   GET  /projects                    -> [{ id, name, updatedAt }]
-//   POST /render  { project|projectObject, codec?, container?, resolution?, fps?,
+//   POST /render  { project|projectObject, codec?, container?, resolution?, fps?, engine?,
 //                   quality?, in?, outSec?, duration?, audioOnly? }
 //                                      -> the rendered video/audio file (attachment)
+//                   engine "native"|"auto" (POST /v1/render, saved project id): ffmpeg from the
+//                   original media, saved to projects/<id>/exports/ -> JSON (docs/native-export.md)
 //   POST /edit    { project|projectObject, ops, ... }
 //                                      -> { ok, project, applied, results } (edited project JSON)
 //   POST /frame   { project|projectObject, at?|frame?, width?, height?, format?, quality? }
@@ -86,6 +88,7 @@ import {
   updateMediaMetadata,
 } from './lib/lifecycle-store.mjs'
 import { withIdempotency } from './lib/idempotency.mjs'
+import { NativeExportRefused, exportsDir, runNativeExport } from './lib/native-export.mjs'
 
 const HELP = `Usage: node headless/serve.mjs --workspace <dir> [options]\n\nOptions:\n  --host <address>           Bind address (default: 127.0.0.1)\n  --port <n>                 HTTP port (default: 8787)\n  --render-timeout-ms <n>    Whole render deadline (default: 1800000)\n  --edit-timeout-ms <n>      Whole edit deadline (default: 120000)\n  --max-queue-depth <n>      Waiting operations allowed behind the active one (default: 8)\n  --shutdown-timeout-ms <n>  Graceful queue drain deadline (default: 30000)\n  --build  --head  --harness-url <url>\n`
 const SERVE_OPTIONS = new Set([
@@ -225,8 +228,83 @@ async function main() {
   fs.mkdirSync(tmpDir, { recursive: true })
   let counter = 0
 
+  // Native export (engine native|auto): ffmpeg renders from the original media,
+  // the page draws only the overlay layers (and the audio mix when it cannot be
+  // mirrored). auto falls back to a browser render with the planner's reasons.
+  // Both save into the project's exports/ folder and answer with JSON.
+  // Service route; exercised end to end by the native export checks (docs/native-export.md)
+  // fallow-ignore-next-line complexity
+  const handleNativeRender = async (body, res) => {
+    const id = assertPortableId(body.project, 'project id')
+    const { project } = loadProjectById(workspace, id)
+    const codec = body.codec === 'h265' ? 'hevc' : (body.codec ?? 'h264')
+    const options = { codec, quality: body.quality ?? 'high', out: body.out }
+    const pageWork = (kind, fn) => queue.enqueue(fn, { timeoutMs: renderTimeoutMs, kind })
+    const t0 = Date.now()
+    try {
+      const report = await runNativeExport({
+        workspace,
+        projectId: id,
+        project,
+        options,
+        log: (line) => console.log(line),
+        renderOverlay: ({ itemIds, spans, sinkUrl }) =>
+          pageWork('native-overlay', () =>
+            session.page.evaluate((payload) => window.freecut.renderOverlayFrames(payload), {
+              project,
+              media: resolveProjectMedia(workspace, project, mediaUrlOf, null).media,
+              itemIds,
+              spans,
+              sinkUrl,
+            }),
+          ),
+        renderBrowserAudio: async (outPath) => {
+          const job = prepareJob(
+            workspace,
+            { project: id, audioOnly: true, container: 'wav', out: outPath },
+            mediaUrlOf,
+          )
+          const summary = await pageWork('native-audio', () =>
+            renderJob(session.page, job, { downloadTimeoutMs: 0 }),
+          )
+          return summary.outputPath
+        },
+      })
+      console.log(`native export ${id} -> ${report.output} in ${Date.now() - t0}ms`)
+      sendJson(res, 200, { ok: true, apiVersion: HEADLESS_API_VERSION, ...report })
+    } catch (error) {
+      if (!(error instanceof NativeExportRefused) || body.engine !== 'auto' || error.hdr) throw error
+      if (codec === 'prores')
+        throw new HttpError(422, 'NATIVE_EXPORT_REFUSED', `${error.message} (ProRes needs native)`)
+      const dir = exportsDir(workspace, id)
+      fs.mkdirSync(dir, { recursive: true })
+      const name = (body.out ?? `${project.name ?? id}-browser`).replace(/[^\w.-]+/g, '_')
+      const job = prepareJob(
+        workspace,
+        { project: id, codec, quality: body.quality, out: path.join(dir, name) },
+        mediaUrlOf,
+      )
+      assertHardwareGpuForJob(job, isSoftwareGpu(gpu))
+      const summary = await pageWork('render', () =>
+        renderJob(session.page, job, { downloadTimeoutMs: 0 }),
+      )
+      sendJson(res, 200, {
+        ok: true,
+        apiVersion: HEADLESS_API_VERSION,
+        engine: 'browser',
+        output: summary.outputPath,
+        fallbackReasons: error.refusals,
+        warnings: summary.warnings,
+      })
+    }
+  }
+
   const handleRender = async (req, res, { normalizeInline = false } = {}) => {
     let body = validate(renderRequestSchema, await readJsonBody(req))
+    if (body.engine === 'native' || body.engine === 'auto') {
+      await handleNativeRender(body, res)
+      return
+    }
     if (normalizeInline && body.projectObject) {
       body = { ...body, projectObject: await browserNormalize(body.projectObject) }
     }

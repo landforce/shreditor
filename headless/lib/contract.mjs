@@ -554,7 +554,8 @@ export const mediaProbeRequestSchema = z
   })
 
 const RENDER_OPTIONS = {
-  codecs: ['h264', 'h265', 'vp9', 'vp8', 'av1'],
+  codecs: ['h264', 'h265', 'hevc', 'vp9', 'vp8', 'av1', 'prores'],
+  engines: ['browser', 'native', 'auto'],
   containers: ['mp4', 'webm', 'mov', 'mkv', 'mp3', 'wav', 'm4a'],
   qualities: ['low', 'medium', 'high', 'ultra'],
 }
@@ -580,6 +581,10 @@ export const renderRequestSchema = z
     duration: finite.positive().optional(),
     audioOnly: z.boolean().optional(),
     strict: z.boolean().optional(),
+    // native: ffmpeg renders from the original media (overlays drawn by the
+    // browser); auto: native when the plan allows it, else browser. Both save to
+    // <workspace>/projects/<id>/exports/ and answer with JSON.
+    engine: z.enum(RENDER_OPTIONS.engines).optional(),
   })
   .strict()
   .refine((v) => Boolean(v.project) !== Boolean(v.projectObject), {
@@ -601,6 +606,21 @@ export const renderRequestSchema = z
   .refine((v) => v.audioOnly || !v.container || !['mp3', 'wav', 'm4a'].includes(v.container), {
     message: 'audio containers require audioOnly',
     path: ['container'],
+  })
+  .refine((v) => !v.engine || v.engine === 'browser' || (v.project && !v.audioOnly), {
+    message: 'native and auto engines export a saved project (project id), video only',
+    path: ['engine'],
+  })
+  .refine(
+    (v) =>
+      !v.engine ||
+      v.engine === 'browser' ||
+      (v.inSec === undefined && v.outSec === undefined && v.duration === undefined),
+    { message: 'native and auto engines export the whole project', path: ['engine'] },
+  )
+  .refine((v) => v.codec !== 'prores' || (v.engine && v.engine !== 'browser'), {
+    message: 'prores is only available with the native engine',
+    path: ['codec'],
   })
 
 export const frameRequestSchema = z

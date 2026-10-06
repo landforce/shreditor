@@ -27,6 +27,9 @@
 //   shred master <audio|video> [--lufs -14] [--tp -1.5] [--out file.wav]
 //                                        loudness-master to a new WAV (two-pass loudnorm)
 //   shred sync <id> [--timeout 20]       make the open editor save now, so the agent sees unsaved tweaks
+//   shred export <id> [--native|--browser] [--codec h264|hevc|prores] [--quality low|medium|high|ultra] [--out name]
+//                                        final export to <workspace>/projects/<id>/exports/; default: native
+//                                        (ffmpeg from the originals) when the plan allows it, else browser
 //
 // Service: 127.0.0.1:8787 (SHRED_SERVICE to override). Workspace: SHRED_WORKSPACE,
 // else ~/.shreditor/config.json, else ~/Movies/Shreditor. Times are frames at the
@@ -73,6 +76,10 @@ const { values: opt, positionals } = parseArgs({
     json: { type: 'boolean' },
     yes: { type: 'boolean' },
     force: { type: 'boolean' },
+    native: { type: 'boolean' },
+    browser: { type: 'boolean' },
+    codec: { type: 'string' },
+    quality: { type: 'string' },
   },
 })
 const [command, ...args] = positionals
@@ -608,6 +615,51 @@ const commands = {
     fs.writeFileSync(path.join(dir, `${n}.json`), `${JSON.stringify(record, null, 2)}\n`)
     say(`Pass #${Number(n)} "${opt.label}" published to ${targetId}: ${changes.length} changes, revision ${saved.revision}`)
     say(`Editor: ${EDITOR}/editor/${targetId}  (an open editor reloads it within a second; open this link if it isn't showing)`)
+  },
+
+  // Final export. Native: ffmpeg renders from the ORIGINAL media and the browser
+  // draws only what ffmpeg can't (text, shapes, effects...) as transparent
+  // overlays; auto (default) falls back to the browser render with the reasons.
+  async export([id]) {
+    if (!id) throw new Error('Pass a project id')
+    if (opt.native && opt.browser) throw new Error('Pass --native or --browser, not both')
+    await warnUnsaved(id)
+    const codec = opt.codec ?? 'h264'
+    const quality = opt.quality ?? 'high'
+    const dir = path.join(workspace(), 'projects', id, 'exports')
+    const name = opt.out ? path.parse(opt.out).name.replace(/[^\w.-]+/g, '_') : undefined
+    let output
+    if (opt.browser) {
+      if (codec === 'prores') throw new Error('ProRes needs the native engine')
+      const { project } = await getProject(id)
+      const bytes = await call('POST', '/v1/render', { project: id, codec, quality })
+      const ext = { hevc: 'mp4', h265: 'mp4', vp9: 'webm', vp8: 'webm', av1: 'webm' }[codec] ?? 'mp4'
+      fs.mkdirSync(dir, { recursive: true })
+      output = path.join(dir, `${name ?? `${slug(project.name ?? id)}-browser`}.${ext}`)
+      fs.writeFileSync(output, bytes)
+      say('engine   browser (everything drawn in headless Chrome, media decoded by the browser)')
+    } else {
+      const res = await call('POST', '/v1/render', { project: id, engine: opt.native ? 'native' : 'auto', codec, quality, ...(name ? { out: name } : {}) })
+      output = res.output
+      if (res.engine === 'browser') {
+        say('engine   browser (native export not possible):')
+        for (const r of res.fallbackReasons ?? []) say(`  - ${r}`)
+      } else {
+        say(`engine   native (${res.codec}; ffmpeg from the original media)`)
+        for (const line of res.summary ?? []) say(`  ${line}`)
+        const v = res.verification
+        say(`checked  ${v.frames} frames, ${v.seconds.toFixed(3)}s, ${v.videoCodec} ${v.pixFmt} ${v.color.matrix}/${v.color.range}${v.audio ? `, ${v.audio.codec} ${v.audio.rate} Hz ${v.audio.seconds.toFixed(3)}s` : ', no audio'}`)
+        say(`time     ${res.timings.totalSeconds.toFixed(1)}s (overlays ${res.timings.overlaySeconds.toFixed(1)}s, encode ${res.timings.encodeSeconds.toFixed(1)}s)`)
+      }
+    }
+    if (opt.out && path.dirname(opt.out) !== '.') {
+      const copy = path.resolve(opt.out.replace(/^~(?=\/|$)/, os.homedir()))
+      const target = path.extname(copy) ? copy : `${copy}${path.extname(output)}`
+      fs.mkdirSync(path.dirname(target), { recursive: true })
+      fs.copyFileSync(output, target)
+      say(`copied   ${target}`)
+    }
+    say(output)
   },
 
   // Clip volume is plain gain with no limiter, so loudness targets are met here,
