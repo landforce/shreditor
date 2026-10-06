@@ -295,7 +295,7 @@ async function main() {
           op: 'addText',
           id: 'caption-1',
           text: 'added',
-          from: 30,
+          from: 90,
           durationInFrames: 45,
           color: '#7dd3fc',
           fontSize: 72,
@@ -322,12 +322,12 @@ async function main() {
         window.freecut.editProject({
           project,
           ops: [
-            { callerId: 'created', op: 'addText', text: 'referenced', from: 0 },
+            { callerId: 'created', op: 'addText', text: 'referenced', from: 90 },
             {
               callerId: 'moved',
               op: 'moveItem',
               id: { $ref: 'created#/detail/id' },
-              from: 12,
+              from: 120,
             },
           ],
         }),
@@ -338,7 +338,7 @@ async function main() {
     check(
       'referenced operation moved the generated item',
       referencedEdit.project?.timeline?.items?.find((item) => item.id === referencedId)?.from ===
-        12,
+        120,
     )
 
     const missingTargetError = await page.evaluate(async (project) => {

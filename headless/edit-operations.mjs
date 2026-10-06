@@ -130,7 +130,7 @@ const cases = [
       op: 'addText',
       id: 'new-text',
       text: 'added',
-      from: 10,
+      from: 90,
       durationInFrames: 20,
       trackId: 'video-1',
     },
@@ -145,7 +145,7 @@ const cases = [
         id: 'new-item',
         type: 'text',
         trackId: 'video-1',
-        from: 5,
+        from: 100,
         durationInFrames: 15,
         text: 'raw',
         label: 'Raw',
@@ -171,11 +171,11 @@ const cases = [
   },
   {
     name: 'moveItem',
-    op: { op: 'moveItem', id: 'text-1', from: 12, trackId: 'video-2' },
+    op: { op: 'moveItem', id: 'text-1', from: 60, trackId: 'video-2' },
     assert: (project) =>
       assert.deepEqual(
         [item(project, 'text-1')?.from, item(project, 'text-1')?.trackId],
-        [12, 'video-2'],
+        [60, 'video-2'],
       ),
     failure: { op: 'moveItem', id: 'missing', from: 2 },
   },
@@ -302,11 +302,21 @@ const cases = [
     schemaFailure: { op: 'addTrack', kind: 'data' },
   },
   {
+    name: 'removeTrack',
+    op: { op: 'removeTrack', trackId: 'audio-1' },
+    assert: (project) =>
+      assert.equal(
+        project.timeline.tracks.some((track) => track.id === 'audio-1'),
+        false,
+      ),
+    failure: { op: 'removeTrack', trackId: 'video-1' },
+  },
+  {
     name: 'addClip',
     op: {
       op: 'addClip',
       mediaId: 'video-media',
-      from: 20,
+      from: 90,
       durationInFrames: 30,
       trackId: 'video-1',
     },

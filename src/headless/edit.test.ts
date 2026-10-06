@@ -422,4 +422,198 @@ describe('editProject', () => {
       easingConfig: { type: 'spring', spring: { tension: 300, friction: 10, mass: 1 } },
     })
   })
+
+  describe('same-track overlaps fail instead of shifting', () => {
+    const textOn = (id: string, from: number, durationInFrames: number, trackId = 't_v') => ({
+      id,
+      type: 'text',
+      trackId,
+      from,
+      durationInFrames,
+      label: id,
+      text: id,
+      color: '#fff',
+      fontSize: 80,
+    })
+    const project = () =>
+      baseProject({ items: [textOn('Title', 0, 90), textOn('Tail', 120, 30)] as never })
+
+    it('addText onto an occupied range names the op, track, item and both ranges', async () => {
+      await expect(
+        editProject({
+          project: project(),
+          ops: [
+            { op: 'addText', text: 'Hook', from: 10, durationInFrames: 30, callerId: 'hook' },
+          ] as EditOp[],
+        }),
+      ).rejects.toThrow(
+        'callerId "hook" (addText) would put text "Hook" at frames [10, 40) on track V1 (t_v), ' +
+          'which overlaps text "Title" (Title) at frames [0, 90)',
+      )
+    })
+
+    it('a later overlapping op fails the whole batch, including earlier valid ops', async () => {
+      const input = project()
+      await expect(
+        editProject({
+          project: input,
+          ops: [
+            { op: 'addText', text: 'ok', from: 90, durationInFrames: 30, callerId: 'ok' },
+            { op: 'addText', text: 'bad', from: 100, durationInFrames: 5, callerId: 'bad' },
+          ] as EditOp[],
+        }),
+      ).rejects.toThrow(/callerId "bad".*overlaps text "ok"/)
+      // The caller's project object is untouched (nothing was applied).
+      expect(input.timeline!.items).toHaveLength(2)
+    })
+
+    it('a free range lands exactly where it was asked (no shift)', async () => {
+      const result = await editProject({
+        project: project(),
+        ops: [
+          { op: 'addText', text: 'gap', from: 90, durationInFrames: 30, callerId: 'gap' },
+        ] as EditOp[],
+      })
+      const added = result.project.timeline!.items.find((item) => item.label === 'Text')
+      expect(added).toMatchObject({ from: 90, durationInFrames: 30 })
+    })
+
+    it('addItem, moveItem and updateItem refuse to overlap', async () => {
+      const cases: EditOp[] = [
+        {
+          op: 'addItem',
+          item: textOn('raw', 80, 20),
+          callerId: 'add',
+        } as unknown as EditOp,
+        { op: 'moveItem', id: 'Tail', from: 60, callerId: 'move' } as EditOp,
+        {
+          op: 'updateItem',
+          id: 'Title',
+          updates: { durationInFrames: 130 },
+          callerId: 'upd',
+        } as EditOp,
+        { op: 'updateItem', id: 'Tail', updates: { from: 85 }, callerId: 'upd2' } as EditOp,
+      ]
+      for (const op of cases) {
+        await expect(editProject({ project: project(), ops: [op] })).rejects.toThrow(
+          `callerId "${String(op.callerId)}" (${op.op})`,
+        )
+      }
+    })
+
+    it('moving onto another track checks that track', async () => {
+      const result = await editProject({
+        project: project(),
+        ops: [
+          { op: 'addTrack', kind: 'video', callerId: 'v2' },
+          { op: 'moveItem', id: 'Tail', from: 0, trackId: { $ref: 'v2#/detail/trackId' } },
+        ] as EditOp[],
+      })
+      expect(result.project.timeline!.items.find((item) => item.id === 'Tail')!.from).toBe(0)
+    })
+
+    it('trimEnd growth into the next item fails rather than clamping', async () => {
+      await expect(
+        editProject({
+          project: project(),
+          ops: [{ op: 'trimEnd', id: 'Title', amount: 40, callerId: 'grow' } as EditOp],
+        }),
+      ).rejects.toThrow(/callerId "grow" \(trimEnd\) would put text "Title".*\[0, 130\).*"Tail"/)
+      const ok = await editProject({
+        project: project(),
+        ops: [{ op: 'trimEnd', id: 'Title', amount: 30, callerId: 'fits' } as EditOp],
+      })
+      expect(ok.project.timeline!.items.find((item) => item.id === 'Title')!.durationInFrames).toBe(
+        120,
+      )
+    })
+
+    it('addClip keeps linked audio in sync on a free audio track', async () => {
+      const result = await editProject({
+        project: baseProject({
+          tracks: [
+            ...baseProject().timeline!.tracks,
+            { id: 't_a', name: 'A1', kind: 'audio', height: 80, order: 1 } as never,
+          ],
+          items: [
+            {
+              id: 'vo',
+              type: 'audio',
+              trackId: 't_a',
+              from: 0,
+              durationInFrames: 300,
+              label: 'VO',
+              mediaId: 'm-vo',
+              src: '',
+            },
+          ] as never,
+        }),
+        media: [{ mediaId: 'm-vid', metadata: videoMedia }],
+        ops: [{ op: 'addClip', mediaId: 'm-vid', from: 30, durationInFrames: 60 } as EditOp],
+      })
+      const created = (
+        result.results[0]!.detail as { created: Array<{ id: string; trackId: string }> }
+      ).created
+      const audio = result.project.timeline!.items.find((item) => item.id === created[1]!.id)!
+      expect(audio.from).toBe(30)
+      expect(audio.trackId).not.toBe('t_a')
+      expect(created[1]!.trackId).toBe(audio.trackId)
+    })
+  })
+
+  describe('removeTrack', () => {
+    const twoTracks = () =>
+      baseProject({
+        tracks: [
+          ...baseProject().timeline!.tracks,
+          { id: 't_a', name: 'A1', kind: 'audio', height: 80, order: 1 } as never,
+        ],
+        items: [
+          {
+            id: 'title',
+            type: 'text',
+            trackId: 't_v',
+            from: 0,
+            durationInFrames: 30,
+            label: 'Title',
+            text: 'Title',
+            color: '#fff',
+            fontSize: 80,
+          },
+        ] as never,
+      })
+
+    it('removes an empty track', async () => {
+      const result = await editProject({
+        project: twoTracks(),
+        ops: [{ op: 'removeTrack', trackId: 't_a' } as EditOp],
+      })
+      expect(result.project.timeline!.tracks.map((track) => track.id)).toEqual(['t_v'])
+    })
+
+    it('refuses a track with items unless removeItems is true', async () => {
+      const ops = [
+        { op: 'addTrack', kind: 'video', callerId: 'spare' },
+        { op: 'removeTrack', trackId: 't_v', callerId: 'rm' },
+      ] as EditOp[]
+      await expect(editProject({ project: twoTracks(), ops })).rejects.toThrow(
+        /track V1 \(t_v\) has 1 item\(s\): text "Title" \(title\).*removeItems: true/,
+      )
+      const result = await editProject({
+        project: twoTracks(),
+        ops: [ops[0]!, { ...ops[1]!, removeItems: true }],
+      })
+      expect(result.project.timeline!.items).toHaveLength(0)
+      expect(result.results[1]!.detail).toMatchObject({ trackId: 't_v', removedItems: ['title'] })
+    })
+
+    it('never removes the last track', async () => {
+      await expect(
+        editProject({
+          project: baseProject(),
+          ops: [{ op: 'removeTrack', trackId: 't_v' } as EditOp],
+        }),
+      ).rejects.toThrow('is the only track')
+    })
+  })
 })
