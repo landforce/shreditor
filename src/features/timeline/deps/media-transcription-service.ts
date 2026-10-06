@@ -1,6 +1,4 @@
 export {
-  buildCaptionTrackAbove,
-  buildStyledCaptionItems,
   cancelMediaTranscriptionJob,
   getMediaTranscriptionModelLabel,
   mediaTranscriptionService,

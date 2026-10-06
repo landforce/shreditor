@@ -37,6 +37,7 @@ import {
   getCaptionRangeForClip,
 } from '../utils/caption-items'
 import { chunkTranscriptForCaptions } from '../utils/caption-chunking'
+import { buildStyledCaptionItems } from '../utils/styled-caption-items'
 import { useProjectStore } from '@/features/media-library/deps/projects'
 import {
   removeTimelineItemsExact,
@@ -212,6 +213,10 @@ class MediaTranscriptionService {
 
   getTranscript = getTranscript
   getTranscriptMediaIds = getTranscriptMediaIds
+  /** Caption items for a clip in a caption style (the timeline places them). */
+  buildStyledCaptionItems = buildStyledCaptionItems
+  /** A new caption track directly above the track at `order`. */
+  buildCaptionTrackAbove = buildCaptionTrackAbove
 
   /** Notifies subscribers when a media's stored transcript is created, replaced, or deleted. */
   onTranscriptChanged(listener: (mediaId: string) => void): () => void {

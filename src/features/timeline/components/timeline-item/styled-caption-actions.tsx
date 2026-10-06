@@ -15,11 +15,7 @@ import { useItemsStore } from '../../stores/items-store'
 import { useTimelineSettingsStore } from '../../stores/timeline-settings-store'
 import { insertStyledCaptions } from '../../stores/actions/text-style-actions'
 import { useProjectStore } from '../../deps/projects'
-import {
-  buildCaptionTrackAbove,
-  buildStyledCaptionItems,
-  mediaTranscriptionService,
-} from '../../deps/media-transcription-service'
+import { mediaTranscriptionService } from '../../deps/media-transcription-service'
 
 type CaptionableClip = AudioItem | VideoItem
 
@@ -58,7 +54,10 @@ function captionTrackFor(clip: CaptionableClip, captions: TextItem[], replaced: 
   )
   if (free) return { trackId: free.id, newTrack: null }
   const clipOrder = tracks.find((track) => track.id === clip.trackId)?.order ?? 0
-  const newTrack = { ...buildCaptionTrackAbove(tracks, clipOrder), formatRole: 'captions' as const }
+  const newTrack = {
+    ...mediaTranscriptionService.buildCaptionTrackAbove(tracks, clipOrder),
+    formatRole: 'captions' as const,
+  }
   return { trackId: newTrack.id, newTrack }
 }
 
@@ -71,7 +70,7 @@ async function addStyledCaptions(
     ? await mediaTranscriptionService.getTranscript(clip.mediaId)
     : null
   if (!transcript) throw new Error('no-transcript')
-  const built = buildStyledCaptionItems({
+  const built = mediaTranscriptionService.buildStyledCaptionItems({
     clip,
     segments: transcript.segments,
     style,
