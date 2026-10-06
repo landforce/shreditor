@@ -14,6 +14,7 @@ import { PreviewStage } from './preview-stage'
 import { RollingEditOverlay } from './rolling-edit-overlay'
 import { RippleEditOverlay } from './ripple-edit-overlay'
 import { SlipEditOverlay } from './slip-edit-overlay'
+import { canvasAspectRatio, EditPanelCanvasAspectContext } from './edit-panel-media-utils'
 import { SlideEditOverlay } from './slide-edit-overlay'
 import { useSelectedComparisonCompositionPrewarm } from './use-selected-comparison-composition-prewarm'
 import { useGpuEffectsOverlay } from '../hooks/use-gpu-effects-overlay'
@@ -795,7 +796,7 @@ const VideoPreviewBase = memo(function VideoPreviewBase({
       />
     ) : null
 
-  const comparisonOverlay = hasRolling2Up ? (
+  const comparisonPanels = hasRolling2Up ? (
     <RollingEditOverlay fps={fps} />
   ) : hasRipple2Up ? (
     <RippleEditOverlay fps={fps} />
@@ -803,6 +804,11 @@ const VideoPreviewBase = memo(function VideoPreviewBase({
     <SlipEditOverlay fps={fps} />
   ) : hasSlide4Up ? (
     <SlideEditOverlay fps={fps} />
+  ) : null
+  const comparisonOverlay = comparisonPanels ? (
+    <EditPanelCanvasAspectContext.Provider value={canvasAspectRatio(project.width, project.height)}>
+      {comparisonPanels}
+    </EditPanelCanvasAspectContext.Provider>
   ) : null
 
   const overlayControls = !suspendOverlay ? (

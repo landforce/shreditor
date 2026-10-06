@@ -1,7 +1,25 @@
-import type { ReactNode } from 'react'
+import { createContext, type ReactNode } from 'react'
 import type { TimelineItem } from '@/types/timeline'
 
-export function getItemAspectRatio(item: TimelineItem | null): number {
+const LANDSCAPE_ASPECT = 16 / 9
+
+/**
+ * The canvas aspect (width / height) of the project the edit overlays preview.
+ * Panels for gaps, or items without a known source size, take this shape, so a
+ * 9:16 project's empty panel is 9:16 rather than 16:9.
+ */
+export const EditPanelCanvasAspectContext = createContext<number>(LANDSCAPE_ASPECT)
+
+/** Width over height for a canvas size, or `fallback` when it is unusable. */
+export function canvasAspectRatio(width: number, height: number, fallback = LANDSCAPE_ASPECT) {
+  const ratio = width / height
+  return Number.isFinite(ratio) && ratio > 0 ? ratio : fallback
+}
+
+export function getItemAspectRatio(
+  item: TimelineItem | null,
+  fallbackAspectRatio: number = LANDSCAPE_ASPECT,
+): number {
   if (
     item &&
     (item.type === 'video' || item.type === 'image') &&
@@ -13,7 +31,23 @@ export function getItemAspectRatio(item: TimelineItem | null): number {
   if (item?.type === 'composition' && item.compositionWidth && item.compositionHeight) {
     return item.compositionWidth / item.compositionHeight
   }
-  return 16 / 9
+  return fallbackAspectRatio
+}
+
+/**
+ * Size of a corner thumbnail in the 4-up view: the item's own shape, with its
+ * long edge `maxEdge` px (a 16:9 item keeps its old size; a 9:16 one is as tall
+ * as that is wide, instead of being squeezed into a 16:9 box).
+ */
+export function computeCornerThumbnailSize(
+  maxEdge: number,
+  aspectRatio: number,
+): { width: number; height: number } {
+  const edge = Math.max(maxEdge, 1)
+  const ratio = Number.isFinite(aspectRatio) && aspectRatio > 0 ? aspectRatio : LANDSCAPE_ASPECT
+  return ratio >= 1
+    ? { width: edge, height: Math.max(edge / ratio, 1) }
+    : { width: Math.max(edge * ratio, 1), height: edge }
 }
 
 export function computeFittedMediaSize(

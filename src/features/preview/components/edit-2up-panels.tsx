@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useRef, useState } from 'react'
+import { memo, useCallback, useContext, useEffect, useRef, useState } from 'react'
 import { SharedVideoExtractorPool, type VideoFrameSource } from '@/features/preview/deps/export'
 import { getGlobalVideoSourcePool } from '@/features/preview/deps/player-pool'
 import {
@@ -22,6 +22,7 @@ import type { TimelineItem } from '@/types/timeline'
 import { resolveMediaUrl, resolveProxyUrl } from '../utils/media-resolver'
 import {
   computeFittedMediaSize,
+  EditPanelCanvasAspectContext,
   getItemAspectRatio,
   renderPanelMedia,
 } from './edit-panel-media-utils'
@@ -126,6 +127,7 @@ interface EditTwoUpPanelsProps {
 export function EditTwoUpPanels({ leftPanel, rightPanel }: EditTwoUpPanelsProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const [containerSize, setContainerSize] = useState({ width: 0, height: 0 })
+  const canvasAspect = useContext(EditPanelCanvasAspectContext)
   useEditOverlayPanelPrewarm([leftPanel, rightPanel])
 
   useEffect(() => {
@@ -147,8 +149,8 @@ export function EditTwoUpPanels({ leftPanel, rightPanel }: EditTwoUpPanelsProps)
   const panelWidth = Math.max((containerSize.width - GAP) / 2, 1)
   const maxAreaHeight = containerSize.height - TEXT_SPACE
 
-  const leftNatural = panelWidth / getItemAspectRatio(leftPanel.item)
-  const rightNatural = panelWidth / getItemAspectRatio(rightPanel.item)
+  const leftNatural = panelWidth / getItemAspectRatio(leftPanel.item, canvasAspect)
+  const rightNatural = panelWidth / getItemAspectRatio(rightPanel.item, canvasAspect)
   const sharedAreaHeight = Math.max(1, Math.min(Math.max(leftNatural, rightNatural), maxAreaHeight))
 
   return (
@@ -165,6 +167,7 @@ export function EditTwoUpPanels({ leftPanel, rightPanel }: EditTwoUpPanelsProps)
         label={leftPanel.label}
         areaHeight={sharedAreaHeight}
         panelWidth={panelWidth}
+        canvasAspect={canvasAspect}
         placeholderText={leftPanel.placeholderText}
       />
       <FramePanel
@@ -175,6 +178,7 @@ export function EditTwoUpPanels({ leftPanel, rightPanel }: EditTwoUpPanelsProps)
         label={rightPanel.label}
         areaHeight={sharedAreaHeight}
         panelWidth={panelWidth}
+        canvasAspect={canvasAspect}
         placeholderText={rightPanel.placeholderText}
       />
     </div>
@@ -189,6 +193,7 @@ interface FramePanelProps {
   label: string
   areaHeight: number
   panelWidth: number
+  canvasAspect: number
   placeholderText?: string
 }
 
@@ -200,9 +205,10 @@ function FramePanel({
   label,
   areaHeight,
   panelWidth,
+  canvasAspect,
   placeholderText,
 }: FramePanelProps) {
-  const ar = getItemAspectRatio(item)
+  const ar = getItemAspectRatio(item, canvasAspect)
   const { mediaWidth, mediaHeight } = computeFittedMediaSize(panelWidth, areaHeight, ar)
 
   return (

@@ -1,11 +1,13 @@
-import { useEffect, useRef, useState } from 'react'
+import { useContext, useEffect, useRef, useState } from 'react'
 import type { EditTwoUpPanelData } from './edit-2up-panels'
 import { CompositionFrame, VideoFrame, ImageFrame, TypePlaceholder } from './edit-2up-panels'
 import { useEditOverlayPanelPrewarm } from './use-edit-overlay-panel-prewarm'
 import type { TimelineItem } from '@/types/timeline'
 import {
-  getItemAspectRatio,
+  computeCornerThumbnailSize,
   computeFittedMediaSize,
+  EditPanelCanvasAspectContext,
+  getItemAspectRatio,
   renderPanelMedia,
 } from './edit-panel-media-utils'
 
@@ -28,6 +30,7 @@ export function EditFourUpPanels({
 }: EditFourUpPanelsProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const [containerSize, setContainerSize] = useState({ width: 0, height: 0 })
+  const canvasAspect = useContext(EditPanelCanvasAspectContext)
   useEditOverlayPanelPrewarm([
     leftPanel,
     rightPanel,
@@ -58,13 +61,12 @@ export function EditFourUpPanels({
   const panelWidth = Math.max((containerSize.width - GAP) / 2, 1)
   const maxAreaHeight = containerSize.height - TEXT_SPACE
 
-  const leftNatural = panelWidth / getItemAspectRatio(leftPanel.item)
-  const rightNatural = panelWidth / getItemAspectRatio(rightPanel.item)
+  const leftNatural = panelWidth / getItemAspectRatio(leftPanel.item, canvasAspect)
+  const rightNatural = panelWidth / getItemAspectRatio(rightPanel.item, canvasAspect)
   const sharedAreaHeight = Math.max(1, Math.min(Math.max(leftNatural, rightNatural), maxAreaHeight))
 
-  // Corner thumbnail sizing
-  const cornerWidth = Math.max(panelWidth * CORNER_SCALE, 1)
-  const cornerHeight = Math.max(cornerWidth / (16 / 9), 1)
+  // Corner thumbnails take their item's shape, long edge a fraction of a panel.
+  const cornerEdge = panelWidth * CORNER_SCALE
 
   return (
     <div
@@ -78,8 +80,10 @@ export function EditFourUpPanels({
           item={topLeftCorner.item}
           sourceTime={topLeftCorner.sourceTime}
           sourceFrame={topLeftCorner.sourceFrame}
-          width={cornerWidth}
-          height={cornerHeight}
+          {...computeCornerThumbnailSize(
+            cornerEdge,
+            getItemAspectRatio(topLeftCorner.item, canvasAspect),
+          )}
           position="top-left"
         />
       )}
@@ -88,15 +92,27 @@ export function EditFourUpPanels({
           item={topRightCorner.item}
           sourceTime={topRightCorner.sourceTime}
           sourceFrame={topRightCorner.sourceFrame}
-          width={cornerWidth}
-          height={cornerHeight}
+          {...computeCornerThumbnailSize(
+            cornerEdge,
+            getItemAspectRatio(topRightCorner.item, canvasAspect),
+          )}
           position="top-right"
         />
       )}
 
       {/* Main panels */}
-      <MainPanel data={leftPanel} areaHeight={sharedAreaHeight} panelWidth={panelWidth} />
-      <MainPanel data={rightPanel} areaHeight={sharedAreaHeight} panelWidth={panelWidth} />
+      <MainPanel
+        data={leftPanel}
+        areaHeight={sharedAreaHeight}
+        panelWidth={panelWidth}
+        canvasAspect={canvasAspect}
+      />
+      <MainPanel
+        data={rightPanel}
+        areaHeight={sharedAreaHeight}
+        panelWidth={panelWidth}
+        canvasAspect={canvasAspect}
+      />
     </div>
   )
 }
@@ -105,10 +121,11 @@ interface MainPanelProps {
   data: EditTwoUpPanelData
   areaHeight: number
   panelWidth: number
+  canvasAspect: number
 }
 
-function MainPanel({ data, areaHeight, panelWidth }: MainPanelProps) {
-  const ar = getItemAspectRatio(data.item)
+function MainPanel({ data, areaHeight, panelWidth, canvasAspect }: MainPanelProps) {
+  const ar = getItemAspectRatio(data.item, canvasAspect)
   const { mediaWidth, mediaHeight } = computeFittedMediaSize(panelWidth, areaHeight, ar)
 
   return (
