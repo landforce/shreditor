@@ -163,7 +163,6 @@ const { values: opt, positionals } = parseArgs({
     browser: { type: 'boolean' },
     codec: { type: 'string' },
     quality: { type: 'string' },
-    role: { type: 'string' },
     preset: { type: 'string' },
   },
 })
