@@ -83,11 +83,12 @@ describe('FormatPanel', () => {
     expect(screen.getByText('None: hard cuts only')).toBeInTheDocument()
 
     const summary = await screen.findByTestId('format-summary')
-    expect(summary).toHaveTextContent('3 fail')
-    expect(summary).toHaveTextContent('4 warn')
+    // Pacing numbers are guidelines (warn); only format rules fail.
+    expect(summary).toHaveTextContent('2 fail')
+    expect(summary).toHaveTextContent('5 warn')
     expect(summary).toHaveTextContent('2 pass')
     const gap = screen.getByTestId('format-check-longestNoNewImageSec')
-    expect(gap).toHaveAttribute('data-status', 'fail')
+    expect(gap).toHaveAttribute('data-status', 'warn')
     expect(gap).toHaveTextContent('Longest stretch with no new image')
     expect(gap).toHaveTextContent('10 s')
     expect(gap).toHaveTextContent('<= 5 s')
