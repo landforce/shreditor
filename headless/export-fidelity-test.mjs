@@ -6,6 +6,8 @@
 //   source time that is not on an AAC packet boundary. Every click must land
 //   within 5 ms of its flash (it was 44-60 ms late: an uncompensated AAC
 //   encoder delay plus range decodes starting at the packet before the cut).
+//   Checked for MP4 (H.264 + AAC) and WebM (VP9 + Opus, which was 7 ms late:
+//   the Opus pre-skip was not in the track's CodecDelay).
 // - Colour: SMPTE bars as full-range BT.601 without a `colr` box (phone
 //   footage). The export must match the source decoded by its tags (it was
 //   decoded as BT.709, visibly yellow-green).
@@ -144,7 +146,7 @@ const track = (id, kind, order) => ({
   items: [],
 })
 
-function timeline(server) {
+function timeline(server, { container, codec }) {
   // Cut B starts at source frame 47 (75200 samples, 448 into an AAC packet).
   return {
     tracks: [track('v1', 'video', 0), track('a1', 'audio', 1)],
@@ -171,15 +173,15 @@ function timeline(server) {
     ],
     settings: {
       mode: 'video',
-      codec: 'avc',
-      container: 'mp4',
+      codec,
+      container,
       quality: 'high',
       resolution: { width: W, height: H },
       fps: FPS,
       videoBitrate: 8_000_000,
       audioBitrate: 192_000,
     },
-    outputFileName: 'fidelity.mp4',
+    outputFileName: `fidelity.${container}`,
   }
 }
 
@@ -309,57 +311,69 @@ async function main() {
     args: chromeLaunchArgs(),
   })
   try {
-    const page = await (await browser.newContext({ acceptDownloads: true })).newPage()
-    await page.goto(server.harnessUrl, { waitUntil: 'load', timeout: 60_000 })
-    await page.waitForFunction(() => Boolean(window.freecut?.ready), { timeout: 30_000 })
-    const download = page.waitForEvent('download', { timeout: 120_000 })
-    const summary = await page.evaluate(
-      (input) => window.freecut.renderTimeline(input),
-      timeline(server),
-    )
-    const output = path.join(tempDir, 'fidelity.mp4')
-    await (await download).saveAs(output)
-    assert.equal(summary.ok, true)
-
-    const { flashes, clicks } = measureAvSync(output)
-    const expected = [15, 43, 88].map((f) => f / FPS)
-    assert.deepEqual(
-      flashes.map((t) => Math.round(t * FPS)),
-      [15, 43, 88],
-      `flashes ${flashes}`,
-    )
-    const offsets = expected.map((t) => {
-      const click = clicks.reduce(
-        (best, c) => (Math.abs(c - t) < Math.abs(best - t) ? c : best),
-        Infinity,
+    const context = await browser.newContext({ acceptDownloads: true })
+    // MP4 (H.264 + AAC, priming in the edit list) and WebM (VP9 + Opus, pre-skip as CodecDelay).
+    for (const format of [
+      { container: 'mp4', codec: 'avc' },
+      { container: 'webm', codec: 'vp9' },
+    ]) {
+      const page = await context.newPage()
+      await page.goto(server.harnessUrl, { waitUntil: 'load', timeout: 60_000 })
+      await page.waitForFunction(() => Boolean(window.freecut?.ready), { timeout: 30_000 })
+      const output = path.join(tempDir, `fidelity.${format.container}`)
+      const download = page.waitForEvent('download', { timeout: 120_000 })
+      const summary = await page.evaluate(
+        (input) => window.freecut.renderTimeline(input),
+        timeline(server, format),
       )
-      return (click - t) * 1000
-    })
-    for (const offset of offsets)
-      assert.ok(Math.abs(offset) < 5, `click minus flash ${offsets.map((o) => o.toFixed(2))} ms`)
-
-    // Decoded as BT.709 the yellow bar's green is 15 levels low and cyan's red 15
-    // off. Decoded by its tags every bar is within ~5 (the hardware decoder's
-    // full-to-limited range step loses a few levels on saturated colours).
-    const exported = barColours(rgb(output, 105, 20))
-    const source = barColours(rgb(fixtures.bars, 5, 20))
-    const colour = Math.max(
-      ...exported.flatMap((bar, i) => bar.map((v, c) => Math.abs(v - source[i][c]))),
-    )
-    assert.ok(
-      colour < 8,
-      `full-range BT.601 bar colours differ from the source by up to ${colour.toFixed(1)} levels`,
-    )
-
-    process.stdout.write(
-      `Export fidelity passed: click-flash ${offsets.map((o) => o.toFixed(2)).join(', ')} ms; ` +
-        `BT.601 full-range bar colours within ${colour.toFixed(1)} levels of the source\n`,
-    )
+      await (await download).saveAs(output)
+      await page.close()
+      assert.equal(summary.ok, true)
+      checkExport(output, fixtures, format.container)
+    }
   } finally {
     await browser.close()
     await server.close()
     fs.rmSync(tempDir, { recursive: true, force: true })
   }
+}
+
+// fallow-ignore-next-line complexity
+function checkExport(output, fixtures, label) {
+  const { flashes, clicks } = measureAvSync(output)
+  const expected = [15, 43, 88].map((f) => f / FPS)
+  assert.deepEqual(
+    flashes.map((t) => Math.round(t * FPS)),
+    [15, 43, 88],
+    `flashes ${flashes}`,
+  )
+  const offsets = expected.map((t) => {
+    const click = clicks.reduce(
+      (best, c) => (Math.abs(c - t) < Math.abs(best - t) ? c : best),
+      Infinity,
+    )
+    return (click - t) * 1000
+  })
+  for (const offset of offsets)
+    assert.ok(Math.abs(offset) < 5, `${label}: click minus flash ${offsets.map((o) => o.toFixed(2))} ms`)
+
+  // Decoded as BT.709 the yellow bar's green is 15 levels low and cyan's red 15
+  // off. Decoded by its tags every bar is within ~5 (the hardware decoder's
+  // full-to-limited range step loses a few levels on saturated colours).
+  const exported = barColours(rgb(output, 105, 20))
+  const source = barColours(rgb(fixtures.bars, 5, 20))
+  const colour = Math.max(
+    ...exported.flatMap((bar, i) => bar.map((v, c) => Math.abs(v - source[i][c]))),
+  )
+  assert.ok(
+    colour < 8,
+    `${label}: full-range BT.601 bar colours differ from the source by up to ${colour.toFixed(1)} levels`,
+  )
+
+  process.stdout.write(
+    `Export fidelity passed (${label}): click-flash ${offsets.map((o) => o.toFixed(2)).join(', ')} ms; ` +
+      `BT.601 full-range bar colours within ${colour.toFixed(1)} levels of the source\n`,
+  )
 }
 
 main().catch((error) => {
