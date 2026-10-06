@@ -1505,6 +1505,7 @@ export async function createCompositionRenderer(
         getCachedPredecodedBitmap,
         getCachedActivePreviewFallbackBitmap,
         isActivePreviewFrameCurrent,
+        isActivePreviewFallbackAllowed,
         isActivePreviewFrameDecodeReady,
         isActivePreviewSourceTarget,
         isActivePreviewFrameSuperseded,
@@ -1517,6 +1518,7 @@ export async function createCompositionRenderer(
         itemRenderContext.getCachedActivePreviewFallbackBitmap =
           getCachedActivePreviewFallbackBitmap
         itemRenderContext.isActivePreviewFrameCurrent = isActivePreviewFrameCurrent
+        itemRenderContext.isActivePreviewFallbackAllowed = isActivePreviewFallbackAllowed
         itemRenderContext.isActivePreviewFrameDecodeReady = isActivePreviewFrameDecodeReady
         itemRenderContext.isActivePreviewSourceTarget = isActivePreviewSourceTarget
         itemRenderContext.isActivePreviewFrameSuperseded = isActivePreviewFrameSuperseded

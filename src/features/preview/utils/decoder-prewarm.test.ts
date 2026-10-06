@@ -9,12 +9,14 @@ import {
   disposePrewarmWorker,
   getCachedActivePreviewFallbackBitmap,
   getDecoderPrewarmMetricsSnapshot,
+  isActivePreviewFallbackAllowed,
   isActivePreviewFrameCurrent,
   isActivePreviewFrameDecodeReady,
   isActivePreviewSourceTarget,
   replaceActivePreviewSourceTargets,
   setActivePreviewRenderTarget,
   settleActivePreviewRenderTarget,
+  subscribeActivePreviewReady,
   waitForInflightPredecodedBitmap,
   warmDecoderPrewarmWorkerPool,
 } from './decoder-prewarm'
@@ -403,7 +405,7 @@ describe('decoder prewarm', () => {
   it('presents a bounded fallback first and replaces it with the exact decoded frame', async () => {
     const fallbackBitmap = { close: vi.fn() } as unknown as ImageBitmap
     registerObjectUrl('blob:fallback', new Blob(['fallback']))
-    setActivePreviewRenderTarget(44)
+    setActivePreviewRenderTarget(44, { moving: true })
     replaceActivePreviewSourceTargets(new Map([['blob:fallback', [2]]]))
 
     cacheActivePreviewFallbackBitmap('blob:fallback', 2, 2.2, fallbackBitmap)
@@ -420,7 +422,7 @@ describe('decoder prewarm', () => {
   it('keeps the active session alive after fallback presentation until exact settlement', async () => {
     const fallbackBitmap = { close: vi.fn() } as unknown as ImageBitmap
     registerObjectUrl('blob:settle', new Blob(['settle']))
-    setActivePreviewRenderTarget(45)
+    setActivePreviewRenderTarget(45, { moving: true })
     replaceActivePreviewSourceTargets(new Map([['blob:settle', [3]]]))
     cacheActivePreviewFallbackBitmap('blob:settle', 3, 3, fallbackBitmap)
 
@@ -433,6 +435,61 @@ describe('decoder prewarm', () => {
     await new Promise((resolve) => setTimeout(resolve, 180))
     expect(isActivePreviewFrameCurrent(45)).toBe(false)
     expect(getCachedActivePreviewFallbackBitmap('blob:settle', 3)).toBeNull()
+  })
+
+  it('lets a fallback stand in only while the pointer is moving through the target', () => {
+    vi.useFakeTimers()
+    try {
+      const fallbackBitmap = { close: vi.fn() } as unknown as ImageBitmap
+      setActivePreviewRenderTarget(46, { moving: true })
+      replaceActivePreviewSourceTargets(new Map([['blob:motion', [4]]]))
+      cacheActivePreviewFallbackBitmap('blob:motion', 4, 4, fallbackBitmap)
+      expect(isActivePreviewFallbackAllowed(46)).toBe(true)
+      expect(isActivePreviewFrameDecodeReady(46)).toBe(true)
+
+      // Held still past the motion window: wait for the exact frame instead.
+      vi.advanceTimersByTime(200)
+      expect(isActivePreviewFallbackAllowed(46)).toBe(false)
+      expect(isActivePreviewFrameDecodeReady(46)).toBe(false)
+
+      // A release/pause target is settled from the start.
+      setActivePreviewRenderTarget(46)
+      expect(isActivePreviewFallbackAllowed(46)).toBe(false)
+      expect(isActivePreviewFallbackAllowed(47)).toBe(false)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('discards a fallback that arrives after the exact frame for the same target', async () => {
+    registerObjectUrl('blob:late', new Blob(['late']))
+    setActivePreviewRenderTarget(48, { moving: true })
+    replaceActivePreviewSourceTargets(new Map([['blob:late', [5]]]))
+    await activePreviewPreseek({ src: 'blob:late', timestamp: 5 })
+
+    const lateFallback = { close: vi.fn() } as unknown as ImageBitmap
+    expect(cacheActivePreviewFallbackBitmap('blob:late', 5, 5.1, lateFallback)).toBe(false)
+    expect(lateFallback.close).toHaveBeenCalledOnce()
+    expect(getCachedActivePreviewFallbackBitmap('blob:late', 5)).toBeNull()
+    expect(getDecoderPrewarmMetricsSnapshot().lateFallbackDiscards).toBeGreaterThan(0)
+  })
+
+  it('wakes the renderer for a new fallback only while the target is moving', () => {
+    const ready = vi.fn()
+    subscribeActivePreviewReady(ready)
+    setActivePreviewRenderTarget(49, { moving: true })
+    replaceActivePreviewSourceTargets(new Map([['blob:wake', [6, 7]]]))
+    cacheActivePreviewFallbackBitmap('blob:wake', 6, 6, {
+      close: vi.fn(),
+    } as unknown as ImageBitmap)
+    expect(ready).toHaveBeenCalledWith('blob:wake', 6)
+
+    ready.mockClear()
+    setActivePreviewRenderTarget(49)
+    cacheActivePreviewFallbackBitmap('blob:wake', 7, 7, {
+      close: vi.fn(),
+    } as unknown as ImageBitmap)
+    expect(ready).not.toHaveBeenCalled()
   })
 
   it('gates an active composition until every exact source target is cached', async () => {
