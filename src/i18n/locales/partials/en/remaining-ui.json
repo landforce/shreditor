@@ -253,6 +253,19 @@
     "toasts": {
       "itemsUpdated": "{{count}} item(s) updated.",
       "itemsUpdatedFailed": "{{count}} item(s) updated. Failed: {{failed}}"
+    },
+    "models": {
+      "title": "Models and licenses",
+      "local": "Transcription runs on this computer; your audio is never uploaded. In-browser models are downloaded once from Hugging Face and cached.",
+      "nativeReady": "Imports are transcribed in the background by whisper.cpp {{version}} with {{model}}.",
+      "nativeMissing": "Background transcription is off: {{hint}}",
+      "whisperCpp": "native background transcription; runs your installed whisper-cli",
+      "whisperWeights": "large-v3-turbo for native transcription; tiny, base, small and large-v3-turbo in the browser",
+      "parakeet": "default in-browser transcription, © NVIDIA, attribution required; loaded from the community ONNX conversion Olicorne/parakeet-tdt-0.6b-v3-smoothquant-onnx (CC-BY-4.0)",
+      "transformers": "runs Whisper and other models in the browser",
+      "onnx": "in-browser inference runtime",
+      "mediabunny": "media reading, decoding and export in the browser",
+      "ffmpeg": "runs your installed ffmpeg and ffprobe; the license of your build applies"
     }
   },
   "projects": {
