@@ -9,6 +9,10 @@ import { z } from 'zod'
 import { TEXT_STYLE_PRESET_IDS } from '@/shared/typography/text-style-preset-ids'
 import { FORMAT_ROLES, getFormat, type FormatRole } from '@formats/registry.mjs'
 import { SNAPSHOT_VERSION } from '../types/snapshot'
+import {
+  AUDIO_DYNAMICS_FIELD_SPECS,
+  type AudioDynamicsItemField,
+} from '@/shared/utils/audio-dynamics'
 
 const formatRoleSchema = z.enum(FORMAT_ROLES as readonly [FormatRole, ...FormatRole[]])
 
@@ -46,6 +50,25 @@ const easingConfigSchema = z.object({
   bezier: bezierControlPointsSchema.optional(),
   spring: springParametersSchema.optional(),
 })
+
+/**
+ * Clip dynamics stage (`audioDenoise`, `audioCompressor`, ...): `{ enabled, ...settings }`
+ * with the ranges from AUDIO_DYNAMICS_FIELD_SPECS. Unknown settings are rejected;
+ * `null` means off.
+ */
+function audioDynamicsStageSchema(field: AudioDynamicsItemField) {
+  const settings = Object.fromEntries(
+    Object.entries(AUDIO_DYNAMICS_FIELD_SPECS[field]).map(([key, spec]) => [
+      key,
+      z.number().min(spec.min).max(spec.max).optional(),
+    ]),
+  )
+  return z
+    .object({ enabled: z.boolean(), ...settings })
+    .strict()
+    .nullable()
+    .optional()
+}
 
 const audioEqCutSlopeSchema = z.union([z.literal(6), z.literal(12), z.literal(18), z.literal(24)])
 
@@ -582,6 +605,10 @@ const timelineItemSchema = z
     audioEqHighCutEnabled: z.boolean().optional(),
     audioEqHighCutFrequencyHz: z.number().min(1400).max(22000).optional(),
     audioEqHighCutSlopeDbPerOct: audioEqCutSlopeSchema.optional(),
+    audioDenoise: audioDynamicsStageSchema('audioDenoise'),
+    audioCompressor: audioDynamicsStageSchema('audioCompressor'),
+    audioDeEsser: audioDynamicsStageSchema('audioDeEsser'),
+    audioLimiter: audioDynamicsStageSchema('audioLimiter'),
     audioDucking: z
       .object({
         duckOthersDb: z.number().min(-60).max(0),

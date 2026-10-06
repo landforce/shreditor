@@ -17,6 +17,7 @@ import { PropertyRow, PropertySection, SliderInput } from '../components'
 import { getMixedValue } from '../utils'
 import { getAudioSectionItems } from './audio-section-utils'
 import { AudioEqPanelContent } from './audio-eq-panel-content'
+import { AudioDynamicsSection } from './audio-dynamics-section'
 import {
   AUDIO_PITCH_CENTS_MAX,
   AUDIO_PITCH_CENTS_MIN,
@@ -36,7 +37,7 @@ const AUDIO_GAIN_DB_MAX = 12
 const AUDIO_PITCH_LIVE_THROTTLE_MS = 50
 
 /**
- * Audio section - volume, EQ, and audio fades.
+ * Audio section - volume, fades, pitch, EQ and dynamics (noise reduction, compressor, limiter).
  * Shown for video and audio clips.
  */
 export function AudioSection({ items }: AudioSectionProps) {
@@ -435,6 +436,8 @@ export function AudioSection({ items }: AudioSectionProps) {
       <PropertySection title={t('editor.audioSection.equalizer')} defaultOpen={true}>
         <AudioEqPanelContent items={items} targetLabel="" layoutMode="compact" />
       </PropertySection>
+
+      <AudioDynamicsSection items={items} />
     </>
   )
 }

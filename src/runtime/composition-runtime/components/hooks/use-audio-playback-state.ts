@@ -18,6 +18,7 @@ import { resolvePreviewAudioPitchShiftSemitones } from '@/shared/utils/audio-pit
 import { useMixerLiveGainProduct, clearMixerLiveGain } from '@/shared/state/mixer-live-gain'
 import type { ResolvedAudioEqSettings } from '@/types/audio'
 import type { AudioPlaybackProps } from '../audio-playback-props'
+import type { PreviewClipDynamicsTarget } from '../../utils/preview-clip-dynamics'
 
 interface AudioPlaybackState {
   frame: number
@@ -28,6 +29,7 @@ interface AudioPlaybackState {
   resolvedVolume: number
   resolvedPitchShiftSemitones: number
   resolvedAudioEqStages: ResolvedAudioEqSettings[]
+  audioDynamicsTarget: PreviewClipDynamicsTarget
 }
 
 export function useAudioPlaybackState({
@@ -46,6 +48,7 @@ export function useAudioPlaybackState({
   audioPitchCents,
   audioPitchShiftSemitones,
   audioEqStages,
+  audioDynamics = null,
   clipFadeSpans,
   contentStartOffsetFrames = 0,
   contentEndOffsetFrames = 0,
@@ -145,6 +148,14 @@ export function useAudioPlaybackState({
     [audioEqStages, preview],
   )
 
+  // Master bus and monitor volume sit before the limiter in preview but after
+  // it in export; the limiter scales its ceiling by them (see ClipLimiter).
+  const limiterInputScale = masterBusGain * effectiveMonitorVolume
+  const audioDynamicsTarget = useMemo(
+    () => ({ dynamics: audioDynamics, limiterInputScale }),
+    [audioDynamics, limiterInputScale],
+  )
+
   return {
     frame,
     fps,
@@ -159,5 +170,6 @@ export function useAudioPlaybackState({
       mixerGain,
     resolvedPitchShiftSemitones,
     resolvedAudioEqStages,
+    audioDynamicsTarget,
   }
 }

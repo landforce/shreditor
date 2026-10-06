@@ -34,6 +34,7 @@ import { isGifUrl, isWebpUrl } from '@/shared/utils/media-utils'
 import { useMediaLibraryStore } from '@/runtime/composition-runtime/deps/stores'
 import { createLogger } from '@/shared/logging/logger'
 import { appendResolvedAudioEqStage, getAudioEqSettings } from '@/shared/utils/audio-eq'
+import { resolveAudioDynamics } from '@/shared/utils/audio-dynamics'
 import {
   isAudioPitchShiftActive,
   resolvePreviewAudioPitchShiftSemitones,
@@ -126,6 +127,7 @@ function getItemAudioPlaybackProps({
     audioPitchSemitones: item.audioPitchSemitones,
     audioPitchCents: item.audioPitchCents,
     audioPitchShiftSemitones,
+    audioDynamics: resolveAudioDynamics(item),
     sourceFps,
     muted,
     durationInFrames: item.durationInFrames,

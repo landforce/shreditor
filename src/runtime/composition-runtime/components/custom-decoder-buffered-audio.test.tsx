@@ -12,6 +12,7 @@ vi.mock('../utils/audio-decode-cache', () => audioDecodeMocks)
 vi.mock('./hooks/use-audio-playback-state', () => ({
   useAudioPlaybackState: vi.fn(() => playbackStateMocks.current),
 }))
+vi.mock('./hooks/use-preview-clip-dynamics', () => ({ usePreviewClipDynamics: vi.fn() }))
 
 import { CustomDecoderBufferedAudio } from './custom-decoder-buffered-audio'
 

@@ -140,7 +140,7 @@ describe('preview-audio-graph', () => {
     expect(firstStage.highNode.frequency.value).toBe(AUDIO_EQ_HIGH_FREQUENCY_HZ)
     expect(firstStage.band6PassNodes).toHaveLength(0)
 
-    expect(getConnections(graph!.sourceInputNode)).toEqual([firstStage.band1BypassNode])
+    expect(getConnections(graph!.eqInputNode)).toEqual([firstStage.band1BypassNode])
     expect(getConnections(firstStage.band1BypassNode)).toEqual([firstStage.lowNode])
     expect(getConnections(firstStage.lowNode)).toEqual([firstStage.lowMidNode])
     expect(getConnections(firstStage.lowMidNode)).toEqual([firstStage.midPeakingNode])
@@ -152,7 +152,11 @@ describe('preview-audio-graph', () => {
     expect(getConnections(secondStage.band1BypassNode)).toEqual([secondStage.lowNode])
     expect(getConnections(secondStage.highNode)).toEqual([secondStage.band6BypassNode])
     expect(getConnections(secondStage.band6BypassNode)).toEqual([secondStage.outputGainNode])
-    expect(getConnections(secondStage.outputGainNode)).toEqual([graph!.outputGainNode])
+    expect(getConnections(secondStage.outputGainNode)).toEqual([graph!.eqOutputNode])
+    // Clip dynamics stages are off: the junctions pass straight through.
+    expect(getConnections(graph!.sourceInputNode)).toEqual([graph!.eqInputNode])
+    expect(getConnections(graph!.eqOutputNode)).toEqual([graph!.outputGainNode])
+    expect(getConnections(graph!.outputGainNode)).toEqual([graph!.context.destination])
   })
 
   it('creates cut nodes when needed and ramps frequency, gain, and Q parameters', () => {
@@ -185,11 +189,11 @@ describe('preview-audio-graph', () => {
     const stage = graph!.eqStageNodes[0]!
     expect(stage.band1PassNodes).toHaveLength(3)
     expect(stage.band6PassNodes).toHaveLength(4)
-    expect(getConnections(graph!.sourceInputNode)[0]).toBe(stage.band1PassNodes[0])
+    expect(getConnections(graph!.eqInputNode)[0]).toBe(stage.band1PassNodes[0])
     expect(getConnections(stage.band1PassNodes.at(-1)!)[0]).toBe(stage.lowNode)
     expect(getConnections(stage.highNode)[0]).toBe(stage.band6PassNodes[0])
     expect(getConnections(stage.band6PassNodes.at(-1)!)[0]).toBe(stage.outputGainNode)
-    expect(getConnections(stage.outputGainNode)[0]).toBe(graph!.outputGainNode)
+    expect(getConnections(stage.outputGainNode)[0]).toBe(graph!.eqOutputNode)
 
     expect(stage.lowNode.frequency.value).toBe(150)
     expect(stage.lowNode.gain.value).toBe(1)
@@ -281,11 +285,11 @@ describe('preview-audio-graph', () => {
     expect(getRampCalls(stage.highNode.frequency).at(-1)).toEqual({ value: 7200, time: 2.25 })
   })
 
-  it('hot-swaps topology-changing EQ updates without disconnecting the source input node again', () => {
+  it('hot-swaps topology-changing EQ updates without disconnecting the EQ input node again', () => {
     const graph = createPreviewClipAudioGraph({ eqStageCount: 1 })
     expect(graph).not.toBeNull()
 
-    const sourceInputNode = graph!.sourceInputNode as unknown as ConnectableNodeMock
+    const sourceInputNode = graph!.eqInputNode as unknown as ConnectableNodeMock
     const disconnectAllCallsBefore = sourceInputNode.disconnectAllCalls
 
     setPreviewClipEq(graph!, [
@@ -304,7 +308,7 @@ describe('preview-audio-graph', () => {
     expect(sourceInputNode.disconnectTargetCalls).toBeGreaterThan(0)
     expect(stage.band1PassNodes).toHaveLength(3)
     expect(stage.band6PassNodes).toHaveLength(4)
-    expect(getConnections(graph!.sourceInputNode)).toEqual([stage.band1PassNodes[0]])
-    expect(getConnections(stage.outputGainNode)).toEqual([graph!.outputGainNode])
+    expect(getConnections(graph!.eqInputNode)).toEqual([stage.band1PassNodes[0]])
+    expect(getConnections(stage.outputGainNode)).toEqual([graph!.eqOutputNode])
   })
 })

@@ -6,6 +6,12 @@ import {
   clampAudioEqFrequencyForSampleRate,
 } from '@/shared/utils/audio-eq'
 import type { ResolvedAudioEqSettings } from '@/types/audio'
+import {
+  connectPreviewClipDynamicsBypass,
+  createPreviewClipDynamicsState,
+  disposePreviewClipDynamics,
+  type PreviewClipDynamicsState,
+} from './preview-clip-dynamics'
 
 export const PREVIEW_AUDIO_GAIN_RAMP_SECONDS = 0.008
 const PREVIEW_AUDIO_EQ_RAMP_SECONDS = 0.012
@@ -29,8 +35,12 @@ interface PreviewClipAudioEqStageNodes {
 export interface PreviewClipAudioGraph {
   context: AudioContext
   sourceInputNode: GainNode
+  /** Junctions around the EQ stages, where the clip dynamics stages attach. */
+  eqInputNode: GainNode
+  eqOutputNode: GainNode
   outputGainNode: GainNode
   eqStageNodes: PreviewClipAudioEqStageNodes[]
+  dynamicsState: PreviewClipDynamicsState
   dispose: () => void
 }
 
@@ -354,20 +364,20 @@ function createPreviewClipAudioEqStage(
 }
 
 function reconnectPreviewClipAudioGraph(graph: PreviewClipAudioGraph): void {
-  graph.sourceInputNode.disconnect()
+  graph.eqInputNode.disconnect()
   for (const stageNodes of graph.eqStageNodes) {
     disconnectStageInternals(stageNodes)
     connectStageInternals(stageNodes)
   }
 
-  let previousNode: AudioNode = graph.sourceInputNode
+  let previousNode: AudioNode = graph.eqInputNode
   for (const stageNodes of graph.eqStageNodes) {
     const band1Entry = getBand1EntryNode(stageNodes)
     previousNode.connect(band1Entry)
     previousNode = stageNodes.outputGainNode
   }
 
-  previousNode.connect(graph.outputGainNode)
+  previousNode.connect(graph.eqOutputNode)
 }
 
 function disconnectNodeFromTarget(source: AudioNode, target: AudioNode): void {
@@ -379,12 +389,12 @@ function disconnectNodeFromTarget(source: AudioNode, target: AudioNode): void {
 }
 
 function getStagePreviousNode(graph: PreviewClipAudioGraph, index: number): AudioNode {
-  return index === 0 ? graph.sourceInputNode : graph.eqStageNodes[index - 1]!.outputGainNode
+  return index === 0 ? graph.eqInputNode : graph.eqStageNodes[index - 1]!.outputGainNode
 }
 
 function getStageNextNode(graph: PreviewClipAudioGraph, index: number): AudioNode {
   if (index >= graph.eqStageNodes.length - 1) {
-    return graph.outputGainNode
+    return graph.eqOutputNode
   }
 
   return getBand1EntryNode(graph.eqStageNodes[index + 1]!)
@@ -492,6 +502,8 @@ export function createPreviewClipAudioGraph(options?: {
   }
 
   const sourceInputNode = context.createGain()
+  const eqInputNode = context.createGain()
+  const eqOutputNode = context.createGain()
   const outputGainNode = context.createGain()
   outputGainNode.gain.value = 0
 
@@ -503,19 +515,25 @@ export function createPreviewClipAudioGraph(options?: {
   const graph: PreviewClipAudioGraph = {
     context,
     sourceInputNode,
+    eqInputNode,
+    eqOutputNode,
     outputGainNode,
     eqStageNodes,
+    dynamicsState: createPreviewClipDynamicsState(),
     dispose: () => {
+      disposePreviewClipDynamics(graph)
       sourceInputNode.disconnect()
-      for (const stageNodes of eqStageNodes) {
+      eqInputNode.disconnect()
+      for (const stageNodes of graph.eqStageNodes) {
         disconnectStageInternals(stageNodes)
       }
+      eqOutputNode.disconnect()
       outputGainNode.disconnect()
     },
   }
 
   reconnectPreviewClipAudioGraph(graph)
-  outputGainNode.connect(context.destination)
+  connectPreviewClipDynamicsBypass(graph)
   return graph
 }
 

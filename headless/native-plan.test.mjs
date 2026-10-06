@@ -397,4 +397,25 @@ test('audio mix: dB gains, fades, placement, linked audio, mute and fallbacks', 
   assert.equal(fast.audio.route, 'browser')
   assert.match(fast.audio.reasons.join(), /speed/)
   assert.match(describePlan(fast).at(-1), /browser mix/)
+
+  // Clip dynamics are only in the browser mix: an enabled stage must route there.
+  for (const field of ['audioDenoise', 'audioCompressor', 'audioDeEsser', 'audioLimiter']) {
+    const processed = planNativeExport({
+      project: project({
+        tracks,
+        items: items.map((i) => (i.id === 'music' ? { ...i, [field]: { enabled: true } } : i)),
+      }),
+      media: media(probes),
+    })
+    assert.equal(processed.audio.route, 'browser', field)
+    assert.match(processed.audio.reasons.join(), /limiter/)
+  }
+  const disabled = planNativeExport({
+    project: project({
+      tracks,
+      items: items.map((i) => (i.id === 'music' ? { ...i, audioLimiter: { enabled: false } } : i)),
+    }),
+    media: media(probes),
+  })
+  assert.equal(disabled.audio.route, 'native')
 })

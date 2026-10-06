@@ -62,6 +62,7 @@
   "dependencies": {
     "@hookform/resolvers": "5.2.2",
     "@huggingface/transformers": "4.1.0",
+    "@jitsi/rnnoise-wasm": "0.2.1",
     "@lottiefiles/dotlottie-web": "0.76.0",
     "@mediabunny/aac-encoder": "1.50.8",
     "@mediabunny/ac3": "1.50.8",

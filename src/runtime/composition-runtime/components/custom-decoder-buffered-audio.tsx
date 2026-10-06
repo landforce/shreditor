@@ -9,6 +9,7 @@ import { createLogger } from '@/shared/logging/logger'
 import type { AudioPlaybackProps } from './audio-playback-props'
 import { getBrowserMediaPlaybackRate } from '@/shared/state/playback/shuttle'
 import { useAudioPlaybackState } from './hooks/use-audio-playback-state'
+import { usePreviewClipDynamics } from './hooks/use-preview-clip-dynamics'
 import { useReverseShuttleAudio } from './hooks/use-reverse-shuttle-audio'
 import {
   createPreviewClipAudioGraph,
@@ -111,6 +112,7 @@ export const CustomDecoderBufferedAudio: React.FC<CustomDecoderBufferedAudioProp
     audioFadeInCurveX = 0.52,
     audioFadeOutCurveX = 0.52,
     audioEqStages,
+    audioDynamics,
     clipFadeSpans,
     contentStartOffsetFrames = 0,
     contentEndOffsetFrames = 0,
@@ -129,6 +131,7 @@ export const CustomDecoderBufferedAudio: React.FC<CustomDecoderBufferedAudioProp
       transportPlaybackRate,
       resolvedVolume: audioVolume,
       resolvedAudioEqStages,
+      audioDynamicsTarget,
     } = useAudioPlaybackState({
       itemId,
       liveGainItemIds,
@@ -142,6 +145,7 @@ export const CustomDecoderBufferedAudio: React.FC<CustomDecoderBufferedAudioProp
       audioFadeInCurveX,
       audioFadeOutCurveX,
       audioEqStages,
+      audioDynamics,
       clipFadeSpans,
       contentStartOffsetFrames,
       contentEndOffsetFrames,
@@ -665,6 +669,8 @@ export const CustomDecoderBufferedAudio: React.FC<CustomDecoderBufferedAudioProp
       if (!graph) return
       rampPreviewClipEq(graph, resolvedAudioEqStages)
     }, [resolvedAudioEqStages])
+
+    usePreviewClipDynamics(graphRef, audioDynamicsTarget, isPreviewScrubbing)
 
     useReverseShuttleAudio({
       graphRef,

@@ -123,6 +123,7 @@ vi.mock('../utils/audio-decode-cache', () => audioDecodeMocks)
 vi.mock('./hooks/use-audio-playback-state', () => ({
   useAudioPlaybackState: vi.fn(() => playbackStateMocks.current),
 }))
+vi.mock('./hooks/use-preview-clip-dynamics', () => ({ usePreviewClipDynamics: vi.fn() }))
 vi.mock('../utils/preview-audio-element-pool', () => previewAudioMocks)
 vi.mock('../utils/preview-audio-graph', () => previewGraphMocks)
 vi.mock('@/runtime/composition-runtime/deps/stores', () => storeMocks)

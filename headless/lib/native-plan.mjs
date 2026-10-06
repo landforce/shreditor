@@ -464,6 +464,10 @@ const EQ_FIELD = /^audioEq/
 const hasItemEq = (item) =>
   Object.keys(item).some((k) => EQ_FIELD.test(k) && item[k] !== undefined && item[k] !== false)
 
+/** Clip dynamics (src/shared/utils/audio-dynamics.ts): a stage counts when `enabled: true`. */
+const DYNAMICS_FIELDS = ['audioDenoise', 'audioCompressor', 'audioDeEsser', 'audioLimiter']
+const hasItemDynamics = (item) => DYNAMICS_FIELDS.some((k) => item[k]?.enabled === true)
+
 /** Project-level audio features the native mix does not reproduce. */
 const AUDIO_PROJECT_RULES = [
   [(p) => p.tracks.some((t) => t.solo), 'a solo track'],
@@ -478,6 +482,7 @@ const AUDIO_CLIP_RULES = [
   [(a) => a.item.isReversed, 'reversed'],
   [(a) => a.item.audioPitchSemitones || a.item.audioPitchCents, 'pitch'],
   [(a) => hasItemEq(a.item) || a.track.audioEq, 'EQ'],
+  [(a) => hasItemDynamics(a.item), 'noise reduction / compressor / de-esser / limiter'],
   [(a) => isKeyframed(a.item, a.ctx), 'keyframes'],
   [(a) => (a.item.audioFadeInCurve ?? 0) !== 0 || (a.item.audioFadeOutCurve ?? 0) !== 0, 'curved fades'],
   [(a) => Number(a.stream.channels) > 2, (a) => `${a.stream.channels}-channel source`],

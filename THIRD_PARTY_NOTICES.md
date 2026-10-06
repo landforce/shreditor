@@ -24,6 +24,15 @@ The editor lists the transcription entries under Settings > AI > Models and lice
 | [Mediabunny](https://github.com/Vanilagy/mediabunny) and `@mediabunny/prores` (also `@mediabunny/aac-encoder`, `mp3-encoder`, `ac3`) | MPL-2.0 | Reading, decoding and exporting media in the browser. Unmodified npm packages; source at the link. |
 | [FFmpeg](https://ffmpeg.org/) | LGPL-2.1+ or GPL, depending on the build | Not bundled. The bridge and CLI run the user's installed `ffmpeg`/`ffprobe`; the license of that build applies. |
 
+## Audio processing
+
+| Component | License | How Shreditor uses it |
+|---|---|---|
+| [RNNoise](https://github.com/xiph/rnnoise) (Jean-Marc Valin, Xiph.Org, Mozilla) | BSD-3-Clause | Per-clip noise reduction (`audioDenoise`), compiled into the WebAssembly below. Runs in the preview AudioWorklet and in the export mix. |
+| [@jitsi/rnnoise-wasm](https://github.com/jitsi/rnnoise-wasm) 0.2.1 | Apache-2.0 | The RNNoise WebAssembly build Shreditor loads (`dist/rnnoise-sync.js`, wasm inlined so it instantiates synchronously inside an AudioWorklet). Unmodified npm package; license in `node_modules/@jitsi/rnnoise-wasm/LICENSE`. |
+
+The compressor, de-esser and limiter are Shreditor's own code (`src/infrastructure/audio/clip-dynamics/`).
+
 ## Other optional in-browser models
 
 Loaded only when the matching feature is used. Licenses as tagged on each Hugging Face repository at the time of writing; check the model card before commercial use.

@@ -45,6 +45,10 @@ type StableVideoRenderBaseSignature = {
   reverseConformLocalStart: number | undefined
   audioPitchSemitones: number
   audioPitchCents: number
+  audioDenoise: StableVideoSequenceComparatorItem['audioDenoise']
+  audioCompressor: StableVideoSequenceComparatorItem['audioCompressor']
+  audioDeEsser: StableVideoSequenceComparatorItem['audioDeEsser']
+  audioLimiter: StableVideoSequenceComparatorItem['audioLimiter']
 }
 
 type StableVideoRenderSignature = StableVideoRenderBaseSignature & {
@@ -80,6 +84,10 @@ function getStableVideoRenderBaseSignature(
     reverseConformLocalStart: item.reverseConformLocalStart,
     audioPitchSemitones: item.audioPitchSemitones ?? 0,
     audioPitchCents: item.audioPitchCents ?? 0,
+    audioDenoise: item.audioDenoise,
+    audioCompressor: item.audioCompressor,
+    audioDeEsser: item.audioDeEsser,
+    audioLimiter: item.audioLimiter,
   }
 }
 
@@ -125,7 +133,11 @@ function areStableVideoRenderBaseSignaturesEqual(
     prevSignature.reverseConformStatus === nextSignature.reverseConformStatus &&
     prevSignature.reverseConformLocalStart === nextSignature.reverseConformLocalStart &&
     prevSignature.audioPitchSemitones === nextSignature.audioPitchSemitones &&
-    prevSignature.audioPitchCents === nextSignature.audioPitchCents
+    prevSignature.audioPitchCents === nextSignature.audioPitchCents &&
+    prevSignature.audioDenoise === nextSignature.audioDenoise &&
+    prevSignature.audioCompressor === nextSignature.audioCompressor &&
+    prevSignature.audioDeEsser === nextSignature.audioDeEsser &&
+    prevSignature.audioLimiter === nextSignature.audioLimiter
   )
 }
 

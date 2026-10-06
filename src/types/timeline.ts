@@ -152,6 +152,12 @@ type BaseTimelineItem = {
   audioEqHighCutEnabled?: boolean // Enable high cut / low-pass filter
   audioEqHighCutFrequencyHz?: number // High cut frequency in Hz
   audioEqHighCutSlopeDbPerOct?: 6 | 12 | 18 | 24 // High cut slope
+  // Clip dynamics (all optional; absent = off). Chain order:
+  // noise reduction -> EQ -> compressor -> de-esser -> volume/fades -> limiter.
+  audioDenoise?: import('@/types/audio').AudioDenoiseSettings
+  audioCompressor?: import('@/types/audio').AudioCompressorSettings
+  audioDeEsser?: import('@/types/audio').AudioDeEsserSettings
+  audioLimiter?: import('@/types/audio').AudioLimiterSettings
   /**
    * Sidechain ducking: while THIS item is audible, other audio in the mix is
    * attenuated by `duckOthersDb` with attack/release ramps. Scope with

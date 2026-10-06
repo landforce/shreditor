@@ -53,6 +53,7 @@ const workletNodeMocks = vi.hoisted(() => ({
 vi.mock('./hooks/use-audio-playback-state', () => ({
   useAudioPlaybackState: vi.fn(() => playbackStateMocks.current),
 }))
+vi.mock('./hooks/use-preview-clip-dynamics', () => ({ usePreviewClipDynamics: vi.fn() }))
 vi.mock('../utils/preview-audio-graph', () => ({
   createPreviewClipAudioGraph: previewGraphMocks.createPreviewClipAudioGraph,
   rampPreviewClipEq: previewGraphMocks.rampPreviewClipEq,
