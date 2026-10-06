@@ -138,10 +138,14 @@ export function createActivity({
       return { targetId, record }
     },
 
-    /** Before publishing: refuse when the user stopped the pass or chose to edit. */
-    async beforePublish(draftId, targetId) {
+    /**
+     * Before publishing: refuse when the user stopped the pass, or chose to edit
+     * and did (`userChanged()` resolves true: the project's revision moved or the
+     * editor holds unsaved edits). "Edit anyway" with nothing changed publishes.
+     */
+    async beforePublish(draftId, targetId, userChanged = async () => true) {
       const record = await guard({ targetId, draftId })
-      if (ownsDraft(record, draftId) && record.state === 'released') {
+      if (ownsDraft(record, draftId) && record.state === 'released' && (await userChanged())) {
         await call(targetId, 'finish', { ended: 'refused', draftId })
         throw new Error(USER_EDITED_MESSAGE)
       }
