@@ -4,6 +4,7 @@ import type { Transition } from '@/types/transition'
 import type { ItemKeyframes } from '@/types/keyframe'
 import type { SubComposition } from '../compositions-store'
 import type { ProjectResolution } from '@/types/project'
+import type { TextStyleDefinition } from '@/types/text-style'
 
 /**
  * Snapshot of all timeline state for undo/redo.
@@ -17,6 +18,8 @@ export interface TimelineSnapshot {
   keyframes: ItemKeyframes[]
   markers: ProjectMarker[]
   compositions: SubComposition[]
+  /** The project's text styles: undone together with the items they restyled. */
+  textStyles: TextStyleDefinition[]
   /** Standalone-timeline tab membership — undone with the compositions it references. */
   topLevelSequenceIds: string[]
   inPoint: number | null

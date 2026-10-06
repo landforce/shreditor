@@ -5,6 +5,7 @@ import type { CropSettings } from './transform'
 import type { TextStylePresetId } from '@/shared/typography/text-style-preset-ids'
 import type { TextLayoutDrafts, TextSpan, TextStyleFields } from './text'
 import type { TextMotionSpec } from './text-motion'
+import type { TextStyleDefinition } from './text-style'
 import type { MaskVertex } from './masks'
 import type { ShapeStyleFields } from './timeline'
 import type { CompositionControlOverrides, CompositionControlSchema } from './composition-controls'
@@ -140,6 +141,8 @@ export interface ProjectTimeline {
       }
       textStylePresetId?: TextStylePresetId
       textStyleScale?: number
+      textStyleId?: string
+      textStyleOverrides?: string[]
       textSpans?: TextSpan[]
       textLayoutDrafts?: TextLayoutDrafts
       /** Per-character/word/line animation (see ./text-motion). */
@@ -295,6 +298,11 @@ export interface ProjectTimeline {
   }>
   // Keyframe animations
   keyframes?: ItemKeyframes[]
+  /**
+   * The project's copies of text styles (see ./text-style). Items link to
+   * them with `textStyleId`; the workspace library is only read on use.
+   */
+  textStyles?: TextStyleDefinition[]
 }
 
 export interface ProjectResolution {

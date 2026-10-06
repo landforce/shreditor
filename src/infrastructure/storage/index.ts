@@ -185,6 +185,14 @@ export {
   type UserEffectPreset,
 } from '@/infrastructure/storage/workspace-fs/effect-presets'
 
+// Text style library (shared by every project and the agent)
+export {
+  readTextStyleLibrary,
+  readTextStyleLibraryStamp,
+  updateTextStyleLibrary,
+  type TextStyleLibraryStamp,
+} from '@/infrastructure/storage/workspace-fs/text-styles'
+
 // Per-project animation presets
 export {
   readAnimationPresets,

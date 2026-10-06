@@ -238,6 +238,13 @@ export type TextItem = BaseTimelineItem &
     textLayoutDrafts?: TextLayoutDrafts
     textStylePresetId?: TextStylePresetId
     textStyleScale?: number
+    /**
+     * The project text style this item uses (`timeline.textStyles`). Editing
+     * the style rewrites the item's styled fields, except `textStyleOverrides`.
+     */
+    textStyleId?: string
+    /** Styled fields changed on this item directly; style edits skip them. */
+    textStyleOverrides?: string[]
     /** Per-character/word/line animation (see src/types/text-motion.ts). */
     textMotion?: TextMotionSpec
     textRole?: 'caption'

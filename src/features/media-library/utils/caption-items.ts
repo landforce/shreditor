@@ -162,7 +162,7 @@ function sourceFramesToTimelineFramesCeil(
   return Math.max(0, Math.ceil((sourceSeconds * timelineFps) / speed))
 }
 
-function getClipSourceBounds(
+export function getClipSourceBounds(
   clip: AudioItem | VideoItem,
   timelineFps: number,
 ): {

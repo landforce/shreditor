@@ -15,6 +15,7 @@ import type {
 import type { AudioEqSettings } from '@/types/audio'
 import type { Transition } from '@/types/transition'
 import type { CompositionEditorKind, ProjectTimeline, Project } from '@/types/project'
+import type { TextStyleDefinition } from '@/types/text-style'
 
 import { createLogger, createOperationId } from '@/shared/logging/logger'
 import { usePreviewBridgeStore } from '@/shared/state/preview-bridge'
@@ -35,6 +36,8 @@ import { useItemsStore } from './items-store'
 import { useTransitionsStore } from './transitions-store'
 import { useKeyframesStore } from './keyframes-store'
 import { useMarkersStore } from './markers-store'
+import { useProjectTextStylesStore } from '@/shared/state/text-styles'
+import { sanitizeTextStyles } from '@/shared/typography/text-styles/text-style-schema'
 import { useTimelineSettingsStore } from './timeline-settings-store'
 import { ROOT_HISTORY_CONTEXT, useTimelineCommandStore } from './timeline-command-store'
 import { useCompositionsStore, type SubComposition } from './compositions-store'
@@ -728,6 +731,7 @@ interface TimelinePersistenceSnapshot {
   inPoint: number | null
   outPoint: number | null
   isRootTimelineLive: boolean
+  textStyles: TextStyleDefinition[]
 }
 
 /**
@@ -795,6 +799,7 @@ function captureTimelinePersistenceSnapshot(): TimelinePersistenceSnapshot {
     inPoint: heldRoot ? heldRoot.inPoint : markers.inPoint,
     outPoint: heldRoot ? heldRoot.outPoint : markers.outPoint,
     isRootTimelineLive: activeTabId === null && navigation.activeCompositionId === null,
+    textStyles: useProjectTextStylesStore.getState().styles,
   }
 }
 
@@ -832,6 +837,7 @@ function buildTimelineFromPersistenceSnapshot(
     ...(rootTimeline.transitions.length > 0 && {
       transitions: rootTimeline.transitions.map(cloneTransitionForProject),
     }),
+    ...(snapshot.textStyles.length > 0 && { textStyles: structuredClone(snapshot.textStyles) }),
     ...(rootTimeline.keyframes.length > 0 && {
       keyframes: rootTimeline.keyframes.map((ik) => ({
         itemId: ik.itemId,
@@ -1143,6 +1149,7 @@ export async function hydrateTimelineStoresFromProject(project: Project): Promis
     useTimelineSettingsStore.getState().setScrollPosition(t.scrollPosition || 0)
     usePlaybackStore.getState().setBusAudioEq(t.busAudioEq)
     usePlaybackStore.getState().setMasterBusDb(t.masterBusDb ?? 0)
+    useProjectTextStylesStore.getState().setStyles(sanitizeTextStyles(t.textStyles))
 
     // Restore sub-compositions
     if (t.compositions && t.compositions.length > 0) {
@@ -1217,6 +1224,7 @@ export async function hydrateTimelineStoresFromProject(project: Project): Promis
     useZoomStore.getState().setZoomLevel(1)
     usePlaybackStore.getState().setCurrentFrame(0)
     usePlaybackStore.getState().setBusAudioEq(undefined)
+    useProjectTextStylesStore.getState().setStyles(sanitizeTextStyles(project.timeline?.textStyles))
   }
 
   // Common setup for both cases

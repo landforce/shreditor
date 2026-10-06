@@ -42,6 +42,7 @@ import {
   withItemIndexes,
 } from './items-store-indexes'
 import type { ItemsIndexState } from './items-store-indexes'
+import { recordTextStyleOverrides } from './items-store-text-style'
 
 function getLog() {
   return createLogger('ItemsStore')
@@ -212,7 +213,13 @@ export const useItemsStore = create<ItemsState & ItemsActions>()((set, get) => (
     const normalizedUpdates = normalizeItemUpdates(updates)
     return set((state) => {
       const nextItems = state.items.map((i) =>
-        i.id === id ? normalizeFrameFields({ ...i, ...normalizedUpdates } as typeof i) : i,
+        i.id === id
+          ? recordTextStyleOverrides(
+              i,
+              normalizeFrameFields({ ...i, ...normalizedUpdates } as typeof i),
+              normalizedUpdates,
+            )
+          : i,
       )
       return withItemIndexes(nextItems, state)
     })
@@ -736,10 +743,10 @@ export const useItemsStore = create<ItemsState & ItemsActions>()((set, get) => (
         if (item.id !== id) return item
         if (!('transform' in item)) return item
 
-        return {
+        return recordTextStyleOverrides(item, {
           ...item,
           transform: { ...item.transform, ...transform },
-        } as typeof item
+        } as typeof item)
       })
       return withItemIndexes(nextItems, state)
     }),
@@ -775,10 +782,10 @@ export const useItemsStore = create<ItemsState & ItemsActions>()((set, get) => (
         if (!idsSet.has(item.id)) return item
         if (!('transform' in item)) return item
 
-        return {
+        return recordTextStyleOverrides(item, {
           ...item,
           transform: { ...item.transform, ...transform },
-        } as typeof item
+        } as typeof item)
       })
       return withItemIndexes(nextItems, state)
     }),
@@ -794,12 +801,18 @@ export const useItemsStore = create<ItemsState & ItemsActions>()((set, get) => (
         const updatedItem = updates
           ? normalizeFrameFields({ ...item, ...normalizeItemUpdates(updates) } as typeof item)
           : item
-        if (!transform || !('transform' in item)) return updatedItem
+        if (!transform || !('transform' in item)) {
+          return recordTextStyleOverrides(item, updatedItem, updates)
+        }
 
-        return normalizeFrameFields({
-          ...updatedItem,
-          transform: { ...item.transform, ...transform },
-        } as typeof item)
+        return recordTextStyleOverrides(
+          item,
+          normalizeFrameFields({
+            ...updatedItem,
+            transform: { ...item.transform, ...transform },
+          } as typeof item),
+          updates,
+        )
       })
       return withItemIndexes(nextItems, state)
     }),

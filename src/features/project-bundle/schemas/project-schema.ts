@@ -7,6 +7,7 @@
 
 import { z } from 'zod'
 import { TEXT_STYLE_PRESET_IDS } from '@/shared/typography/text-style-preset-ids'
+import { textStyleDefinitionSchema } from '@/shared/typography/text-styles/text-style-schema'
 import { FORMAT_ROLES, getFormat, type FormatRole } from '@formats/registry.mjs'
 import { SNAPSHOT_VERSION } from '../types/snapshot'
 import {
@@ -503,6 +504,8 @@ const timelineItemSchema = z
     color: z.string().optional(),
     textStylePresetId: textStylePresetIdSchema.optional(),
     textStyleScale: z.number().positive().optional(),
+    textStyleId: z.string().min(1).optional(),
+    textStyleOverrides: z.array(z.string().min(1)).optional(),
     backgroundColor: z.string().optional(),
     backgroundRadius: z.number().min(0).optional(),
     backgroundMode: z.enum(['text', 'box']).optional(),
@@ -731,6 +734,7 @@ const timelineSchema = z
     topLevelSequenceIds: z.array(z.string()).optional(),
     compositions: z.array(compositionSchema).optional(),
     keyframes: z.array(itemKeyframesSchema).optional(),
+    textStyles: z.array(textStyleDefinitionSchema).optional(),
   })
   .passthrough()
 

@@ -7,6 +7,7 @@ import { useTimelineSettingsStore } from '../timeline-settings-store'
 import { useCompositionsStore } from '../compositions-store'
 import { useSequencesStore } from '../sequences-store'
 import { usePlaybackStore } from '@/shared/state/playback'
+import { useProjectTextStylesStore } from '@/shared/state/text-styles'
 import { useProjectStore } from '@/features/timeline/deps/projects'
 import { updateProject } from '@/infrastructure/storage'
 import { createLogger } from '@/shared/logging/logger'
@@ -103,6 +104,7 @@ export function captureSnapshot(): TimelineSnapshot {
     keyframes: keyframesState.keyframes,
     markers: markersState.markers,
     compositions: compositionsState.compositions,
+    textStyles: useProjectTextStylesStore.getState().styles,
     topLevelSequenceIds: useSequencesStore.getState().topLevelSequenceIds,
     inPoint: markersState.inPoint,
     outPoint: markersState.outPoint,
@@ -139,6 +141,7 @@ export function restoreSnapshot(snapshot: TimelineSnapshot): void {
   // by that comp's canvas, so its restored duration has to be in place first.
   useCompositionsStore.getState().setCompositions(snapshot.compositions)
   useSequencesStore.getState().setTopLevelSequenceIds(snapshot.topLevelSequenceIds)
+  useProjectTextStylesStore.getState().setStyles(snapshot.textStyles ?? [])
 
   // Restore markers and in/out points
   useMarkersStore.getState().setMarkers(snapshot.markers)
@@ -177,6 +180,7 @@ export function snapshotsEqual(a: TimelineSnapshot, b: TimelineSnapshot): boolea
     a.keyframes === b.keyframes &&
     a.markers === b.markers &&
     a.compositions === b.compositions &&
+    a.textStyles === b.textStyles &&
     a.topLevelSequenceIds === b.topLevelSequenceIds &&
     a.inPoint === b.inPoint &&
     a.outPoint === b.outPoint &&

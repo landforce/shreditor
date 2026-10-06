@@ -36,6 +36,7 @@ import {
   getCaptionTextItemTemplate,
   getCaptionRangeForClip,
 } from '../utils/caption-items'
+import { chunkTranscriptForCaptions } from '../utils/caption-chunking'
 import { useProjectStore } from '@/features/media-library/deps/projects'
 import {
   removeTimelineItemsExact,
@@ -58,15 +59,7 @@ import { TRANSCRIPTION_CANCELLED_MESSAGE } from '@/shared/utils/transcription-ca
 
 const logger = createLogger('MediaTranscriptionService')
 const DEFAULT_MODEL: MediaTranscriptModel = DEFAULT_WHISPER_MODEL
-const MAX_TRANSCRIPT_CAPTION_CHARS = 42
-const MAX_TRANSCRIPT_CAPTION_WORDS = 8
-const MAX_TRANSCRIPT_CAPTION_SECONDS = 2.2
-const PREFERRED_TRANSCRIPT_CAPTION_SECONDS = 1.4
-const MIN_TRANSCRIPT_CAPTION_WORDS = 2
-// A short but audible pause is a better phrase boundary than a blanket timing offset.
-const TRANSCRIPT_CAPTION_BREAK_GAP_SECONDS = 0.18
 const TRANSCRIPT_CAPTION_TIMING_VERSION = 4
-const SENTENCE_END_PATTERN = /[.!?。！？]$/
 const DEFAULT_QUANTIZATION = DEFAULT_WHISPER_QUANTIZATION
 
 type CaptionableClip = AudioItem | VideoItem
@@ -141,157 +134,11 @@ function joinRequestOrigin(job: QueuedTranscriptionJob, origin: 'background' | u
   if (origin !== 'background') job.origin = undefined
 }
 
-function sanitizeTranscriptWord(word: NonNullable<TranscriptSegment['words']>[number]) {
-  return {
-    text: word.text.trim(),
-    start: word.start,
-    end: word.end,
-    ...(typeof word.confidence === 'number' ? { confidence: word.confidence } : {}),
-  }
-}
-
-function buildTranscriptSegmentFromWords(
-  words: ReturnType<typeof sanitizeTranscriptWord>[],
-): MediaTranscriptSegment | null {
-  const validWords = words.filter((word) => word.text.length > 0 && word.end > word.start)
-  const first = validWords[0]
-  const last = validWords.at(-1)
-  if (!first || !last) return null
-
-  return {
-    text: joinTranscriptWords(validWords.map((word) => word.text)),
-    start: first.start,
-    end: last.end,
-    words: validWords,
-  }
-}
-
-function shouldBreakTranscriptCaption(
-  currentWords: ReturnType<typeof sanitizeTranscriptWord>[],
-  nextWord: ReturnType<typeof sanitizeTranscriptWord>,
-): boolean {
-  const first = currentWords[0]
-  const previous = currentWords.at(-1)
-  if (!first || !previous) return false
-
-  const nextText = joinTranscriptWords([...currentWords, nextWord].map((word) => word.text))
-  const currentDuration = previous.end - first.start
-  const nextDuration = nextWord.end - first.start
-  const gap = nextWord.start - previous.end
-
-  if (
-    currentWords.length >= MIN_TRANSCRIPT_CAPTION_WORDS &&
-    gap >= TRANSCRIPT_CAPTION_BREAK_GAP_SECONDS
-  ) {
-    return true
-  }
-  if (
-    currentWords.length >= MIN_TRANSCRIPT_CAPTION_WORDS &&
-    (currentWords.length >= MAX_TRANSCRIPT_CAPTION_WORDS ||
-      nextText.length > MAX_TRANSCRIPT_CAPTION_CHARS ||
-      nextDuration > MAX_TRANSCRIPT_CAPTION_SECONDS)
-  ) {
-    return true
-  }
-  if (
-    currentDuration >= PREFERRED_TRANSCRIPT_CAPTION_SECONDS &&
-    SENTENCE_END_PATTERN.test(previous.text)
-  ) {
-    return true
-  }
-
-  return false
-}
-
-function transcriptCaptionGroupFitsLimits(
-  words: ReturnType<typeof sanitizeTranscriptWord>[],
-): boolean {
-  const first = words[0]
-  const last = words.at(-1)
-  if (!first || !last) return false
-
-  const hasPhraseBreakingGap = words.some((word, index) => {
-    const previous = words[index - 1]
-    return (
-      previous !== undefined && word.start - previous.end >= TRANSCRIPT_CAPTION_BREAK_GAP_SECONDS
-    )
-  })
-
-  return (
-    words.length <= MAX_TRANSCRIPT_CAPTION_WORDS &&
-    joinTranscriptWords(words.map((word) => word.text)).length <= MAX_TRANSCRIPT_CAPTION_CHARS &&
-    last.end - first.start <= MAX_TRANSCRIPT_CAPTION_SECONDS &&
-    !hasPhraseBreakingGap
-  )
-}
-
-function segmentTranscriptForCaptions(segments: TranscriptSegment[]): MediaTranscriptSegment[] {
-  const sanitizedBySegment = segments.map((segment) =>
-    (segment.words?.map(sanitizeTranscriptWord) ?? []).filter(
-      (word) => word.text.length > 0 && word.end > word.start,
-    ),
-  )
-  const words = sanitizedBySegment.flat().toSorted((left, right) => left.start - right.start)
-
-  if (words.length === 0) {
-    return segments.map((segment) => ({
-      text: segment.text.trim(),
-      start: segment.start,
-      end: segment.end,
-    }))
-  }
-
-  const captionWordGroups: (typeof words)[] = []
-  let currentWords: typeof words = []
-
-  for (const word of words) {
-    if (currentWords.length > 0 && shouldBreakTranscriptCaption(currentWords, word)) {
-      captionWordGroups.push(currentWords)
-      currentWords = []
-    }
-    currentWords.push(word)
-  }
-
-  if (currentWords.length > 0) captionWordGroups.push(currentWords)
-
-  // Avoid ending on a one-word flash. Rebalance with the preceding phrase when possible.
-  const trailingGroup = captionWordGroups.at(-1)
-  const previousGroup = captionWordGroups.at(-2)
-  if (trailingGroup?.length === 1 && previousGroup) {
-    if (previousGroup.length >= 3) {
-      const shortenedPreviousGroup = previousGroup.slice(0, -1)
-      const rebalancedTrailingGroup = [previousGroup.at(-1)!, ...trailingGroup]
-      if (
-        transcriptCaptionGroupFitsLimits(shortenedPreviousGroup) &&
-        transcriptCaptionGroupFitsLimits(rebalancedTrailingGroup)
-      ) {
-        captionWordGroups.splice(-2, 2, shortenedPreviousGroup, rebalancedTrailingGroup)
-      }
-    } else if (transcriptCaptionGroupFitsLimits([...previousGroup, ...trailingGroup])) {
-      previousGroup.push(...trailingGroup)
-      captionWordGroups.pop()
-    }
-  }
-
-  const captionSegments = captionWordGroups
-    .map(buildTranscriptSegmentFromWords)
-    .filter((segment): segment is MediaTranscriptSegment => segment !== null)
-
-  segments.forEach((segment, index) => {
-    if ((sanitizedBySegment[index]?.length ?? 0) > 0) return
-    const text = segment.text.trim()
-    if (text.length === 0) return
-    captionSegments.push({ text, start: segment.start, end: segment.end })
-  })
-
-  return captionSegments.toSorted((left, right) => left.start - right.start)
-}
-
 function buildTimelineTranscriptCaptionCues(
   mediaId: string,
   segments: readonly MediaTranscriptSegment[],
 ): TimelineTranscriptCaptionCue[] {
-  return segmentTranscriptForCaptions([...segments]).map((segment, index) => ({
+  return chunkTranscriptForCaptions(segments).map((segment, index) => ({
     id: `transcript-${mediaId}-${index}`,
     startSeconds: segment.start,
     endSeconds: segment.end,
@@ -606,7 +453,7 @@ class MediaTranscriptionService {
       language: job.language,
       quantization: job.quantization,
       text: joinTranscriptWords(segments.map((segment) => segment.text)),
-      segments: segmentTranscriptForCaptions(segments),
+      segments: chunkTranscriptForCaptions(segments),
       ...(job.origin ? { origin: job.origin } : {}),
       createdAt: Date.now(),
       updatedAt: Date.now(),
