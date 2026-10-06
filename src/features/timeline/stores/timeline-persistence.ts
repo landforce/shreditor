@@ -38,12 +38,15 @@ import { useMarkersStore } from './markers-store'
 import { useTimelineSettingsStore } from './timeline-settings-store'
 import { ROOT_HISTORY_CONTEXT, useTimelineCommandStore } from './timeline-command-store'
 import { useCompositionsStore, type SubComposition } from './compositions-store'
-import {
-  getActiveTabId,
-  useCompositionNavigationStore,
-} from './composition-navigation-store'
+import { getActiveTabId, useCompositionNavigationStore } from './composition-navigation-store'
 import { useSequencesStore } from './sequences-store'
-import { getProject, updateProject, saveProjectThumbnail } from '@/infrastructure/storage'
+import {
+  getProject,
+  updateProject,
+  saveProjectThumbnail,
+  readProjectStamp,
+  setTrackedRevision,
+} from '@/infrastructure/storage'
 import {
   importCanvasRenderOrchestrator,
   convertTimelineToComposition,
@@ -785,8 +788,7 @@ function captureTimelinePersistenceSnapshot(): TimelinePersistenceSnapshot {
     compositions,
     currentFrame: heldRoot ? heldRoot.currentFrame : playback.currentFrame,
     zoomLevel: heldRoot?.zoomLevel ?? rootView?.zoomLevel ?? zoom.level,
-    scrollPosition:
-      heldRoot?.scrollPosition ?? rootView?.scrollPosition ?? settings.scrollPosition,
+    scrollPosition: heldRoot?.scrollPosition ?? rootView?.scrollPosition ?? settings.scrollPosition,
     busAudioEq: heldRoot ? heldRoot.busAudioEq : playback.busAudioEq,
     masterBusDb: playback.masterBusDb,
     markers: heldRoot ? heldRoot.markers : markers.markers,
@@ -913,7 +915,10 @@ export function buildTimelineFromStores(): ProjectTimeline {
   return buildTimelineFromPersistenceSnapshot(captureTimelinePersistenceSnapshot())
 }
 
-export async function saveTimeline(projectId: string): Promise<void> {
+export async function saveTimeline(
+  projectId: string,
+  options: { force?: boolean } = {},
+): Promise<void> {
   const opId = createOperationId()
   const event = logger.startEvent('saveTimeline', opId)
   event.set('projectId', projectId)
@@ -1046,11 +1051,13 @@ export async function saveTimeline(projectId: string): Promise<void> {
     // pre-await `project` snapshot would clobber those newer fields.
     // Clear the deprecated inline thumbnail field when using thumbnailId.
     const updatedAt = Date.now()
-    await updateProject(projectId, {
+    const timelineUpdate = {
       timeline: sanitizedTimeline,
       ...(thumbnailId && { thumbnailId, thumbnail: undefined }),
       updatedAt,
-    })
+    }
+    if (options.force) await updateProject(projectId, timelineUpdate, { force: true })
+    else await updateProject(projectId, timelineUpdate)
 
     // Mark as clean after successful save
     useTimelineSettingsStore.getState().markClean()
@@ -1230,10 +1237,7 @@ function getTimelineLoadKey(projectId: string, options: LoadTimelineOptions): st
   return JSON.stringify([projectId, options.allowProjectUpgrade === true])
 }
 
-export function loadTimeline(
-  projectId: string,
-  options: LoadTimelineOptions = {},
-): Promise<void> {
+export function loadTimeline(projectId: string, options: LoadTimelineOptions = {}): Promise<void> {
   const loadKey = getTimelineLoadKey(projectId, options)
   const inFlightLoad = inFlightTimelineLoads.get(loadKey)
   if (inFlightLoad) return inFlightLoad
@@ -1268,9 +1272,26 @@ async function loadTimelineOnce(
   options: LoadTimelineOptions = {},
 ): Promise<void> {
   try {
-    const rawProject = await getProject(projectId)
+    // Read the revision alongside the project. A write landing in between
+    // makes the next save conflict (safe) rather than overwrite it.
+    const [loadedStamp, rawProject] = await Promise.all([
+      readProjectStamp(projectId).catch((error: unknown) => {
+        logger.warn('Could not read project revision; saves will not be revision-checked', error)
+        return null
+      }),
+      getProject(projectId),
+    ])
     if (!rawProject) {
       throw new Error(`Project not found: ${projectId}`)
+    }
+    if (loadedStamp) {
+      // If the file moved while we read it, we can't know which bytes we got:
+      // track a revision that never matches, so the watcher re-syncs.
+      const settled = await readProjectStamp(projectId).catch(() => null)
+      setTrackedRevision(
+        projectId,
+        settled?.revision === loadedStamp.revision ? loadedStamp.revision : 'sha256:unknown',
+      )
     }
 
     const storedSchemaVersion = rawProject.schemaVersion ?? 1

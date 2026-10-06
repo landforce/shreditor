@@ -27,6 +27,10 @@ import {
 import { toast } from 'sonner'
 import { useEditorHotkeys } from '@/features/editor/hooks/use-editor-hotkeys'
 import { useAutoSave } from '../hooks/use-auto-save'
+import { ProjectSyncBanner } from '../agent-sync/sync-banner'
+import { useProjectSyncStore } from '../agent-sync/sync-store'
+import { useProjectFileWatcher } from '../agent-sync/use-project-file-watcher'
+import { ProjectRevisionConflictError } from '@/infrastructure/storage'
 import {
   useTimelineShortcuts,
   useTransitionBreakageNotifications,
@@ -365,11 +369,14 @@ const TimelineDialogHost = memo(function TimelineDialogHost() {
 
 const AutoSaveController = memo(function AutoSaveController({
   onSave,
+  projectId,
 }: {
   onSave: () => Promise<void>
+  projectId: string
 }) {
   const isDirty = useTimelineStore((s: { isDirty: boolean }) => s.isDirty)
   useAutoSave({ isDirty, onSave })
+  useProjectFileWatcher(projectId)
   return null
 })
 
@@ -592,16 +599,30 @@ export const LoadedEditor = memo(function LoadedEditor({
 
     isSavingRef.current = true
     const { saveTimeline } = useTimelineStore.getState()
+    const sync = useProjectSyncStore.getState()
+    if (sync.status === 'conflict') {
+      isSavingRef.current = false
+      toast.error('The project changed on disk. Choose a version in the banner first.')
+      return
+    }
+    sync.setWriting(true)
 
     try {
       await saveTimeline(projectId)
       logger.debug('Project saved successfully')
       toast.success(i18n.t('editor.editor.projectSaved'))
     } catch (error) {
+      if (error instanceof ProjectRevisionConflictError) {
+        // An agent pass landed since this editor loaded; never overwrite it silently.
+        sync.setStatus('conflict')
+        toast.error('Not saved: the project changed on disk. Choose a version in the banner.')
+        return
+      }
       logger.error('Failed to save project:', error)
       toast.error(i18n.t('editor.editor.projectSaveFailed'))
       throw error // Re-throw so callers know save failed
     } finally {
+      sync.setWriting(false)
       isSavingRef.current = false
     }
   }, [projectId])
@@ -673,7 +694,8 @@ export const LoadedEditor = memo(function LoadedEditor({
       role="application"
       aria-label={t('editor.editor.appLabel')}
     >
-      <AutoSaveController onSave={handleSave} />
+      <AutoSaveController onSave={handleSave} projectId={projectId} />
+      <ProjectSyncBanner projectId={projectId} />
       <TimelineShortcutsController />
 
       {/* Top Toolbar */}

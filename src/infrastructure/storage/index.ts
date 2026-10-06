@@ -15,6 +15,14 @@ export {
   deleteProject,
   getDBStats,
 } from '@/infrastructure/storage/workspace-fs/projects'
+export {
+  ProjectRevisionConflictError,
+  getTrackedRevision,
+  onTrackedRevisionChange,
+  readProjectStamp,
+  setTrackedRevision,
+  type ProjectFileStamp,
+} from '@/infrastructure/storage/workspace-fs/project-revisions'
 
 // Media
 export {

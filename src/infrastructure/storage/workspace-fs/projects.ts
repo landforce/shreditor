@@ -32,6 +32,13 @@ import {
   type WorkspaceIndexEntry,
 } from './workspace-index'
 import { withKeyLock } from './with-key-lock'
+import {
+  getTrackedRevision,
+  ProjectRevisionConflictError,
+  readProjectStamp,
+  revisionOfText,
+  setTrackedRevision,
+} from './project-revisions'
 
 /**
  * Single key for every `index.json` mutation.
@@ -249,7 +256,11 @@ export async function createProject(project: Project): Promise<Project> {
   }
 }
 
-export async function updateProject(id: string, updates: Partial<Project>): Promise<Project> {
+export async function updateProject(
+  id: string,
+  updates: Partial<Project>,
+  options: { force?: boolean } = {},
+): Promise<Project> {
   const root = requireWorkspaceRoot()
   try {
     const existingSerialized = await readJson<SerializedProject>(root, projectJsonPath(id))
@@ -287,7 +298,20 @@ export async function updateProject(id: string, updates: Partial<Project>): Prom
       }
     }
 
+    // Timeline writes from an open editor must not clobber a newer project.json
+    // (an agent pass written through the headless service).
+    const expected = getTrackedRevision(id)
+    if (expected && 'timeline' in serializableUpdates && !options.force) {
+      const onDisk = await readProjectStamp(id)
+      if (onDisk?.revision !== expected) {
+        throw new ProjectRevisionConflictError(id, expected, onDisk?.revision ?? null)
+      }
+    }
+
     await writeJsonAtomic(root, projectJsonPath(id), nextSerialized)
+    if (expected) {
+      setTrackedRevision(id, await revisionOfText(JSON.stringify(nextSerialized, null, 2)))
+    }
     await upsertIndexEntry(root, { id, name: nextSerialized.name, updatedAt })
     return restoreRootFolderHandle(nextSerialized)
   } catch (error) {
