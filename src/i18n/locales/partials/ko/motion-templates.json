@@ -1,0 +1,43 @@
+{
+  "motionTemplates": {
+    "tabLabel": "템플릿",
+    "saveAsTemplate": "템플릿으로 저장…",
+    "search": "템플릿 검색",
+    "refresh": "라이브러리 다시 불러오기",
+    "category": "카테고리",
+    "allCategories": "모든 카테고리",
+    "empty": "아직 모션 그래픽 템플릿이 없습니다. 복합 클립(또는 선택 항목)을 오른쪽 클릭하고 템플릿으로 저장을 선택하세요.",
+    "noMatches": "일치하는 템플릿이 없습니다.",
+    "insert": "{{name}} 삽입",
+    "insertHint": "클릭하면 재생 헤드에 삽입되고, 타임라인으로 끌어다 놓을 수도 있습니다",
+    "mediaMissingBadge": "미디어 없음",
+    "missingMedia": "\"{{name}}\"을(를) 삽입할 수 없습니다: 이 작업 공간에 {{files}}이(가) 없습니다. 먼저 템플릿 팩이나 해당 파일을 가져오세요.",
+    "outdated": "이 프로젝트는 \"{{name}}\"의 버전 {{projectVersion}}을 사용합니다. 라이브러리에는 버전 {{libraryVersion}}이 있습니다.",
+    "update": "최신 버전으로 업데이트",
+    "updateFrom": "v{{version}}에서 업데이트",
+    "updated": "\"{{name}}\"을(를) 버전 {{version}}으로 업데이트했습니다(타임라인에 {{count}}개).",
+    "upToDate": "\"{{name}}\"은(는) 이미 최신 버전입니다.",
+    "droppedControls": "다음 컨트롤이 더 이상 없어서 값이 삭제되었습니다: {{names}}",
+    "saveTitle": "템플릿으로 저장",
+    "saveDescription": "이 작업 공간의 템플릿 라이브러리에 저장되어 모든 프로젝트에서 다시 쓸 수 있습니다.",
+    "name": "이름",
+    "newVersionHint": "\"{{name}}\"이라는 템플릿이 있습니다: 그 버전 {{version}}으로 저장됩니다.",
+    "role": "포맷 역할",
+    "noRole": "없음",
+    "controls": "편집 가능한 필드",
+    "controlsHint": "각 인스턴스가 바꿀 수 있는 텍스트와 색을 켜고 이름을 붙이세요.",
+    "noCandidates": "이 컴포지션에는 노출할 항목이 없습니다(텍스트나 도형 레이어를 추가하세요).",
+    "cancel": "취소",
+    "save": "템플릿 저장",
+    "saveNewVersion": "새 버전 저장",
+    "saved": "\"{{name}}\" 저장됨(버전 {{version}}).",
+    "categories": {
+      "lower-third": "하단 자막",
+      "title": "제목",
+      "callout": "콜아웃",
+      "transition": "전환",
+      "overlay": "오버레이",
+      "other": "기타"
+    }
+  }
+}

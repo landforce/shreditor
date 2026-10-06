@@ -114,6 +114,13 @@ async function scaleCanvasToBlob(
   return out.convertToBlob({ type: 'image/jpeg', quality })
 }
 
+/** The library motion template a composition was copied from (absent on most). */
+function templateTags(composition: { templateId?: string; templateVersion?: number }) {
+  return composition.templateId
+    ? { templateId: composition.templateId, templateVersion: composition.templateVersion }
+    : {}
+}
+
 function collectVideoMediaIds(project: Project): string[] {
   const mediaIds = new Set<string>()
   const timeline = project.timeline
@@ -892,6 +899,7 @@ function buildTimelineFromPersistenceSnapshot(
           durationInFrames: c.durationInFrames,
           ...(c.backgroundColor && { backgroundColor: c.backgroundColor }),
           compositionControls: c.compositionControls,
+          ...templateTags(c),
           ...(c.busAudioEq && { busAudioEq: c.busAudioEq }),
           ...(c.markers?.length && { markers: c.markers as ProjectTimeline['markers'] }),
           ...(c.inPoint != null && { inPoint: c.inPoint }),
@@ -1170,6 +1178,7 @@ export async function hydrateTimelineStoresFromProject(project: Project): Promis
           durationInFrames: c.durationInFrames,
           ...(c.backgroundColor && { backgroundColor: c.backgroundColor }),
           compositionControls: c.compositionControls,
+          ...templateTags(c),
           ...(c.busAudioEq && { busAudioEq: c.busAudioEq }),
           markers: c.markers ?? [],
           inPoint: c.inPoint ?? null,

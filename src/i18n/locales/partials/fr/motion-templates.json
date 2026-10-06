@@ -1,0 +1,43 @@
+{
+  "motionTemplates": {
+    "tabLabel": "Modèles",
+    "saveAsTemplate": "Enregistrer comme modèle…",
+    "search": "Rechercher des modèles",
+    "refresh": "Recharger la bibliothèque",
+    "category": "Catégorie",
+    "allCategories": "Toutes les catégories",
+    "empty": "Aucun modèle d'animation pour l'instant. Faites un clic droit sur un clip composé (ou une sélection) et choisissez Enregistrer comme modèle.",
+    "noMatches": "Aucun modèle ne correspond.",
+    "insert": "Insérer {{name}}",
+    "insertHint": "Cliquez pour insérer à la tête de lecture, ou faites glisser sur la timeline",
+    "mediaMissingBadge": "Médias manquants",
+    "missingMedia": "Impossible d'insérer « {{name}} » : cet espace de travail ne contient pas {{files}}. Importez d'abord le pack de modèles ou ces fichiers.",
+    "outdated": "Ce projet utilise la version {{projectVersion}} de « {{name}} » ; la bibliothèque a la version {{libraryVersion}}.",
+    "update": "Mettre à jour",
+    "updateFrom": "Mettre à jour depuis v{{version}}",
+    "updated": "« {{name}} » mis à jour en version {{version}} ({{count}} sur la timeline).",
+    "upToDate": "« {{name}} » est déjà à la dernière version.",
+    "droppedControls": "Ces contrôles n'existent plus, leurs valeurs ont été supprimées : {{names}}",
+    "saveTitle": "Enregistrer comme modèle",
+    "saveDescription": "Enregistré dans la bibliothèque de modèles de cet espace de travail, réutilisable par tous les projets.",
+    "name": "Nom",
+    "newVersionHint": "Un modèle nommé « {{name}} » existe : ceci enregistre sa version {{version}}.",
+    "role": "Rôle du format",
+    "noRole": "Aucun",
+    "controls": "Champs modifiables",
+    "controlsHint": "Activez les textes et couleurs que chaque instance peut changer, et nommez-les.",
+    "noCandidates": "Rien à exposer dans cette composition (ajoutez un calque de texte ou de forme).",
+    "cancel": "Annuler",
+    "save": "Enregistrer le modèle",
+    "saveNewVersion": "Enregistrer une nouvelle version",
+    "saved": "« {{name}} » enregistré (version {{version}}).",
+    "categories": {
+      "lower-third": "Tiers inférieur",
+      "title": "Titre",
+      "callout": "Encadré",
+      "transition": "Transition",
+      "overlay": "Superposition",
+      "other": "Autre"
+    }
+  }
+}

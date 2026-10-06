@@ -69,6 +69,13 @@
 //   shred master <audio|video> [--lufs -14] [--tp -1.5] [--out file.wav]
 //                                        loudness-master to a new WAV (two-pass loudnorm)
 //   shred sync <id> [--timeout 20]       make the open editor save now, so the agent sees unsaved tweaks
+//   shred templates list [--category c] [--json]   the motion graphics template library: name,
+//                                        category, size, duration, controls (with defaults)
+//   shred templates show <name|id>       one template: controls, media, folder, thumbnail
+//   shred templates save <projectId> <compositionItemId|compositionId> --name "..." --category <c> [--role r]
+//                                        save a composition to the library (same name = new version)
+//   shred templates export <name|id> --out <dir|file.zip>   a template pack (template, thumbnail, media)
+//   shred templates import <dir|file.zip>   add a pack's templates; media comes in through import
 //   shred export <id> [--native|--browser] [--codec h264|hevc|prores] [--quality low|medium|high|ultra] [--out name]
 //                                        final export to <workspace>/projects/<id>/exports/; default: native
 //                                        (ffmpeg from the originals) when the plan allows it, else browser
@@ -102,6 +109,7 @@ import {
   listLutNames,
   readCubeFileHeader,
 } from '../../../headless/lib/luts.mjs'
+import { templatesCommand } from './templates.mjs'
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..')
 const SERVICE = process.env.SHRED_SERVICE || 'http://127.0.0.1:8787'
@@ -135,6 +143,7 @@ const { values: opt, positionals } = parseArgs({
     summary: { type: 'string' },
     link: { type: 'boolean' },
     category: { type: 'string' },
+    role: { type: 'string' },
     build: { type: 'boolean' },
     dev: { type: 'boolean' },
     timeout: { type: 'string' },
@@ -1250,6 +1259,17 @@ const commands = {
         )
       }
     }
+  },
+
+  async templates(rest) {
+    await templatesCommand(rest, {
+      opt,
+      say,
+      call,
+      getProject,
+      warnUnsaved,
+      workspace: workspace(),
+    })
   },
 
   // Through the editor's bridge when it's up, else the same code in-process.

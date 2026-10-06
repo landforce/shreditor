@@ -20,6 +20,7 @@ import {
   Captions,
   Sticker,
   WandSparkles,
+  LayoutTemplate,
 } from 'lucide-react'
 import { motion, useReducedMotion } from 'motion/react'
 import { Button } from '@/components/ui/button'
@@ -44,6 +45,7 @@ import {
 } from '@/features/editor/deps/media-library'
 import { importTranscriptEditorPanel } from '@/features/editor/deps/timeline-panels'
 import { LottieBrowserPanel } from '@/features/editor/deps/lottie-browser'
+import { MotionTemplatesPanel } from '@/features/editor/deps/motion-templates'
 import { TransitionsPanel } from './transitions-panel'
 import {
   createDefaultGradientItem,
@@ -546,6 +548,7 @@ export const MediaSidebar = memo(function MediaSidebar() {
     { id: 'effects' as const, icon: Layers, label: t('editor.mediaSidebar.effects') },
     { id: 'transitions' as const, icon: Blend, label: t('editor.mediaSidebar.transitions') },
     { id: 'lottie' as const, icon: Sticker, label: t('lottieBrowser.tabLabel') },
+    { id: 'templates' as const, icon: LayoutTemplate, label: t('motionTemplates.tabLabel') },
     { id: 'transcript' as const, icon: Captions, label: t('transcript.tabLabel') },
     { id: 'ai' as const, icon: WandSparkles, label: t('editor.mediaSidebar.ai') },
   ]
@@ -760,6 +763,13 @@ export const MediaSidebar = memo(function MediaSidebar() {
               className={`min-h-0 flex-1 overflow-hidden ${activeTab === 'media' ? 'block' : 'hidden'}`}
             >
               <MediaLibrary />
+            </div>
+
+            {/* Motion graphics templates (kept mounted: it hosts the save dialog) */}
+            <div
+              className={`min-h-0 flex-1 overflow-hidden ${activeTab === 'templates' ? 'block' : 'hidden'}`}
+            >
+              <MotionTemplatesPanel active={leftSidebarOpen && activeTab === 'templates'} />
             </div>
 
             {/* Text Tab */}

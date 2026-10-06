@@ -240,3 +240,51 @@ export function collectTextStyleInput(workspace, project, ops) {
     ...(transcripts.length ? { transcripts } : {}),
   }
 }
+
+// ---------------------------------------------------------------------------
+// Wire schemas of the text style ops (spread into contract.mjs)
+// ---------------------------------------------------------------------------
+
+const itemId = z.string().min(1)
+
+export const TEXT_STYLE_OP_NAMES = ['applyTextStyle', 'upsertTextStyle', 'addCaptions']
+
+export const TEXT_STYLE_OP_SCHEMAS = [
+  z
+    .object({
+      op: z.literal('applyTextStyle'),
+      ids: z.array(itemId).min(1),
+      styleId: z.string().min(1),
+    })
+    .strict(),
+  z.union([
+    z.object({ op: z.literal('upsertTextStyle'), style: textStyleInputSchema }).strict(),
+    z
+      .object({
+        op: z.literal('upsertTextStyle'),
+        fromItemId: itemId,
+        name: z.string().trim().min(1).max(80),
+        role: z.enum(TEXT_STYLE_ROLES),
+        id: styleId.optional(),
+        description: z.string().max(500).optional(),
+        caption: captionRulesSchema.optional(),
+      })
+      .strict(),
+  ]),
+  z
+    .object({
+      op: z.literal('addCaptions'),
+      clipId: itemId,
+      styleId: z.string().min(1),
+      trackId: itemId.optional(),
+      replace: z.boolean().optional(),
+    })
+    .strict(),
+]
+
+export const TEXT_STYLE_OP_DESCRIPTIONS = {
+  applyTextStyle: 'Link text items to a text style and give them its look',
+  upsertTextStyle:
+    "Add or replace a project text style (or save one from an item's look); restyles its items",
+  addCaptions: 'Caption a clip from its transcript with a caption style, on the captions track',
+}

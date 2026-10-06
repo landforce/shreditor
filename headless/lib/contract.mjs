@@ -1,7 +1,16 @@
 import { readFileSync } from 'node:fs'
 import { z } from 'zod'
 import { FORMAT_IDS, getFormat } from '../../formats/registry.mjs'
-import { TEXT_STYLE_ROLES, captionRulesSchema, textStyleInputSchema } from './text-styles.mjs'
+import {
+  TEXT_STYLE_OP_DESCRIPTIONS,
+  TEXT_STYLE_OP_NAMES,
+  TEXT_STYLE_OP_SCHEMAS,
+} from './text-styles.mjs'
+import {
+  TEMPLATE_OP_DESCRIPTIONS,
+  TEMPLATE_OP_NAMES,
+  TEMPLATE_OP_SCHEMAS,
+} from './template-contract.mjs'
 
 export const HEADLESS_API_VERSION = 1
 
@@ -274,39 +283,8 @@ const opSchemas = [
       ),
     })
     .strict(),
-  z
-    .object({
-      op: z.literal('applyTextStyle'),
-      ids: z.array(id).min(1),
-      styleId: z.string().min(1),
-    })
-    .strict(),
-  z.union([
-    z.object({ op: z.literal('upsertTextStyle'), style: textStyleInputSchema }).strict(),
-    z
-      .object({
-        op: z.literal('upsertTextStyle'),
-        fromItemId: id,
-        name: z.string().trim().min(1).max(80),
-        role: z.enum(TEXT_STYLE_ROLES),
-        id: z
-          .string()
-          .regex(/^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/)
-          .optional(),
-        description: z.string().max(500).optional(),
-        caption: captionRulesSchema.optional(),
-      })
-      .strict(),
-  ]),
-  z
-    .object({
-      op: z.literal('addCaptions'),
-      clipId: id,
-      styleId: z.string().min(1),
-      trackId: id.optional(),
-      replace: z.boolean().optional(),
-    })
-    .strict(),
+  ...TEMPLATE_OP_SCHEMAS,
+  ...TEXT_STYLE_OP_SCHEMAS,
 ]
 
 export const EDIT_OPERATION_NAMES = [
@@ -332,9 +310,8 @@ export const EDIT_OPERATION_NAMES = [
   'updateEffect',
   'addLut',
   'setTransform',
-  'applyTextStyle',
-  'upsertTextStyle',
-  'addCaptions',
+  ...TEMPLATE_OP_NAMES,
+  ...TEXT_STYLE_OP_NAMES,
 ]
 const EDIT_OPERATION_DESCRIPTIONS = Object.fromEntries(
   EDIT_OPERATION_NAMES.map((name) => [name, samplesDescription(name)]),
@@ -364,10 +341,8 @@ function samplesDescription(name) {
     updateEffect: "Change an effect's params (merged) or turn it on/off",
     addLut: 'Add a gpu-lut effect from a .cube file in the workspace luts/ folder',
     setTransform: 'Update an item transform',
-    applyTextStyle: 'Link text items to a text style and give them its look',
-    upsertTextStyle:
-      "Add or replace a project text style (or save one from an item's look); restyles its items",
-    addCaptions: 'Caption a clip from its transcript with a caption style, on the captions track',
+    ...TEMPLATE_OP_DESCRIPTIONS,
+    ...TEXT_STYLE_OP_DESCRIPTIONS,
   }
   return descriptions[name]
 }
@@ -503,6 +478,10 @@ export const lifecycleEditRequestSchema = z
       'rightClipId',
       'effectId',
       'mediaId',
+      // Template ops: composition and control targets from createComposition results.
+      'compositionId',
+      'targetItemId',
+      // Text style ops: the clip addCaptions captions, the item upsertTextStyle saves.
       'clipId',
       'fromItemId',
     ])

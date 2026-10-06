@@ -7,6 +7,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { assertSinglePathComponent, HttpError, resolveContained } from './http-security.mjs'
 import { collectLuts } from './luts.mjs'
+import { collectTemplateInputs } from './templates.mjs'
 
 // Files in media/{id}/ that are NOT the source blob (mirrors
 // NON_SOURCE_NAMES in workspace-fs/media-source.ts).
@@ -171,9 +172,14 @@ export function collectAddClipMedia(workspaceDir, ops) {
  * this in, so none can forget a kind.
  */
 export function collectEditResources(workspaceDir, ops, project = null) {
+  // Library motion templates named by addTemplate/updateTemplate ops (media checked).
+  const templates = collectTemplateInputs(workspaceDir, ops, (mediaId) =>
+    Boolean(resolveMediaFileOrNull(workspaceDir, mediaId)),
+  )
   return {
     media: collectAddClipMedia(workspaceDir, ops),
     luts: collectLuts(workspaceDir, ops),
+    ...(templates.length > 0 ? { templates } : {}),
     // Library text styles the ops name and transcripts for addCaptions.
     ...collectTextStyleInput(workspaceDir, project, ops),
   }
@@ -221,6 +227,15 @@ export function resolveMediaFile(workspaceDir, mediaId, { original = false } = {
   }
   const source = resolveSourceLink(mediaDir)
   return source && !original ? (resolveCompatibleMedia(source, mediaDir) ?? source) : source
+}
+
+/** resolveMediaFile, with an invalid id answering null instead of throwing. */
+function resolveMediaFileOrNull(workspaceDir, mediaId) {
+  try {
+    return resolveMediaFile(workspaceDir, mediaId)
+  } catch {
+    return null
+  }
 }
 
 /**

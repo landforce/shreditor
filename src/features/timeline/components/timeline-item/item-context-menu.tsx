@@ -32,6 +32,7 @@ import {
 } from '@/features/timeline/deps/analysis'
 import { formatHotkeyBinding } from '@/config/hotkeys'
 import { useResolvedHotkeys } from '@/features/timeline/deps/settings'
+import { SaveAsTemplateMenuItem } from './save-as-template-menu-item'
 
 type ItemContextMenuSectionProps = {
   t: ReturnType<typeof useTranslation>['t']
@@ -688,6 +689,7 @@ function CompositionActions({
           {t('timeline.contextMenu.createCompoundClip')}
         </ContextMenuItem>
       )}
+      {(isCompositionItem || canCreatePreComp) && <SaveAsTemplateMenuItem />}
       <ContextMenuSeparator />
     </>
   )

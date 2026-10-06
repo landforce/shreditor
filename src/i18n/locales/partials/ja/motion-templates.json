@@ -1,0 +1,43 @@
+{
+  "motionTemplates": {
+    "tabLabel": "テンプレート",
+    "saveAsTemplate": "テンプレートとして保存…",
+    "search": "テンプレートを検索",
+    "refresh": "ライブラリを再読み込み",
+    "category": "カテゴリ",
+    "allCategories": "すべてのカテゴリ",
+    "empty": "モーショングラフィックスのテンプレートはまだありません。複合クリップ（または選択範囲）を右クリックして「テンプレートとして保存」を選びます。",
+    "noMatches": "一致するテンプレートがありません。",
+    "insert": "{{name}} を挿入",
+    "insertHint": "クリックで再生ヘッドに挿入、またはタイムラインにドラッグ",
+    "mediaMissingBadge": "メディアがありません",
+    "missingMedia": "「{{name}}」を挿入できません：このワークスペースに {{files}} がありません。先にテンプレートパックかそのファイルを読み込んでください。",
+    "outdated": "このプロジェクトは「{{name}}」のバージョン {{projectVersion}} を使っています。ライブラリはバージョン {{libraryVersion}} です。",
+    "update": "最新に更新",
+    "updateFrom": "v{{version}} から更新",
+    "updated": "「{{name}}」をバージョン {{version}} に更新しました（タイムライン上に {{count}} 個）。",
+    "upToDate": "「{{name}}」はすでに最新バージョンです。",
+    "droppedControls": "これらのコントロールはもう存在しないため、値は破棄されました：{{names}}",
+    "saveTitle": "テンプレートとして保存",
+    "saveDescription": "このワークスペースのテンプレートライブラリに保存され、どのプロジェクトでも再利用できます。",
+    "name": "名前",
+    "newVersionHint": "「{{name}}」という名前のテンプレートがあります：そのバージョン {{version}} として保存します。",
+    "role": "フォーマットの役割",
+    "noRole": "なし",
+    "controls": "編集可能なフィールド",
+    "controlsHint": "各インスタンスで変更できるテキストと色をオンにして、名前を付けます。",
+    "noCandidates": "このコンポジションには公開できるものがありません（テキストかシェイプのレイヤーを追加してください）。",
+    "cancel": "キャンセル",
+    "save": "テンプレートを保存",
+    "saveNewVersion": "新しいバージョンを保存",
+    "saved": "「{{name}}」を保存しました（バージョン {{version}}）。",
+    "categories": {
+      "lower-third": "ローワーサード",
+      "title": "タイトル",
+      "callout": "コールアウト",
+      "transition": "トランジション",
+      "overlay": "オーバーレイ",
+      "other": "その他"
+    }
+  }
+}

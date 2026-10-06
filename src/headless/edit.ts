@@ -34,6 +34,8 @@ import { useTimelineSettingsStore } from '@/features/timeline/stores/timeline-se
 import { useMediaLibraryStore } from '@/features/media-library/stores/media-library-store'
 import { createClassicTrack } from '@/features/timeline/utils/classic-tracks'
 import { seedMediaLibrary } from './seed-media'
+import { applyTemplateOp, setTemplateEditInput, type TemplateOperationName } from './template-ops'
+import type { MotionTemplate } from '@/shared/motion-templates/template-core.mjs'
 import {
   addItem,
   updateItem,
@@ -93,6 +95,7 @@ export type EditOperationName =
   | 'updateEffect'
   | 'addLut'
   | 'setTransform'
+  | TemplateOperationName
   | 'applyTextStyle'
   | 'upsertTextStyle'
   | 'addCaptions'
@@ -111,6 +114,8 @@ export interface HeadlessEditInput {
   transcripts?: TextStyleEditInput['transcripts']
   /** Text of the workspace `luts/` files that addLut ops name (read by the Node side). */
   luts?: HeadlessLutFile[]
+  /** Library templates named by addTemplate/updateTemplate ops (read by the Node side). */
+  templates?: MotionTemplate[]
 }
 
 export interface HeadlessEditResult {
@@ -142,6 +147,10 @@ const REFERENCE_ID_FIELDS = new Set([
   'rightClipId',
   'effectId',
   'mediaId',
+  // Template ops: composition and control targets from createComposition results.
+  'compositionId',
+  'targetItemId',
+  // Text style ops: the clip addCaptions captions, the item upsertTextStyle saves.
   'clipId',
   'fromItemId',
 ])
@@ -817,7 +826,7 @@ function applyOp(op: EditOp): unknown {
     default: {
       const handled = runTextStyleOp(op, context)
       if (handled) return handled.result
-      throw new Error(`Unknown edit op: ${String(op.op)}`)
+      return applyTemplateOp(op, { overlap: context, canvas: editCanvas })
     }
   }
 }
@@ -863,6 +872,7 @@ export async function editProject(input: HeadlessEditInput): Promise<HeadlessEdi
     transcripts: input.transcripts,
   })
   editLuts = input.luts ?? []
+  setTemplateEditInput(input.templates)
 
   log.info('Headless edit starting', { ops: input.ops.length })
 

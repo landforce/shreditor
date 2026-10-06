@@ -291,6 +291,9 @@ export interface ProjectTimeline {
     durationInFrames: number
     backgroundColor?: string
     compositionControls?: CompositionControlSchema
+    /** Set when the composition is a copy of a library motion template. */
+    templateId?: string
+    templateVersion?: number
     busAudioEq?: AudioEqSettings
     markers?: ProjectTimeline['markers']
     inPoint?: number

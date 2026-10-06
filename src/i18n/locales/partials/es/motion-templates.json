@@ -1,0 +1,43 @@
+{
+  "motionTemplates": {
+    "tabLabel": "Plantillas",
+    "saveAsTemplate": "Guardar como plantilla…",
+    "search": "Buscar plantillas",
+    "refresh": "Recargar la biblioteca",
+    "category": "Categoría",
+    "allCategories": "Todas las categorías",
+    "empty": "Aún no hay plantillas de gráficos animados. Haz clic derecho en un clip compuesto (o una selección) y elige Guardar como plantilla.",
+    "noMatches": "Ninguna plantilla coincide.",
+    "insert": "Insertar {{name}}",
+    "insertHint": "Haz clic para insertar en el cabezal o arrastra a la línea de tiempo",
+    "mediaMissingBadge": "Faltan medios",
+    "missingMedia": "No se puede insertar \"{{name}}\": a este espacio de trabajo le falta {{files}}. Importa primero el paquete de plantillas o esos archivos.",
+    "outdated": "Este proyecto usa la versión {{projectVersion}} de \"{{name}}\"; la biblioteca tiene la versión {{libraryVersion}}.",
+    "update": "Actualizar a la última",
+    "updateFrom": "Actualizar desde v{{version}}",
+    "updated": "\"{{name}}\" actualizada a la versión {{version}} ({{count}} en la línea de tiempo).",
+    "upToDate": "\"{{name}}\" ya está en la última versión.",
+    "droppedControls": "Estos controles ya no existen, así que se descartaron sus valores: {{names}}",
+    "saveTitle": "Guardar como plantilla",
+    "saveDescription": "Se guarda en la biblioteca de plantillas de este espacio de trabajo para que cualquier proyecto la reutilice.",
+    "name": "Nombre",
+    "newVersionHint": "Ya existe una plantilla llamada \"{{name}}\": esto guarda su versión {{version}}.",
+    "role": "Rol del formato",
+    "noRole": "Ninguno",
+    "controls": "Campos editables",
+    "controlsHint": "Activa los textos y colores que cada instancia puede cambiar y ponles nombre.",
+    "noCandidates": "No hay nada que exponer en esta composición (añade una capa de texto o forma).",
+    "cancel": "Cancelar",
+    "save": "Guardar plantilla",
+    "saveNewVersion": "Guardar nueva versión",
+    "saved": "\"{{name}}\" guardada (versión {{version}}).",
+    "categories": {
+      "lower-third": "Tercio inferior",
+      "title": "Título",
+      "callout": "Llamada",
+      "transition": "Transición",
+      "overlay": "Superposición",
+      "other": "Otro"
+    }
+  }
+}
