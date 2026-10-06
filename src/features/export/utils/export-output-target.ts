@@ -1,4 +1,10 @@
 import type { ClientContainer, ClientRenderResult } from './client-renderer'
+import {
+  addAudioPrimingEditListToBuffer,
+  addAudioPrimingEditListToFile,
+  type AudioPrimingEdit,
+  type IsoBmffFileAccess,
+} from './isobmff-audio-priming'
 
 type MediabunnyModule = typeof import('mediabunny')
 
@@ -17,6 +23,11 @@ export interface ExportOutputTarget {
     | InstanceType<MediabunnyModule['BufferTarget']>
     | InstanceType<MediabunnyModule['StreamTarget']>
   kind: 'buffer' | 'file'
+  /**
+   * After `output.finalize()`: mark the AAC encoder delay in the finished
+   * MP4/MOV (isobmff-audio-priming.ts). Resolves whether the file changed.
+   */
+  applyAudioPrimingEdit: (edit: AudioPrimingEdit) => Promise<boolean>
   complete: () => Promise<{
     blob: Blob
     temporaryOutput?: TemporaryExportOutput
@@ -30,6 +41,63 @@ function randomOutputName(container: ClientContainer): string {
       ? crypto.randomUUID()
       : `${Date.now()}-${Math.random().toString(36).slice(2)}`
   return `${id}.${container}`
+}
+
+async function readFileRange(file: Blob, offset: number, length: number): Promise<Uint8Array> {
+  return new Uint8Array(await file.slice(offset, offset + length).arrayBuffer())
+}
+
+/**
+ * Patch the finished OPFS file in place. A sync access handle (workers) writes
+ * in place; elsewhere a writable that keeps the existing data is used, which
+ * the browser backs with a copy of the file.
+ */
+async function patchOpfsFile(
+  fileHandle: FileSystemFileHandle,
+  edit: AudioPrimingEdit,
+): Promise<boolean> {
+  const file = await fileHandle.getFile()
+  const inWorker =
+    typeof WorkerGlobalScope !== 'undefined' && globalThis instanceof WorkerGlobalScope
+  if (inWorker && typeof fileHandle.createSyncAccessHandle === 'function') {
+    const handle = await fileHandle.createSyncAccessHandle()
+    try {
+      const access: IsoBmffFileAccess = {
+        size: handle.getSize(),
+        read: async (offset, length) => {
+          const bytes = new Uint8Array(Math.max(0, Math.min(length, handle.getSize() - offset)))
+          handle.read(bytes, { at: offset })
+          return bytes
+        },
+        replaceTail: async (offset, data) => {
+          handle.write(data, { at: offset })
+          handle.truncate(offset + data.byteLength)
+          handle.flush()
+        },
+      }
+      return await addAudioPrimingEditListToFile(access, edit)
+    } finally {
+      handle.close()
+    }
+  }
+  let writable: FileSystemWritableFileStream | null = null
+  const access: IsoBmffFileAccess = {
+    size: file.size,
+    read: (offset, length) => readFileRange(file, offset, length),
+    replaceTail: async (offset, data) => {
+      writable = await fileHandle.createWritable({ keepExistingData: true })
+      await writable.write({ type: 'write', position: offset, data })
+      await writable.truncate(offset + data.byteLength)
+    },
+  }
+  try {
+    const changed = await addAudioPrimingEditListToFile(access, edit)
+    await (writable as FileSystemWritableFileStream | null)?.close()
+    return changed
+  } catch (error) {
+    await (writable as FileSystemWritableFileStream | null)?.abort().catch(() => undefined)
+    throw error
+  }
 }
 
 async function createFileBackedTarget(
@@ -76,6 +144,7 @@ async function createFileBackedTarget(
       chunkSize: STREAM_CHUNK_SIZE_BYTES,
     }),
     kind: 'file',
+    applyAudioPrimingEdit: (edit) => patchOpfsFile(fileHandle, edit),
     complete: async () => {
       settled = true
       const file = await fileHandle.getFile()
@@ -116,6 +185,13 @@ export async function createExportOutputTarget(
   return {
     target,
     kind: 'buffer',
+    applyAudioPrimingEdit: async (edit) => {
+      if (!target.buffer) return false
+      const patched = addAudioPrimingEditListToBuffer(new Uint8Array(target.buffer), edit)
+      if (!patched) return false
+      target.buffer = patched.buffer
+      return true
+    },
     complete: async () => {
       if (!target.buffer) throw new Error('No output buffer generated')
       return { blob: new Blob([target.buffer], { type: mimeType }) }

@@ -25,6 +25,7 @@ import {
   resolveSubtitleExportPlan,
 } from './embedded-subtitle-export'
 import { createExportOutputTarget } from './export-output-target'
+import { measureAudioEncoderDelay } from './audio-encoder-delay'
 
 // Subsystems
 import { createCompositionRenderer } from './client-render-engine'
@@ -141,6 +142,26 @@ interface PreparedAudioPacketCopy {
   >
   source: InstanceType<MediabunnyModule['EncodedAudioPacketSource']>
   durationSeconds: number
+}
+
+/**
+ * Write the AAC encoder delay into the finished file's edit list. Without it
+ * the audio plays late by the delay (2112 samples, 44 ms, with Chrome's AAC
+ * encoder). An unknown delay or an unrecognised file leaves the file as is.
+ */
+async function markAudioEncoderDelay(
+  outputTarget: Awaited<ReturnType<typeof createExportOutputTarget>>,
+  delay: Promise<number | null> | null,
+  presentationSamples: number,
+): Promise<void> {
+  const primingSamples = delay ? await delay : null
+  if (!primingSamples || presentationSamples <= 0) return
+  const edit = { primingSamples, presentationSamples, sampleRate: 48_000 }
+  const marked = await outputTarget.applyAudioPrimingEdit(edit).catch((error: unknown) => {
+    getLog().warn('Could not mark the audio encoder delay', { error })
+    return false
+  })
+  getLog().info('Audio encoder delay', { ...edit, marked })
 }
 
 async function prepareAudioPacketCopy(params: {
@@ -646,6 +667,10 @@ export async function renderComposition(options: RenderEngineOptions): Promise<C
   })
 
   let audioSource: InstanceType<typeof AudioSampleSource> | null = null
+  // Encoder delay of the AAC we encode, marked in the MP4/MOV edit list after
+  // finalize so the audio is not late by it (isobmff-audio-priming.ts).
+  let audioEncoderDelay: Promise<number | null> | null = null
+  let encodedAudioFrames = 0
 
   if (packetAudio) {
     output.addAudioTrack(packetAudio.source)
@@ -675,6 +700,14 @@ export async function renderComposition(options: RenderEngineOptions): Promise<C
       audioSource = new AudioSampleSource({
         codec: audioCodec,
         bitrate: settings.audioBitrate ?? 192000,
+        onEncoderConfig: (config) => {
+          if (
+            audioCodec === 'aac' &&
+            (settings.container === 'mp4' || settings.container === 'mov')
+          ) {
+            audioEncoderDelay = measureAudioEncoderDelay(config)
+          }
+        },
       })
 
       // Add audio track to output (audio data fed after start())
@@ -747,6 +780,7 @@ export async function renderComposition(options: RenderEngineOptions): Promise<C
               signal,
               onProgress: (frames) => reportAudioProgress(frames / 48_000, 'processing'),
             })
+            encodedAudioFrames = encodedFrames
             getLog().info('Audio chunks fed to encoder', {
               duration: encodedFrames / 48_000,
               samples: encodedFrames,
@@ -835,6 +869,7 @@ export async function renderComposition(options: RenderEngineOptions): Promise<C
 
     // Finalize output
     await output.finalize()
+    await markAudioEncoderDelay(outputTarget, audioEncoderDelay, encodedAudioFrames)
 
     const completed = await outputTarget.complete()
     const { blob } = completed

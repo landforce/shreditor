@@ -42,6 +42,31 @@ vi.mock('mediabunny', () => {
         throw new Error('Mediabunny range decode failed')
       }
       const sampleRate = this.track.src.includes('44100') ? 44100 : 48000
+      if (this.track.src.includes('packets')) {
+        // A real decoder yields whole 1024-frame packets, the first one
+        // starting at or before `startTime`, each with its timestamp. The
+        // values are the absolute source sample index / 1e6.
+        const packet = 1024
+        const first = Math.floor((startTime * sampleRate) / packet) * packet
+        for (let index = first; index < endTime * sampleRate; index += packet) {
+          yield {
+            numberOfFrames: packet,
+            numberOfChannels: 2,
+            sampleRate,
+            timestamp: index / sampleRate,
+            copyTo(
+              destination: Float32Array,
+              options: { planeIndex: number; frameOffset?: number; frameCount?: number },
+            ) {
+              const offset = options.frameOffset ?? 0
+              const count = options.frameCount ?? packet - offset
+              for (let i = 0; i < count; i++) destination[i] = (index + offset + i) / 1_000_000
+            },
+            close() {},
+          }
+        }
+        return
+      }
       const frameCount = Math.max(1, Math.round((endTime - startTime) * sampleRate))
       // 'ramp' sources yield a monotone ramp tied to the ABSOLUTE source
       // position, so tests can observe reversal and speed consumption.
@@ -896,6 +921,33 @@ describe('audio DSP through processAudio (real pipeline, mocked decode)', () => 
     expect(midway).toBeLessThan(0.125)
   })
 
+  it('starts a clip exactly at its source start when decoded packets straddle it', async () => {
+    // sourceStart 45 at 30 fps = 1.5 s = sample 72000, 320 frames into a
+    // 1024-frame packet. The packet's leading frames must not shift the clip.
+    const result = await processAudio(
+      dspComposition({ src: 'blob:audio-packets', sourceStart: 45, sourceFps: 30 }),
+    )
+    const samples = result!.samples[0]!
+    expect(samples).toHaveLength(3 * 48_000)
+    expect(samples[0]).toBeCloseTo(72_000 / 1_000_000, 7)
+    expect(samples[1000]).toBeCloseTo(73_000 / 1_000_000, 7)
+    expect(samples[3 * 48_000 - 1]).toBeCloseTo((72_000 + 3 * 48_000 - 1) / 1_000_000, 7)
+  })
+
+  it('places windowed decodes at their exact source position as well', async () => {
+    const composition = dspComposition({
+      src: 'blob:audio-packets',
+      sourceStart: 45,
+      sourceFps: 30,
+    })
+    const chunks: Float32Array[] = []
+    for await (const window of processAudioWindows(composition)) chunks.push(window.samples[0]!)
+    const samples = new Float32Array(chunks.reduce((sum, chunk) => sum + chunk.length, 0))
+    chunks.reduce((at, chunk) => (samples.set(chunk, at), at + chunk.length), 0)
+    expect(samples[0]).toBeCloseTo(72_000 / 1_000_000, 7)
+    expect(samples[100_000]).toBeCloseTo(172_000 / 1_000_000, 7)
+  })
+
   it('hasAudioContent: true for an audible clip, false when its track is muted', async () => {
     await expect(hasAudioContent(dspComposition({}))).resolves.toBe(true)
     const muted = dspComposition({})
@@ -1105,7 +1157,13 @@ describe('sidechain ducking', () => {
             order: 0,
             kind: 'audio',
             items: [
-              makeAudioItem({ id: 'sting', trackId: 'root-a1', from: 55, durationInFrames: 20, audioDucking: ducking }),
+              makeAudioItem({
+                id: 'sting',
+                trackId: 'root-a1',
+                from: 55,
+                durationInFrames: 20,
+                audioDucking: ducking,
+              }),
             ],
           }),
         ],
@@ -1119,7 +1177,13 @@ describe('sidechain ducking', () => {
       id: 'sub-equiv',
       name: 'Equivalent',
       items: [
-        makeAudioItem({ id: 'sting', trackId: 'sub-a1', from: 15, durationInFrames: 20, audioDucking: ducking }),
+        makeAudioItem({
+          id: 'sting',
+          trackId: 'sub-a1',
+          from: 15,
+          durationInFrames: 20,
+          audioDucking: ducking,
+        }),
       ],
       tracks: [makeTrack({ id: 'sub-a1', order: 0, kind: 'audio' })],
       transitions: [],
