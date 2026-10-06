@@ -1,4 +1,4 @@
-import type { TimelineItem } from '@/types/timeline'
+import type { ImageItem, TimelineItem } from '@/types/timeline'
 import type { ItemKeyframes } from '@/types/keyframe'
 import type { ItemEffect } from '@/types/effects'
 import { hasMediaCrop } from '@/shared/utils/media-crop'
@@ -6,6 +6,20 @@ import { getAnimatedCrop, getAnimatedTransform } from './canvas-keyframes'
 import { resolveAnimatedColorEffects } from '@/features/export/deps/keyframes'
 import { getAdjustmentLayerEffects, type AdjustmentLayerWithTrackOrder } from './canvas-effects'
 import type { CanvasSettings } from './canvas-item-renderer'
+
+const OPAQUE_IMAGE_EXTENSION = /\.(jpe?g|jfif|bmp)$/i
+
+/**
+ * Whether an image item's source format can never carry alpha (JPEG, BMP), so a
+ * full-canvas cover is genuinely opaque. Decided from the file name (`label`,
+ * then `src` without query/hash); anything unknown counts as possibly
+ * transparent, which only costs rendering the layers below.
+ */
+export function isOpaqueImageFormat(item: Pick<ImageItem, 'label' | 'src'>): boolean {
+  if (item.label && OPAQUE_IMAGE_EXTENSION.test(item.label)) return true
+  const path = item.src?.split(/[?#]/)[0] ?? ''
+  return OPAQUE_IMAGE_EXTENSION.test(path)
+}
 
 export interface FrameOcclusionContext {
   frame: number
@@ -32,7 +46,8 @@ export interface FrameOcclusionContext {
  * Whether `baseItem` fully and opaquely covers the canvas this frame, so every
  * track below it (higher order) can be skipped during occlusion culling.
  *
- * An item fully occludes only when it is opaque video/image content that covers
+ * An item fully occludes only when it is opaque video/image content (no alpha
+ * video source; images only in alpha-less formats such as JPEG) that covers
  * the whole canvas after transform/keyframes with: opacity 1, rotation 0/180,
  * no corner radius, no crop, no corner pin, normal blend mode, not in a
  * transition, and no transparency-adding effects (item or adjustment-layer).
@@ -68,9 +83,10 @@ export function isItemFullyOccluding(
 
   // A video whose source carries an alpha channel is not opaque even at full
   // cover — culling the layers below would wrongly reveal the black base fill.
-  // (Images decode to alpha-carrying bitmaps drawn as-is; only video needs this
-  // codec-level check since its opacity depends on the decoded frame's format.)
   if (item.type === 'video' && hasTransparentVideoSource?.(item)) return false
+  // Same for images: a full-canvas PNG/WebP/GIF overlay is usually transparent
+  // around its subject, so only formats that cannot carry alpha may cull.
+  if (item.type === 'image' && !isOpaqueImageFormat(item)) return false
 
   // Items in transitions are blended, not fully occluding
   if (transitionClipIds.has(item.id)) return false

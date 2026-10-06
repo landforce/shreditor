@@ -1990,7 +1990,7 @@ describe('renderTransitionToGpuTexture', () => {
       trackId: 'sub-track-1',
       from: 0,
       durationInFrames: 120,
-      src: 'top.png',
+      src: 'top.jpg',
       label: 'Masked multiply image',
       blendMode: 'multiply',
       transform: { x: 0, y: 0, width: 640, height: 360, rotation: 0, opacity: 1 },
@@ -2200,7 +2200,7 @@ describe('renderTransitionToGpuTexture', () => {
       trackId: 'sub-track-0',
       from: 0,
       durationInFrames: 120,
-      src: 'top.png',
+      src: 'top.jpg',
       label: 'Full cover image',
       transform: { x: 0, y: 0, width: 640, height: 360, rotation: 0, opacity: 1 },
     } as ImageItem

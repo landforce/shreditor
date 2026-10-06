@@ -42,6 +42,7 @@ export interface ResolvedTextStyle {
   color: string
   backgroundColor?: string
   backgroundRadius: number
+  backgroundMode: NonNullable<TextItem['backgroundMode']>
   textShadow?: TextItem['textShadow']
   stroke?: TextItem['stroke']
 }
@@ -74,6 +75,7 @@ export type TextStyleInput = Pick<
   | 'color'
   | 'backgroundColor'
   | 'backgroundRadius'
+  | 'backgroundMode'
   | 'textAlign'
   | 'verticalAlign'
   | 'lineHeight'
@@ -107,6 +109,7 @@ export function resolveTextStyle(item: TextStyleInput): ResolvedTextStyle {
     color: item.color ?? TEXT_DEFAULTS.color,
     backgroundColor: item.backgroundColor,
     backgroundRadius: Math.max(0, item.backgroundRadius ?? 0),
+    backgroundMode: item.backgroundMode ?? 'text',
     textShadow: item.textShadow,
     stroke: item.stroke,
   }

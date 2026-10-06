@@ -379,7 +379,19 @@ export function layoutTextBlock(
   }
 
   let background: TextBlockBackground | undefined
-  if (style.backgroundColor && lines.length > 0) {
+  if (style.backgroundColor && style.backgroundMode === 'box') {
+    // Box mode: the panel is the item's transform box itself; text is laid out
+    // inside it as usual (textPadding insets, align/verticalAlign position).
+    const width = Math.max(0, boxWidth)
+    const height = Math.max(0, boxHeight)
+    background = {
+      x: 0,
+      y: 0,
+      width,
+      height,
+      radius: Math.max(0, Math.min(style.backgroundRadius, width / 2, height / 2)),
+    }
+  } else if (style.backgroundColor && lines.length > 0) {
     const maxLineWidth = Math.max(...lines.map((line) => line.width))
     const backgroundCenterX =
       style.textAlign === 'left'

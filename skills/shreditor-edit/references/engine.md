@@ -67,7 +67,10 @@ Nothing is ever shifted to make room. Pick a free range, put the item on another
 
 - Fonts: any font installed on the machine works by its family name (e.g. `Helvetica Neue`, `Neue Haas Display`); unknown names fall back. Check a rendered frame; the editor can't tell you a font is missing.
 - Text items are positioned like everything else (center origin). Give them an explicit `transform` `width` wide enough for the line, or long lines wrap.
-- `stroke` draws the outline the canvas way (round joins). If a style needs square-cornered die-cut edges, say it's an approximation in the summary.
+- `stroke` is `{ width, color, join? }`. `width` is px outward from the glyph edge. `join` is `round` (default), `miter` (square die-cut corners; very sharp points past a miter limit of 3 are bevelled so they don't spike) or `bevel`. Text inside a transitioning compound clip draws through the GPU glyph path, which keeps round joins and caps the outline at about 8px.
+- `letterSpacing` is px (at project resolution) added after every character, spaces included, as in CSS. A word gap therefore shrinks by about twice the value: -6.5 on a 124px bold title leaves roughly 30px between words, versus about 44px at 0.
+
+Text background box: `backgroundColor` (with `backgroundRadius`, `textPadding`) hugs the text lines by default. Set `backgroundMode: "box"` to fill the item's whole transform box (`width` x `height`) instead, with the text laid out inside it by `textAlign`, `verticalAlign` and `textPadding`. That builds a fixed-size chat pill or panel natively: e.g. `transform { width: 800, height: 140 }`, `backgroundColor "#ffffff"`, `backgroundRadius 70`, `textPadding 36`, `textAlign "left"`. The radius is clamped to half the shorter side.
 
 ## Shapes: UI elements
 

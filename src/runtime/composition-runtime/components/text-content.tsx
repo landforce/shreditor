@@ -15,6 +15,25 @@ const VERTICAL_ALIGN_TO_FLEX: Record<string, string> = {
   middle: 'center',
   bottom: 'flex-end',
 }
+
+/**
+ * Where the background and padding go. Default ('text' mode) the inner wrapper
+ * hugs the text block and carries both; 'box' mode paints the whole item box
+ * (a fixed-size panel) on the outer wrapper, which then holds the padding.
+ */
+function getBackgroundBoxStyles(
+  style: ReturnType<typeof resolveTextStyle>,
+  scale: number,
+): { outer: React.CSSProperties; inner: React.CSSProperties } {
+  const padding = `${style.textPadding * scale}px`
+  const borderRadius = `${style.backgroundRadius * scale}px`
+  if (!style.backgroundColor) return { outer: { padding }, inner: { padding: 0 } }
+  const fill = { backgroundColor: style.backgroundColor, borderRadius }
+  return style.backgroundMode === 'box'
+    ? { outer: { padding, ...fill }, inner: { padding: 0 } }
+    : { outer: { padding: 0 }, inner: { padding, ...fill } }
+}
+
 const TEXT_ALIGN_TO_FLEX: Record<string, string> = {
   left: 'flex-start',
   center: 'center',
@@ -100,6 +119,7 @@ export const TextContent: React.FC<{ item: TextItem & { _sequenceFrameOffset?: n
     ? `${style.textShadow.offsetX * scaleX}px ${style.textShadow.offsetY * scaleY}px ${style.textShadow.blur * scale}px ${style.textShadow.color}`
     : undefined
   const strokeWidth = style.stroke?.width ? `${style.stroke.width * scale * 2}px` : undefined
+  const background = getBackgroundBoxStyles(style, scale)
 
   return (
     <div
@@ -109,19 +129,18 @@ export const TextContent: React.FC<{ item: TextItem & { _sequenceFrameOffset?: n
         display: 'flex',
         alignItems,
         justifyContent,
-        padding: style.backgroundColor ? 0 : `${style.textPadding * scale}px`,
         boxSizing: 'border-box',
+        ...background.outer,
       }}
     >
       <div
         style={{
-          backgroundColor: style.backgroundColor,
-          borderRadius: `${style.backgroundRadius * scale}px`,
-          padding: style.backgroundColor ? `${style.textPadding * scale}px` : 0,
+          ...background.inner,
           textAlign: style.textAlign,
           textShadow: cssTextShadow,
           WebkitTextStrokeWidth: strokeWidth,
           WebkitTextStrokeColor: style.stroke?.color,
+          strokeLinejoin: style.stroke?.join,
           // Paint stroke first, then fill on top — without this, a thick
           // stroke covers the fill entirely (text becomes solid stroke
           // color, e.g. illegible black-on-black for the TikTok preset).
