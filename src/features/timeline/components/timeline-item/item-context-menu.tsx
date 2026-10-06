@@ -16,6 +16,8 @@ import { captureContextMenuEventInit, replayContextMenuEvent } from '../../utils
 import { useSelectionStore } from '@/shared/state/selection'
 import { useGradeClipboardStore } from '@/shared/state/grade-clipboard'
 import { useItemsStore } from '../../stores/items-store'
+import { StyledCaptionActions } from './styled-caption-actions'
+import type { AudioItem, VideoItem } from '@/types/timeline'
 import {
   copyGradeFromItem,
   itemHasColorGrade,
@@ -73,6 +75,8 @@ type CaptionActionsProps = ItemContextMenuSectionProps & {
   canExtractEmbeddedSubtitles?: boolean
   canConsolidateCaptionsToSegment?: boolean
   onOpenCaptionDialog?: () => void
+  /** The clip "Captions with a style" captions (video/audio with media). */
+  styledCaptionClip?: AudioItem | VideoItem
   onExtractEmbeddedSubtitles?: () => void
   onConsolidateCaptionsToSegment?: () => void
 }
@@ -610,6 +614,7 @@ function CaptionActions({
   canExtractEmbeddedSubtitles,
   canConsolidateCaptionsToSegment,
   onOpenCaptionDialog,
+  styledCaptionClip,
   onExtractEmbeddedSubtitles,
   onConsolidateCaptionsToSegment,
 }: CaptionActionsProps) {
@@ -626,6 +631,7 @@ function CaptionActions({
           ) : (
             <ContextMenuItem onClick={onOpenCaptionDialog}>{captionActionLabel}</ContextMenuItem>
           )}
+          {styledCaptionClip && <StyledCaptionActions t={t} clip={styledCaptionClip} />}
           <ContextMenuSeparator />
         </>
       )}

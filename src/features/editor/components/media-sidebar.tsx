@@ -29,9 +29,14 @@ import {
   useCompositionNavigationStore,
   useCompositionsStore,
   useTimelineStore,
+  upsertProjectTextStyle,
 } from '@/features/editor/deps/timeline-store'
 import { usePlaybackStore } from '@/shared/state/playback'
 import { useSelectionStore } from '@/shared/state/selection'
+import { useProjectTextStylesStore } from '@/shared/state/text-styles'
+import { buildApplyTextStyleUpdates } from '@/shared/typography/text-styles/text-style-resolve'
+import type { TextStyleDefinition } from '@/types/text-style'
+import { StyledTextTemplates } from './styled-text-templates'
 import { useProjectStore } from '@/features/editor/deps/projects'
 import { DEFAULT_PROJECT_HEIGHT, DEFAULT_PROJECT_WIDTH } from '@/shared/projects/defaults'
 import {
@@ -382,7 +387,7 @@ export const MediaSidebar = memo(function MediaSidebar() {
   // Add text item on its own new layer at the playhead, matching what dragging
   // the same preset onto the canvas does (minus the cursor-driven position).
   const handleAddText = useCallback(
-    (presetId?: (typeof TEXT_STYLE_PRESETS)[number]['id']) => {
+    (presetId?: (typeof TEXT_STYLE_PRESETS)[number]['id'], style?: TextStyleDefinition) => {
       // Read all needed state from stores directly to avoid subscriptions
       const { tracks, fps, addItemOnNewTrack } = useTimelineStore.getState()
       const { activeTrackId, selectItems, setActiveTrack } = useSelectionStore.getState()
@@ -417,8 +422,21 @@ export const MediaSidebar = memo(function MediaSidebar() {
         text: t('editor.textSection.defaultText'),
         textStylePresetId: presetId,
       })
+      const canvas = { width: canvasWidth, height: canvasHeight }
+      const styledItem: TextItem = style
+        ? {
+            ...textItem,
+            ...buildApplyTextStyleUpdates(textItem, style, canvas),
+            label: style.name,
+            durationInFrames: style.defaultDurationFrames ?? textItem.durationInFrames,
+          }
+        : textItem
 
-      addItemOnNewTrack(textItem, newTrack.tracks)
+      addItemOnNewTrack(styledItem, newTrack.tracks)
+      // A library style is copied into the project on first use.
+      if (style && !useProjectTextStylesStore.getState().styles.some((s) => s.id === style.id)) {
+        upsertProjectTextStyle(style, canvas)
+      }
       setActiveTrack(newTrack.trackId)
       selectItems([textItem.id])
     },
@@ -765,6 +783,7 @@ export const MediaSidebar = memo(function MediaSidebar() {
                   <div className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
                     {t('editor.mediaSidebar.templates')}
                   </div>
+                  <StyledTextTemplates onAdd={(style) => handleAddText(undefined, style)} />
                   {TEXT_TEMPLATE_GROUPS.map((group) => {
                     const presets = textTemplatesByLayout[group.key]
                     const showAddText = group.key === 'single'

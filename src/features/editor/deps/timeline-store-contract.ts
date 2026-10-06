@@ -57,6 +57,14 @@ export {
   removeTextMotionEffect,
 } from '@/features/timeline/stores/actions/text-motion-actions'
 export {
+  applyTextStyleToItems,
+  detachItemsFromTextStyle,
+  removeProjectTextStyle,
+  resetItemsToTextStyle,
+  saveTextStyleFromItems,
+  upsertProjectTextStyle,
+} from '@/features/timeline/stores/actions/text-style-actions'
+export {
   captureAnimationFromItem,
   getPresetCompatibility,
 } from '@/features/timeline/deps/keyframe-editors'

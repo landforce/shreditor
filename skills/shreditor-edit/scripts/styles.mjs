@@ -16,7 +16,17 @@ const PACK_KIND = 'shreditor-text-styles'
 
 /** Same look, layout and rules (version and time aside). */
 function sameStyle(a, b) {
-  const strip = ({ version: _v, updatedAt: _u, ...rest }) => JSON.stringify(rest, Object.keys(rest).sort())
+  const stable = (value) => {
+    if (Array.isArray(value)) return `[${value.map(stable).join(',')}]`
+    if (value && typeof value === 'object')
+      return `{${Object.keys(value)
+        .filter((key) => value[key] !== undefined)
+        .sort()
+        .map((key) => `${JSON.stringify(key)}:${stable(value[key])}`)
+        .join(',')}}`
+    return JSON.stringify(value)
+  }
+  const strip = ({ version: _v, updatedAt: _u, ...rest }) => stable(rest)
   return strip(a) === strip(b)
 }
 

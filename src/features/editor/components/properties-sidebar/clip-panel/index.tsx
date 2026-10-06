@@ -63,6 +63,9 @@ const LazyTextContentSection = lazy(() =>
 const LazyTextEffectsSection = lazy(() =>
   import('./text-section').then((module) => ({ default: module.TextEffectsSection })),
 )
+const LazyTextStylesSection = lazy(() =>
+  import('./text-styles-section').then((module) => ({ default: module.TextStylesSection })),
+)
 const LazyTextStyleSection = lazy(() =>
   import('./text-section').then((module) => ({ default: module.TextStyleSection })),
 )
@@ -666,6 +669,11 @@ const ClipPanelCore = memo(function ClipPanelCore({
                 />
               )}
               {paintableLayoutItems.length > 0 && <CornerPinSection items={paintableLayoutItems} />}
+              {hasTextItems && (
+                <Suspense fallback={null}>
+                  <LazyTextStylesSection items={selectedItems} canvas={canvas} />
+                </Suspense>
+              )}
               {hasTextItems && (
                 <Suspense fallback={null}>
                   <LazyTextContentSection items={selectedItems} canvas={canvas} />

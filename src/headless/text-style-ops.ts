@@ -27,6 +27,7 @@ import {
   addItems,
   applyTextStyleToItems,
   removeItems,
+  saveTextStyleFromItems,
   setTracks,
   upsertProjectTextStyle,
 } from '@/features/timeline/stores/timeline-actions'
@@ -168,8 +169,9 @@ function upsertTextStyleOp(op: Op): unknown {
   )
   const probe = { id: 'probe', type: 'text', trackId: 't', from: 0, durationInFrames: 1, label: '', text: '', color: '#fff' } as TextItem
   assertValidItem({ ...probe, ...buildApplyTextStyleUpdates(probe, style, input.canvas) }, 'style')
-  const updatedItems = upsertProjectTextStyle(style, input.canvas)
-  if (fromItemId) applyTextStyleToItems([fromItemId], style, input.canvas)
+  const updatedItems = fromItemId
+    ? saveTextStyleFromItems(style, [fromItemId], input.canvas)
+    : upsertProjectTextStyle(style, input.canvas)
   return { styleId: style.id, version: style.version, style, updatedItems }
 }
 

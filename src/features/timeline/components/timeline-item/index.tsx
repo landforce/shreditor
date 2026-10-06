@@ -894,6 +894,8 @@ export const TimelineItem = memo(function TimelineItem({
           isGeneratingCaptions:
             caption.transcriptStatus === 'queued' || caption.transcriptStatus === 'transcribing',
           onOpenCaptionDialog: caption.openDialog,
+          styledCaptionClip:
+            (item.type === 'video' || item.type === 'audio') && item.mediaId ? item : undefined,
           canExtractEmbeddedSubtitles: caption.canExtractEmbeddedSubtitles,
           onExtractEmbeddedSubtitles: caption.handleExtractEmbeddedSubtitles,
           canConsolidateCaptionsToSegment: caption.hasConsolidatablePerCueCaptions,

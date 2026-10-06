@@ -7,6 +7,7 @@ import { useTimelineStore } from '@/features/editor/deps/timeline-store'
 import type { SubtitleSegmentItem, TextItem } from '@/types/timeline'
 
 import { ColorPicker, PropertyRow, SliderInput } from '../components'
+import { CaptionStyleChoices } from './caption-style-choices'
 import {
   CAPTION_STYLE_PRESETS,
   type CaptionStylePreset,
@@ -100,6 +101,12 @@ export const CaptionStyleControls = memo(function CaptionStyleControls({
 
   return (
     <div className="space-y-1">
+      <CaptionStyleChoices
+        items={items}
+        canvasWidth={canvasWidth}
+        canvasHeight={canvasHeight}
+        onApplyPatch={applyPatch}
+      />
       <div>
         <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground pb-1.5">
           {t('editor.captionStyleControls.stylePreset')}
