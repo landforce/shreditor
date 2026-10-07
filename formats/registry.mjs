@@ -59,6 +59,10 @@ const track = (name, kind, role) => ({ name, kind, role })
 // Roles are shared across formats; `name` is the guide's word for it.
 const part = (role, name, note, required = true) => ({ role, name, required, note })
 
+// planMode: what a plan lays out (formats/plan/). A speaker format's plan is the
+// performance (the speaker's lines, kept or cut, with the visuals for each); the
+// others plan a story of beats.
+
 /** Story roles a plan's beats can play, in story order. */
 export const STRUCTURE_ROLES = Object.freeze(['hook', 'setup', 'body', 'payoff', 'close'])
 
@@ -119,6 +123,7 @@ const graphicYap = {
     part('body', 'Body', 'one image per point; lists loop: name it, show it, comment'),
     part('close', 'Close', 'summary line, verbal CTA, or a gag or payoff shot; no end card'),
   ],
+  planMode: 'performance',
   tracks: [
     track('Title', 'video', 'title'),
     track('Captions', 'video', 'captions'),
@@ -220,6 +225,7 @@ const greenscreen = {
     ),
     part('close', 'Close', 'a line straight to the audience, or the thesis; no end card'),
   ],
+  planMode: 'performance',
   tracks: [
     track('Title', 'video', 'title'),
     track('Captions', 'video', 'captions'),
@@ -347,6 +353,7 @@ const vlog = {
     part('payoff', 'Payoff', 'the finished result or reveal, held longest'),
     part('close', 'End', 'held reveal, bookend callback or part-two tease', false),
   ],
+  planMode: 'story',
   tracks: [
     track('Title', 'video', 'title'),
     track('Captions', 'video', 'captions'),
@@ -455,6 +462,7 @@ const tenShot = {
     part('payoff', 'Premise payoff', 'optional: the turn the setup builds to', false),
     part('close', 'Ending', 'a closing hold on a summary image, or end at full speed'),
   ],
+  planMode: 'story',
   tracks: [
     track('Title', 'video', 'title'),
     track('Labels', 'video', 'labels'),

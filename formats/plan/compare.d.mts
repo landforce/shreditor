@@ -16,3 +16,9 @@ export function comparePlan(
     | { items?: Array<{ mediaId?: string; type: string; from: number; durationInFrames: number }> }
     | undefined,
 ): { findings: PlanFinding[]; checked: number; skipped: number }
+export const range: (startFrame: number, endFrame: number) => FrameRange
+export const describe: (r: FrameRange, fps: number) => string
+export function lengthFinding(
+  plan: Pick<Plan, 'fps' | 'durationFrames'>,
+  end: number,
+): PlanFinding | null

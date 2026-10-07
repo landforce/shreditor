@@ -233,7 +233,8 @@ const longest = (ranges, count = 3) =>
 // Speech, from transcripts mapped through each clip's source window
 // ---------------------------------------------------------------------------
 
-function transcriptWords(transcript) {
+/** A stored transcript's words ({ text, start, end }, source seconds), from its words or segments. */
+export function transcriptWords(transcript) {
   const data = transcript?.data ?? transcript
   if (Array.isArray(data?.words)) return data.words
   const segs = Array.isArray(data?.segments) ? data.segments : []

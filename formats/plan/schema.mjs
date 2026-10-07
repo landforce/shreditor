@@ -1,5 +1,10 @@
-// The beat plan (`<workspace>/projects/<id>/agent/plan.json`): reading it, in
-// either schema version, into one normalized shape. Pure: no files, no format.
+// The plan (`<workspace>/projects/<id>/agent/plan.json`): reading it, in any
+// schema version, into one normalized shape. Pure: no files, no format.
+//
+// v3 adds `mode`: 'story' (the v2 beats below) or 'performance' (a speaker's
+// lines, kept or cut, with visuals per line: ./performance/read.mjs). Without a
+// `mode`, a plan with `performance` is one, a plan with `beats` is a story, else
+// the format's plan mode (`defaultMode`) applies. v2 and v1 are story plans.
 //
 // v2 (story first):
 //   { schemaVersion: 2, fps, durationFrames, request, story: { arc, structure },
@@ -12,23 +17,12 @@
 // its source, in seconds (`unit: 's'`) or frames at the plan's fps (`'frames'`,
 // v1's only unit).
 
-const PLAN_SCHEMA_VERSION = 2
+import { readPerformance } from './performance/read.mjs'
+import { firstProblem, isInt, isObject, issueList, isText, plain, trimmed } from './shape.mjs'
+
+const PLAN_SCHEMA_VERSION = 3
+const PLAN_MODES = new Set(['story', 'performance'])
 const TEXT_ROLES = new Set(['title', 'labels'])
-
-const isInt = (value) => Number.isInteger(value)
-const isText = (value) => typeof value === 'string' && value.trim().length > 0
-
-/** Collects errors and warnings, each tied to a beat id or 'plan'. */
-export function issueList() {
-  const errors = []
-  const warnings = []
-  return {
-    errors,
-    warnings,
-    error: (where, message) => errors.push({ where, message }),
-    warn: (where, message) => warnings.push({ where, message }),
-  }
-}
 
 /** `[start, end)` as whole frames with start < end, else null. */
 function frameRange(value) {
@@ -37,14 +31,14 @@ function frameRange(value) {
   return isInt(start) && isInt(end) && start >= 0 && end > start ? { start, end } : null
 }
 
-const trimmed = (value) => (isText(value) ? value.trim() : '')
-const plain = (value) => (typeof value === 'string' ? value : '')
-const isObject = (value) => Boolean(value) && typeof value === 'object' && !Array.isArray(value)
+/** A performance plan's length comes from its kept lines: `durationFrames` is optional there. */
+function checkDuration(raw, mode, issues) {
+  if (mode === 'performance' && raw.durationFrames === undefined) return
+  if (!(isInt(raw.durationFrames) && raw.durationFrames > 0))
+    issues.error('plan', '`durationFrames` must be a whole number of frames above 0')
+}
 
-/** The first message whose rule is broken: `[[broken, message], ...]`, else null. */
-const firstProblem = (rules) => rules.find(([broken]) => broken)?.[1] ?? null
-
-function checkTiming(raw, projectFps, issues) {
+function checkTiming(raw, mode, projectFps, issues) {
   const fps = raw.fps
   const problem = firstProblem([
     [!(typeof fps === 'number' && fps > 0), '`fps` must be a number above 0'],
@@ -54,8 +48,7 @@ function checkTiming(raw, projectFps, issues) {
     ],
   ])
   if (problem) issues.error('plan', problem)
-  if (!(isInt(raw.durationFrames) && raw.durationFrames > 0))
-    issues.error('plan', '`durationFrames` must be a whole number of frames above 0')
+  checkDuration(raw, mode, issues)
 }
 
 function checkStory(raw, story, version, issues) {
@@ -72,12 +65,13 @@ function checkStory(raw, story, version, issues) {
     issues.error('plan', '`story.arc` is missing: say the order of the story and why')
 }
 
-function readHeader(raw, version, issues, projectFps) {
+function readHeader(raw, version, mode, issues, projectFps) {
   const story = isObject(raw.story) ? raw.story : {}
-  checkTiming(raw, projectFps, issues)
+  checkTiming(raw, mode, projectFps, issues)
   checkStory(raw, story, version, issues)
   return {
     version,
+    mode,
     fps: typeof raw.fps === 'number' ? raw.fps : 0,
     durationFrames: isInt(raw.durationFrames) ? raw.durationFrames : 0,
     request: trimmed(raw.request),
@@ -188,23 +182,54 @@ function readBeat(raw, index, header, issues) {
   return beat
 }
 
+/** The plan's mode: v1 and v2 are stories; v3 says, or its shape does, or the format. */
+function modeOf(raw, version, defaultMode) {
+  if (version < 3) return 'story'
+  if (raw.mode !== undefined) return raw.mode
+  if (isObject(raw.performance)) return 'performance'
+  return Array.isArray(raw.beats) ? 'story' : (defaultMode ?? 'story')
+}
+
+function versionProblem(raw, version) {
+  if (![1, 2, PLAN_SCHEMA_VERSION].includes(version))
+    return `schemaVersion ${version} is unknown (1, 2 or ${PLAN_SCHEMA_VERSION})`
+  if (version < 3 && raw.mode === 'performance')
+    return 'a performance plan is schemaVersion 3: set "schemaVersion": 3'
+  return null
+}
+
+const notAPlan = (issues, message) => {
+  issues.error('plan', message)
+  return { plan: null, errors: issues.errors, warnings: issues.warnings }
+}
+
 /**
- * Read a plan (parsed JSON) of either version. Returns the normalized plan and
+ * Read a plan (parsed JSON) of any version. Returns the normalized plan and
  * the problems found in its shape; the format, media and timing rules are
- * checked by ./validate.mjs.
+ * checked by ./validate.mjs (story) and ./performance/validate.mjs.
+ * `defaultMode` is the format's plan mode, for a v3 plan that doesn't say.
  */
-export function readPlan(raw, { projectFps } = {}) {
+export function readPlan(raw, { projectFps, defaultMode } = {}) {
   const issues = issueList()
-  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
-    issues.error('plan', 'the plan is a JSON object')
-    return { plan: null, ...issues }
-  }
+  if (!isObject(raw)) return notAPlan(issues, 'the plan is a JSON object')
   const version = raw.schemaVersion ?? 1
-  if (version !== 1 && version !== PLAN_SCHEMA_VERSION) {
-    issues.error('plan', `schemaVersion ${version} is unknown (1 or ${PLAN_SCHEMA_VERSION})`)
-    return { plan: null, ...issues }
+  const problem = versionProblem(raw, version)
+  if (problem) return notAPlan(issues, problem)
+  const mode = modeOf(raw, version, defaultMode)
+  if (!PLAN_MODES.has(mode)) return notAPlan(issues, `mode "${mode}" is "story" or "performance"`)
+  const header = readHeader(raw, version, mode, issues, projectFps)
+  if (mode === 'performance') {
+    const performance = readPerformance(raw.performance, header.fps, issues)
+    return {
+      plan: { ...header, beats: [], performance },
+      errors: issues.errors,
+      warnings: issues.warnings,
+    }
   }
-  const header = readHeader(raw, version, issues, projectFps)
+  return readStory(raw, header, issues)
+}
+
+function readStory(raw, header, issues) {
   if (!Array.isArray(raw.beats) || raw.beats.length === 0) issues.error('plan', 'no beats')
   const beats = (Array.isArray(raw.beats) ? raw.beats : [])
     .map((beat, index) => readBeat(beat, index, header, issues))
@@ -214,5 +239,9 @@ export function readPlan(raw, { projectFps } = {}) {
     if (seen.has(beat.id)) issues.error(beat.id, 'beat id is used twice')
     seen.add(beat.id)
   }
-  return { plan: { ...header, beats }, errors: issues.errors, warnings: issues.warnings }
+  return {
+    plan: { ...header, beats, performance: null },
+    errors: issues.errors,
+    warnings: issues.warnings,
+  }
 }

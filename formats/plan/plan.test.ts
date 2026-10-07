@@ -174,7 +174,14 @@ test('a v1 plan stays readable (frames in-points) but needs a story before it bu
 })
 
 test('shape errors: version, fps, request, arc, ids, roles, edits, sources, units, text', () => {
-  assert.ok(has(check({ schemaVersion: 3 }).errors, /schemaVersion 3 is unknown/))
+  assert.ok(has(check({ schemaVersion: 4 }).errors, /schemaVersion 4 is unknown \(1, 2 or 3\)/))
+  assert.ok(
+    has(
+      check({ ...tenShotPlan(), mode: 'performance' }).errors,
+      /a performance plan is schemaVersion 3/,
+    ),
+  )
+  assert.ok(has(check({ ...tenShotPlan(), schemaVersion: 3, mode: 'act' }).errors, /mode "act"/))
   assert.ok(has(check([]).errors, /JSON object/))
   const bad = check({
     schemaVersion: 2,

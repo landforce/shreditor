@@ -1,11 +1,9 @@
 // Types for ./schema.mjs.
 import type { StructureRole } from '../registry.mjs'
+import type { Performance } from './performance/read.mjs'
+import type { PlanIssue } from './shape.mjs'
 
-export interface PlanIssue {
-  /** A beat id, or 'plan'. */
-  where: string
-  message: string
-}
+export type { PlanIssue }
 
 export interface PlanText {
   text: string
@@ -32,23 +30,24 @@ export interface PlanBeat {
   text: PlanText | null
 }
 
+export type PlanMode = 'story' | 'performance'
+
 export interface Plan {
-  version: 1 | 2
+  version: 1 | 2 | 3
+  /** v1 and v2 are story plans. */
+  mode: PlanMode
   fps: number
   durationFrames: number
   request: string
   story: { arc: string; structure: string[] }
   sources: unknown[]
+  /** A story plan's beats (empty in performance mode). */
   beats: PlanBeat[]
+  /** A performance plan's lines (null in story mode, or when unreadable). */
+  performance: Performance | null
 }
 
-export function issueList(): {
-  errors: PlanIssue[]
-  warnings: PlanIssue[]
-  error(where: string, message: string): void
-  warn(where: string, message: string): void
-}
 export function readPlan(
   raw: unknown,
-  options?: { projectFps?: number },
+  options?: { projectFps?: number; defaultMode?: PlanMode },
 ): { plan: Plan | null; errors: PlanIssue[]; warnings: PlanIssue[] }

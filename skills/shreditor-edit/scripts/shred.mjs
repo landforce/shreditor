@@ -71,13 +71,19 @@
 //                                        --no-plan only on a timeline the user built by hand
 //   shred done <draftId|id>              end the pass without publishing (the editor lets the user edit)
 //   shred plan <projectId> [--file plan.json]
-//                                        validate the beat plan (agent/plan.json) and print its beat sheet,
+//                                        validate the plan (agent/plan.json) and print it (a story plan's
+//                                        beat sheet, a performance plan's script and to-source list),
 //                                        with the format's targets estimated; records its hash. The
 //                                        first draft of a project needs a plan that validated clean
+//   shred plan <projectId> --scaffold <speaker mediaId...>
+//                                        Graphic Yap / Greenscreen: a draft performance plan from the
+//                                        speakers' transcripts (lines, obvious cuts marked), written to
+//                                        agent/plan.json if none (else plan.scaffold.json); review every line
 //   shred build <draftId> [--plan file] [--replace]
-//                                        the first assembly from the plan, one atomic batch: clips, sync
-//                                        sound per the format, planned text, a marker per beat
-//   shred build <projectId> --markers-only   only the beat markers, on the user's project (plan review)
+//                                        the first assembly from the plan, one atomic batch: clips (a
+//                                        performance's kept lines back to back), sync sound per the
+//                                        format, visuals, planned text, a marker per beat or kept line
+//   shred build <projectId> --markers-only   only the plan markers, on the user's project (plan review)
 //   shred apply <id> <ops.json>          apply an op batch atomically (revision-checked)
 //   shred frames <id> --at 30,95,... [--out grid.jpg] [--size 270x480]
 //                                        render saved frames and tile them for review
@@ -86,8 +92,8 @@
 //                                        can fail (exit 1); --frames renders every flagged frame into one
 //                                        contact sheet with what each is for
 //                                        (a project with a Video Style Kit adds the kit's rules: Kit section)
-//                                        (a project with a plan adds a Plan section: beats missing or out of
-//                                        order, length drift; warnings only)
+//                                        (a project with a plan adds a Plan section: beats or kept lines
+//                                        missing or out of order, cut lines back in, length drift; warnings only)
 //   shred kit apply <kit.json|folder> --project <id> [--force]
 //                                        a Video Style Kit: its titles, captions and overlays become
 //                                        kit:* text styles (project and library), the kit is recorded on
@@ -220,6 +226,7 @@ const { values: opt, positionals } = parseArgs({
     plan: { type: 'string' },
     replace: { type: 'boolean' },
     'markers-only': { type: 'boolean' },
+    scaffold: { type: 'boolean' },
     'no-plan': { type: 'boolean' },
   },
 })

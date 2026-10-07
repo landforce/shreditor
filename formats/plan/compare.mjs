@@ -4,8 +4,8 @@
 // restructure is a reason to update the plan, not to undo the edit.
 
 const sec = (frames, fps) => (frames / fps).toFixed(2)
-const range = (startFrame, endFrame) => ({ startFrame, endFrame })
-const describe = (r, fps) =>
+export const range = (startFrame, endFrame) => ({ startFrame, endFrame })
+export const describe = (r, fps) =>
   `frames ${r.startFrame}-${r.endFrame} [${sec(r.startFrame, fps)}-${sec(r.endFrame, fps)} s]`
 
 /** Root timeline clips from this beat's media (pictures for a picture beat). */
@@ -76,7 +76,8 @@ function orderFindings(located, fps) {
   }))
 }
 
-function lengthFinding(plan, end) {
+/** Length drift of the timeline (ending at `end`) from the plan's `durationFrames`, or null. */
+export function lengthFinding(plan, end) {
   const drift = end - plan.durationFrames
   if (drift === 0) return null
   const level = Math.abs(drift) > plan.fps / 2 ? 'warn' : 'info'

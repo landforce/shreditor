@@ -10,11 +10,12 @@ import { trackRole } from '../scorecard.mjs'
 const PLAN_MARKER_PREFIX = 'plan-'
 const MARKER_LABEL_MAX = 90
 
-const markerId = (beat) => `${PLAN_MARKER_PREFIX}${beat.id.replace(/[^A-Za-z0-9_-]+/g, '-')}`
-const markerLabel = (beat) => {
-  const label = `${beat.role ?? 'beat'}: ${beat.takeaway || beat.id}`
-  return label.length > MARKER_LABEL_MAX ? `${label.slice(0, MARKER_LABEL_MAX - 1)}…` : label
-}
+/** The marker id for a beat or line id: `plan-<id>`. */
+export const markerId = (id) => `${PLAN_MARKER_PREFIX}${id.replace(/[^A-Za-z0-9_-]+/g, '-')}`
+/** A marker label, cut to fit. */
+export const markerText = (label) =>
+  label.length > MARKER_LABEL_MAX ? `${label.slice(0, MARKER_LABEL_MAX - 1)}…` : label
+const markerLabel = (beat) => markerText(`${beat.role ?? 'beat'}: ${beat.takeaway || beat.id}`)
 const capital = (role) => role.charAt(0).toUpperCase() + role.slice(1)
 
 /** Where a missing format track goes: next to the format tracks around it, in the format's order. */
@@ -34,7 +35,7 @@ function orderFor(spec, format, tracks) {
 }
 
 /** Finds the project's track for a role, or plans an addTrack for it (once per role). */
-function trackFinder(project, format, ops) {
+export function trackFinder(project, format, ops) {
   const tracks = [...(project.timeline?.tracks ?? [])].sort((a, b) => a.order - b.order)
   const made = new Map()
   return (role, kind) => {
@@ -59,7 +60,7 @@ function trackFinder(project, format, ops) {
 }
 
 /** The text style for planned text: the beat's own, the kit's, else a project style of that role. */
-function styleFinder(project) {
+export function styleFinder(project) {
   const styles = project.timeline?.textStyles ?? []
   const has = (id) => styles.some((style) => style.id === id || style.name === id)
   const kit = { title: 'kit:title', labels: 'kit:overlay' }
@@ -69,9 +70,13 @@ function styleFinder(project) {
     (has(kit[text.role]) ? kit[text.role] : styles.find((s) => s.role === styleRole[text.role])?.id)
 }
 
-function clipOps(beat, index, track, { fps, dropSyncSound }) {
+/**
+ * addClip for a beat's media at its frames, its source window, and the sync
+ * sound rule: `{ ops, syncSound: 'kept' | 'removed' | null }`. `callerId` names
+ * the addClip (the other ops derive theirs from it).
+ */
+export function clipOps(beat, callerId, track, { fps, dropSyncSound }) {
   const { media } = beat
-  const callerId = `clip${index}`
   const length = beat.end - beat.start
   const ops = [
     {
@@ -104,12 +109,12 @@ function clipOps(beat, index, track, { fps, dropSyncSound }) {
   return { ops, syncSound: 'removed' }
 }
 
-function textOps(beat, index, findTrack, styleFor) {
-  const { text } = beat
+/** addText for planned text (`{ text, role, start, end, style? }`) on its role's track, in its style. */
+export function textOps(text, callerId, findTrack, styleFor) {
   const track = findTrack(text.role, 'video')
   const style = styleFor(text)
   const op = {
-    callerId: `text${index}`,
+    callerId,
     op: 'addText',
     text: text.text,
     from: text.start,
@@ -141,7 +146,7 @@ function assertEmpty(items, { replace, markersOnly }) {
 }
 
 /** Ops that clear what a rebuild replaces: the plan's old markers, and with `replace` every item. */
-function clearingOps(project, options) {
+export function clearingOps(project, options) {
   const items = project.timeline?.items ?? []
   assertEmpty(items, options)
   const ops = []
@@ -174,7 +179,7 @@ export function buildPlanOps(
       const entry = { beat }
       if (!markersOnly) {
         const track = findTrack(beat.trackRole, beat.media.kind === 'audio' ? 'audio' : 'video')
-        const clip = clipOps(beat, index, track, { fps: plan.fps, dropSyncSound })
+        const clip = clipOps(beat, `clip${index}`, track, { fps: plan.fps, dropSyncSound })
         ops.push(...clip.ops)
         Object.assign(entry, {
           track: track.name,
@@ -182,7 +187,7 @@ export function buildPlanOps(
           syncSound: clip.syncSound,
         })
         if (beat.text) {
-          const text = textOps(beat, index, findTrack, styleFor)
+          const text = textOps(beat.text, `text${index}`, findTrack, styleFor)
           ops.push(...text.ops)
           entry.text = text.placed
         }
@@ -190,7 +195,7 @@ export function buildPlanOps(
       ops.push({
         callerId: `mark${index}`,
         op: 'addMarker',
-        id: markerId(beat),
+        id: markerId(beat.id),
         frame: beat.start,
         label: markerLabel(beat),
       })
