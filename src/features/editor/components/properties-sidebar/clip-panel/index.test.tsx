@@ -12,6 +12,7 @@ import type {
   TimelineItem,
   VideoItem,
 } from '@/types/timeline'
+import { TooltipProvider } from '@/components/ui/tooltip'
 import { ClipPanel } from './index'
 
 const clipPanelTestState = vi.hoisted(() => ({
@@ -61,6 +62,11 @@ vi.mock('./text-section', () => ({
   TextSection: () => <div>Text Body</div>,
   TextContentSection: () => <div>Text Content Body</div>,
   TextEffectsSection: () => <div>Text Effects Body</div>,
+  TextStyleSection: () => <div>Text Style Body</div>,
+}))
+
+vi.mock('./text-styles-section', () => ({
+  TextStylesSection: () => <div>Saved Styles Body</div>,
 }))
 
 vi.mock('./shape-section', () => ({
@@ -260,6 +266,33 @@ describe('ClipPanel inspector tabs', () => {
     })
   })
 
+  it('opens a title or text overlay on its text box, before layout', async () => {
+    const title = {
+      id: 'clip-text',
+      type: 'text',
+      trackId: 'track-1',
+      from: 0,
+      durationInFrames: 90,
+      label: 'Title',
+      text: 'POV: it is finally time',
+      color: '#ffffff',
+    } as TimelineItem
+    resetStores([title], [title.id])
+    render(
+      <TooltipProvider>
+        <ClipPanel />
+      </TooltipProvider>,
+    )
+
+    const textBox = await screen.findByText('Text Content Body')
+    const savedStyles = await screen.findByText('Saved Styles Body')
+    const layout = screen.getByText('Layout Body')
+    const follows = (a: Element, b: Element) =>
+      Boolean(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING)
+    expect(follows(textBox, savedStyles)).toBe(true)
+    expect(follows(savedStyles, layout)).toBe(true)
+  })
+
   it('shows a newly selected item without waiting for deferred inspector work', () => {
     const secondVideo: VideoItem = {
       ...VIDEO_ITEM,
@@ -333,10 +366,7 @@ describe('ClipPanel inspector tabs', () => {
 
     render(<ClipPanel />)
 
-    expect(screen.getByRole('tab', { name: 'Properties' })).toHaveAttribute(
-      'data-state',
-      'active',
-    )
+    expect(screen.getByRole('tab', { name: 'Properties' })).toHaveAttribute('data-state', 'active')
     expect(screen.getAllByRole('tab').map((tab) => tab.textContent)).toEqual([
       'Properties',
       'Audio',
