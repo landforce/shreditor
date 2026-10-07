@@ -1,25 +1,9 @@
-import { useState, useMemo, useRef, useEffect, useCallback } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
-import { Search, ArrowUpDown, X, Trash2, AlertTriangle, Plus, Upload } from 'lucide-react'
+import { Search, Trash2, AlertTriangle, Plus, Upload } from 'lucide-react'
 import { Link } from '@tanstack/react-router'
-import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -31,17 +15,8 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { ProjectCard } from './project-card'
-import {
-  useFilteredProjects,
-  useSortField,
-  useSortDirection,
-  useFilterResolution,
-  useFilterFps,
-  useHasActiveFilters,
-} from '../hooks/use-project-selectors'
+import { useFilteredProjects, useProjects } from '../hooks/use-project-selectors'
 import { useProjectFilters, useDeleteProject } from '../hooks/use-project-actions'
-import { getUniqueResolutions, getUniqueFps } from '../utils/project-helpers'
-import { useProjects } from '../hooks/use-project-selectors'
 import type { Project } from '@/types/project'
 
 interface ProjectListProps {
@@ -60,7 +35,6 @@ const MARQUEE_DRAG_THRESHOLD = 4
 
 export function ProjectList({ onEditProject, onImportProject }: ProjectListProps) {
   const { t } = useTranslation()
-  const [localSearchQuery, setLocalSearchQuery] = useState('')
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [anchorId, setAnchorId] = useState<string | null>(null)
   const [showBulkDeleteDialog, setShowBulkDeleteDialog] = useState(false)
@@ -78,24 +52,14 @@ export function ProjectList({ onEditProject, onImportProject }: ProjectListProps
 
   const allProjects = useProjects()
   const filteredProjects = useFilteredProjects()
-  const sortField = useSortField()
-  const sortDirection = useSortDirection()
-  const filterResolution = useFilterResolution()
-  const filterFps = useFilterFps()
-  const hasActiveFilters = useHasActiveFilters()
-
-  const {
-    setSearchQuery,
-    setSortField,
-    setSortDirection,
-    setFilterResolution,
-    setFilterFps,
-    clearFilters,
-  } = useProjectFilters()
+  const { clearFilters } = useProjectFilters()
   const deleteProject = useDeleteProject()
 
-  const uniqueResolutions = useMemo(() => getUniqueResolutions(allProjects), [allProjects])
-  const uniqueFps = useMemo(() => getUniqueFps(allProjects), [allProjects])
+  // The list has no search or filter controls: drop any filter remembered from
+  // before, so no project stays hidden.
+  useEffect(() => {
+    clearFilters()
+  }, [clearFilters])
 
   // Prune selections that disappear (e.g. after deletion or filtering changes)
   useEffect(() => {
@@ -114,21 +78,8 @@ export function ProjectList({ onEditProject, onImportProject }: ProjectListProps
     })
   }, [filteredProjects])
 
-  const handleSearchChange = (value: string) => {
-    setLocalSearchQuery(value)
-    const timeoutId = setTimeout(() => {
-      setSearchQuery(value)
-    }, 300)
-    return () => clearTimeout(timeoutId)
-  }
-
   const handleClearFilters = () => {
-    setLocalSearchQuery('')
     clearFilters()
-  }
-
-  const toggleSortDirection = () => {
-    setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')
   }
 
   const clearSelection = useCallback(() => {
@@ -332,113 +283,9 @@ export function ProjectList({ onEditProject, onImportProject }: ProjectListProps
 
   return (
     <div className="space-y-6">
-      {/* Search and Filters Bar */}
-      {!isEmpty && (
-        <div className="flex items-center gap-3">
-          {/* Search */}
-          <div className="relative flex-1 max-w-md">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input
-              type="text"
-              placeholder={t('projects.list.searchPlaceholder')}
-              value={localSearchQuery}
-              onChange={(e) => handleSearchChange(e.target.value)}
-              className="pl-9 pr-9"
-            />
-            {localSearchQuery && (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7"
-                onClick={() => handleSearchChange('')}
-              >
-                <X className="w-3 h-3" />
-              </Button>
-            )}
-          </div>
-
-          {/* Resolution Filter */}
-          <Select
-            value={filterResolution || 'all'}
-            onValueChange={(value) => setFilterResolution(value === 'all' ? undefined : value)}
-          >
-            <SelectTrigger className="w-[180px]">
-              <SelectValue placeholder={t('projects.list.allResolutions')} />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">{t('projects.list.allResolutions')}</SelectItem>
-              {uniqueResolutions.map((res) => (
-                <SelectItem key={res} value={res}>
-                  {res}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          {/* FPS Filter */}
-          <Select
-            value={filterFps?.toString() || 'all'}
-            onValueChange={(value) => setFilterFps(value === 'all' ? undefined : Number(value))}
-          >
-            <SelectTrigger className="w-[140px]">
-              <SelectValue placeholder={t('projects.list.allFps')} />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">{t('projects.list.allFps')}</SelectItem>
-              {uniqueFps.map((fps) => (
-                <SelectItem key={fps} value={fps.toString()}>
-                  {t('projects.list.fpsOption', { fps })}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          {/* Sort Menu */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="icon">
-                <ArrowUpDown className="w-4 h-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-48">
-              <DropdownMenuLabel>{t('projects.list.sortBy')}</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => setSortField('name')}>
-                {t('projects.list.sortName')}{' '}
-                {sortField === 'name' && `(${sortDirection === 'asc' ? '↑' : '↓'})`}
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setSortField('updatedAt')}>
-                {t('projects.list.sortLastModified')}{' '}
-                {sortField === 'updatedAt' && `(${sortDirection === 'asc' ? '↑' : '↓'})`}
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setSortField('createdAt')}>
-                {t('projects.list.sortDateCreated')}{' '}
-                {sortField === 'createdAt' && `(${sortDirection === 'asc' ? '↑' : '↓'})`}
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setSortField('resolution')}>
-                {t('projects.list.sortResolution')}{' '}
-                {sortField === 'resolution' && `(${sortDirection === 'asc' ? '↑' : '↓'})`}
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={toggleSortDirection}>
-                {sortDirection === 'asc'
-                  ? t('projects.list.ascending')
-                  : t('projects.list.descending')}
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-
-          {/* Clear Filters */}
-          {hasActiveFilters && (
-            <Button variant="ghost" size="sm" onClick={handleClearFilters}>
-              <X className="w-4 h-4 mr-2" />
-              {t('projects.list.clearFilters')}
-            </Button>
-          )}
-
-          {/* Spacer */}
-          <div className="flex-1" />
-
+      {/* Selection bar: shows only while projects are selected (bulk delete). */}
+      {!isEmpty && selectionCount > 0 && (
+        <div className="flex items-center justify-end gap-3">
           {/* Selection controls */}
           {selectionCount > 0 && (
             <>

@@ -35,6 +35,8 @@ export type VideoFrameCallbackCorrectionPlan =
       playbackRate: number
     }
 
+const PARKED_FRAME_TOLERANCE_SECONDS = 0.001
+
 export function shouldReactOwnPlaybackRate(input: {
   isPlaying: boolean
   supportsRequestVideoFrameCallback: boolean
@@ -119,6 +121,8 @@ export function planLayoutVideoSync(input: {
   targetTime: number
   isPlaying: boolean
   needsInitialSync: boolean
+  /** The element has decoded the frame at its current time (readyState >= 2, not seeking). */
+  isFrameReady?: boolean
 }): VideoSyncAction & { shouldMarkInitialSyncComplete: boolean } {
   if (!input.canSeek) {
     return {
@@ -143,9 +147,15 @@ export function planLayoutVideoSync(input: {
   }
 
   if (input.needsInitialSync) {
+    // An element prepared on exactly this frame (parked there ahead of its cut)
+    // must not be re-seeked: even a same-time seek drops it to HAVE_METADATA
+    // and freezes the picture for a few frames.
+    const isParkedOnTarget =
+      input.isFrameReady === true &&
+      Math.abs(input.currentTime - input.targetTime) <= PARKED_FRAME_TOLERANCE_SECONDS
     return {
       shouldPause: false,
-      seekTo: input.targetTime,
+      seekTo: isParkedOnTarget ? null : input.targetTime,
       shouldMarkInitialSyncComplete: true,
     }
   }

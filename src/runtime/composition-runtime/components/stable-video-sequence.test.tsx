@@ -37,8 +37,17 @@ function setMediaLibraryItems(items: Array<{ id: string; fps: number }>) {
   mediaLibraryMock.state.mediaById = Object.fromEntries(items.map((m) => [m.id, m]))
 }
 
+const playbackMock = vi.hoisted(() => {
+  const state = { isPlaying: true, previewFrame: null as number | null, playbackRate: 1 }
+  const store = Object.assign((selector: (value: typeof state) => unknown) => selector(state), {
+    getState: () => state,
+  })
+  return { state, store }
+})
+
 vi.mock('@/runtime/composition-runtime/deps/stores', () => ({
   useMediaLibraryStore: mediaLibraryMock.store,
+  usePlaybackStore: playbackMock.store,
 }))
 
 vi.mock('./video-content', () => ({
@@ -345,6 +354,7 @@ describe('StableVideoSequence', () => {
     vi.mocked(useTransitionParticipantSync).mockClear()
     setMediaLibraryItems([])
     sequenceContextValue.localFrame = 28
+    Object.assign(playbackMock.state, { isPlaying: true, previewFrame: null, playbackRate: 1 })
   })
 
   it('uses a lightweight hidden bridge for shadow participants instead of renderItem', () => {
@@ -438,5 +448,103 @@ describe('StableVideoSequence', () => {
       0,
       30,
     )
+  })
+
+  describe('prepares the clip after the next cut', () => {
+    const renderLaneItem = (item: StableVideoSequenceItem) => (
+      <div
+        data-testid={`render-${item.id}`}
+        data-pool={item._poolClipId}
+        data-offset={item._sequenceFrameOffset}
+      />
+    )
+    const slotOf = (id: string) => screen.getByTestId(`render-${id}`).parentElement!
+    const splitItems = (secondSourceStart: number) => [
+      renderComparatorItem({
+        id: 'a',
+        from: 0,
+        durationInFrames: 30,
+        sourceStart: 0,
+        sourceEnd: 60,
+      }),
+      renderComparatorItem({
+        id: 'b',
+        from: 30,
+        durationInFrames: 30,
+        sourceStart: secondSourceStart,
+        sourceEnd: secondSourceStart + 60,
+      }),
+    ]
+
+    it('mounts the first clip of a group hidden on its lane while the Sequence premounts', () => {
+      sequenceContextValue.localFrame = -1
+      render(<StableVideoSequence items={[renderComparatorItem()]} renderItem={renderLaneItem} />)
+
+      expect(screen.getByTestId('render-clip-1')).toHaveAttribute(
+        'data-pool',
+        'group-media-1-origin-1-clip-1',
+      )
+      expect(screen.getByTestId('render-clip-1')).toHaveAttribute('data-offset', '0')
+      expect(slotOf('clip-1')).toHaveAttribute('data-video-lane', 'prepared')
+      expect(slotOf('clip-1')).toHaveStyle({ opacity: '0' })
+    })
+
+    it('prepares a source jump inside a group on the other lane and swaps without remounting', () => {
+      sequenceContextValue.localFrame = 5
+      const element = <StableVideoSequence items={splitItems(300)} renderItem={renderLaneItem} />
+      const { rerender } = render(element)
+
+      expect(slotOf('a')).toHaveAttribute('data-video-lane', 'active')
+      expect(screen.getByTestId('render-a')).toHaveAttribute(
+        'data-pool',
+        'group-media-1-origin-1-a',
+      )
+      expect(slotOf('b')).toHaveAttribute('data-video-lane', 'prepared')
+      expect(screen.getByTestId('render-b')).toHaveAttribute(
+        'data-pool',
+        'group-media-1-origin-1-a:lane-1',
+      )
+      const preparedSlot = slotOf('b')
+
+      // The mocked Sequence context isn't reactive; a new renderItem re-renders the group.
+      sequenceContextValue.localFrame = 30
+      rerender(
+        <StableVideoSequence items={splitItems(300)} renderItem={(item) => renderLaneItem(item)} />,
+      )
+
+      expect(slotOf('b')).toBe(preparedSlot)
+      expect(slotOf('b')).toHaveAttribute('data-video-lane', 'active')
+      expect(screen.queryByTestId('render-a')).not.toBeInTheDocument()
+    })
+
+    it('keeps one element playing through a split whose source carries on', () => {
+      sequenceContextValue.localFrame = 5
+      render(<StableVideoSequence items={splitItems(60)} renderItem={renderLaneItem} />)
+
+      expect(screen.getByTestId('render-a')).toBeInTheDocument()
+      expect(screen.queryByTestId('render-b')).not.toBeInTheDocument()
+    })
+
+    it('does not prepare beyond the lookahead', () => {
+      sequenceContextValue.localFrame = 5
+      const items = splitItems(300).map((item, index) =>
+        index === 0 ? { ...item, durationInFrames: 60 } : { ...item, from: 60 },
+      )
+      render(<StableVideoSequence items={items} renderItem={renderLaneItem} />)
+
+      expect(screen.queryByTestId('render-b')).not.toBeInTheDocument()
+    })
+
+    it.each([
+      ['scrubbing', { isPlaying: false, previewFrame: 12 }],
+      ['shuttling in reverse', { playbackRate: -2 }],
+    ])('does not prepare while %s', (_name, playback) => {
+      Object.assign(playbackMock.state, playback)
+      sequenceContextValue.localFrame = 5
+      render(<StableVideoSequence items={splitItems(300)} renderItem={renderLaneItem} />)
+
+      expect(screen.getByTestId('render-a')).toBeInTheDocument()
+      expect(screen.queryByTestId('render-b')).not.toBeInTheDocument()
+    })
   })
 })

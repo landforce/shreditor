@@ -328,6 +328,10 @@
             "title": "Editing",
             "blurb": "Clip edits, delete flows, and precise canvas nudging."
           },
+          "selection": {
+            "title": "Selection",
+            "blurb": "Select all, deselect, and pick the clip at the playhead."
+          },
           "tools": {
             "title": "Tools",
             "blurb": "Tool switching for timeline editing modes."
@@ -365,7 +369,14 @@
           "goToEnd": "Go to end",
           "previousSnapPoint": "Previous snap point",
           "nextSnapPoint": "Next snap point",
+          "shuttleReverse": "Shuttle reverse (press again for faster)",
+          "shuttlePause": "Shuttle pause (hold with J or L to step a frame)",
+          "shuttleForward": "Shuttle forward (press again for faster)",
           "splitAtPlayhead": "Split at playhead",
+          "addEditAtPlayhead": "Add edit at playhead (selected or all clips)",
+          "rippleTrimStartToPlayhead": "Ripple trim clip start to playhead",
+          "rippleTrimEndToPlayhead": "Ripple trim clip end to playhead",
+          "duplicateSelectedClips": "Duplicate selected clips",
           "joinSelectedClips": "Join selected clips",
           "deleteSelectedItems": "Delete selected items",
           "rippleDeleteSelectedItems": "Ripple delete selected items",
@@ -375,6 +386,9 @@
           "toggleLinkedSelection": "Toggle linked selection",
           "nudge1px": "Nudge (1px)",
           "nudge10px": "Nudge (10px)",
+          "selectAllClips": "Select all clips",
+          "deselectAll": "Deselect all",
+          "selectClipAtPlayhead": "Select clip at playhead",
           "selectionTool": "Selection tool",
           "trimEditTool": "Trim edit tool",
           "razorTool": "Razor tool",

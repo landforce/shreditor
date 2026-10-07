@@ -1,15 +1,20 @@
 /**
- * Playback & Navigation shortcuts: Space, Arrow Left/Right, Home/End, Up/Down snap points.
+ * Playback & Navigation shortcuts: Space, J/K/L shuttle (K+J / K+L frame step),
+ * Arrow Left/Right, Home/End, Up/Down snap points.
  */
 
-import { useCallback } from 'react'
+import { useCallback, useEffect, useRef } from 'react'
 import { useHotkeys } from 'react-hotkeys-hook'
 import { usePlaybackStore } from '@/shared/state/playback'
 import { usePreviewBridgeStore } from '@/shared/state/preview-bridge'
 import { useItemsStore } from '../../stores/items-store'
 import { useMarkersStore } from '../../stores/markers-store'
 import { useTransitionsStore } from '../../stores/transitions-store'
-import { HOTKEY_OPTIONS } from '@/config/hotkeys'
+import {
+  HOTKEY_OPTIONS,
+  getHotkeyPrimaryTokenFromEventData,
+  splitHotkeyBinding,
+} from '@/config/hotkeys'
 import type { TimelineShortcutCallbacks } from '../use-timeline-shortcuts'
 import { useSourcePlayerStore } from '@/shared/state/source-player'
 import { getFilteredItemSnapEdges } from '../../utils/timeline-snap-utils'
@@ -32,6 +37,51 @@ function getSnapPoints(): number[] {
     points.add(marker.frame)
   }
   return Array.from(points).sort((a, b) => a - b)
+}
+
+function isTextEntryTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false
+  return (
+    target.isContentEditable ||
+    target instanceof HTMLInputElement ||
+    target instanceof HTMLTextAreaElement ||
+    target instanceof HTMLSelectElement
+  )
+}
+
+/**
+ * Whether the primary key of `binding` is held down right now (outside text
+ * fields). K held turns J and L into single frame steps, as in other NLEs.
+ */
+function useHeldKeyRef(binding: string) {
+  const heldRef = useRef(false)
+  const primaryToken = splitHotkeyBinding(binding).at(-1) ?? ''
+
+  useEffect(() => {
+    heldRef.current = false
+    if (!primaryToken) return
+    const matches = (event: KeyboardEvent) =>
+      getHotkeyPrimaryTokenFromEventData(event) === primaryToken
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (matches(event) && !isTextEntryTarget(event.target)) heldRef.current = true
+    }
+    const onKeyUp = (event: KeyboardEvent) => {
+      if (matches(event)) heldRef.current = false
+    }
+    const onBlur = () => {
+      heldRef.current = false
+    }
+    window.addEventListener('keydown', onKeyDown, true)
+    window.addEventListener('keyup', onKeyUp, true)
+    window.addEventListener('blur', onBlur)
+    return () => {
+      window.removeEventListener('keydown', onKeyDown, true)
+      window.removeEventListener('keyup', onKeyUp, true)
+      window.removeEventListener('blur', onBlur)
+    }
+  }, [primaryToken])
+
+  return heldRef
 }
 
 export function usePlaybackShortcuts(callbacks: TimelineShortcutCallbacks) {
@@ -74,13 +124,39 @@ export function usePlaybackShortcuts(callbacks: TimelineShortcutCallbacks) {
     [togglePlayPause, isPlaying, callbacks],
   )
 
+  const shuttlePauseHeldRef = useHeldKeyRef(hotkeys.SHUTTLE_PAUSE)
+
+  // K+J / K+L: pause and step one frame, in the source monitor when it is hovered.
+  const stepFrameWhilePaused = useCallback(
+    (direction: -1 | 1) => {
+      const { hoveredPanel, playerMethods } = useSourcePlayerStore.getState()
+      if (hoveredPanel === 'source' && playerMethods) {
+        if (playerMethods.isPlaying()) playerMethods.pause()
+        if (direction < 0) playerMethods.frameBack(1)
+        else playerMethods.frameForward(1)
+        return
+      }
+      if (usePlaybackStore.getState().isPlaying) {
+        pause()
+        callbacks.onPause?.()
+      }
+      const currentFrame = usePlaybackStore.getState().currentFrame
+      commitTimelineSeek(Math.max(0, currentFrame + direction))
+    },
+    [callbacks, commitTimelineSeek, pause],
+  )
+
   // Shuttle: L advances forward through 1x, 2x, and 4x. Ignore browser key
   // repeat so one physical press produces one transport transition.
   useHotkeys(
-    'l',
+    hotkeys.SHUTTLE_FORWARD,
     (event) => {
-      if (event.repeat) return
       event.preventDefault()
+      if (shuttlePauseHeldRef.current) {
+        stepFrameWhilePaused(1)
+        return
+      }
+      if (event.repeat) return
       const { hoveredPanel, playerMethods } = useSourcePlayerStore.getState()
       if (hoveredPanel === 'source' && playerMethods) {
         playerMethods.shuttleForward()
@@ -93,16 +169,20 @@ export function usePlaybackShortcuts(callbacks: TimelineShortcutCallbacks) {
       }
     },
     { ...HOTKEY_OPTIONS, eventListenerOptions: { capture: true } },
-    [callbacks, shuttleForward],
+    [callbacks, shuttleForward, shuttlePauseHeldRef, stepFrameWhilePaused],
   )
 
   // Shuttle: J mirrors L in reverse. Browser media stays on a paused visual
   // seek path for negative rates; the Clock still advances at display cadence.
   useHotkeys(
-    'j',
+    hotkeys.SHUTTLE_REVERSE,
     (event) => {
-      if (event.repeat) return
       event.preventDefault()
+      if (shuttlePauseHeldRef.current) {
+        stepFrameWhilePaused(-1)
+        return
+      }
+      if (event.repeat) return
       const { hoveredPanel, playerMethods } = useSourcePlayerStore.getState()
       if (hoveredPanel === 'source' && playerMethods) {
         playerMethods.shuttleReverse()
@@ -115,13 +195,13 @@ export function usePlaybackShortcuts(callbacks: TimelineShortcutCallbacks) {
       }
     },
     { ...HOTKEY_OPTIONS, eventListenerOptions: { capture: true } },
-    [callbacks, shuttleReverse],
+    [callbacks, shuttleReverse, shuttlePauseHeldRef, stepFrameWhilePaused],
   )
 
   // K owns pause only while a transport is active. When already paused it
-  // yields to the existing Edit keyframe shortcut.
+  // yields to the Edit keyframe shortcut that shares the key.
   useHotkeys(
-    'k',
+    hotkeys.SHUTTLE_PAUSE,
     (event) => {
       if (event.repeat) return
       const { hoveredPanel, playerMethods } = useSourcePlayerStore.getState()
@@ -138,7 +218,7 @@ export function usePlaybackShortcuts(callbacks: TimelineShortcutCallbacks) {
       pause()
       callbacks.onPause?.()
     },
-    { ...HOTKEY_OPTIONS, eventListenerOptions: { capture: true } },
+    { ...HOTKEY_OPTIONS, preventDefault: false, eventListenerOptions: { capture: true } },
     [callbacks, pause],
   )
 

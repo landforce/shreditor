@@ -111,6 +111,18 @@ export const HOTKEY_EDITOR_SECTIONS: readonly HotkeyEditorSection[] = [
         labelKey: 'projects.settings.hotkeys.items.nextSnapPoint',
         keys: ['NEXT_SNAP_POINT'],
       },
+      {
+        labelKey: 'projects.settings.hotkeys.items.shuttleReverse',
+        keys: ['SHUTTLE_REVERSE'],
+      },
+      {
+        labelKey: 'projects.settings.hotkeys.items.shuttlePause',
+        keys: ['SHUTTLE_PAUSE'],
+      },
+      {
+        labelKey: 'projects.settings.hotkeys.items.shuttleForward',
+        keys: ['SHUTTLE_FORWARD'],
+      },
     ],
   },
   {
@@ -118,8 +130,24 @@ export const HOTKEY_EDITOR_SECTIONS: readonly HotkeyEditorSection[] = [
     blurbKey: 'projects.settings.hotkeys.sections.editing.blurb',
     items: [
       {
+        labelKey: 'projects.settings.hotkeys.items.addEditAtPlayhead',
+        keys: ['SPLIT_AT_PLAYHEAD'],
+      },
+      {
         labelKey: 'projects.settings.hotkeys.items.splitAtPlayhead',
         keys: ['SPLIT_AT_PLAYHEAD_ALT'],
+      },
+      {
+        labelKey: 'projects.settings.hotkeys.items.rippleTrimStartToPlayhead',
+        keys: ['RIPPLE_TRIM_START_TO_PLAYHEAD'],
+      },
+      {
+        labelKey: 'projects.settings.hotkeys.items.rippleTrimEndToPlayhead',
+        keys: ['RIPPLE_TRIM_END_TO_PLAYHEAD'],
+      },
+      {
+        labelKey: 'projects.settings.hotkeys.items.duplicateSelectedClips',
+        keys: ['DUPLICATE_SELECTED'],
       },
       {
         labelKey: 'projects.settings.hotkeys.items.joinSelectedClips',
@@ -156,6 +184,24 @@ export const HOTKEY_EDITOR_SECTIONS: readonly HotkeyEditorSection[] = [
       {
         labelKey: 'projects.settings.hotkeys.items.nudge10px',
         keys: ['NUDGE_LEFT_LARGE', 'NUDGE_RIGHT_LARGE', 'NUDGE_UP_LARGE', 'NUDGE_DOWN_LARGE'],
+      },
+    ],
+  },
+  {
+    titleKey: 'projects.settings.hotkeys.sections.selection.title',
+    blurbKey: 'projects.settings.hotkeys.sections.selection.blurb',
+    items: [
+      {
+        labelKey: 'projects.settings.hotkeys.items.selectAllClips',
+        keys: ['SELECT_ALL'],
+      },
+      {
+        labelKey: 'projects.settings.hotkeys.items.deselectAll',
+        keys: ['DESELECT_ALL', 'DESELECT_ALL_ALT'],
+      },
+      {
+        labelKey: 'projects.settings.hotkeys.items.selectClipAtPlayhead',
+        keys: ['SELECT_CLIP_AT_PLAYHEAD'],
       },
     ],
   },

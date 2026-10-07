@@ -328,6 +328,10 @@
             "title": "Bearbeitung",
             "blurb": "Clip-Bearbeitungen, Löschvorgänge und präzises Verschieben auf der Leinwand."
           },
+          "selection": {
+            "title": "Auswahl",
+            "blurb": "Alles auswählen, Auswahl aufheben und den Clip am Abspielkopf wählen."
+          },
           "tools": {
             "title": "Werkzeuge",
             "blurb": "Werkzeugwechsel für die Timeline-Bearbeitungsmodi."
@@ -365,7 +369,14 @@
           "goToEnd": "Zum Ende gehen",
           "previousSnapPoint": "Vorheriger Einrastpunkt",
           "nextSnapPoint": "Nächster Einrastpunkt",
+          "shuttleReverse": "Shuttle rückwärts (erneut drücken für schneller)",
+          "shuttlePause": "Shuttle anhalten (mit J oder L gedrückt halten, um ein Bild zu springen)",
+          "shuttleForward": "Shuttle vorwärts (erneut drücken für schneller)",
           "splitAtPlayhead": "Am Abspielkopf teilen",
+          "addEditAtPlayhead": "Schnitt am Abspielkopf hinzufügen (ausgewählte oder alle Clips)",
+          "rippleTrimStartToPlayhead": "Clipanfang bis zum Abspielkopf mit Lücke kürzen",
+          "rippleTrimEndToPlayhead": "Clipende bis zum Abspielkopf mit Lücke kürzen",
+          "duplicateSelectedClips": "Ausgewählte Clips duplizieren",
           "joinSelectedClips": "Ausgewählte Clips verbinden",
           "deleteSelectedItems": "Ausgewählte Elemente löschen",
           "rippleDeleteSelectedItems": "Ausgewählte Elemente mit Lücke löschen",
@@ -375,6 +386,9 @@
           "toggleLinkedSelection": "Verknüpfte Auswahl umschalten",
           "nudge1px": "Verschieben (1px)",
           "nudge10px": "Verschieben (10px)",
+          "selectAllClips": "Alle Clips auswählen",
+          "deselectAll": "Auswahl aufheben",
+          "selectClipAtPlayhead": "Clip am Abspielkopf auswählen",
           "selectionTool": "Auswahlwerkzeug",
           "trimEditTool": "Trimmwerkzeug",
           "razorTool": "Rasierklingenwerkzeug",

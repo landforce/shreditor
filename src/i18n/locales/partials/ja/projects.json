@@ -328,6 +328,10 @@
             "title": "編集",
             "blurb": "クリップ編集、削除フロー、キャンバスの精密な微調整。"
           },
+          "selection": {
+            "title": "選択",
+            "blurb": "すべて選択、選択解除、再生ヘッド位置のクリップの選択。"
+          },
           "tools": {
             "title": "ツール",
             "blurb": "タイムライン編集モードのツール切り替え。"
@@ -365,7 +369,14 @@
           "goToEnd": "末尾に移動",
           "previousSnapPoint": "前のスナップポイント",
           "nextSnapPoint": "次のスナップポイント",
+          "shuttleReverse": "シャトル逆再生（もう一度押すと高速）",
+          "shuttlePause": "シャトル一時停止（J または L と同時に押すと 1 フレーム移動）",
+          "shuttleForward": "シャトル再生（もう一度押すと高速）",
           "splitAtPlayhead": "再生ヘッドで分割",
+          "addEditAtPlayhead": "再生ヘッドに編集点を追加（選択中または全クリップ）",
+          "rippleTrimStartToPlayhead": "クリップの先頭を再生ヘッドまでリップルトリム",
+          "rippleTrimEndToPlayhead": "クリップの末尾を再生ヘッドまでリップルトリム",
+          "duplicateSelectedClips": "選択したクリップを複製",
           "joinSelectedClips": "選択したクリップを結合",
           "deleteSelectedItems": "選択した項目を削除",
           "rippleDeleteSelectedItems": "選択した項目をリップル削除",
@@ -375,6 +386,9 @@
           "toggleLinkedSelection": "リンク選択を切り替え",
           "nudge1px": "微調整（1px）",
           "nudge10px": "微調整（10px）",
+          "selectAllClips": "すべてのクリップを選択",
+          "deselectAll": "すべて選択解除",
+          "selectClipAtPlayhead": "再生ヘッド位置のクリップを選択",
           "selectionTool": "選択ツール",
           "trimEditTool": "トリム編集ツール",
           "razorTool": "レーザーツール",

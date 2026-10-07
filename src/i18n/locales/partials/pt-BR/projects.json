@@ -328,6 +328,10 @@
             "title": "Edição",
             "blurb": "Edições de clipes, fluxos de exclusão e ajuste preciso na tela."
           },
+          "selection": {
+            "title": "Seleção",
+            "blurb": "Selecionar tudo, desmarcar e escolher o clipe no cabeçote de reprodução."
+          },
           "tools": {
             "title": "Ferramentas",
             "blurb": "Troca de ferramentas para os modos de edição da linha do tempo."
@@ -365,7 +369,14 @@
           "goToEnd": "Ir para o fim",
           "previousSnapPoint": "Ponto de ajuste anterior",
           "nextSnapPoint": "Próximo ponto de ajuste",
+          "shuttleReverse": "Shuttle para trás (pressione de novo para acelerar)",
+          "shuttlePause": "Pausar shuttle (segure com J ou L para avançar um quadro)",
+          "shuttleForward": "Shuttle para frente (pressione de novo para acelerar)",
           "splitAtPlayhead": "Dividir no cabeçote de reprodução",
+          "addEditAtPlayhead": "Adicionar corte no cabeçote de reprodução (clipes selecionados ou todos)",
+          "rippleTrimStartToPlayhead": "Aparar em cascata o início do clipe até o cabeçote de reprodução",
+          "rippleTrimEndToPlayhead": "Aparar em cascata o fim do clipe até o cabeçote de reprodução",
+          "duplicateSelectedClips": "Duplicar clipes selecionados",
           "joinSelectedClips": "Unir clipes selecionados",
           "deleteSelectedItems": "Excluir itens selecionados",
           "rippleDeleteSelectedItems": "Exclusão em cascata dos itens selecionados",
@@ -375,6 +386,9 @@
           "toggleLinkedSelection": "Alternar seleção vinculada",
           "nudge1px": "Mover (1px)",
           "nudge10px": "Mover (10px)",
+          "selectAllClips": "Selecionar todos os clipes",
+          "deselectAll": "Desmarcar tudo",
+          "selectClipAtPlayhead": "Selecionar o clipe no cabeçote de reprodução",
           "selectionTool": "Ferramenta de seleção",
           "trimEditTool": "Ferramenta de aparar",
           "razorTool": "Ferramenta lâmina",

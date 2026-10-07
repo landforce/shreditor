@@ -328,6 +328,10 @@
             "title": "Edición",
             "blurb": "Ediciones de clips, flujos de eliminación y ajuste preciso en el lienzo."
           },
+          "selection": {
+            "title": "Selección",
+            "blurb": "Seleccionar todo, deseleccionar y elegir el clip en el cabezal de reproducción."
+          },
           "tools": {
             "title": "Herramientas",
             "blurb": "Cambio de herramientas para los modos de edición de la línea de tiempo."
@@ -365,7 +369,14 @@
           "goToEnd": "Ir al final",
           "previousSnapPoint": "Punto de ajuste anterior",
           "nextSnapPoint": "Punto de ajuste siguiente",
+          "shuttleReverse": "Shuttle hacia atrás (pulsa de nuevo para ir más rápido)",
+          "shuttlePause": "Pausa de shuttle (mantén pulsada con J o L para avanzar un fotograma)",
+          "shuttleForward": "Shuttle hacia adelante (pulsa de nuevo para ir más rápido)",
           "splitAtPlayhead": "Dividir en el cabezal de reproducción",
+          "addEditAtPlayhead": "Añadir corte en el cabezal de reproducción (clips seleccionados o todos)",
+          "rippleTrimStartToPlayhead": "Recorte en cascada del inicio del clip hasta el cabezal de reproducción",
+          "rippleTrimEndToPlayhead": "Recorte en cascada del final del clip hasta el cabezal de reproducción",
+          "duplicateSelectedClips": "Duplicar los clips seleccionados",
           "joinSelectedClips": "Unir los clips seleccionados",
           "deleteSelectedItems": "Eliminar los elementos seleccionados",
           "rippleDeleteSelectedItems": "Eliminación en cascada de los elementos seleccionados",
@@ -375,6 +386,9 @@
           "toggleLinkedSelection": "Alternar selección vinculada",
           "nudge1px": "Mover (1px)",
           "nudge10px": "Mover (10px)",
+          "selectAllClips": "Seleccionar todos los clips",
+          "deselectAll": "Deseleccionar todo",
+          "selectClipAtPlayhead": "Seleccionar el clip en el cabezal de reproducción",
           "selectionTool": "Herramienta de selección",
           "trimEditTool": "Herramienta de recorte",
           "razorTool": "Herramienta cuchilla",

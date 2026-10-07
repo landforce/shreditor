@@ -328,6 +328,10 @@
             "title": "Düzenleme",
             "blurb": "Klip düzenlemeleri, silme akışları ve hassas tuval kaydırmaları."
           },
+          "selection": {
+            "title": "Seçim",
+            "blurb": "Tümünü seç, seçimi kaldır ve oynatma başlığındaki klibi seç."
+          },
           "tools": {
             "title": "Araçlar",
             "blurb": "Zaman çizelgesi düzenleme modları için araç değiştirme."
@@ -365,7 +369,14 @@
           "goToEnd": "Sona git",
           "previousSnapPoint": "Önceki yakalama noktası",
           "nextSnapPoint": "Sonraki yakalama noktası",
+          "shuttleReverse": "Geri shuttle (daha hızlı için tekrar basın)",
+          "shuttlePause": "Shuttle duraklat (bir kare ilerlemek için J veya L ile basılı tutun)",
+          "shuttleForward": "İleri shuttle (daha hızlı için tekrar basın)",
           "splitAtPlayhead": "Oynatma başlığında böl",
+          "addEditAtPlayhead": "Oynatma başlığında kesme ekle (seçili veya tüm klipler)",
+          "rippleTrimStartToPlayhead": "Klip başlangıcını oynatma başlığına kadar ripple kırp",
+          "rippleTrimEndToPlayhead": "Klip sonunu oynatma başlığına kadar ripple kırp",
+          "duplicateSelectedClips": "Seçili klipleri çoğalt",
           "joinSelectedClips": "Seçili klipleri birleştir",
           "deleteSelectedItems": "Seçili öğeleri sil",
           "rippleDeleteSelectedItems": "Seçili öğeleri ripple sil",
@@ -375,6 +386,9 @@
           "toggleLinkedSelection": "Bağlı seçimi aç/kapat",
           "nudge1px": "Kaydır (1px)",
           "nudge10px": "Kaydır (10px)",
+          "selectAllClips": "Tüm klipleri seç",
+          "deselectAll": "Tüm seçimi kaldır",
+          "selectClipAtPlayhead": "Oynatma başlığındaki klibi seç",
           "selectionTool": "Seçim aracı",
           "trimEditTool": "Kırpma düzenleme aracı",
           "razorTool": "Kesici aracı",

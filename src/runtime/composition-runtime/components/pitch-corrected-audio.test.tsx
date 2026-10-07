@@ -403,10 +403,76 @@ describe('PitchCorrectedAudio', () => {
     await waitFor(() => {
       expect(audioDecodeMocks.getOrDecodeAudioSliceForPlayback).toHaveBeenCalledTimes(1)
     })
-    const reverseOptions =
-      audioDecodeMocks.getOrDecodeAudioSliceForPlayback.mock.calls[0]?.[2]
+    const reverseOptions = audioDecodeMocks.getOrDecodeAudioSliceForPlayback.mock.calls[0]?.[2]
     expect(reverseOptions?.targetTimeSeconds).toBeCloseTo(10, 4)
     expect(reverseOptions?.preRollSeconds).toBe(4)
     expect(document.querySelector('[data-testid="pitch"]')).toBeInTheDocument()
+  })
+
+  it('parks a premounted element on its first sample and starts it at the cut without a seek', async () => {
+    const seeks: number[] = []
+    let currentTime = 0
+    const audio = {
+      volume: 1,
+      muted: false,
+      playbackRate: 1,
+      readyState: 0,
+      paused: true,
+      seeking: false,
+      play: vi.fn(() => {
+        audio.paused = false
+        return Promise.resolve()
+      }),
+      pause: vi.fn(() => {
+        audio.paused = true
+      }),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    }
+    Object.defineProperty(audio, 'currentTime', {
+      get: () => currentTime,
+      set: (value: number) => {
+        seeks.push(value)
+        currentTime = value
+      },
+    })
+    previewAudioMocks.acquirePreviewAudioElement.mockImplementationOnce(
+      () => audio as unknown as HTMLAudioElement,
+    )
+    playbackStateMocks.current = { ...playbackStateMocks.current, frame: -1, playing: true }
+    const renderAudio = (volumeMultiplier: number) => (
+      <PitchCorrectedAudio
+        src="blob:audio"
+        itemId="item-1"
+        durationInFrames={30}
+        playbackRate={1}
+        trimBefore={60}
+        sourceFps={30}
+        volumeMultiplier={volumeMultiplier}
+      />
+    )
+
+    const { rerender } = render(renderAudio(1))
+
+    // No metadata yet: it parks as soon as it can seek.
+    await waitFor(() =>
+      expect(audio.addEventListener).toHaveBeenCalledWith('loadedmetadata', expect.any(Function), {
+        once: true,
+      }),
+    )
+    expect(audio.play).not.toHaveBeenCalled()
+    audio.readyState = 4
+    const parkOnFirstSample = audio.addEventListener.mock.calls.find(
+      ([type]) => type === 'loadedmetadata',
+    )![1] as () => void
+    parkOnFirstSample()
+    expect(currentTime).toBe(2)
+
+    const seeksBeforeCut = seeks.length
+    playbackStateMocks.current = { ...playbackStateMocks.current, frame: 0 }
+    rerender(renderAudio(1.01))
+
+    await waitFor(() => expect(audio.play).toHaveBeenCalledTimes(1))
+    expect(seeks.length).toBe(seeksBeforeCut)
   })
 })

@@ -31,6 +31,7 @@ const testState = vi.hoisted(() => ({
   mediaLibraryState: {
     mediaById: {} as Record<string, { codec: string }>,
   },
+  sequence: { localFrame: 0 },
 }))
 
 testState.pool = {
@@ -100,7 +101,12 @@ function createMockVideoElement(): HTMLVideoElement {
 }
 
 vi.mock('@/runtime/composition-runtime/deps/player', () => ({
-  useSequenceContext: () => ({ localFrame: 0, from: 0, durationInFrames: 120, parentFrom: 0 }),
+  useSequenceContext: () => ({
+    localFrame: testState.sequence.localFrame,
+    from: 0,
+    durationInFrames: 120,
+    parentFrom: 0,
+  }),
   useVideoSourcePool: () => testState.pool!,
   useClock: () => ({
     currentFrame: 0,
@@ -161,6 +167,7 @@ describe('VideoContent pooled handoff', () => {
     gizmoState.preview = null
     timelineState.keyframes = []
     mediaLibraryState.mediaById = {}
+    testState.sequence.localFrame = 0
   })
 
   it("draws the video a pixel past its box and clips it back, hiding Chrome's edge bleed", async () => {
@@ -426,5 +433,82 @@ describe('coalesced reverse video seeking', () => {
         targetTime: 6,
       }),
     ).toBe(false)
+  })
+})
+
+describe('VideoContent prepared ahead of its cut', () => {
+  beforeEach(() => {
+    acquireForClipMock.mockClear()
+    releaseClipMock.mockClear()
+    playbackState.isPlaying = true
+    playbackState.previewFrame = null
+    testState.sequence.localFrame = 0
+  })
+
+  const preparedItem = {
+    id: 'clip-next',
+    type: 'video' as const,
+    trackId: 'track-1',
+    from: 30,
+    durationInFrames: 30,
+    label: 'Next',
+    src: 'blob:next',
+    _poolClipId: 'group-origin-1:lane-1',
+    _sequenceFrameOffset: 30,
+  }
+  const renderPrepared = () => (
+    <VideoContent
+      item={{ ...preparedItem }}
+      muted={false}
+      safeTrimBefore={120}
+      playbackRate={1}
+      sourceFps={60}
+      audioEqStages={[]}
+    />
+  )
+
+  function trackSeeks(element: HTMLVideoElement) {
+    const seeks: number[] = []
+    const descriptor = Object.getOwnPropertyDescriptor(element, 'currentTime')!
+    Object.defineProperty(element, 'currentTime', {
+      configurable: true,
+      get: descriptor.get,
+      set: (value: number) => {
+        seeks.push(value)
+        descriptor.set!(value)
+      },
+    })
+    return seeks
+  }
+
+  it('parks paused and hidden on its in-point while playback runs, then starts at the cut without a seek', async () => {
+    const pooledElement = createMockVideoElement()
+    const seeks = trackSeeks(pooledElement)
+    acquireForClipMock.mockReturnValue(pooledElement)
+    testState.sequence.localFrame = 5 // 25 frames before this clip
+
+    const { rerender, container } = render(renderPrepared())
+
+    await waitFor(() => expect(acquireForClipMock).toHaveBeenCalledTimes(1))
+    expect(pooledElement.play).not.toHaveBeenCalled()
+    expect(pooledElement.paused).toBe(true)
+    expect(pooledElement.currentTime).toBeCloseTo(2, 3)
+    expect(container.querySelector('[data-item-id="clip-next"]')).toHaveStyle({
+      visibility: 'hidden',
+    })
+
+    // canplay while parked must not start it either.
+    pooledElement.dispatchEvent(new Event('canplay'))
+    expect(pooledElement.play).not.toHaveBeenCalled()
+
+    const seeksBeforeCut = seeks.length
+    testState.sequence.localFrame = 30
+    rerender(renderPrepared())
+
+    expect(pooledElement.play).toHaveBeenCalledTimes(1)
+    expect(seeks.length).toBe(seeksBeforeCut)
+    expect(container.querySelector('[data-item-id="clip-next"]')).not.toHaveStyle({
+      visibility: 'hidden',
+    })
   })
 })
