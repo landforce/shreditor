@@ -18,7 +18,33 @@ const page = {
             ['Previous / Next frame', '`Left` / `Right`'],
             ['Previous / Next snap point', '`Up` / `Down`'],
             ['Go to start / end', '`Home` / `End`'],
+            ['Shuttle reverse / pause / forward', '`J` / `K` / `L`'],
+            ['Step one frame back / forward', 'Hold `K`, press `J` / `L`'],
           ],
+        },
+        {
+          kind: 'note',
+          tone: 'info',
+          text: 'Press `J` or `L` again to shuttle faster (2x, then 4x). `K` pauses only while playing; when paused it adds a keyframe to the selected Edit layer.',
+        },
+      ],
+    },
+    {
+      title: 'Selection',
+      blocks: [
+        {
+          kind: 'table',
+          headers: ['Action', 'Shortcut'],
+          rows: [
+            ['Select all clips', '`Ctrl+A`'],
+            ['Deselect all', '`Ctrl+Shift+A` / `Esc`'],
+            ['Select clip at playhead', '`D`'],
+          ],
+        },
+        {
+          kind: 'note',
+          tone: 'info',
+          text: 'Select all skips locked tracks. In a text field `Ctrl+A` still selects the text. `D` picks the clip on the active track, or the topmost one under the playhead.',
         },
       ],
     },
@@ -29,7 +55,10 @@ const page = {
           kind: 'table',
           headers: ['Action', 'Shortcut'],
           rows: [
-            ['Split at playhead', '`Alt+C`'],
+            ['Add edit at playhead (selected clips, else every unlocked clip)', '`Ctrl+K`'],
+            ['Split every clip at playhead', '`Alt+C`'],
+            ['Ripple trim clip start / end to playhead', '`Q` / `W`'],
+            ['Duplicate selected clips', '`Ctrl+D`'],
             ['Split at cursor', '`Shift+C`'],
             ['Join', '`Shift+J`'],
             ['Delete / Ripple delete', '`Delete` / `Ctrl+Delete`'],
