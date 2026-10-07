@@ -44,6 +44,13 @@ import { appendResolvedAudioEqSources, getAudioEqSettings } from '@/shared/utils
 import { resolveReverseConformedVideoItem } from '@/shared/utils/reverse-conform-item'
 import { useNestedMediaResolutionMode } from '../contexts/nested-media-resolution-context'
 import { areGroupPropsEqual } from './stable-video-sequence-comparator'
+import {
+  assignVideoPlaybackLanes,
+  getVideoLanePoolClipId,
+  getVideoPlaybackLane,
+} from '../utils/video-cut-prepare'
+import { usePreparedVideoLane } from '../hooks/use-prepared-video-lane'
+import { VideoLaneSlots } from './video-lane-slots'
 
 const warmupLog = createLogger('StableVideoWarmup')
 const SAME_ORIGIN_SHADOW_MOUNT_MIN_LOOKAHEAD_FRAMES = 8
@@ -190,10 +197,9 @@ const GroupRenderer: React.FC<{
   const sequenceContext = useSequenceContext()
   const localFrame = sequenceContext?.localFrame ?? 0
 
-  // CRITICAL: Don't render during premount phase (localFrame < 0)
-  // Premount is for keeping React tree mounted, not for showing content.
-  // Without this check, clips with gaps would show their start frame
-  // before the playhead actually reaches them.
+  // During the premount phase (localFrame < 0) no item is active: nothing may
+  // show before the playhead reaches it. The first clip is only prepared there,
+  // hidden (see the prepared lane below).
   const isPremounted = localFrame < 0
 
   // Convert to global frame for comparison with item.from (which is global)
@@ -305,6 +311,11 @@ const GroupRenderer: React.FC<{
     [activeTransitionClipIds, group.items, group.minFrom, overlapKey],
   )
 
+  // Playback lanes: clips whose source carries straight on share a lane (one
+  // element plays through the split); a source jump moves to the other lane.
+  const lanes = useMemo(() => assignVideoPlaybackLanes(group.items), [group.items])
+  const activeLane = getVideoPlaybackLane(lanes, activeItemIndex)
+
   // Memoize the adjusted item based on active item identity.
   // Only recalculates when crossing split boundaries or when item/group properties change.
   const adjustedItem = useMemo(() => {
@@ -323,18 +334,28 @@ const GroupRenderer: React.FC<{
       _sequenceFrameOffset: itemOffset,
       // Keep a stable pool identity across split boundaries so preview video
       // playback does not release/reacquire the element on item.id changes.
-      _poolClipId: `group-${group.originKey}`,
+      _poolClipId: getVideoLanePoolClipId(group.originKey, activeLane),
       _sharedTransitionSync: activeTransitionClipIds.has(activeItem.id),
     }
-  }, [activeItem, activeTransitionClipIds, group.minFrom, group.originKey])
+  }, [activeItem, activeLane, activeTransitionClipIds, group.minFrom, group.originKey])
 
-  // CRITICAL: Also memoize the RENDERED OUTPUT.
-  // This prevents calling renderItem (which creates new React elements) every frame.
-  // Without this, canvas-based effects like halftone would re-render on every frame.
-  const renderedContent = useMemo(() => {
-    if (!adjustedItem) return null
-    return renderItem(adjustedItem)
-  }, [adjustedItem, renderItem])
+  // The clip after the next cut, prepared hidden on its own lane: loaded and
+  // parked on its first frame, so the cut is a swap instead of a load or seek.
+  const preparedLane = usePreparedVideoLane({
+    group,
+    lanes,
+    activeItemIndex,
+    globalFrame,
+    fps,
+    transitionWindows,
+  })
+  const activeVideoLane = useMemo(
+    () => (adjustedItem ? { lane: activeLane, item: adjustedItem } : null),
+    [activeLane, adjustedItem],
+  )
+  const renderedContent = (
+    <VideoLaneSlots active={activeVideoLane} prepared={preparedLane} renderItem={renderItem} />
+  )
 
   // Memoize shadow content — only changes at transition boundaries
   const shadowContent = useMemo(() => {
