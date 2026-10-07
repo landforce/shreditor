@@ -217,7 +217,10 @@ test('track layouts: valid roles, video lanes above audio, layout tracks with fo
   }
   const custom = createFormatTracks('vlog', { idFor: (_, index) => `t${index}`, height: 80 })
   assert.equal(custom[0]?.id, 't0')
-  assert.equal(custom[0]?.height, 80)
+  // Text tracks (Title, Captions, Labels) are slim; picture and sound take the height asked for.
+  const byRole = Object.fromEntries(custom.map((track) => [track.formatRole, track.height]))
+  assert.equal(byRole.title, 48)
+  assert.equal(byRole.broll, 80)
   assert.throws(() => createFormatTracks('nope'), /Unknown format/)
 })
 

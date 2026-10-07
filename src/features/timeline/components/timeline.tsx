@@ -55,6 +55,9 @@ import { getDefaultActiveTrackId } from '../utils/default-active-track'
 import { KeyframeGraphPanel } from './keyframe-graph-panel'
 import { createRafCoalescedCallback } from '../utils/raf-coalesced-callback'
 
+/** Format roles that hold words, kept in view at the top of the video tracks. */
+const TEXT_TRACK_ROLES = new Set(['title', 'captions', 'labels'])
+
 const logger = createLogger('Timeline')
 
 /**
@@ -507,12 +510,20 @@ export const Timeline = memo(function Timeline({ duration }: TimelineProps) {
         ? allTrackHeadersScrollRef.current
         : null
 
+    // Video tracks stack up from the divider, so the view normally rests on the
+    // bottom one. A format project keeps its title, caption and label tracks on
+    // top: show those first, or the text is out of sight when tracks don't fit.
+    const showTextTracksFirst = videoTracks.some(
+      (track) => track.formatRole !== undefined && TEXT_TRACK_ROLES.has(track.formatRole),
+    )
     const anchorToDivider = (element: HTMLDivElement | null) => {
       if (!element) {
         return
       }
 
-      element.scrollTop = Math.max(0, element.scrollHeight - element.clientHeight)
+      element.scrollTop = showTextTracksFirst
+        ? 0
+        : Math.max(0, element.scrollHeight - element.clientHeight)
     }
 
     anchorToDivider(content)
@@ -523,7 +534,7 @@ export const Timeline = memo(function Timeline({ duration }: TimelineProps) {
     hasTrackSections,
     videoPaneHeight,
     videoDisplayHeight,
-    videoTracks.length,
+    videoTracks,
   ])
 
   // Update drop indicator from shared ref (only during drag)

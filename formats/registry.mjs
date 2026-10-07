@@ -636,6 +636,10 @@ const slug = (text) =>
  * `track-<name>` (e.g. `track-speaker-audio`); pass `idFor(entry, index)` to
  * choose your own.
  */
+/** Tracks that hold words only need a slim row; picture and sound keep the full height. */
+const TEXT_ROLES = new Set(['title', 'captions', 'labels'])
+const TEXT_TRACK_HEIGHT = 48
+
 export function createFormatTracks(id, { height = 100, idFor } = {}) {
   const format = typeof id === 'object' && id?.tracks ? id : getFormat(id)
   if (!format) throw new Error(`Unknown format "${id}"`)
@@ -644,7 +648,7 @@ export function createFormatTracks(id, { height = 100, idFor } = {}) {
     name: entry.name,
     kind: entry.kind,
     formatRole: entry.role,
-    height,
+    height: TEXT_ROLES.has(entry.role) ? Math.min(height, TEXT_TRACK_HEIGHT) : height,
     locked: false,
     syncLock: true,
     visible: true,

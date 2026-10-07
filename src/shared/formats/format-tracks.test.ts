@@ -81,7 +81,13 @@ describe('addMissingFormatTracks', () => {
       'Music',
       'A1',
     ])
-    expect(fromPlain.added.every((track) => track.height === 80)).toBe(true)
+    // Text tracks are slim; the rest match the project's track height.
+    expect(fromPlain.added.map((track) => [track.name, track.height])).toEqual([
+      ['Title', 48],
+      ['Labels', 48],
+      ['Shots', 80],
+      ['Music', 80],
+    ])
   })
 
   it('gives added tracks unique ids', () => {
