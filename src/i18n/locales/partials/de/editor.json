@@ -878,7 +878,7 @@
     "agentActivity": {
       "working": "Der Agent arbeitet an einem Durchgang: {{label}}",
       "workingNoLabel": "Der Agent arbeitet an einem Durchgang",
-      "watchMode": "Abspielen, Scrubben und Ansehen geht weiter. Änderungen warten auf den Agenten.",
+      "watchMode": "Bearbeiten ist pausiert, bis der Agent fertig ist. Mit der Leertaste abspielen.",
       "editAnyway": "Trotzdem bearbeiten",
       "stop": "Agent stoppen",
       "stopping": "Wird gestoppt… der Agent sieht es bei seinem nächsten Schritt",

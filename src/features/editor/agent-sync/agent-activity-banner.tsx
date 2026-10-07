@@ -49,6 +49,37 @@ function Bar({ tone, children }: { tone: 'working' | 'ready'; children: ReactNod
   )
 }
 
+/**
+ * While the agent works the whole editor sits under this layer, so nothing
+ * can be clicked or dragged by accident; Space still plays (the editor's own
+ * shortcut) and the card in the middle says what's happening.
+ */
+function WorkingOverlay({ children }: { children: ReactNode }) {
+  return (
+    <div
+      data-testid="agent-activity-overlay"
+      className="fixed inset-0 z-[90] flex items-center justify-center bg-background/55 backdrop-blur-[1.5px]"
+      onPointerDown={(event) => event.stopPropagation()}
+      onContextMenu={(event) => event.preventDefault()}
+    >
+      <div
+        role="status"
+        aria-live="polite"
+        data-testid="agent-activity-banner"
+        className="flex w-[min(92vw,460px)] flex-col items-center gap-3 rounded-xl border border-primary/30 bg-background px-6 py-5 text-center text-sm shadow-xl"
+      >
+        {children}
+      </div>
+    </div>
+  )
+}
+
+/** Buttons give focus back after a click, so Space keeps playing instead of pressing them. */
+const blurAfter = (run: () => void) => (event: { currentTarget: HTMLElement }) => {
+  event.currentTarget.blur()
+  run()
+}
+
 function WorkingBar({ projectId }: { projectId: string }) {
   const { t } = useTranslation()
   const activity = useAgentActivityStore((s) => s.activity)
@@ -64,33 +95,42 @@ function WorkingBar({ projectId }: { projectId: string }) {
     }
   }
   return (
-    <Bar tone="working">
-      <Loader2 className="h-4 w-4 shrink-0 animate-spin text-primary" aria-hidden />
-      <span className="min-w-0 flex-1">
-        <span className="font-medium">
-          {activity.label
-            ? t('editor.agentActivity.working', { label: activity.label })
-            : t('editor.agentActivity.workingNoLabel')}
-        </span>{' '}
-        <Elapsed since={activity.startedAt} />
-        <span className="block text-xs text-muted-foreground">
-          {t('editor.agentActivity.watchMode')}
-        </span>
+    <WorkingOverlay>
+      <Loader2 className="h-6 w-6 animate-spin text-primary" aria-hidden />
+      <span className="font-medium">
+        {activity.label
+          ? t('editor.agentActivity.working', { label: activity.label })
+          : t('editor.agentActivity.workingNoLabel')}
       </span>
-      <Button size="sm" variant="outline" disabled={busy} onClick={() => void act('release')}>
-        {t('editor.agentActivity.editAnyway')}
-      </Button>
-      <Button size="sm" variant="ghost" disabled={busy} onClick={() => void act('cancel')}>
-        {t('editor.agentActivity.stop')}
-      </Button>
-    </Bar>
+      <Elapsed since={activity.startedAt} />
+      <span className="text-xs text-muted-foreground">{t('editor.agentActivity.watchMode')}</span>
+      <span className="flex gap-2">
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={busy}
+          onClick={blurAfter(() => void act('release'))}
+        >
+          {t('editor.agentActivity.editAnyway')}
+        </Button>
+        <Button
+          size="sm"
+          variant="ghost"
+          disabled={busy}
+          onClick={blurAfter(() => void act('cancel'))}
+        >
+          {t('editor.agentActivity.stop')}
+        </Button>
+      </span>
+    </WorkingOverlay>
   )
 }
 
 /**
- * Top of the editor while an agent is mid-pass on this project ("Agent is
- * working on a pass: <label>", elapsed time, Edit anyway / Stop the agent),
- * while a stop is on its way to the agent, and briefly when the pass lands.
+ * Over the whole editor while an agent is mid-pass on this project ("Agent is
+ * working on a pass: <label>", elapsed time, Edit anyway / Stop the agent) and
+ * while a stop is on its way to the agent; a bar at the top briefly when the
+ * pass lands.
  * Working puts the editor in watch mode (see use-agent-watch-mode.ts).
  */
 export const AgentActivityBanner = memo(function AgentActivityBanner({
@@ -108,10 +148,10 @@ export const AgentActivityBanner = memo(function AgentActivityBanner({
   if (state === 'working') return <WorkingBar projectId={projectId} />
   if (state === 'cancelled') {
     return (
-      <Bar tone="working">
-        <Loader2 className="h-4 w-4 shrink-0 animate-spin text-primary" aria-hidden />
-        <span className="flex-1">{t('editor.agentActivity.stopping')}</span>
-      </Bar>
+      <WorkingOverlay>
+        <Loader2 className="h-6 w-6 animate-spin text-primary" aria-hidden />
+        <span>{t('editor.agentActivity.stopping')}</span>
+      </WorkingOverlay>
     )
   }
   if (passReady) {

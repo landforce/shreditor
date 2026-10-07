@@ -878,7 +878,7 @@
     "agentActivity": {
       "working": "智能体正在处理一轮编辑：{{label}}",
       "workingNoLabel": "智能体正在处理一轮编辑",
-      "watchMode": "你可以播放、拖动播放头和查看。编辑会等智能体完成。",
+      "watchMode": "代理完成前暂停编辑。按空格键播放。",
       "editAnyway": "仍要编辑",
       "stop": "停止智能体",
       "stopping": "正在停止… 智能体会在下一步看到",

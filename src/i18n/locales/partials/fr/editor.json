@@ -878,7 +878,7 @@
     "agentActivity": {
       "working": "L’agent travaille sur une passe : {{label}}",
       "workingNoLabel": "L’agent travaille sur une passe",
-      "watchMode": "Vous pouvez lire, parcourir et regarder. Les modifications attendent l’agent.",
+      "watchMode": "La modification est en pause jusqu'à ce que l'agent ait fini. Appuyez sur Espace pour lire.",
       "editAnyway": "Modifier quand même",
       "stop": "Arrêter l’agent",
       "stopping": "Arrêt en cours… l’agent le verra à sa prochaine étape",

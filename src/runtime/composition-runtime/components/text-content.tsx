@@ -1,4 +1,5 @@
 import React, { useCallback, useMemo } from 'react'
+import { textOutlineCss } from '../utils/text-outline'
 import { useGizmoStore, useTimelineStore } from '@/runtime/composition-runtime/deps/stores'
 import { DEFAULT_PROJECT_HEIGHT, DEFAULT_PROJECT_WIDTH } from '@/shared/projects/defaults'
 import type { TextItem } from '@/types/timeline'
@@ -140,10 +141,12 @@ export const TextContent: React.FC<{ item: TextItem & { _sequenceFrameOffset?: n
   const justifyContent = TEXT_ALIGN_TO_FLEX[style.textAlign] ?? 'center'
   const alignItems = VERTICAL_ALIGN_TO_FLEX[style.verticalAlign] ?? 'center'
 
-  const cssTextShadow = style.textShadow
+  const dropShadow = style.textShadow
     ? `${style.textShadow.offsetX * scaleX}px ${style.textShadow.offsetY * scaleY}px ${style.textShadow.blur * scale}px ${style.textShadow.color}`
     : undefined
-  const strokeWidth = style.stroke?.width ? `${style.stroke.width * scale * 2}px` : undefined
+  const outline = textOutlineCss(style.stroke, scale)
+  const cssTextShadow = [outline.ring, dropShadow].filter(Boolean).join(', ') || undefined
+  const strokeWidth = outline.webkitStrokeWidth
   const background = getBackgroundBoxStyles(style, scale)
 
   return (
@@ -164,8 +167,7 @@ export const TextContent: React.FC<{ item: TextItem & { _sequenceFrameOffset?: n
           textAlign: style.textAlign,
           textShadow: cssTextShadow,
           WebkitTextStrokeWidth: strokeWidth,
-          WebkitTextStrokeColor: style.stroke?.color,
-          strokeLinejoin: style.stroke?.join,
+          WebkitTextStrokeColor: strokeWidth ? style.stroke?.color : undefined,
           // Paint stroke first, then fill on top — without this, a thick
           // stroke covers the fill entirely (text becomes solid stroke
           // color, e.g. illegible black-on-black for the TikTok preset).

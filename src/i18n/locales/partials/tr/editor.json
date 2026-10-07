@@ -878,7 +878,7 @@
     "agentActivity": {
       "working": "Ajan bir geçiş üzerinde çalışıyor: {{label}}",
       "workingNoLabel": "Ajan bir geçiş üzerinde çalışıyor",
-      "watchMode": "Oynatabilir, ileri geri sarabilir ve inceleyebilirsiniz. Düzenlemeler ajanı bekler.",
+      "watchMode": "Ajan bitirene kadar düzenleme duraklatıldı. Oynatmak için Boşluk tuşuna basın.",
       "editAnyway": "Yine de düzenle",
       "stop": "Ajanı durdur",
       "stopping": "Durduruluyor… ajan bunu bir sonraki adımında görecek",

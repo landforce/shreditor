@@ -880,7 +880,7 @@
     "agentActivity": {
       "working": "Agent is working on a pass: {{label}}",
       "workingNoLabel": "Agent is working on a pass",
-      "watchMode": "You can play, scrub and look around. Edits wait for the agent.",
+      "watchMode": "Editing is paused until the agent finishes. Press Space to play.",
       "editAnyway": "Edit anyway",
       "stop": "Stop the agent",
       "stopping": "Stopping… the agent will see it on its next step",

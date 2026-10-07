@@ -878,7 +878,7 @@
     "agentActivity": {
       "working": "O agente está trabalhando em uma passada: {{label}}",
       "workingNoLabel": "O agente está trabalhando em uma passada",
-      "watchMode": "Você pode reproduzir, navegar e olhar. As edições esperam o agente.",
+      "watchMode": "A edição está pausada até o agente terminar. Pressione Espaço para reproduzir.",
       "editAnyway": "Editar mesmo assim",
       "stop": "Parar o agente",
       "stopping": "Parando… o agente verá isso no próximo passo",
