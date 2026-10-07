@@ -228,6 +228,7 @@ export function useTimelineSlipSlide(
   const { getMagneticSnapTargets, getSnapThresholdFrames, isSnapEnabled } = useSnapCalculator(
     timelineDuration,
     item.id,
+    { includeBeats: false },
   )
 
   const [state, setState] = useState<SlipSlideState>({

@@ -3,6 +3,7 @@ import type { TimelineItem } from '@/types/timeline'
 import type { CoordinateParams, Transform } from '../types/gizmo'
 import { getScreenTransformOrigin, transformToScreenBounds } from '../utils/coordinate-transform'
 import { notifyOnBlockedMouseDragIntent } from '../utils/mouse-drag-intent'
+import { useTextEditStore } from '../stores/text-edit-store'
 
 interface SelectableItemProps {
   item: TimelineItem
@@ -17,6 +18,8 @@ interface SelectableItemProps {
   translateBlockedLabel?: string
   /** Called only when a blocked item is moved far enough to begin a drag. */
   onTranslateBlocked?: () => void
+  /** Double-click on a text item starts editing it in place. */
+  onEditText?: () => void
 }
 
 /**
@@ -34,6 +37,7 @@ export function SelectableItem({
   translateBlocked = false,
   translateBlockedLabel,
   onTranslateBlocked,
+  onEditText,
 }: SelectableItemProps) {
   const [isHovered, setIsHovered] = useState(false)
   const transformOrigin = useMemo(() => {
@@ -72,6 +76,7 @@ export function SelectableItem({
 
       // Select the item first
       onSelect(e)
+      if (item.type === 'text') useTextEditStore.getState().noteSelectClick(item.id)
 
       if (translateBlocked) {
         if (onTranslateBlocked) {
@@ -83,7 +88,7 @@ export function SelectableItem({
       // Start dragging immediately if handler provided
       onDragStart?.(e, transform)
     },
-    [onSelect, onDragStart, onTranslateBlocked, transform, translateBlocked],
+    [item.id, item.type, onSelect, onDragStart, onTranslateBlocked, transform, translateBlocked],
   )
 
   // Only show hover state for unselected items (selected items have gizmo)
@@ -109,7 +114,10 @@ export function SelectableItem({
       aria-label={translateBlocked ? translateBlockedLabel : undefined}
       title={translateBlocked ? translateBlockedLabel : undefined}
       onMouseDown={handleMouseDown}
-      onDoubleClick={(e) => e.stopPropagation()}
+      onDoubleClick={(e) => {
+        e.stopPropagation()
+        if (item.type === 'text') onEditText?.()
+      }}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     />

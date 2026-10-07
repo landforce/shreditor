@@ -5,6 +5,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Slider } from '@/components/ui/slider'
@@ -28,7 +29,15 @@ import {
   Link2,
   Volume2,
   Diamond,
+  Trash2,
+  Plus,
+  MoreHorizontal,
+  PanelLeft,
+  Check,
+  Mic,
+  Music,
 } from 'lucide-react'
+import { useSettingsStore } from '@/features/timeline/deps/settings'
 import { Separator } from '@/components/ui/separator'
 import { formatHotkeyBinding } from '@/config/hotkeys'
 import { useTimelineStore } from '../stores/timeline-store'
@@ -41,6 +50,12 @@ import { ZOOM_MIN, ZOOM_MAX, SLIP_SLIDE_TOOLS_ENABLED } from '../constants'
 import { EDITOR_LAYOUT_CSS_VALUES } from '@/config/editor-layout'
 import { useResolvedHotkeys } from '@/features/timeline/deps/settings'
 import { MicRecordControl } from './mic-record-control'
+import { isConciseWorkspace } from '@/config/editor-workspaces'
+import type { EditorSidebarTab } from '@/config/editor-workspaces'
+import { useMicRecordingStore } from '@/shared/state/mic-recording-store'
+import { useConciseTimelineStore } from '../stores/concise-timeline-store'
+import { deleteSelectionFromStores, splitAtPlayhead } from '../utils/editing-commands'
+import { isMicRecordingSupported, startMicRecording } from '../services/mic-recording-controller'
 
 interface TimelineHeaderProps {
   onZoomChange?: (newZoom: number) => void
@@ -431,20 +446,10 @@ const TimelineZoomControls = memo(function TimelineZoomControls({
 })
 
 /**
- * Timeline Toolbar Component
- *
- * Unified toolbar for timeline controls:
- * - Select/Razor tools
- * - Undo/Redo
- * - In/Out points, Snap toggle
- * - Zoom controls
+ * State and handlers shared by the full and the concise (compact) toolbars, so
+ * a control behaves identically wherever it is rendered.
  */
-export const TimelineHeader = memo(function TimelineHeader({
-  onZoomChange,
-  onZoomIn,
-  onZoomOut,
-  onZoomToFit,
-}: TimelineHeaderProps) {
+function useTimelineHeaderModel() {
   const { t } = useTranslation()
   const hotkeys = useResolvedHotkeys()
   const snapEnabled = useTimelineStore((s) => s.snapEnabled)
@@ -490,6 +495,116 @@ export const TimelineHeader = memo(function TimelineHeader({
     useTimelineStore.temporal.getState().redo()
   }
 
+  const selectTool = () => setActiveTool('select')
+  const toggleTrimTool = () => setActiveTool(activeTool === 'trim-edit' ? 'select' : 'trim-edit')
+  const toggleRazorTool = () => setActiveTool(activeTool === 'razor' ? 'select' : 'razor')
+  const toggleRateStretchTool = () =>
+    setActiveTool(activeTool === 'rate-stretch' ? 'select' : 'rate-stretch')
+  const toggleSlipTool = () => setActiveTool(activeTool === 'slip' ? 'select' : 'slip')
+  const toggleSlideTool = () => setActiveTool(activeTool === 'slide' ? 'select' : 'slide')
+  const handleSetInPoint = () => setInPoint(usePlaybackStore.getState().currentFrame)
+  const handleSetOutPoint = () => setOutPoint(usePlaybackStore.getState().currentFrame)
+  const handleAddMarker = () => addMarker(usePlaybackStore.getState().currentFrame)
+  const handleRemoveSelectedMarker = () => {
+    if (selectedMarkerId) {
+      removeMarker(selectedMarkerId)
+      clearSelection()
+    }
+  }
+  const toggleLinkedSelection = () => setLinkedSelectionEnabled(!linkedSelectionEnabled)
+
+  return {
+    t,
+    hotkeys,
+    snapEnabled,
+    toggleSnap,
+    audioSkimmingEnabled,
+    toggleAudioSkimming,
+    inPoint,
+    outPoint,
+    clearInOutPoints,
+    hasMarkers,
+    clearAllMarkers,
+    activeTool,
+    selectedMarkerId,
+    inlineKeyframesOpen,
+    toggleEditKeyframePanel,
+    linkedSelectionEnabled,
+    canUndo,
+    canRedo,
+    undoLabel,
+    redoLabel,
+    SlipSlideFlyoutIcon,
+    btnSize,
+    handleUndo,
+    handleRedo,
+    selectTool,
+    toggleTrimTool,
+    toggleRazorTool,
+    toggleRateStretchTool,
+    toggleSlipTool,
+    toggleSlideTool,
+    handleSetInPoint,
+    handleSetOutPoint,
+    handleAddMarker,
+    handleRemoveSelectedMarker,
+    toggleLinkedSelection,
+  }
+}
+
+/**
+ * Timeline Toolbar Component
+ *
+ * Unified toolbar for timeline controls:
+ * - Select/Razor tools
+ * - Undo/Redo
+ * - In/Out points, Snap toggle
+ * - Zoom controls
+ */
+const FullTimelineHeader = memo(function FullTimelineHeader({
+  onZoomChange,
+  onZoomIn,
+  onZoomOut,
+  onZoomToFit,
+}: TimelineHeaderProps) {
+  const {
+    t,
+    hotkeys,
+    snapEnabled,
+    toggleSnap,
+    audioSkimmingEnabled,
+    toggleAudioSkimming,
+    inPoint,
+    outPoint,
+    clearInOutPoints,
+    hasMarkers,
+    clearAllMarkers,
+    activeTool,
+    selectedMarkerId,
+    inlineKeyframesOpen,
+    toggleEditKeyframePanel,
+    linkedSelectionEnabled,
+    canUndo,
+    canRedo,
+    undoLabel,
+    redoLabel,
+    SlipSlideFlyoutIcon,
+    btnSize,
+    handleUndo,
+    handleRedo,
+    selectTool,
+    toggleTrimTool,
+    toggleRazorTool,
+    toggleRateStretchTool,
+    toggleSlipTool,
+    toggleSlideTool,
+    handleSetInPoint,
+    handleSetOutPoint,
+    handleAddMarker,
+    handleRemoveSelectedMarker,
+    toggleLinkedSelection,
+  } = useTimelineHeaderModel()
+
   return (
     <div
       className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 border-b border-border px-3"
@@ -519,7 +634,7 @@ export const TimelineHeader = memo(function TimelineHeader({
                   ? 'bg-primary text-primary-foreground hover:bg-primary/90'
                   : ''
               }
-              onClick={() => setActiveTool('select')}
+              onClick={selectTool}
               aria-label={t('timeline.header.selectTool')}
               data-tooltip={t('timeline.header.selectToolTooltip')}
             >
@@ -535,7 +650,7 @@ export const TimelineHeader = memo(function TimelineHeader({
                   ? 'bg-primary text-primary-foreground hover:bg-primary/90'
                   : ''
               }
-              onClick={() => setActiveTool(activeTool === 'trim-edit' ? 'select' : 'trim-edit')}
+              onClick={toggleTrimTool}
               aria-label={t('timeline.header.trimEditTool')}
               data-tooltip={t('timeline.header.trimEditToolTooltip')}
             >
@@ -551,7 +666,7 @@ export const TimelineHeader = memo(function TimelineHeader({
                   ? 'bg-primary text-primary-foreground hover:bg-primary/90'
                   : ''
               }
-              onClick={() => setActiveTool(activeTool === 'razor' ? 'select' : 'razor')}
+              onClick={toggleRazorTool}
               aria-label={t('timeline.header.razorTool')}
               data-tooltip={t('timeline.header.razorToolTooltip')}
             >
@@ -567,9 +682,7 @@ export const TimelineHeader = memo(function TimelineHeader({
                   ? 'bg-primary text-primary-foreground hover:bg-primary/90'
                   : ''
               }
-              onClick={() =>
-                setActiveTool(activeTool === 'rate-stretch' ? 'select' : 'rate-stretch')
-              }
+              onClick={toggleRateStretchTool}
               aria-label={t('timeline.header.rateStretchTool')}
               data-tooltip={t('timeline.header.rateStretchToolTooltip')}
             >
@@ -599,18 +712,14 @@ export const TimelineHeader = memo(function TimelineHeader({
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="start">
-                  <DropdownMenuItem
-                    onClick={() => setActiveTool(activeTool === 'slip' ? 'select' : 'slip')}
-                  >
+                  <DropdownMenuItem onClick={toggleSlipTool}>
                     <ArrowRightLeft className="w-3.5 h-3.5" />
                     <span className="flex-1">{t('timeline.header.slipTool')}</span>
                     <span className="text-xs text-muted-foreground">
                       {formatHotkeyBinding(hotkeys.SLIP_TOOL)}
                     </span>
                   </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onClick={() => setActiveTool(activeTool === 'slide' ? 'select' : 'slide')}
-                  >
+                  <DropdownMenuItem onClick={toggleSlideTool}>
                     <BetweenHorizontalEnd className="w-3.5 h-3.5" />
                     <span className="flex-1">{t('timeline.header.slideTool')}</span>
                     <span className="text-xs text-muted-foreground">
@@ -675,7 +784,7 @@ export const TimelineHeader = memo(function TimelineHeader({
               variant="ghost"
               size="icon"
               style={btnSize}
-              onClick={() => setInPoint(usePlaybackStore.getState().currentFrame)}
+              onClick={handleSetInPoint}
               aria-label={t('timeline.header.setInPoint')}
               data-tooltip={t('timeline.header.setInPointTooltip')}
             >
@@ -688,7 +797,7 @@ export const TimelineHeader = memo(function TimelineHeader({
               variant="ghost"
               size="icon"
               style={btnSize}
-              onClick={() => setOutPoint(usePlaybackStore.getState().currentFrame)}
+              onClick={handleSetOutPoint}
               aria-label={t('timeline.header.setOutPoint')}
               data-tooltip={t('timeline.header.setOutPointTooltip')}
             >
@@ -718,7 +827,7 @@ export const TimelineHeader = memo(function TimelineHeader({
               variant="ghost"
               size="icon"
               style={btnSize}
-              onClick={() => addMarker(usePlaybackStore.getState().currentFrame)}
+              onClick={handleAddMarker}
               aria-label={t('timeline.header.addMarker')}
               data-tooltip={t('timeline.header.addMarkerTooltip')}
             >
@@ -729,12 +838,7 @@ export const TimelineHeader = memo(function TimelineHeader({
               variant="ghost"
               size="icon"
               style={btnSize}
-              onClick={() => {
-                if (selectedMarkerId) {
-                  removeMarker(selectedMarkerId)
-                  clearSelection()
-                }
-              }}
+              onClick={handleRemoveSelectedMarker}
               disabled={!selectedMarkerId}
               aria-label={t('timeline.header.removeSelectedMarker')}
               data-tooltip={t('timeline.header.removeSelectedMarkerTooltip')}
@@ -815,7 +919,7 @@ export const TimelineHeader = memo(function TimelineHeader({
             className={
               linkedSelectionEnabled ? 'bg-primary text-primary-foreground hover:bg-primary/90' : ''
             }
-            onClick={() => setLinkedSelectionEnabled(!linkedSelectionEnabled)}
+            onClick={toggleLinkedSelection}
             aria-label={
               linkedSelectionEnabled
                 ? t('timeline.header.disableLinkedSelection')
@@ -842,4 +946,399 @@ export const TimelineHeader = memo(function TimelineHeader({
       />
     </div>
   )
+})
+
+const CONCISE_ADD_TABS: readonly EditorSidebarTab[] = [
+  'media',
+  'text',
+  'shapes',
+  'effects',
+  'transitions',
+  'lottie',
+  'templates',
+  'transcript',
+  'ai',
+]
+
+/** Show the media sidebar on `tab`, the same way the shell's rail does. */
+function openSidebarTab(tab: EditorSidebarTab): void {
+  const editor = useEditorStore.getState()
+  editor.setActiveTab(tab)
+  editor.setLeftSidebarOpen(true)
+}
+
+function MoreMenuItem({
+  icon,
+  label,
+  hint,
+  checked,
+  disabled,
+  onClick,
+}: {
+  icon?: React.ReactNode
+  label: string
+  hint?: string
+  checked?: boolean
+  disabled?: boolean
+  onClick: () => void
+}) {
+  return (
+    <DropdownMenuItem disabled={disabled} onClick={onClick}>
+      <span className="inline-flex w-3.5 items-center justify-center">{icon}</span>
+      <span className="flex-1">{label}</span>
+      {checked ? <Check className="h-3.5 w-3.5" /> : null}
+      {hint ? <span className="text-xs text-muted-foreground">{hint}</span> : null}
+    </DropdownMenuItem>
+  )
+}
+
+const hotkeyHint = (binding: string | undefined): string | undefined =>
+  binding ? formatHotkeyBinding(binding) : undefined
+
+/**
+ * Compact 32px toolbar for the Concise workspace. Everything the full toolbar
+ * offers is still reachable: the rest lives in the More menu with its shortcut
+ * hints, and every shortcut keeps working.
+ */
+const ConciseTimelineHeader = memo(function ConciseTimelineHeader({
+  onZoomChange,
+  onZoomIn,
+  onZoomOut,
+  onZoomToFit,
+}: TimelineHeaderProps) {
+  const m = useTimelineHeaderModel()
+  const { t, hotkeys, btnSize } = m
+  const conciseFullHeaders = useConciseTimelineStore((s) => s.conciseFullHeaders)
+  const showBeatGrid = useSettingsStore((s) => s.showBeatGrid)
+  const setSetting = useSettingsStore((s) => s.setSetting)
+  const toggleConciseFullHeaders = useConciseTimelineStore((s) => s.toggleConciseFullHeaders)
+  const clearAllMarkers = m.clearAllMarkers
+  const micStatus = useMicRecordingStore((s) => s.status)
+  const micError = useMicRecordingStore((s) => s.error)
+  const micSupported = isMicRecordingSupported()
+  const activeClass = 'bg-primary text-primary-foreground hover:bg-primary/90'
+  const sep = <Separator orientation="vertical" className="mx-1 h-4" />
+  const conciseHeight = 32
+  const tracksLabel = conciseFullHeaders
+    ? t('timeline.concise.compactTracks')
+    : t('timeline.concise.fullTracks')
+
+  return (
+    <div
+      className="flex items-center gap-1 border-b border-border px-2"
+      style={{ height: conciseHeight }}
+      role="toolbar"
+      aria-label={t('timeline.header.controls')}
+      data-testid="timeline-header-concise"
+    >
+      <Button
+        variant="ghost"
+        size="icon"
+        style={btnSize}
+        className={m.activeTool === 'select' ? activeClass : ''}
+        onClick={m.selectTool}
+        aria-label={t('timeline.header.selectTool')}
+        data-tooltip={t('timeline.header.selectToolTooltip')}
+      >
+        <MousePointer2 className="w-3.5 h-3.5" />
+      </Button>
+
+      <Button
+        variant="ghost"
+        size="icon"
+        style={btnSize}
+        onClick={splitAtPlayhead}
+        aria-label={t('timeline.concise.splitAtPlayhead')}
+        data-tooltip={t('timeline.concise.splitAtPlayhead')}
+      >
+        <Scissors className="w-3.5 h-3.5 -rotate-90" />
+      </Button>
+
+      <Button
+        variant="ghost"
+        size="icon"
+        style={btnSize}
+        onClick={deleteSelectionFromStores}
+        aria-label={t('timeline.concise.deleteSelected')}
+        data-tooltip={t('timeline.concise.deleteSelected')}
+      >
+        <Trash2 className="w-3.5 h-3.5" />
+      </Button>
+
+      <Button
+        variant="ghost"
+        size="icon"
+        style={btnSize}
+        onClick={m.handleUndo}
+        disabled={!m.canUndo}
+        aria-label={
+          m.undoLabel
+            ? t('timeline.header.undoWithLabel', { label: m.undoLabel })
+            : t('timeline.header.undo')
+        }
+        data-tooltip={
+          m.undoLabel
+            ? t('timeline.header.undoWithLabelTooltip', { label: m.undoLabel })
+            : t('timeline.header.undoTooltip')
+        }
+      >
+        <Undo2 className="w-3.5 h-3.5" />
+      </Button>
+
+      <Button
+        variant="ghost"
+        size="icon"
+        style={btnSize}
+        onClick={m.handleRedo}
+        disabled={!m.canRedo}
+        aria-label={
+          m.redoLabel
+            ? t('timeline.header.redoWithLabel', { label: m.redoLabel })
+            : t('timeline.header.redo')
+        }
+        data-tooltip={
+          m.redoLabel
+            ? t('timeline.header.redoWithLabelTooltip', { label: m.redoLabel })
+            : t('timeline.header.redoTooltip')
+        }
+      >
+        <Redo2 className="w-3.5 h-3.5" />
+      </Button>
+
+      {sep}
+
+      <Button
+        variant="ghost"
+        size="icon"
+        style={btnSize}
+        className={m.snapEnabled ? activeClass : ''}
+        onClick={m.toggleSnap}
+        aria-label={
+          m.snapEnabled ? t('timeline.header.disableSnapping') : t('timeline.header.enableSnapping')
+        }
+        data-tooltip={
+          m.snapEnabled ? t('timeline.header.snapEnabled') : t('timeline.header.snapDisabled')
+        }
+      >
+        <Magnet className="w-3.5 h-3.5" />
+      </Button>
+
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            variant="ghost"
+            style={{ height: EDITOR_LAYOUT_CSS_VALUES.toolbarButtonSize }}
+            className="gap-1 px-2"
+            aria-label={t('timeline.concise.add')}
+            data-tooltip={t('timeline.concise.add')}
+          >
+            <Plus className="w-3.5 h-3.5" />
+            <span className="text-xs">{t('timeline.concise.add')}</span>
+            <ChevronDown className="w-3 h-3 opacity-70" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start">
+          {CONCISE_ADD_TABS.map((tab) => (
+            <DropdownMenuItem key={tab} onClick={() => openSidebarTab(tab)}>
+              {t(`timeline.concise.addItems.${tab}`)}
+            </DropdownMenuItem>
+          ))}
+        </DropdownMenuContent>
+      </DropdownMenu>
+
+      {isMicRecordingSupported() && (micStatus !== 'idle' || micError) ? (
+        <MicRecordControl />
+      ) : null}
+
+      <div className="min-w-0 flex-1" />
+
+      <TimelineZoomControls
+        onZoomChange={onZoomChange}
+        onZoomIn={onZoomIn}
+        onZoomOut={onZoomOut}
+        onZoomToFit={onZoomToFit}
+      />
+
+      {sep}
+
+      <Button
+        variant="ghost"
+        size="icon"
+        style={btnSize}
+        className={conciseFullHeaders ? activeClass : ''}
+        onClick={toggleConciseFullHeaders}
+        aria-label={tracksLabel}
+        aria-pressed={conciseFullHeaders}
+        data-tooltip={tracksLabel}
+      >
+        <PanelLeft className="w-3.5 h-3.5" />
+      </Button>
+
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            variant="ghost"
+            size="icon"
+            style={btnSize}
+            aria-label={t('timeline.concise.more')}
+            data-tooltip={t('timeline.concise.more')}
+          >
+            <MoreHorizontal className="w-3.5 h-3.5" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="min-w-[14rem]">
+          <MoreMenuItem
+            icon={<TrimEditIcon className="w-3.5 h-3.5" />}
+            label={t('timeline.header.trimEditTool')}
+            hint={hotkeyHint(hotkeys.TRIM_EDIT_TOOL)}
+            checked={m.activeTool === 'trim-edit'}
+            onClick={m.toggleTrimTool}
+          />
+          <MoreMenuItem
+            icon={<Scissors className="w-3.5 h-3.5 -rotate-90" />}
+            label={t('timeline.header.razorTool')}
+            hint={hotkeyHint(hotkeys.RAZOR_TOOL)}
+            checked={m.activeTool === 'razor'}
+            onClick={m.toggleRazorTool}
+          />
+          <MoreMenuItem
+            icon={<Gauge className="w-3.5 h-3.5" />}
+            label={t('timeline.header.rateStretchTool')}
+            hint={hotkeyHint(hotkeys.RATE_STRETCH_TOOL)}
+            checked={m.activeTool === 'rate-stretch'}
+            onClick={m.toggleRateStretchTool}
+          />
+          {SLIP_SLIDE_TOOLS_ENABLED ? (
+            <>
+              <MoreMenuItem
+                icon={<ArrowRightLeft className="w-3.5 h-3.5" />}
+                label={t('timeline.header.slipTool')}
+                hint={hotkeyHint(hotkeys.SLIP_TOOL)}
+                checked={m.activeTool === 'slip'}
+                onClick={m.toggleSlipTool}
+              />
+              <MoreMenuItem
+                icon={<BetweenHorizontalEnd className="w-3.5 h-3.5" />}
+                label={t('timeline.header.slideTool')}
+                hint={hotkeyHint(hotkeys.SLIDE_TOOL)}
+                checked={m.activeTool === 'slide'}
+                onClick={m.toggleSlideTool}
+              />
+            </>
+          ) : null}
+
+          <DropdownMenuSeparator />
+          <MoreMenuItem
+            icon={
+              <span className="text-sm font-bold" style={{ color: 'var(--color-timeline-in)' }}>
+                [
+              </span>
+            }
+            label={t('timeline.header.setInPoint')}
+            hint={hotkeyHint(hotkeys.MARK_IN)}
+            onClick={m.handleSetInPoint}
+          />
+          <MoreMenuItem
+            icon={
+              <span className="text-sm font-bold" style={{ color: 'var(--color-timeline-out)' }}>
+                ]
+              </span>
+            }
+            label={t('timeline.header.setOutPoint')}
+            hint={hotkeyHint(hotkeys.MARK_OUT)}
+            onClick={m.handleSetOutPoint}
+          />
+          <MoreMenuItem
+            icon={<X className="w-3.5 h-3.5" />}
+            label={t('timeline.header.clearInOutPoints')}
+            hint={hotkeyHint(hotkeys.CLEAR_IN_OUT)}
+            disabled={m.inPoint === null && m.outPoint === null}
+            onClick={m.clearInOutPoints}
+          />
+
+          <DropdownMenuSeparator />
+          <MoreMenuItem
+            icon={
+              <Flag className="w-3.5 h-3.5" style={{ color: 'var(--color-timeline-marker)' }} />
+            }
+            label={t('timeline.header.addMarker')}
+            hint={hotkeyHint(hotkeys.ADD_MARKER)}
+            onClick={m.handleAddMarker}
+          />
+          <MoreMenuItem
+            icon={<FlagOff className="w-3.5 h-3.5" />}
+            label={t('timeline.header.removeSelectedMarker')}
+            hint={hotkeyHint(hotkeys.REMOVE_MARKER)}
+            disabled={!m.selectedMarkerId}
+            onClick={m.handleRemoveSelectedMarker}
+          />
+          <MoreMenuItem
+            icon={<X className="w-3.5 h-3.5" />}
+            label={t('timeline.header.clearAllMarkers')}
+            disabled={!m.hasMarkers}
+            onClick={clearAllMarkers}
+          />
+
+          <DropdownMenuSeparator />
+          {micSupported ? (
+            <MoreMenuItem
+              icon={<Mic className="w-3.5 h-3.5" style={{ color: 'var(--color-destructive)' }} />}
+              label={t('recording.record')}
+              disabled={micStatus !== 'idle'}
+              onClick={() => void startMicRecording()}
+            />
+          ) : null}
+          <MoreMenuItem
+            icon={<Volume2 className="w-3.5 h-3.5" />}
+            label={
+              m.audioSkimmingEnabled
+                ? t('timeline.header.disableAudioSkimming')
+                : t('timeline.header.enableAudioSkimming')
+            }
+            checked={m.audioSkimmingEnabled}
+            onClick={m.toggleAudioSkimming}
+          />
+          <MoreMenuItem
+            icon={<Diamond className="w-3.5 h-3.5" />}
+            label={t(
+              m.inlineKeyframesOpen
+                ? 'timeline.keyframeEditor.editLane.hide'
+                : 'timeline.keyframeEditor.editLane.show',
+              {
+                defaultValue: m.inlineKeyframesOpen ? 'Hide keyframe panel' : 'Show keyframe panel',
+              },
+            )}
+            checked={m.inlineKeyframesOpen}
+            onClick={m.toggleEditKeyframePanel}
+          />
+          <MoreMenuItem
+            icon={<Link2 className="w-3.5 h-3.5" />}
+            label={
+              m.linkedSelectionEnabled
+                ? t('timeline.header.disableLinkedSelection')
+                : t('timeline.header.enableLinkedSelection')
+            }
+            hint={hotkeyHint(hotkeys.TOGGLE_LINKED_SELECTION)}
+            checked={m.linkedSelectionEnabled}
+            onClick={m.toggleLinkedSelection}
+          />
+          <MoreMenuItem
+            icon={<Music className="w-3.5 h-3.5" />}
+            label={t('timeline.concise.beatGrid')}
+            checked={showBeatGrid}
+            onClick={() => setSetting('showBeatGrid', !showBeatGrid)}
+          />
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </div>
+  )
+})
+
+/**
+ * Timeline toolbar. The Concise workspace gets the compact variant; every other
+ * workspace renders the full toolbar unchanged.
+ */
+export const TimelineHeader = memo(function TimelineHeader(props: TimelineHeaderProps) {
+  const isConcise = useEditorStore((s) => isConciseWorkspace(s.workspace))
+  return isConcise ? <ConciseTimelineHeader {...props} /> : <FullTimelineHeader {...props} />
 })

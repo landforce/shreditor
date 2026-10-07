@@ -7,52 +7,71 @@
  */
 const EDIT_DOPESHEET_COLUMN_WIDTH = 288
 
+const COMPACT_PRESET = {
+  toolbarHeight: 48,
+  sidebarRailWidth: 44,
+  sidebarHeaderHeight: 36,
+  sidebarHeaderButtonSize: 20,
+  toolbarButtonSize: 20,
+  leftSidebarDefaultWidth: 320,
+  leftSidebarMinWidth: 240,
+  leftSidebarMaxWidth: 560,
+  rightSidebarDefaultWidth: 288,
+  rightSidebarMinWidth: 280,
+  rightSidebarMaxWidth: 420,
+  previewPadding: 32,
+  previewSplitHeaderHeight: 32,
+  previewControlsHeight: 32,
+  previewControlButtonSize: 30,
+  timelineDefaultSize: 28,
+  timelineMinSize: 14,
+  timelineMaxSize: 80,
+  graphPanelSizeIncrease: 10,
+  timelineHeaderHeight: 40,
+  // Ruler + its left-column header are kept equal so track rows align on both
+  // sides. The ruler now hosts a top IO lane (12px) + a shorter tick ruler.
+  timelineTracksHeaderHeight: 34,
+  timelineRulerHeight: 34,
+  // The Edit track header follows the classic dopesheet property column so
+  // both timeline surfaces share the same ruler and playhead origin.
+  timelineSidebarWidth: EDIT_DOPESHEET_COLUMN_WIDTH,
+  timelineMeterWidth: 84,
+  timelineMixerWidth: 260,
+  timelineTrackHeight: 100,
+  timelineClipLabelRowHeight: 24,
+  timelineWaveformRowHeight: 24,
+} as const
+
 const EDITOR_DENSITY_PRESETS = {
-  compact: {
-    toolbarHeight: 48,
-    sidebarRailWidth: 44,
-    sidebarHeaderHeight: 36,
-    sidebarHeaderButtonSize: 20,
-    toolbarButtonSize: 20,
-    leftSidebarDefaultWidth: 320,
-    leftSidebarMinWidth: 240,
-    leftSidebarMaxWidth: 560,
-    rightSidebarDefaultWidth: 288,
-    rightSidebarMinWidth: 280,
-    rightSidebarMaxWidth: 420,
-    previewPadding: 32,
-    previewSplitHeaderHeight: 32,
-    previewControlsHeight: 32,
-    previewControlButtonSize: 30,
-    timelineDefaultSize: 28,
-    timelineMinSize: 14,
-    timelineMaxSize: 80,
-    graphPanelSizeIncrease: 10,
-    timelineHeaderHeight: 40,
-    // Ruler + its left-column header are kept equal so track rows align on both
-    // sides. The ruler now hosts a top IO lane (12px) + a shorter tick ruler.
-    timelineTracksHeaderHeight: 34,
-    timelineRulerHeight: 34,
-    // The Edit track header follows the classic dopesheet property column so
-    // both timeline surfaces share the same ruler and playhead origin.
-    timelineSidebarWidth: EDIT_DOPESHEET_COLUMN_WIDTH,
-    timelineMeterWidth: 84,
-    timelineMixerWidth: 260,
-    timelineTrackHeight: 100,
-    timelineClipLabelRowHeight: 24,
-    timelineWaveformRowHeight: 24,
+  compact: COMPACT_PRESET,
+  // Concise (CapCut-style review) layout: narrow 72px track labels, a 32px
+  // timeline toolbar and a short clip label row. Everything else follows compact.
+  concise: {
+    ...COMPACT_PRESET,
+    timelineHeaderHeight: 32,
+    timelineSidebarWidth: 72,
+    timelineTrackHeight: 72,
+    timelineClipLabelRowHeight: 18,
   },
 } as const
 
 export type EditorDensityPresetName = keyof typeof EDITOR_DENSITY_PRESETS
-export type EditorLayout = (typeof EDITOR_DENSITY_PRESETS)[EditorDensityPresetName]
-type LeftSidebarLayoutBounds = { leftSidebarMinWidth: number; leftSidebarMaxWidth: number }
-type RightSidebarLayoutBounds = { rightSidebarMinWidth: number; rightSidebarMaxWidth: number }
+export type EditorLayout = {
+  -readonly [K in keyof (typeof EDITOR_DENSITY_PRESETS)['compact']]: number
+}
+type LeftSidebarLayoutBounds = {
+  leftSidebarMinWidth: number
+  leftSidebarMaxWidth: number
+}
+type RightSidebarLayoutBounds = {
+  rightSidebarMinWidth: number
+  rightSidebarMaxWidth: number
+}
 
 export const DEFAULT_EDITOR_DENSITY_PRESET: EditorDensityPresetName = 'compact'
 
 export function normalizeEditorDensityPreset(value: unknown): EditorDensityPresetName {
-  return value === 'compact' ? value : DEFAULT_EDITOR_DENSITY_PRESET
+  return value === 'compact' || value === 'concise' ? value : DEFAULT_EDITOR_DENSITY_PRESET
 }
 
 export function getEditorLayout(preset: unknown = DEFAULT_EDITOR_DENSITY_PRESET): EditorLayout {

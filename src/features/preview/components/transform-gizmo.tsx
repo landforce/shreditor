@@ -1,5 +1,6 @@
 import { useMemo, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { TimelineItem } from '@/types/timeline'
+import { useTextEditStore, wasJustSelectedByClick } from '../stores/text-edit-store'
 import type { CropSettings } from '@/types/transform'
 import type { GizmoHandle, Transform, CoordinateParams } from '../types/gizmo'
 import { useGizmoStore } from '../stores/gizmo-store'
@@ -31,10 +32,7 @@ interface TransformGizmoProps {
   item: TimelineItem
   coordParams: CoordinateParams
   onTransformStart: () => void
-  onTransformEnd: (
-    transform: Transform,
-    operation: 'move' | 'resize' | 'rotate' | 'anchor',
-  ) => void
+  onTransformEnd: (transform: Transform, operation: 'move' | 'resize' | 'rotate' | 'anchor') => void
   onCropEnd: (edge: CropEdge, ratio: number) => void
   /** Whether video is currently playing - gizmo shows at lower opacity during playback */
   isPlaying?: boolean
@@ -42,6 +40,8 @@ interface TransformGizmoProps {
   translateBlocked?: boolean
   translateBlockedLabel?: string
   onTranslateBlocked?: () => void
+  /** Double-click on a text item starts editing it in place. */
+  onEditText?: () => void
 }
 
 /**
@@ -58,6 +58,7 @@ export function TransformGizmo({
   translateBlocked = false,
   translateBlockedLabel,
   onTranslateBlocked,
+  onEditText,
 }: TransformGizmoProps) {
   const { activeGizmo, previewTransform, itemPreview } = useItemGizmoPreview(item.id, {
     imperativeTranslate: true,
@@ -80,8 +81,7 @@ export function TransformGizmo({
   const acknowledgedHandoffRef = useRef<number | null>(null)
 
   const isTransformInteracting = activeGizmo?.itemId === item.id
-  const isInteracting =
-    isTransformInteracting || activeCropEdge !== null || isAnchorDragging
+  const isInteracting = isTransformInteracting || activeCropEdge !== null || isAnchorDragging
 
   // Get animated transform using centralized hook
   const { transform: animatedTransform, relativeFrame } = useAnimatedTransform(
@@ -140,9 +140,7 @@ export function TransformGizmo({
       const active = state.activeGizmo
       const handoff = state.presentationHandoff
       const liveTransform =
-        active?.itemId === item.id && active.mode === 'translate'
-          ? state.previewTransform
-          : null
+        active?.itemId === item.id && active.mode === 'translate' ? state.previewTransform : null
       const settlingTransform =
         !liveTransform && handoff?.itemId === item.id && handoff.mode === 'translate'
           ? handoff.finalTransform
@@ -184,10 +182,7 @@ export function TransformGizmo({
     syncTranslatePresentation(useGizmoStore.getState())
   }, [currentTransform, syncTranslatePresentation])
 
-  useEffect(
-    () => useGizmoStore.subscribe(syncTranslatePresentation),
-    [syncTranslatePresentation],
-  )
+  useEffect(() => useGizmoStore.subscribe(syncTranslatePresentation), [syncTranslatePresentation])
 
   const sourceDimensions = useMemo(() => {
     if (item.type !== 'video' && item.type !== 'composition') return null
@@ -279,13 +274,7 @@ export function TransformGizmo({
       }
       const point = toCanvasPoint(e)
       const startTransformSnapshot = { ...currentTransform }
-      const interactionId = startTranslate(
-        item.id,
-        point,
-        currentTransform,
-        strokeWidth,
-        item.type,
-      )
+      const interactionId = startTranslate(item.id, point, currentTransform, strokeWidth, item.type)
       onTransformStart()
       document.body.style.cursor = 'move'
 
@@ -380,13 +369,7 @@ export function TransformGizmo({
       e.preventDefault()
       const point = toCanvasPoint(e)
       const startTransformSnapshot = { ...currentTransform }
-      const interactionId = startRotate(
-        item.id,
-        point,
-        currentTransform,
-        strokeWidth,
-        item.type,
-      )
+      const interactionId = startRotate(item.id, point, currentTransform, strokeWidth, item.type)
       onTransformStart()
       document.body.style.cursor = 'crosshair'
 
@@ -621,7 +604,23 @@ export function TransformGizmo({
       }}
       // Prevent events from propagating to elements below
       onMouseDown={(e) => e.stopPropagation()}
-      onDoubleClick={(e) => e.stopPropagation()}
+      // The click that selected this text item replaced the hit area with this
+      // gizmo, so a quick second click is the double-click the browser can't see.
+      onMouseDownCapture={(e) => {
+        if (e.button !== 0 || item.type !== 'text' || !onEditText) return
+        if (!wasJustSelectedByClick(item.id)) {
+          // First click on an already selected title: remember it for the second.
+          useTextEditStore.getState().noteSelectClick(item.id)
+          return
+        }
+        e.preventDefault()
+        e.stopPropagation()
+        onEditText()
+      }}
+      onDoubleClick={(e) => {
+        e.stopPropagation()
+        if (item.type === 'text') onEditText?.()
+      }}
     >
       {item.type === 'controller' && (
         <div className="pointer-events-none absolute inset-0" data-testid="null-controller-gizmo">

@@ -41,6 +41,7 @@ import { TimelinePreviewScrubber } from './timeline-preview-scrubber'
 import { TimelineRulerSurface } from './timeline-ruler-surface'
 import { TimelineTrack } from './timeline-track'
 import { TimelineGuidelines } from './timeline-guidelines'
+import { TimelineBeatGrid } from './timeline-beat-grid'
 import { TimelineMediaDropZone } from './timeline-media-drop-zone'
 import { TimelineRecordingOverlay } from './timeline-recording-overlay'
 import { IO_LANE_HEIGHT } from './timeline-markers'
@@ -2113,6 +2114,7 @@ export const TimelineContent = memo(function TimelineContent({
   const trackSurfaceOverlayChildren = useMemo(
     () => (
       <>
+        <TimelineBeatGrid variant="tracks" />
         {isDragging && <TimelineGuidelines />}
         <TimelineRecordingOverlay />
       </>

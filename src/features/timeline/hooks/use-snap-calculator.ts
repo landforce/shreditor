@@ -12,6 +12,7 @@ import {
 } from '../utils/timeline-snap-utils'
 import { getVisibleTrackIds } from '../utils/group-utils'
 import { BASE_SNAP_THRESHOLD_PIXELS } from '../constants'
+import { getSnapBeatFrames } from './use-timeline-beats'
 import { getZoomLevelNow, getPixelsPerSecondNow } from '../utils/zoom-conversions'
 
 type SnapExclusion = string | string[] | null
@@ -38,9 +39,12 @@ export function useSnapCalculator(
   excludeItemIds: SnapExclusion,
   options: {
     includeTransitionMidpoints?: boolean
+    /** Music beats are snap targets (same priority as item edges). Slip/slide opt out. */
+    includeBeats?: boolean
   } = {},
 ) {
   const includeTransitionMidpoints = options.includeTransitionMidpoints ?? true
+  const includeBeats = options.includeBeats ?? true
 
   const getSnapThresholdFrames = useCallback(() => {
     const fps = useTimelineSettingsStore.getState().fps
@@ -78,9 +82,21 @@ export function useSnapCalculator(
         },
       )
 
+      if (includeBeats) {
+        // Beats share the magnetic priority of item edges. Only present while
+        // the beat grid is shown, so what you see is what you snap to.
+        const seen = new Set<number>()
+        for (const beat of getSnapBeatFrames(excludeIds, items, tracks)) {
+          const frame = Math.round(beat)
+          if (seen.has(frame)) continue
+          seen.add(frame)
+          targets.push({ frame, type: 'beat' })
+        }
+      }
+
       return targets
     },
-    [excludeItemIds, includeTransitionMidpoints],
+    [excludeItemIds, includeBeats, includeTransitionMidpoints],
   )
 
   const generateSnapTargets = useCallback(() => {

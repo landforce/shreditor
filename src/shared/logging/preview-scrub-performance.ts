@@ -1,4 +1,4 @@
-export type PreviewScrubWorkspace = 'edit' | 'color' | 'animate' | 'motion'
+export type PreviewScrubWorkspace = 'edit' | 'color' | 'animate' | 'motion' | 'concise'
 
 export interface PreviewScrubRequestSample {
   seq: number

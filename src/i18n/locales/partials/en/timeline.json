@@ -251,6 +251,27 @@
       "trimAnimationToast": "Removed {{count}} trimmed keyframes.",
       "springMass": "Mass"
     },
+    "concise": {
+      "add": "Add",
+      "addItems": {
+        "media": "Media",
+        "text": "Text",
+        "shapes": "Shapes",
+        "effects": "Effects",
+        "transitions": "Transitions",
+        "lottie": "Lottie",
+        "templates": "Templates",
+        "transcript": "Transcript",
+        "ai": "AI"
+      },
+      "beatGrid": "Beat grid",
+      "bpm": "{{bpm}} BPM",
+      "compactTracks": "Compact track labels",
+      "deleteSelected": "Delete selected",
+      "fullTracks": "Full track headers",
+      "more": "More",
+      "splitAtPlayhead": "Split at playhead"
+    },
     "markerName": "Marker {{index}}",
     "noTracksToRemove": "No Tracks To Remove",
     "region": "Region",

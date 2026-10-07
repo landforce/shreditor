@@ -370,6 +370,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
   const { t } = useTranslation()
   const snapEnabled = useSettingsStore((s) => s.snapEnabled)
   const showWaveforms = useSettingsStore((s) => s.showWaveforms)
+  const showBeatGrid = useSettingsStore((s) => s.showBeatGrid)
   const showFilmstrips = useSettingsStore((s) => s.showFilmstrips)
   const enableFilmstripExtraction = useSettingsStore((s) => s.enableFilmstripExtraction)
   const autoSaveInterval = useSettingsStore((s) => s.autoSaveInterval)
@@ -917,6 +918,13 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                           <Switch
                             checked={showWaveforms}
                             onCheckedChange={(v) => setSetting('showWaveforms', v)}
+                          />
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <Label className="text-sm">{t('settings.timeline.showBeatGrid')}</Label>
+                          <Switch
+                            checked={showBeatGrid}
+                            onCheckedChange={(v) => setSetting('showBeatGrid', v)}
                           />
                         </div>
                         <div className="flex items-center justify-between">

@@ -6,6 +6,8 @@ import { formatTimecodeCompact } from '@/shared/utils/time-utils'
 interface TimecodeDisplayProps {
   fps: number
   totalFrames: number
+  /** Show only the current time (narrow transports). */
+  compact?: boolean
 }
 
 /**
@@ -17,14 +19,16 @@ interface TimecodeDisplayProps {
  * - Tabular numbers for consistent width
  * - Primary color for current time
  */
-export function TimecodeDisplay({ fps, totalFrames }: TimecodeDisplayProps) {
+export function TimecodeDisplay({ fps, totalFrames, compact = false }: TimecodeDisplayProps) {
   const [showFrames, setShowFrames] = useState(false)
   const currentTimeRef = useRef<HTMLSpanElement>(null)
   const frameDigits = Math.max(totalFrames.toString().length, 1)
   const lastFrame = Math.max(0, totalFrames - 1)
   const timecodeDigits = formatTimecodeCompact(lastFrame, fps).length
   const reservedCharWidth = Math.max(frameDigits, timecodeDigits)
-  const reservedDisplayWidth = `calc(${reservedCharWidth * 2 + 1}ch + 0.75rem)`
+  const reservedDisplayWidth = compact
+    ? `calc(${reservedCharWidth}ch + 0.25rem)`
+    : `calc(${reservedCharWidth * 2 + 1}ch + 0.75rem)`
 
   // Use refs for values accessed in subscription to avoid stale closures
   const showFramesRef = useRef(showFrames)
@@ -99,10 +103,14 @@ export function TimecodeDisplay({ fps, totalFrames }: TimecodeDisplayProps) {
           ? formatFrameNumber(getVisibleFrame())
           : formatTimecodeCompact(getVisibleFrame(), fps)}
       </span>
-      <span className="text-muted-foreground">/</span>
-      <span>
-        {showFrames ? formatFrameNumber(lastFrame) : formatTimecodeCompact(lastFrame, fps)}
-      </span>
+      {!compact && (
+        <>
+          <span className="text-muted-foreground">/</span>
+          <span>
+            {showFrames ? formatFrameNumber(lastFrame) : formatTimecodeCompact(lastFrame, fps)}
+          </span>
+        </>
+      )}
     </button>
   )
 }

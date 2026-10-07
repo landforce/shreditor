@@ -130,6 +130,19 @@ describe('PreviewArea mask editor toolbar', () => {
     expect(useMaskEditorStore.getState().isEditing).toBe(false)
   })
 
+  it('concise chrome hides the alignment row and zoom when compact', () => {
+    const project = { width: 1080, height: 1920, fps: 30 }
+    const { rerender } = render(<PreviewArea project={project} chrome="concise" />)
+    expect(screen.queryByTestId('alignment-toolbar')).not.toBeInTheDocument()
+    expect(screen.getByTestId('playback-controls')).toBeInTheDocument()
+    expect(screen.getByTestId('timecode-display')).toBeInTheDocument()
+    expect(screen.getByTestId('preview-zoom-controls')).toBeInTheDocument()
+
+    rerender(<PreviewArea project={project} chrome="concise" compact />)
+    expect(screen.queryByTestId('preview-zoom-controls')).not.toBeInTheDocument()
+    expect(screen.getByTestId('playback-controls')).toBeInTheDocument()
+  })
+
   it('does not show the color scopes panel in edit workspace', () => {
     useEditorStore.setState({
       colorScopesOpen: true,
@@ -250,10 +263,7 @@ describe('PreviewArea mask editor toolbar', () => {
     expect(screen.getByTestId('video-preview')).toHaveAttribute('data-width', '1440')
     expect(screen.getByTestId('video-preview')).toHaveAttribute('data-height', '1080')
     expect(screen.getByTestId('video-preview')).toHaveAttribute('data-fps', '24')
-    expect(screen.getByTestId('video-preview')).toHaveAttribute(
-      'data-background-color',
-      '#123456',
-    )
+    expect(screen.getByTestId('video-preview')).toHaveAttribute('data-background-color', '#123456')
     expect(screen.getByTestId('playback-controls')).toHaveAttribute('data-total-frames', '240')
     expect(screen.getByTestId('timecode-display')).toHaveAttribute('data-total-frames', '240')
   })
@@ -269,9 +279,7 @@ describe('PreviewArea mask editor toolbar', () => {
   })
 
   it('preserves the program preview DOM while switching workspace chrome', () => {
-    const { rerender } = render(
-      <PreviewArea project={{ width: 1920, height: 1080, fps: 30 }} />,
-    )
+    const { rerender } = render(<PreviewArea project={{ width: 1920, height: 1080, fps: 30 }} />)
     const previewNode = screen.getByTestId('video-preview')
 
     act(() => {

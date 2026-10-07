@@ -38,6 +38,7 @@
     "ariaLabel": "Editor toolbar",
     "workspaces": {
       "motion": "Motion",
+      "concise": "Concise",
       "label": "Workspaces",
       "edit": "Edit",
       "color": "Color",
@@ -109,6 +110,7 @@
       "snapByDefault": "Snap by Default",
       "snapByDefaultDescription": "Sets the initial snap state when a project opens.",
       "showWaveforms": "Show Waveforms",
+      "showBeatGrid": "Show Beat Grid",
       "showFilmstrips": "Show Filmstrips",
       "enableFilmstripExtraction": "Extract Filmstrips",
       "enableFilmstripExtractionDescription": "Generate video thumbnail strips during import and timeline display."

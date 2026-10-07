@@ -13,12 +13,15 @@ const EDGE_BUDGETS = [
   // store, hooks, UI, panels, motion, subscriptions, cache and test helpers all
   // cross the feature boundary through dedicated deps/* contracts.
   // 74: text styles added one action module (text-style-actions) the editor's style panel uses.
-  { edge: 'editor -> timeline', maxImports: 74, maxFiles: 11 },
+  // 75: the Concise view's Pass card labels undo entries with formatTimelineCommandLabel.
+  // 76: the music beat grid - the shot card reads useTimelineBeats through timeline-hooks.
+  { edge: 'editor -> timeline', maxImports: 76, maxFiles: 11 },
   // The editor preview contract added one supported preview export. Keep the
   // file budget tight so this remains consolidated behind the existing adapter.
   { edge: 'editor -> preview', maxImports: 16, maxFiles: 2 },
   { edge: 'editor -> media-library', maxImports: 13, maxFiles: 2 },
-  { edge: 'preview -> timeline', maxImports: 2, maxFiles: 2 },
+  // 3: on-canvas text editing commits through the timeline command store (coalesced undo).
+  { edge: 'preview -> timeline', maxImports: 3, maxFiles: 2 },
   { edge: 'preview -> player', maxImports: 2, maxFiles: 2 },
   // Raised for the on-device transcription + caption feature: the timeline
   // transcript editor / auto-captions and the media-library Parakeet/Whisper

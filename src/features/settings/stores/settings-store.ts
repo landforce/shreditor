@@ -30,6 +30,8 @@ interface AppSettings {
   // Canvas/gizmo snap (preview area) — independent from timeline frame snap
   canvasSnapEnabled: boolean
   showWaveforms: boolean
+  // Beat ticks from the music track (always on in the Concise workspace)
+  showBeatGrid: boolean
   showFilmstrips: boolean
   enableFilmstripExtraction: boolean
 
@@ -145,6 +147,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   timelineSectionDividerPosition: null,
   canvasSnapEnabled: true,
   showWaveforms: true,
+  showBeatGrid: true,
   showFilmstrips: true,
   enableFilmstripExtraction: true,
 

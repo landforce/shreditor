@@ -113,6 +113,10 @@ import { useProjectStore } from '@/features/timeline/deps/projects'
 import { captureSnapshot } from './commands/snapshot'
 import { rateStretchItemWithoutHistory } from './actions/item-edit-actions'
 import type { ProjectTimeline } from '@/types/project'
+import { useEditorStore } from '@/shared/state/editor'
+
+// Existing suites assume a non-concise workspace (the default is concise).
+useEditorStore.setState({ workspace: 'edit' })
 
 describe('TimelineStoreFacade', () => {
   beforeEach(() => {
@@ -1115,9 +1119,12 @@ describe('TimelineStoreFacade', () => {
       expect(
         savedTimeline.compositions?.find((composition) => composition.id === 'motion-comp'),
       ).toMatchObject({
-        items: [expect.objectContaining({ id: 'motion-base' }), expect.objectContaining({
-          id: 'motion-unsaved',
-        })],
+        items: [
+          expect.objectContaining({ id: 'motion-base' }),
+          expect.objectContaining({
+            id: 'motion-unsaved',
+          }),
+        ],
         durationInFrames: 100,
         busAudioEq: motionBus,
         markers: motionMarkers,

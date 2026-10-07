@@ -1,11 +1,19 @@
 import { act, fireEvent, render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { usePlaybackStore } from '@/shared/state/playback'
 import type { FocusEventHandler, KeyboardEventHandler, PointerEventHandler } from 'react'
-import { beforeEach, describe, expect, it, vi } from 'vite-plus/test'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vite-plus/test'
 
 import { ZOOM_MAX, ZOOM_MIN } from '../constants'
 import { useZoomStore } from '../stores/zoom-store'
 import { useSelectionStore } from '@/shared/state/selection'
+import { useEditorStore } from '@/shared/state/editor'
+import { useTimelineStore } from '../stores/timeline-store'
+import { useConciseTimelineStore } from '../stores/concise-timeline-store'
 import { TimelineHeader } from './timeline-header'
+
+// Existing suites assume a non-concise workspace (the default is concise).
+useEditorStore.setState({ workspace: 'edit' })
 
 const { micRenderSpy, sliderRenderSpy, sliderInput } = vi.hoisted(() => ({
   micRenderSpy: vi.fn(),
@@ -84,6 +92,13 @@ vi.mock('./mic-record-control', () => ({
     micRenderSpy()
     return null
   },
+}))
+
+const { splitSpy } = vi.hoisted(() => ({ splitSpy: vi.fn() }))
+
+vi.mock('../stores/actions/item-actions', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../stores/actions/item-actions')>()),
+  splitAllItemsAtFrame: splitSpy,
 }))
 
 describe('TimelineHeader zoom slider', () => {
@@ -315,5 +330,105 @@ describe('TimelineHeader zoom slider', () => {
       'aria-pressed',
       'true',
     )
+  })
+})
+
+describe('TimelineHeader concise workspace', () => {
+  beforeEach(() => {
+    splitSpy.mockClear()
+    useEditorStore.setState({ workspace: 'concise' })
+    useConciseTimelineStore.setState({ conciseFullHeaders: false })
+    useSelectionStore.setState({
+      selectedItemIds: [],
+      selectedItemIdSet: new Set<string>(),
+      activeTool: 'select',
+      editKeyframePanelOpen: false,
+      expandedKeyframeLanes: new Set<string>(),
+    })
+  })
+
+  afterEach(() => {
+    useEditorStore.setState({ workspace: 'edit' })
+  })
+
+  it('renders the compact 32px toolbar and moves the other tools into More', () => {
+    render(<TimelineHeader />)
+
+    const toolbar = screen.getByTestId('timeline-header-concise')
+    expect(toolbar.style.height).toBe('32px')
+    expect(screen.getByRole('button', { name: 'Select Tool' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Split at playhead' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Delete selected' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Redo' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Disable Snapping' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Add' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Razor Tool' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Set In Point' })).not.toBeInTheDocument()
+  })
+
+  it('splits at the gray playhead through the shared split action', () => {
+    usePlaybackStore.setState({ currentFrame: 40, previewFrame: 25 })
+    render(<TimelineHeader />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Split at playhead' }))
+
+    expect(splitSpy).toHaveBeenCalledWith(25)
+    usePlaybackStore.setState({ previewFrame: null })
+  })
+
+  it('opens the sidebar tab from the Add menu', async () => {
+    useEditorStore.setState({ activeTab: 'media', leftSidebarOpen: false })
+    const user = userEvent.setup()
+    render(<TimelineHeader />)
+
+    await user.click(screen.getByRole('button', { name: 'Add' }))
+    await user.click(await screen.findByRole('menuitem', { name: 'Transitions' }))
+
+    expect(useEditorStore.getState().activeTab).toBe('transitions')
+    expect(useEditorStore.getState().leftSidebarOpen).toBe(true)
+  })
+
+  it('runs the same tool handlers from the More menu', async () => {
+    const user = userEvent.setup()
+    render(<TimelineHeader />)
+
+    await user.click(screen.getByRole('button', { name: 'More' }))
+    await user.click(await screen.findByRole('menuitem', { name: /Razor Tool/ }))
+
+    expect(useSelectionStore.getState().activeTool).toBe('razor')
+  })
+
+  it('adds a marker at the playhead from the More menu', async () => {
+    usePlaybackStore.setState({ currentFrame: 12 })
+    const addMarker = vi.spyOn(useTimelineStore.getState(), 'addMarker')
+    const user = userEvent.setup()
+    render(<TimelineHeader />)
+
+    await user.click(screen.getByRole('button', { name: 'More' }))
+    await user.click(await screen.findByRole('menuitem', { name: /Add Marker/ }))
+
+    expect(addMarker).toHaveBeenCalledWith(12)
+    addMarker.mockRestore()
+  })
+
+  it('toggles full track headers and persists the choice', () => {
+    render(<TimelineHeader />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Full track headers' }))
+
+    expect(useConciseTimelineStore.getState().conciseFullHeaders).toBe(true)
+    expect(localStorage.getItem('timeline:conciseFullHeaders')).toBe('true')
+    expect(screen.getByRole('button', { name: 'Compact track labels' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    )
+  })
+
+  it('keeps the full toolbar outside the concise workspace', () => {
+    useEditorStore.setState({ workspace: 'edit' })
+    render(<TimelineHeader />)
+
+    expect(screen.queryByTestId('timeline-header-concise')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Razor Tool' })).toBeInTheDocument()
   })
 })

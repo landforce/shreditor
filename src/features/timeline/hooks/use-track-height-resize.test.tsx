@@ -8,6 +8,9 @@ import { useTimelineCommandStore } from '../stores/timeline-command-store'
 import { useTimelineSettingsStore } from '../stores/timeline-settings-store'
 import { clearAllTrackHeightOverrides, setTrackHeightOverride } from '../utils/track-heights'
 
+// Existing suites assume a non-concise workspace (the default is concise).
+useEditorStore.setState({ workspace: 'edit' })
+
 function createTrack(id: string, kind: 'video' | 'audio', height: number) {
   return {
     id,

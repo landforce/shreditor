@@ -64,7 +64,7 @@ export function useEditorHotkeys(callbacks: EditorHotkeyCallbacks = {}) {
     [],
   )
 
-  // Workspace switching: Alt+1 (Edit), Alt+2 (Color), Alt+3 (Motion).
+  // Workspace switching: Alt+1 (Edit), Alt+2 (Color), Alt+3 (Motion), Alt+4 (Concise).
   // WORKSPACE_ANIMATE retains its persisted command id for shortcut migration.
   useHotkeys(
     hotkeys.WORKSPACE_EDIT,
@@ -91,6 +91,16 @@ export function useEditorHotkeys(callbacks: EditorHotkeyCallbacks = {}) {
     (event) => {
       event.preventDefault()
       useEditorStore.getState().setWorkspace('motion')
+    },
+    HOTKEY_OPTIONS,
+    [],
+  )
+
+  useHotkeys(
+    hotkeys.WORKSPACE_CONCISE,
+    (event) => {
+      event.preventDefault()
+      useEditorStore.getState().setWorkspace('concise')
     },
     HOTKEY_OPTIONS,
     [],

@@ -16,6 +16,10 @@ import { useTimelineCommandStore } from './timeline-command-store'
 import { captureSnapshot, restoreSnapshot, timelineContentEqual } from './commands/snapshot'
 import { formatTimelineCommandLabel } from './commands/labels'
 import { hydrateTimelineStoresFromProject } from './timeline-persistence'
+import { useEditorStore } from '@/shared/state/editor'
+
+// Existing suites assume a non-concise workspace (the default is concise).
+useEditorStore.setState({ workspace: 'edit' })
 
 const track = makeTimelineTrack({ id: 'track-v1', name: 'Speaker', kind: 'video', order: 0 })
 const titleTrack = makeTimelineTrack({ id: 'track-t1', name: 'Title', kind: 'video', order: 1 })

@@ -7,6 +7,8 @@ interface TrackSectionLayoutParams {
   tracks: TimelineTrack[]
   sectionDividerPosition: number | null
   trackTitleBarHeight: number
+  /** Default the divider to the video lanes' own height instead of a 50/50 split (Concise). */
+  fitVideoLanes?: boolean
 }
 
 interface TrackSectionLayout {
@@ -186,16 +188,20 @@ export function getTrackSectionLayout({
   tracks,
   sectionDividerPosition,
   trackTitleBarHeight,
+  fitVideoLanes = false,
 }: TrackSectionLayoutParams): TrackSectionLayout {
   const { videoSectionHeight, audioSectionHeight, hasTrackSections } =
     getTrackSectionHeights(tracks)
   const { availablePaneHeight, minimumSectionDividerPosition, maximumSectionDividerPosition } =
     getSectionDividerBounds(viewportHeight, tracks, trackTitleBarHeight)
   const defaultSectionDividerPosition = hasTrackSections
-    ? // Center the divider so the video and audio panes get equal height by
-      // default. (videoPaneHeight === position, audioPaneHeight === available
-      // - position, so half the available height splits them evenly.)
-      availablePaneHeight / 2
+    ? fitVideoLanes
+      ? // Concise: the video pane is exactly as tall as its lanes, the rest is audio.
+        videoSectionHeight
+      : // Center the divider so the video and audio panes get equal height by
+        // default. (videoPaneHeight === position, audioPaneHeight === available
+        // - position, so half the available height splits them evenly.)
+        availablePaneHeight / 2
     : videoSectionHeight > 0
       ? availablePaneHeight
       : 0

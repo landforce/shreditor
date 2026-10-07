@@ -7,7 +7,7 @@
  * panel inside a workspace, and their per-workspace tweaks are persisted
  * by the editor store (`editor:workspaceLayout:<id>` in localStorage).
  */
-export type EditorWorkspaceId = 'edit' | 'color' | 'motion'
+export type EditorWorkspaceId = 'edit' | 'color' | 'motion' | 'concise'
 
 export type EditorSidebarTab =
   | 'media'
@@ -30,6 +30,12 @@ export interface EditorWorkspaceLayout {
 }
 
 const EDITOR_WORKSPACE_PRESETS: Record<EditorWorkspaceId, EditorWorkspaceLayout> = {
+  concise: {
+    colorScopesOpen: false,
+    clipInspectorTab: 'video',
+    activeTab: 'media',
+    propertiesFullColumn: false,
+  },
   edit: {
     colorScopesOpen: false,
     clipInspectorTab: 'video',
@@ -62,17 +68,24 @@ export const EDITOR_WORKSPACE_TIMELINE_SIZE: Record<EditorWorkspaceId, number | 
   color: 18,
   // Motion reuses the standard split and swaps only the timeline surface.
   motion: null,
+  concise: null,
 }
 
-const DEFAULT_EDITOR_WORKSPACE: EditorWorkspaceId = 'edit'
+const DEFAULT_EDITOR_WORKSPACE: EditorWorkspaceId = 'concise'
 
 export function normalizeEditorWorkspaceId(value: unknown): EditorWorkspaceId {
+  if (value === 'concise') return 'concise'
+  if (value === 'edit') return 'edit'
   if (value === 'color') return 'color'
   // Animate and Compose were separate historical surfaces. Both now migrate
   // into the single Motion workspace so persisted sessions cannot reopen the
   // disconnected legacy editor.
   if (value === 'animate' || value === 'motion' || value === 'compose') return 'motion'
   return DEFAULT_EDITOR_WORKSPACE
+}
+
+export function isConciseWorkspace(value: unknown): boolean {
+  return normalizeEditorWorkspaceId(value) === 'concise'
 }
 
 const SIDEBAR_TABS: readonly EditorSidebarTab[] = [

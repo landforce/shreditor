@@ -22,7 +22,7 @@ import {
  * Re-derive every track's height from the preset + overrides. `setTracks` does
  * the resolving, so handing it back the current array is enough.
  */
-function refreshTrackHeights(): void {
+export function refreshTrackHeights(): void {
   useItemsStore.getState().setTracks(useItemsStore.getState().tracks)
 }
 

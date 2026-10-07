@@ -39,4 +39,6 @@ export {
   useWaveform,
 } from '@/features/timeline/contracts/preview'
 
+export { execute as executeTimelineCommand } from '@/features/timeline/stores/actions/shared'
+
 export const importFilmstripCache = () => import('@/features/timeline/services/filmstrip-cache')

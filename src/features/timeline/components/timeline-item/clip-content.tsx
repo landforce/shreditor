@@ -1,12 +1,4 @@
-import {
-  Suspense,
-  lazy,
-  memo,
-  useCallback,
-  useDeferredValue,
-  useMemo,
-  type ReactNode,
-} from 'react'
+import { Suspense, lazy, memo, useCallback, useDeferredValue, useMemo, type ReactNode } from 'react'
 import { Link2 } from 'lucide-react'
 import { perfMarkRender } from '@/shared/logging/perf-marks'
 import type { TimelineItem } from '@/types/timeline'
@@ -19,6 +11,8 @@ import { useClipVisibility } from '../../hooks/use-clip-visibility'
 import { useZoomStore } from '../../stores/zoom-store'
 import { getDemotionAwarePixelsPerSecond } from '../../utils/timeline-dom-density'
 import { EDITOR_LAYOUT_CSS_VALUES } from '@/config/editor-layout'
+import { isConciseWorkspace } from '@/config/editor-workspaces'
+import { useEditorStore } from '@/shared/state/editor'
 import { getTextItemPlainText } from '@/shared/utils/text-item-spans'
 import {
   getCompositionVisualSegments,
@@ -524,11 +518,15 @@ const ImageClipVisualContent = memo(function ImageClipVisualContent({
 
 const StaticClipContent = memo(function StaticClipContent({ item }: { item: TimelineItem }) {
   perfMarkRender('ClipContent')
+  // Concise text lanes are 28px tall: only the label row fits, no caption row.
+  const singleRow = useEditorStore((s) => isConciseWorkspace(s.workspace))
 
   if (item.type === 'text') {
     return (
-      <div className="absolute inset-0 flex flex-col px-2 py-1 overflow-hidden">
-        <div className="text-[10px] text-muted-foreground truncate">Text</div>
+      <div
+        className={`absolute inset-0 flex flex-col px-2 overflow-hidden ${singleRow ? 'justify-center' : 'py-1'}`}
+      >
+        {singleRow ? null : <div className="text-[10px] text-muted-foreground truncate">Text</div>}
         <div className="text-xs font-medium truncate flex-1">
           {getTextItemPlainText(item) || 'Empty text'}
         </div>
@@ -540,10 +538,14 @@ const StaticClipContent = memo(function StaticClipContent({ item }: { item: Time
     const cueCount = item.cues.length
     const firstCueText = item.cues[0]?.text ?? ''
     return (
-      <div className="absolute inset-0 flex flex-col px-2 py-1 overflow-hidden">
-        <div className="text-[10px] text-muted-foreground truncate">
-          {`Subtitles · ${cueCount} cue${cueCount === 1 ? '' : 's'}`}
-        </div>
+      <div
+        className={`absolute inset-0 flex flex-col px-2 overflow-hidden ${singleRow ? 'justify-center' : 'py-1'}`}
+      >
+        {singleRow ? null : (
+          <div className="text-[10px] text-muted-foreground truncate">
+            {`Subtitles · ${cueCount} cue${cueCount === 1 ? '' : 's'}`}
+          </div>
+        )}
         <div className="text-xs font-medium truncate flex-1">
           {firstCueText || item.label || 'Subtitles'}
         </div>

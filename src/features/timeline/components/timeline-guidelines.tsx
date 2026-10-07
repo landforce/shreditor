@@ -34,7 +34,9 @@ export function TimelineGuidelines() {
       }
 
       const isMagnetic =
-        activeSnapTarget.type === 'item-start' || activeSnapTarget.type === 'item-end'
+        activeSnapTarget.type === 'item-start' ||
+        activeSnapTarget.type === 'item-end' ||
+        activeSnapTarget.type === 'beat'
       const isPlayhead = activeSnapTarget.type === 'playhead'
       if (!isMagnetic && !isPlayhead) {
         container.style.display = 'none'

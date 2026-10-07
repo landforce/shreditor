@@ -82,6 +82,9 @@ const LazyTimeline = lazy(() => importTimeline().then(({ Timeline }) => ({ defau
 const LazyColorGradingDock = lazy(() =>
   import('./color-grading-dock').then(({ ColorGradingDock }) => ({ default: ColorGradingDock })),
 )
+const LazyConciseShell = lazy(() =>
+  import('./concise/concise-shell').then(({ ConciseShell }) => ({ default: ConciseShell })),
+)
 const LazyColorTimelineNavigator = lazy(() =>
   import('./color-timeline-navigator').then(({ ColorTimelineNavigator }) => ({
     default: ColorTimelineNavigator,
@@ -728,6 +731,7 @@ export const LoadedEditor = memo(function LoadedEditor({
   const timelineDuration = 30
   const isColorWorkspace = workspace === 'color'
   const isMotionWorkspace = workspace === 'motion'
+  const isConciseWorkspace = workspace === 'concise'
   // Color replaces the default editor shell. Motion deliberately keeps it and
   // swaps the preview/timeline surfaces while retaining the shared sidebars.
   const hidesDefaultSidebars = isColorWorkspace
@@ -762,7 +766,7 @@ export const LoadedEditor = memo(function LoadedEditor({
           floating panels: rounded cards separated by a small gap. */}
       <div className="flex-1 flex overflow-hidden gap-[var(--panel-gap)] px-[var(--panel-gap)] pb-[var(--panel-gap)]">
         {/* Left Sidebar - Media Library (full column mode) */}
-        {mediaFullColumn && !hidesDefaultSidebars && (
+        {mediaFullColumn && !hidesDefaultSidebars && !isConciseWorkspace && (
           <InteractionLockRegion locked={isMaskEditingActive} className="editor-panel">
             <ErrorBoundary level="feature">
               <MediaSidebar />
@@ -771,7 +775,15 @@ export const LoadedEditor = memo(function LoadedEditor({
         )}
 
         {/* Right side: Preview/Properties + Timeline */}
-        {isColorWorkspace ? (
+        {isConciseWorkspace ? (
+          <InteractionLockRegion locked={isMaskEditingActive} className="min-w-0 flex-1">
+            <ErrorBoundary level="feature">
+              <Suspense fallback={null}>
+                <LazyConciseShell project={project} onSave={handleSave} />
+              </Suspense>
+            </ErrorBoundary>
+          </InteractionLockRegion>
+        ) : isColorWorkspace ? (
           <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
             <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
               <ErrorBoundary level="feature">
@@ -871,7 +883,7 @@ export const LoadedEditor = memo(function LoadedEditor({
         )}
 
         {/* Right Sidebar - Properties (full column mode) */}
-        {propertiesFullColumn && !hidesDefaultSidebars && (
+        {propertiesFullColumn && !hidesDefaultSidebars && !isConciseWorkspace && (
           <InteractionLockRegion locked={isMaskEditingActive} className="editor-panel">
             <ErrorBoundary level="feature">
               <PropertiesSidebar />

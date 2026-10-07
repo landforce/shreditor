@@ -14,4 +14,5 @@ export {
   useMediaDependencyStore,
   useCompositionsStore,
   useCompositionNavigationStore,
+  executeTimelineCommand,
 } from './timeline-contract'

@@ -18,6 +18,8 @@ import { useGizmoStore, type ItemPreview } from '../stores/gizmo-store'
 import { useExclusiveCanvasEditor } from '../hooks/use-exclusive-canvas-editor'
 import { TransformGizmo } from './transform-gizmo'
 import { GroupGizmo } from './group-gizmo'
+import { TextInlineEditor } from './text-inline-editor'
+import { canEditTextInline, useTextEditStore } from '../stores/text-edit-store'
 import { SelectableItem } from './selectable-item'
 import { MotionPathOverlay } from './motion-path-overlay'
 import { SnapGuides } from './snap-guides'
@@ -216,11 +218,7 @@ export function GizmoOverlay({
     () =>
       itemsSnapshot.map((item, index) => {
         const liveTransform = liveTransforms[index]
-        if (
-          !liveTransform ||
-          !('transform' in item) ||
-          Object.is(liveTransform, item.transform)
-        ) {
+        if (!liveTransform || !('transform' in item) || Object.is(liveTransform, item.transform)) {
           return item
         }
         return { ...item, transform: liveTransform } as TimelineItem
@@ -233,9 +231,7 @@ export function GizmoOverlay({
   // its hit targets without invalidating VideoPreview/MainComposition.
   const visualItems = useMemo(
     () =>
-      itemsWithLiveTransforms.filter(
-        (item) => item.type !== 'audio' && item.type !== 'adjustment',
-      ),
+      itemsWithLiveTransforms.filter((item) => item.type !== 'audio' && item.type !== 'adjustment'),
     [itemsWithLiveTransforms],
   )
   const tracks = useTimelineStore((s) => s.tracks)
@@ -440,10 +436,7 @@ export function GizmoOverlay({
   const itemLabelById = useMemo(
     () =>
       new Map(
-        itemsSnapshot.map((item) => [
-          item.id,
-          item.label || item.type || 'the source layer',
-        ]),
+        itemsSnapshot.map((item) => [item.id, item.label || item.type || 'the source layer']),
       ),
     [itemsSnapshot],
   )
@@ -491,6 +484,45 @@ export function GizmoOverlay({
   const unselectedItems = useMemo(() => {
     return visibleItems.filter((item) => !selectedItemIdsSet.has(item.id))
   }, [visibleItems, selectedItemIdsSet])
+
+  const editingTextItemId = useTextEditStore((s) => s.editingItemId)
+  const startEditingText = useTextEditStore((s) => s.startEditing)
+  const stopEditingText = useTextEditStore((s) => s.stopEditing)
+  const editingTextItem = useMemo(() => {
+    if (!editingTextItemId) return null
+    const found = visibleItems.find((item) => item.id === editingTextItemId)
+    return found && found.type === 'text' ? found : null
+  }, [editingTextItemId, visibleItems])
+
+  // Editing ends when its item leaves the frame, loses selection, or playback starts.
+  useEffect(() => {
+    if (!editingTextItemId) return
+    const stillSelected = selectedItems.length === 1 && selectedItems[0]?.id === editingTextItemId
+    if (!editingTextItem || !stillSelected || isPlaying) stopEditingText()
+  }, [editingTextItemId, editingTextItem, selectedItems, isPlaying, stopEditingText])
+  useEffect(() => () => stopEditingText(), [stopEditingText])
+
+  // Enter on a single selected text item starts editing it (not while typing elsewhere).
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== 'Enter' || e.metaKey || e.ctrlKey || e.altKey || e.shiftKey || e.repeat) return
+      if (e.defaultPrevented || isPlaying) return
+      const target = e.target
+      if (
+        target instanceof HTMLElement &&
+        (target.isContentEditable ||
+          ['INPUT', 'TEXTAREA', 'SELECT', 'BUTTON'].includes(target.tagName))
+      ) {
+        return
+      }
+      const only = selectedItems
+      if (only.length !== 1 || !only[0] || !canEditTextInline(only[0])) return
+      e.preventDefault()
+      startEditingText(only[0].id)
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [isPlaying, selectedItems, startEditingText])
 
   // Coordinate params for gizmo positioning
   const coordParams: CoordinateParams | null = useMemo(() => {
@@ -1460,6 +1492,7 @@ export function GizmoOverlay({
         {/* Selected items are handled by their respective gizmos (TransformGizmo or GroupGizmo) */}
         {!isExclusiveCanvasEditorActive &&
           unselectedItems.map((item) => {
+            if (item.id === editingTextItemId) return null
             const resolved = visualTransformsMap.get(item.id)
             if (!resolved) return null
             const positionLinkFeedback = getPositionLinkFeedback(item.id)
@@ -1484,13 +1517,42 @@ export function GizmoOverlay({
                 translateBlocked={!!positionLinkFeedback}
                 translateBlockedLabel={positionLinkFeedback?.label}
                 onTranslateBlocked={() => showPositionLinkFeedback(item.id)}
+                onEditText={canEditTextInline(item) ? () => startEditingText(item.id) : undefined}
               />
             )
           })}
 
+        {!isExclusiveCanvasEditorActive &&
+          !isPlaying &&
+          editingTextItem &&
+          (() => {
+            const resolved = visualTransformsMap.get(editingTextItem.id)
+            if (!resolved || editingTextItem.type !== 'text') return null
+            return (
+              <TextInlineEditor
+                key={editingTextItem.id}
+                item={editingTextItem}
+                transform={{
+                  x: resolved.x,
+                  y: resolved.y,
+                  width: resolved.width,
+                  height: resolved.height,
+                  anchorX: resolved.anchorX,
+                  anchorY: resolved.anchorY,
+                  rotation: resolved.rotation,
+                  opacity: resolved.opacity,
+                  cornerRadius: resolved.cornerRadius,
+                }}
+                coordParams={coordParams}
+                onExit={stopEditingText}
+              />
+            )
+          })()}
+
         {/* Transform gizmo(s) for selected items - hidden while another canvas editor is active */}
-        {isExclusiveCanvasEditorActive || isPlaying ? null : selectedItems.length === 1 &&
-          selectedItems[0] ? (
+        {isExclusiveCanvasEditorActive ||
+        isPlaying ||
+        editingTextItem ? null : selectedItems.length === 1 && selectedItems[0] ? (
           <TransformGizmo
             item={selectedItems[0]}
             coordParams={coordParams}
@@ -1503,6 +1565,11 @@ export function GizmoOverlay({
             translateBlocked={positionLinkByItemId.has(selectedItems[0].id)}
             translateBlockedLabel={getPositionLinkFeedback(selectedItems[0].id)?.label}
             onTranslateBlocked={() => showPositionLinkFeedback(selectedItems[0]!.id)}
+            onEditText={
+              canEditTextInline(selectedItems[0])
+                ? () => startEditingText(selectedItems[0]!.id)
+                : undefined
+            }
           />
         ) : selectedItems.length > 1 ? (
           <GroupGizmo
@@ -1526,9 +1593,7 @@ export function GizmoOverlay({
         ) : null}
 
         {/* Snap guides shown during drag */}
-        {!isExclusiveCanvasEditorActive && (
-          <LiveSnapGuides coordParams={coordParams} />
-        )}
+        {!isExclusiveCanvasEditorActive && <LiveSnapGuides coordParams={coordParams} />}
       </div>
 
       {/* Context menu for selecting from overlapping items - rendered via portal to ensure it's above all other elements */}

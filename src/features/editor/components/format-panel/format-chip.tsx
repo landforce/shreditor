@@ -37,7 +37,7 @@ function StatusBadge() {
 }
 
 /** The project's format in the top bar, with its scorecard status; opens the format panel. */
-export const FormatChip = memo(function FormatChip() {
+export const FormatChip = memo(function FormatChip({ compact = false }: { compact?: boolean }) {
   const { t } = useTranslation()
   const format = useResolvedProjectFormat()
   return (
@@ -49,7 +49,7 @@ export const FormatChip = memo(function FormatChip() {
       data-tooltip={t('formats.chip.open')}
       data-tooltip-side="bottom"
       className={cn(
-        'flex h-7 items-center gap-1.5 rounded-full border px-2.5 text-xs font-semibold transition-colors',
+        'flex h-7 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-2.5 text-xs font-semibold transition-colors',
         format
           ? 'border-transparent bg-primary-soft text-primary-text hover:bg-primary/15'
           : 'border-dashed border-border text-muted-foreground hover:border-primary/50 hover:text-foreground',
@@ -59,7 +59,7 @@ export const FormatChip = memo(function FormatChip() {
       {format ? (
         <>
           <span>{format.name}</span>
-          {format.variant && (
+          {format.variant && !compact && (
             <span className="font-medium opacity-75">
               · {variantName(t, format.id, format.variant)}
             </span>

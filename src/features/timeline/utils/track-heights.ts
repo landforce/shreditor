@@ -12,8 +12,19 @@
  * so a drag gesture doesn't write once per mousemove.
  */
 import { useEditorStore } from '@/shared/state/editor'
+import { isConciseWorkspace } from '@/config/editor-workspaces'
+import type { TimelineItem, TimelineTrack } from '@/types/timeline'
 import { TRACK_SIZE_PRESET_HEIGHTS } from '../constants'
 import { clampTrackHeight } from './track-resize'
+import { getTrackKind } from './classic-tracks'
+
+/** Lane heights in the Concise workspace, keyed by what the track holds. */
+export const CONCISE_TRACK_HEIGHTS = {
+  video: 80,
+  audio: 40,
+  text: 28,
+  empty: 20,
+} as const
 
 const OVERRIDES_KEY_PREFIX = 'editor:trackHeights:'
 const PERSIST_DEBOUNCE_MS = 250
@@ -61,8 +72,37 @@ export function getPresetTrackHeight(): number {
   return TRACK_SIZE_PRESET_HEIGHTS[useEditorStore.getState().trackSizePreset]
 }
 
-export function resolveTrackHeight(trackId: string): number {
-  return overrides.get(trackId) ?? getPresetTrackHeight()
+/** Concise lane height from what the track holds: video 80, audio 40, text-only 28, empty 20. */
+export function getConciseTrackHeight(
+  track: Pick<TimelineTrack, 'name' | 'kind'>,
+  items: readonly Pick<TimelineItem, 'type'>[] | undefined,
+): number {
+  if (!items || items.length === 0) return CONCISE_TRACK_HEIGHTS.empty
+  if (items.every((item) => item.type === 'text' || item.type === 'subtitle')) {
+    return CONCISE_TRACK_HEIGHTS.text
+  }
+  return getTrackKind(track as TimelineTrack) === 'audio' ||
+    items.every((item) => item.type === 'audio')
+    ? CONCISE_TRACK_HEIGHTS.audio
+    : CONCISE_TRACK_HEIGHTS.video
+}
+
+/**
+ * Row height for a track: a per-track override wins; otherwise the Track Size
+ * preset, or per-kind heights in the Concise workspace (pass the track and its
+ * items so the kind can be read).
+ */
+export function resolveTrackHeight(
+  trackId: string,
+  track?: Pick<TimelineTrack, 'name' | 'kind'>,
+  items?: readonly Pick<TimelineItem, 'type'>[],
+): number {
+  const override = overrides.get(trackId)
+  if (override !== undefined) return override
+  if (track && isConciseWorkspace(useEditorStore.getState().workspace)) {
+    return getConciseTrackHeight(track, items)
+  }
+  return getPresetTrackHeight()
 }
 
 /** Swap the override set to the given project. Flushes the outgoing project first. */

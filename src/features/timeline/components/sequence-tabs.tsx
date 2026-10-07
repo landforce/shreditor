@@ -36,7 +36,12 @@ import {
  * every top-level sequence; clicking switches which sequence is live. A
  * sequence is the same primitive as a compound clip — see sequences-store.
  */
-export const SequenceTabs = memo(function SequenceTabs() {
+export const SequenceTabs = memo(function SequenceTabs({
+  hideWhenSingle = false,
+}: {
+  /** Concise workspace: only show the strip when there is more than one sequence. */
+  hideWhenSingle?: boolean
+}) {
   const topLevelSequenceIds = useSequencesStore((s) => s.topLevelSequenceIds)
   const compositionById = useCompositionsStore((s) => s.compositionById)
   const breadcrumbs = useCompositionNavigationStore((s) => s.breadcrumbs)
@@ -77,6 +82,8 @@ export const SequenceTabs = memo(function SequenceTabs() {
   // Main is the active tab whenever the breadcrumb root is Main — including when
   // drilled into a compound clip from Main (that's the Main lineage, not a tab).
   const isMainActive = activeTabId === null
+
+  if (hideWhenSingle && tabs.length === 0) return null
 
   return (
     <div className="flex items-center gap-1 px-2 py-1 border-b border-border bg-background/60 backdrop-blur-sm text-xs overflow-x-auto">

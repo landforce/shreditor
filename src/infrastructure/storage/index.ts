@@ -23,6 +23,12 @@ export {
   type ProjectFileStamp,
 } from '@/infrastructure/storage/workspace-fs/project-revisions'
 export { readAgentPassLabel } from '@/infrastructure/storage/workspace-fs/agent-passes'
+export {
+  readAgentNotes,
+  writeAgentNotes,
+  type AgentNote,
+  type AgentNotes,
+} from '@/infrastructure/storage/workspace-fs/agent-notes'
 
 // Media
 export {

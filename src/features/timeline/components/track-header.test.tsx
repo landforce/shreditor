@@ -1,10 +1,15 @@
 import { fireEvent, render, screen } from '@testing-library/react'
-import { beforeEach, describe, expect, it, vi } from 'vite-plus/test'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vite-plus/test'
 
 import type { TimelineTrack } from '@/types/timeline'
 
+import { useEditorStore } from '@/shared/state/editor'
 import { useItemsStore } from '../stores/items-store'
+import { useConciseTimelineStore } from '../stores/concise-timeline-store'
 import { TrackHeader } from './track-header'
+
+// Existing suites assume a non-concise workspace (the default is concise).
+useEditorStore.setState({ workspace: 'edit' })
 
 vi.mock('../hooks/use-track-drag', () => ({
   useTrackDrag: () => ({
@@ -142,5 +147,86 @@ describe('TrackHeader', () => {
     )
 
     expect(screen.getByRole('button', { name: 'Enable sync lock' })).toBeInTheDocument()
+  })
+})
+
+describe('TrackHeader concise workspace', () => {
+  beforeEach(() => {
+    useItemsStore.getState().setItems([])
+    useEditorStore.setState({ workspace: 'concise' })
+    useConciseTimelineStore.setState({ conciseFullHeaders: false })
+  })
+
+  afterEach(() => {
+    useEditorStore.setState({ workspace: 'edit' })
+  })
+
+  it('renders a compact label with a kind icon and only disable + lock actions', () => {
+    renderTrackHeader(makeTrack({ name: 'Main video', height: 80 }))
+
+    expect(screen.getByTestId('track-header-concise')).toBeInTheDocument()
+    expect(screen.getByText('Main video')).toBeInTheDocument()
+    expect(screen.getByTestId('track-kind-icon')).toHaveAttribute('data-kind', 'video')
+    expect(screen.getByRole('button', { name: 'Disable track' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Lock Track' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Solo Track' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Disable sync lock' })).not.toBeInTheDocument()
+  })
+
+  it('uses the music icon for audio tracks and the type icon for text-only tracks', () => {
+    const { unmount } = renderTrackHeader(makeTrack({ name: 'A1', kind: 'audio' }))
+    expect(screen.getByTestId('track-kind-icon')).toHaveAttribute('data-kind', 'audio')
+    unmount()
+
+    useItemsStore.getState().setItems([
+      {
+        id: 'text-1',
+        trackId: 'track-1',
+        type: 'text',
+        from: 0,
+        durationInFrames: 30,
+        label: 'Hook',
+        text: 'Hook',
+      } as never,
+    ])
+    renderTrackHeader(makeTrack({ name: 'Captions' }))
+    expect(screen.getByTestId('track-kind-icon')).toHaveAttribute('data-kind', 'text')
+  })
+
+  it('fires the disable and lock handlers', () => {
+    const onToggleDisabled = vi.fn()
+    const onToggleLock = vi.fn()
+    render(
+      <TrackHeader
+        track={makeTrack()}
+        isActive={false}
+        isSelected={false}
+        canDeleteTrack
+        canDeleteEmptyTracks
+        onToggleLock={onToggleLock}
+        onToggleSyncLock={() => undefined}
+        onToggleDisabled={onToggleDisabled}
+        onToggleSolo={() => undefined}
+        onSelect={() => undefined}
+        onAddVideoTrack={() => undefined}
+        onAddAudioTrack={() => undefined}
+        onDeleteTrack={() => undefined}
+        onDeleteEmptyTracks={() => undefined}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Disable track' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Lock Track' }))
+
+    expect(onToggleDisabled).toHaveBeenCalledTimes(1)
+    expect(onToggleLock).toHaveBeenCalledTimes(1)
+  })
+
+  it('renders the normal header when full headers are on', () => {
+    useConciseTimelineStore.setState({ conciseFullHeaders: true })
+    renderTrackHeader(makeTrack())
+
+    expect(screen.queryByTestId('track-header-concise')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Solo Track' })).toBeInTheDocument()
   })
 })

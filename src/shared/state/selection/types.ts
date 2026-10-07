@@ -1,6 +1,6 @@
 export type SelectionSnapTarget = {
   frame: number
-  type: 'grid' | 'item-start' | 'item-end' | 'playhead'
+  type: 'grid' | 'item-start' | 'item-end' | 'playhead' | 'beat'
   itemId?: string
 } | null
 

@@ -99,3 +99,39 @@ describe('SelectableItem linked Position feedback', () => {
     expect(onDragStart).toHaveBeenCalledOnce()
   })
 })
+
+describe('SelectableItem text editing', () => {
+  it('double-click on a text item starts editing without reaching the canvas', () => {
+    const onEditText = vi.fn()
+    const parentDoubleClick = vi.fn()
+    const { container } = render(
+      <div onDoubleClick={parentDoubleClick}>
+        <SelectableItem
+          item={ITEM}
+          transform={TRANSFORM}
+          coordParams={COORD_PARAMS}
+          onSelect={vi.fn()}
+          onEditText={onEditText}
+        />
+      </div>,
+    )
+    fireEvent.doubleClick(container.querySelector('[data-gizmo="selectable-item"]')!)
+    expect(onEditText).toHaveBeenCalledTimes(1)
+    expect(parentDoubleClick).not.toHaveBeenCalled()
+  })
+
+  it('ignores double-click on non-text items', () => {
+    const onEditText = vi.fn()
+    const { container } = render(
+      <SelectableItem
+        item={{ ...ITEM, type: 'shape' } as TimelineItem}
+        transform={TRANSFORM}
+        coordParams={COORD_PARAMS}
+        onSelect={vi.fn()}
+        onEditText={onEditText}
+      />,
+    )
+    fireEvent.doubleClick(container.querySelector('[data-gizmo="selectable-item"]')!)
+    expect(onEditText).not.toHaveBeenCalled()
+  })
+})

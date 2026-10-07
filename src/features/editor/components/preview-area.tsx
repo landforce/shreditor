@@ -1,3 +1,4 @@
+import { cn } from '@/shared/ui/cn'
 import { useState, useEffect, useRef, useCallback, memo, useMemo, lazy, Suspense } from 'react'
 import { Columns2 } from 'lucide-react'
 import {
@@ -32,6 +33,10 @@ interface PreviewAreaProps {
   }
   durationInFrames?: number
   preferProjectStoreMetadata?: boolean
+  /** `'concise'`: review layout with no alignment row and left-aligned transport. */
+  chrome?: 'concise'
+  /** Concise only: drop the zoom control (the preview column is very narrow). */
+  compact?: boolean
 }
 
 type PreviewChrome = 'edit' | 'color'
@@ -60,7 +65,9 @@ const LazySourceMonitor = lazy(() =>
   importSourceMonitor().then((module) => ({ default: module.SourceMonitor })),
 )
 const LazyInlineSourcePreview = lazy(() =>
-  importInlineSourcePreview().then((module) => ({ default: module.InlineSourcePreview })),
+  importInlineSourcePreview().then((module) => ({
+    default: module.InlineSourcePreview,
+  })),
 )
 const LazyInlineCompositionPreview = lazy(() =>
   importInlineCompositionPreview().then((module) => ({
@@ -68,7 +75,9 @@ const LazyInlineCompositionPreview = lazy(() =>
   })),
 )
 const LazyColorScopesMonitor = lazy(() =>
-  importColorScopesMonitor().then((module) => ({ default: module.ColorScopesMonitor })),
+  importColorScopesMonitor().then((module) => ({
+    default: module.ColorScopesMonitor,
+  })),
 )
 
 function PreviewSplitHandle({
@@ -181,12 +190,17 @@ export const PreviewArea = memo(function PreviewArea({
   project,
   durationInFrames,
   preferProjectStoreMetadata = true,
+  chrome: layoutChrome,
+  compact = false,
 }: PreviewAreaProps) {
+  const isConciseChrome = layoutChrome === 'concise'
   const { t } = useTranslation()
   const previewContainerRef = useRef<HTMLDivElement>(null)
   const [containerSize, setContainerSize] = useState({ width: 0, height: 0 })
   const editorDensity = useSettingsStore((s) => s.editorDensity)
   const editorLayout = getEditorLayout(editorDensity)
+  // Concise keeps the video as large as the column allows.
+  const previewPadding = isConciseChrome ? 8 : editorLayout.previewPadding
   const isMaskEditingActive = useMaskEditorStore((s) => s.isEditing)
   const isPenModeActive = useMaskEditorStore((s) => s.penMode)
   const isShapePenModeActive = useMaskEditorStore((s) => s.shapePenMode)
@@ -265,8 +279,8 @@ export const PreviewArea = memo(function PreviewArea({
 
     const updateSize = () => {
       const rect = element.getBoundingClientRect()
-      const nextWidth = Math.max(0, Math.floor(rect.width - editorLayout.previewPadding))
-      const nextHeight = Math.max(0, Math.floor(rect.height - editorLayout.previewPadding))
+      const nextWidth = Math.max(0, Math.floor(rect.width - previewPadding))
+      const nextHeight = Math.max(0, Math.floor(rect.height - previewPadding))
 
       // Bail out when dimensions are unchanged to avoid redundant re-renders.
       setContainerSize((prev) => {
@@ -306,7 +320,7 @@ export const PreviewArea = memo(function PreviewArea({
         cancelAnimationFrame(rafId)
       }
     }
-  }, [editorLayout.previewPadding])
+  }, [previewPadding])
 
   const liveProject = useMemo(
     () => ({ width, height, fps, backgroundColor }),
@@ -556,15 +570,17 @@ export const PreviewArea = memo(function PreviewArea({
         role="region"
         aria-label="Program monitor"
       >
-        {/* CapCut-style panel title */}
-        <div
-          className="flex items-center px-3 flex-shrink-0"
-          style={{ height: EDITOR_LAYOUT_CSS_VALUES.previewSplitHeaderHeight }}
-        >
-          <span className="text-[13px] font-semibold text-foreground">
-            {hasSidePanels ? 'Program' : 'Player'}
-          </span>
-        </div>
+        {/* CapCut-style panel title (Concise gives the height to the video instead) */}
+        {!isConciseChrome && (
+          <div
+            className="flex items-center px-3 flex-shrink-0"
+            style={{ height: EDITOR_LAYOUT_CSS_VALUES.previewSplitHeaderHeight }}
+          >
+            <span className="text-[13px] font-semibold text-foreground">
+              {hasSidePanels ? 'Program' : 'Player'}
+            </span>
+          </div>
+        )}
 
         <div className="flex-1 flex flex-col min-w-0 min-h-0">
           <div
@@ -688,7 +704,7 @@ export const PreviewArea = memo(function PreviewArea({
           ) : (
             <InteractionLockRegion locked={false} overlayClassName="rounded-none">
               <div className="flex flex-col flex-shrink-0">
-                {previewChrome === 'edit' && (
+                {previewChrome === 'edit' && !isConciseChrome && (
                   <div className="border-t border-border bg-panel-header flex h-7 items-center justify-center overflow-hidden px-3">
                     <div className="flex items-center gap-0">
                       <AlignmentToolbar projectSize={{ width, height }} />
@@ -698,23 +714,47 @@ export const PreviewArea = memo(function PreviewArea({
 
                 {/* Playback controls row */}
                 <div
-                  className="@container border-t border-border bg-panel-header relative flex items-center px-3 overflow-hidden"
-                  style={{ height: EDITOR_LAYOUT_CSS_VALUES.previewControlsHeight }}
+                  className={cn(
+                    '@container border-t border-border bg-panel-header relative flex items-center overflow-hidden',
+                    compact ? 'px-2' : 'px-3',
+                  )}
+                  style={{
+                    height: EDITOR_LAYOUT_CSS_VALUES.previewControlsHeight,
+                  }}
                 >
-                  <div className="flex flex-shrink-0 items-center gap-2">
-                    <TimecodeDisplay fps={fps} totalFrames={totalFrames} />
-                    <ProgramShuttleIndicator />
-                  </div>
+                  {isConciseChrome ? (
+                    <>
+                      <div className="flex min-w-0 items-center gap-2">
+                        <div className="flex flex-shrink-0 items-center gap-2.5">
+                          <PlaybackControls totalFrames={totalFrames} fps={fps} compact={compact} />
+                        </div>
+                        <TimecodeDisplay fps={fps} totalFrames={totalFrames} compact={compact} />
+                        {!compact && <ProgramShuttleIndicator />}
+                      </div>
+                      {!compact && (
+                        <div className="ml-auto flex-shrink-0">
+                          <PreviewZoomControls />
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      <div className="flex flex-shrink-0 items-center gap-2">
+                        <TimecodeDisplay fps={fps} totalFrames={totalFrames} />
+                        <ProgramShuttleIndicator />
+                      </div>
 
-                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                    <div className="flex items-center gap-2.5 pointer-events-auto">
-                      <PlaybackControls totalFrames={totalFrames} fps={fps} />
-                    </div>
-                  </div>
+                      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                        <div className="flex items-center gap-2.5 pointer-events-auto">
+                          <PlaybackControls totalFrames={totalFrames} fps={fps} />
+                        </div>
+                      </div>
 
-                  <div className="ml-auto flex-shrink-0">
-                    <PreviewZoomControls />
-                  </div>
+                      <div className="ml-auto flex-shrink-0">
+                        <PreviewZoomControls />
+                      </div>
+                    </>
+                  )}
                 </div>
               </div>
             </InteractionLockRegion>

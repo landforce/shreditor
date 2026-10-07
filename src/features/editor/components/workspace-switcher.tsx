@@ -1,6 +1,6 @@
 import { memo } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Layers, Palette, Scissors } from 'lucide-react'
+import { Layers, Palette, PanelsTopLeft, Scissors } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { useEditorStore } from '@/shared/state/editor'
 import { cn } from '@/shared/ui/cn'
@@ -11,6 +11,7 @@ const WORKSPACE_ITEMS: readonly {
   icon: LucideIcon
   labelKey: string
 }[] = [
+  { id: 'concise', icon: PanelsTopLeft, labelKey: 'toolbar.workspaces.concise' },
   { id: 'edit', icon: Scissors, labelKey: 'toolbar.workspaces.edit' },
   { id: 'color', icon: Palette, labelKey: 'toolbar.workspaces.color' },
   { id: 'motion', icon: Layers, labelKey: 'toolbar.workspaces.motion' },

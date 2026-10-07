@@ -28,6 +28,8 @@ import { MonitorVolumeControl } from './monitor-volume-control'
 interface PlaybackControlsProps {
   totalFrames: number
   fps: number
+  /** Narrow transports (Concise at half a screen): drop go-to-start and go-to-end. */
+  compact?: boolean
 }
 
 async function canvasToBlob(
@@ -98,7 +100,7 @@ const btnSize = {
   height: EDITOR_LAYOUT_CSS_VALUES.toolbarButtonSize,
 } as const
 
-export function PlaybackControls({ totalFrames, fps }: PlaybackControlsProps) {
+export function PlaybackControls({ totalFrames, fps, compact = false }: PlaybackControlsProps) {
   const { t } = useTranslation()
   const [isSavingFrame, setIsSavingFrame] = useState(false)
 
@@ -220,17 +222,19 @@ export function PlaybackControls({ totalFrames, fps }: PlaybackControlsProps) {
     <>
       {/* Transport Controls */}
       <div className="flex items-center gap-0.5 flex-shrink-0">
-        <Button
-          variant="ghost"
-          size="icon"
-          className="flex-shrink-0"
-          style={btnSize}
-          onClick={handleGoToStart}
-          data-tooltip={t('preview.controls.goToStartTooltip')}
-          aria-label={t('preview.controls.goToStart')}
-        >
-          <SkipBack className="w-3.5 h-3.5" />
-        </Button>
+        {!compact && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="flex-shrink-0"
+            style={btnSize}
+            onClick={handleGoToStart}
+            data-tooltip={t('preview.controls.goToStartTooltip')}
+            aria-label={t('preview.controls.goToStart')}
+          >
+            <SkipBack className="w-3.5 h-3.5" />
+          </Button>
+        )}
 
         <Button
           variant="ghost"
@@ -269,17 +273,19 @@ export function PlaybackControls({ totalFrames, fps }: PlaybackControlsProps) {
           <ChevronRight className="w-3.5 h-3.5" />
         </Button>
 
-        <Button
-          variant="ghost"
-          size="icon"
-          className="flex-shrink-0"
-          style={btnSize}
-          onClick={handleGoToEnd}
-          data-tooltip={t('preview.controls.goToEndTooltip')}
-          aria-label={t('preview.controls.goToEnd')}
-        >
-          <SkipForward className="w-3.5 h-3.5" />
-        </Button>
+        {!compact && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="flex-shrink-0"
+            style={btnSize}
+            onClick={handleGoToEnd}
+            data-tooltip={t('preview.controls.goToEndTooltip')}
+            aria-label={t('preview.controls.goToEnd')}
+          >
+            <SkipForward className="w-3.5 h-3.5" />
+          </Button>
+        )}
 
         <MonitorVolumeControl buttonStyle={btnSize} />
       </div>

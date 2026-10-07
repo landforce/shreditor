@@ -185,7 +185,11 @@ export const useItemsStore = create<ItemsState & ItemsActions>()((set, get) => (
           // the single funnel for track writes, which keeps whatever height a
           // caller happens to carry — a project file, a snapshot restored by
           // undo, a freshly created track — from leaking into the timeline.
-          const height = resolveTrackHeight(normalized.id)
+          const height = resolveTrackHeight(
+            normalized.id,
+            normalized,
+            state.itemsByTrackId[normalized.id],
+          )
           return normalized.height === height ? normalized : { ...normalized, height }
         })
         .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))

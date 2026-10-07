@@ -1,7 +1,9 @@
-import { beforeEach, describe, expect, it } from 'vite-plus/test'
+import { afterEach, beforeEach, describe, expect, it } from 'vite-plus/test'
 import { useEditorStore } from '@/shared/state/editor'
 import { COMPACT_TRACK_HEIGHT, DEFAULT_TRACK_HEIGHT, MAX_TRACK_HEIGHT } from '../constants'
 import {
+  CONCISE_TRACK_HEIGHTS,
+  getConciseTrackHeight,
   clearAllTrackHeightOverrides,
   clearTrackHeightOverride,
   flushTrackHeightOverrides,
@@ -65,5 +67,42 @@ describe('track-heights', () => {
     loadTrackHeightOverrides('project-a')
 
     expect(resolveTrackHeight('track-1')).toBe(120)
+  })
+})
+
+describe('concise track heights', () => {
+  beforeEach(() => {
+    localStorage.clear()
+    clearAllTrackHeightOverrides()
+    loadTrackHeightOverrides('project-concise')
+    useEditorStore.setState({ workspace: 'concise' })
+  })
+
+  afterEach(() => {
+    useEditorStore.setState({ workspace: 'edit' })
+  })
+
+  const video = { name: 'V1', kind: 'video' as const }
+  const audio = { name: 'A1', kind: 'audio' as const }
+
+  it('sizes lanes by what they hold', () => {
+    expect(getConciseTrackHeight(video, [{ type: 'video' }])).toBe(80)
+    expect(getConciseTrackHeight(audio, [{ type: 'audio' }])).toBe(40)
+    expect(getConciseTrackHeight(video, [{ type: 'text' }, { type: 'subtitle' }])).toBe(28)
+    expect(getConciseTrackHeight(video, [])).toBe(20)
+    expect(getConciseTrackHeight(video, undefined)).toBe(20)
+    expect(CONCISE_TRACK_HEIGHTS).toEqual({ video: 80, audio: 40, text: 28, empty: 20 })
+  })
+
+  it('uses the concise height only in the concise workspace', () => {
+    expect(resolveTrackHeight('v1', video, [{ type: 'video' }])).toBe(80)
+
+    useEditorStore.setState({ workspace: 'edit' })
+    expect(resolveTrackHeight('v1', video, [{ type: 'video' }])).toBe(DEFAULT_TRACK_HEIGHT)
+  })
+
+  it('still honours a per-track override', () => {
+    setTrackHeightOverride('v1', 120)
+    expect(resolveTrackHeight('v1', video, [{ type: 'video' }])).toBe(120)
   })
 })

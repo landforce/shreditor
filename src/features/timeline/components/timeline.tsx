@@ -32,10 +32,20 @@ import {
 import { createClassicTrack, getAdjacentTrackOrder, getTrackKind } from '../utils/classic-tracks'
 import { getEmptyTrackIdsForRemoval } from '../utils/track-removal'
 import { createLogger } from '@/shared/logging/logger'
-import { EDITOR_LAYOUT_CSS_VALUES, getEditorLayout } from '@/config/editor-layout'
+import {
+  EDITOR_LAYOUT_CSS_VALUES,
+  getEditorLayout,
+  getEditorLayoutCssVars,
+} from '@/config/editor-layout'
+import { isConciseWorkspace } from '@/config/editor-workspaces'
+import { useConciseTimelineStore } from '../stores/concise-timeline-store'
 import { useTrackHeightResize } from '../hooks/use-track-height-resize'
 import { resizeTracksOfKindByDelta } from '../utils/track-resize'
-import { applyTrackSizePreset, commitTrackHeights } from '../stores/actions/track-height-actions'
+import {
+  applyTrackSizePreset,
+  commitTrackHeights,
+  refreshTrackHeights,
+} from '../stores/actions/track-height-actions'
 import { useZoomStore } from '../stores/zoom-store'
 import { computeWheelZoomStep } from '../constants'
 import {
@@ -88,7 +98,17 @@ interface TimelineProps {
 export const Timeline = memo(function Timeline({ duration }: TimelineProps) {
   const { t } = useTranslation()
   const editorDensity = useSettingsStore((s) => s.editorDensity)
-  const editorLayout = getEditorLayout(editorDensity)
+  const isConcise = useEditorStore((s) => isConciseWorkspace(s.workspace))
+  const conciseFullHeaders = useConciseTimelineStore((s) => s.conciseFullHeaders)
+  // Concise review layout: narrow labels, short toolbar and clip label row.
+  // CSS vars inherit, so setting them on this root overrides the editor root.
+  const useConciseLayout = isConcise && !conciseFullHeaders
+  const editorLayout = getEditorLayout(useConciseLayout ? 'concise' : editorDensity)
+  const headerButtonClass = useConciseLayout ? 'h-5 w-5' : 'h-6 w-6'
+  const conciseLayoutStyle = useMemo(
+    () => (useConciseLayout ? getEditorLayoutCssVars(getEditorLayout('concise')) : undefined),
+    [useConciseLayout],
+  )
   const {
     tracks,
     addTrack,
@@ -169,6 +189,19 @@ export const Timeline = memo(function Timeline({ duration }: TimelineProps) {
   const trackSizePreset = useEditorStore((s) => s.trackSizePreset)
   const setTimelineTracks = useTimelineStore((s) => s.setTracks)
 
+  // Concise lane heights depend on what each track holds, so re-derive them when
+  // the workspace changes and whenever clips move between tracks.
+  useEffect(() => {
+    refreshTrackHeights()
+    if (!isConcise) return
+    let previous = useItemsStore.getState().itemsByTrackId
+    return useItemsStore.subscribe((state) => {
+      if (state.itemsByTrackId === previous) return
+      previous = state.itemsByTrackId
+      refreshTrackHeights()
+    })
+  }, [isConcise])
+
   useEffect(() => {
     const clearExternalDropPreviews = () => {
       clearAllTimelineDropPreviewOwners()
@@ -231,9 +264,11 @@ export const Timeline = memo(function Timeline({ duration }: TimelineProps) {
         tracks: visibleTracks,
         sectionDividerPosition,
         trackTitleBarHeight: editorLayout.timelineClipLabelRowHeight,
+        fitVideoLanes: isConcise,
       }),
     [
       editorLayout.timelineClipLabelRowHeight,
+      isConcise,
       sectionDividerPosition,
       trackRowsViewportHeight,
       visibleTracks,
@@ -918,6 +953,8 @@ export const Timeline = memo(function Timeline({ duration }: TimelineProps) {
   return (
     <div
       className="timeline-bg h-full border-t border-border flex flex-col overflow-hidden"
+      style={conciseLayoutStyle}
+      data-concise={isConcise ? 'true' : undefined}
       role="region"
       aria-label={t('timeline.region')}
     >
@@ -930,7 +967,7 @@ export const Timeline = memo(function Timeline({ duration }: TimelineProps) {
       />
 
       {/* Standalone-timeline (sequence) tabs — Main + top-level sequences */}
-      <SequenceTabs />
+      <SequenceTabs hideWhenSingle={isConcise} />
 
       {/* Composition Breadcrumbs - shown when inside a sub-composition */}
       <CompositionBreadcrumbs />
@@ -947,7 +984,7 @@ export const Timeline = memo(function Timeline({ duration }: TimelineProps) {
         >
           {/* Tracks label with controls */}
           <div
-            className="flex items-center justify-between px-3 border-b border-border bg-secondary/20 flex-shrink-0"
+            className={`flex items-center justify-between border-b border-border bg-secondary/20 flex-shrink-0 ${useConciseLayout ? 'px-1' : 'px-3'}`}
             style={{ height: EDITOR_LAYOUT_CSS_VALUES.timelineTracksHeaderHeight }}
           >
             {/* Track size flyout */}
@@ -956,7 +993,7 @@ export const Timeline = memo(function Timeline({ duration }: TimelineProps) {
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-6 w-6"
+                  className={headerButtonClass}
                   title={t('timeline.trackSize.label')}
                 >
                   <ActiveTrackSizeIcon className="w-3 h-3" />
@@ -986,7 +1023,7 @@ export const Timeline = memo(function Timeline({ duration }: TimelineProps) {
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-6 w-6"
+                    className={headerButtonClass}
                     title={t('timeline.addTrack.label')}
                   >
                     <Plus className="w-3 h-3" />
@@ -1007,7 +1044,7 @@ export const Timeline = memo(function Timeline({ duration }: TimelineProps) {
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-6 w-6"
+                className={headerButtonClass}
                 onClick={handleRemoveTracks}
                 disabled={tracks.length === 0 || (!activeTrackId && selectedTrackIds.length === 0)}
                 title={

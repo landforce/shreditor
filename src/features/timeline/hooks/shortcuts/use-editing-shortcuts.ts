@@ -11,12 +11,8 @@ import { useSelectionStore } from '@/shared/state/selection'
 import { HOTKEY_OPTIONS } from '@/config/hotkeys'
 import { canJoinMultipleItems } from '@/features/timeline/utils/clip-utils'
 import { canLinkSelection, hasLinkedItems } from '@/features/timeline/utils/linked-items'
-import {
-  insertFreezeFrame,
-  linkItems,
-  splitAllItemsAtFrame,
-  unlinkItems,
-} from '../../stores/actions/item-actions'
+import { insertFreezeFrame, linkItems, unlinkItems } from '../../stores/actions/item-actions'
+import { deleteSelection, splitAtPlayhead } from '../../utils/editing-commands'
 import type { TransformProperties } from '@/types/transform'
 import type { TimelineShortcutCallbacks } from '../use-timeline-shortcuts'
 import { useClearKeyframesDialogStore } from '@/shared/state/clear-keyframes-dialog'
@@ -78,36 +74,26 @@ export function useEditingShortcuts(callbacks: TimelineShortcutCallbacks) {
     [selectedItemIds, items, updateItemsTransformMap],
   )
 
-  // Editing: Delete - Delete selected items, marker, or transition
-  useHotkeys(
-    hotkeys.DELETE_SELECTED,
-    (event) => {
-      if (deleteOwnedByPanel) {
+  const runDeleteShortcut = useCallback(
+    (event: KeyboardEvent) => {
+      const result = deleteSelection({
+        ownedByPanel: deleteOwnedByPanel,
+        selectedTransitionId,
+        selectedMarkerId,
+        selectedItemIds,
+        removeTransition,
+        removeMarker,
+        removeItems,
+        clearSelection,
+        onDelete: callbacks.onDelete,
+      })
+      if (result === 'blocked') {
         event.preventDefault()
         event.stopPropagation()
-        return
-      }
-      if (selectedTransitionId) {
+      } else if (result === 'handled') {
         event.preventDefault()
-        removeTransition(selectedTransitionId)
-        clearSelection()
-        return
-      }
-      if (selectedMarkerId) {
-        event.preventDefault()
-        removeMarker(selectedMarkerId)
-        clearSelection()
-        return
-      }
-      if (selectedItemIds.length > 0) {
-        event.preventDefault()
-        removeItems(selectedItemIds)
-        if (callbacks.onDelete) {
-          callbacks.onDelete()
-        }
       }
     },
-    HOTKEY_OPTIONS,
     [
       deleteOwnedByPanel,
       selectedItemIds,
@@ -121,47 +107,24 @@ export function useEditingShortcuts(callbacks: TimelineShortcutCallbacks) {
     ],
   )
 
+  // Editing: Delete - Delete selected items, marker, or transition
+  useHotkeys(
+    hotkeys.DELETE_SELECTED,
+    (event) => {
+      runDeleteShortcut(event)
+    },
+    HOTKEY_OPTIONS,
+    [runDeleteShortcut],
+  )
+
   // Editing: Backspace - Delete selected items, marker, or transition (alternative)
   useHotkeys(
     hotkeys.DELETE_SELECTED_ALT,
     (event) => {
-      if (deleteOwnedByPanel) {
-        event.preventDefault()
-        event.stopPropagation()
-        return
-      }
-      if (selectedTransitionId) {
-        event.preventDefault()
-        removeTransition(selectedTransitionId)
-        clearSelection()
-        return
-      }
-      if (selectedMarkerId) {
-        event.preventDefault()
-        removeMarker(selectedMarkerId)
-        clearSelection()
-        return
-      }
-      if (selectedItemIds.length > 0) {
-        event.preventDefault()
-        removeItems(selectedItemIds)
-        if (callbacks.onDelete) {
-          callbacks.onDelete()
-        }
-      }
+      runDeleteShortcut(event)
     },
     HOTKEY_OPTIONS,
-    [
-      deleteOwnedByPanel,
-      selectedItemIds,
-      selectedMarkerId,
-      selectedTransitionId,
-      removeItems,
-      removeMarker,
-      removeTransition,
-      clearSelection,
-      callbacks,
-    ],
+    [runDeleteShortcut],
   )
 
   // Editing: Ctrl+Delete - Ripple delete selected items (delete + close gap)
@@ -347,19 +310,17 @@ export function useEditingShortcuts(callbacks: TimelineShortcutCallbacks) {
     [toggleLinkedSelectionEnabled],
   )
 
-  const splitAtPlayhead = useCallback((event: KeyboardEvent) => {
+  const splitAtPlayheadShortcut = useCallback((event: KeyboardEvent) => {
     event.preventDefault()
-    const { previewFrame, currentFrame } = usePlaybackStore.getState()
-    const splitFrame = previewFrame ?? currentFrame
-    splitAllItemsAtFrame(splitFrame)
+    splitAtPlayhead()
   }, [])
 
   // Editing: Alt+C - Split all items at gray playhead (or main playhead)
   useHotkeys(
     hotkeys.SPLIT_AT_PLAYHEAD_ALT,
-    splitAtPlayhead,
+    splitAtPlayheadShortcut,
     { ...HOTKEY_OPTIONS, eventListenerOptions: { capture: true } },
-    [splitAtPlayhead],
+    [splitAtPlayheadShortcut],
   )
 
   // Editing: Shift+F - Insert freeze frame at playhead

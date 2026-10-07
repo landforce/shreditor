@@ -101,6 +101,10 @@ vi.mock('./compose-workspace/compose-layout', () => ({
   MotionTimelineDock: () => <div data-testid="motion-timeline-dock" />,
 }))
 
+vi.mock('./concise/concise-shell', () => ({
+  ConciseShell: () => <div data-testid="concise-shell" />,
+}))
+
 vi.mock('./project-debug-panel', () => ({
   ProjectDebugPanel: () => <div data-testid="project-debug-panel" />,
 }))
@@ -480,5 +484,34 @@ describe('LoadedEditor migration metadata refresh', () => {
     expect(screen.queryByTestId('timeline')).not.toBeInTheDocument()
     expect(screen.getByTestId('media-sidebar')).toBeInTheDocument()
     expect(screen.getByTestId('properties-sidebar')).toBeInTheDocument()
+  })
+
+  it('mounts the concise shell instead of the sidebars and timeline', async () => {
+    mocks.editorState.workspace = 'concise'
+    mocks.editorState.propertiesFullColumn = true
+    mocks.editorState.mediaFullColumn = true
+
+    render(
+      <LoadedEditor
+        projectId="project-1"
+        project={{
+          id: 'project-1',
+          name: 'Concise Project',
+          width: 1080,
+          height: 1920,
+          fps: 30,
+        }}
+        migration={{
+          storedSchemaVersion: 14,
+          currentSchemaVersion: 14,
+          requiresUpgrade: false,
+        }}
+      />,
+    )
+
+    expect(await screen.findByTestId('concise-shell')).toBeInTheDocument()
+    expect(screen.queryByTestId('media-sidebar')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('properties-sidebar')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('timeline')).not.toBeInTheDocument()
   })
 })

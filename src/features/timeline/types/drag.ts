@@ -37,7 +37,7 @@ export interface SnapTarget {
   /** Frame position of the snap point */
   frame: number
   /** Type of snap target */
-  type: 'grid' | 'item-start' | 'item-end' | 'playhead'
+  type: 'grid' | 'item-start' | 'item-end' | 'playhead' | 'beat'
   /** Item ID if this is an item edge snap */
   itemId?: string
 }
