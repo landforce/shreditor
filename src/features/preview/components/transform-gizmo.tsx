@@ -615,7 +615,12 @@ export function TransformGizmo({
         }
         e.preventDefault()
         e.stopPropagation()
-        onEditText()
+        // Start once this click has finished: starting on mousedown lets the
+        // trailing mouseup/click blur the new editor and close it again.
+        window.addEventListener('click', () => window.setTimeout(onEditText, 0), {
+          once: true,
+          capture: true,
+        })
       }}
       onDoubleClick={(e) => {
         e.stopPropagation()
