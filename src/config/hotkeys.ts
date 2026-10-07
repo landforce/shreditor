@@ -14,9 +14,22 @@ export const HOTKEYS = {
   GO_TO_END: "end",
   NEXT_SNAP_POINT: "down",
   PREVIOUS_SNAP_POINT: "up",
+  SHUTTLE_REVERSE: "j",
+  SHUTTLE_PAUSE: "k",
+  SHUTTLE_FORWARD: "l",
+
+  // Selection
+  SELECT_ALL: "mod+a",
+  DESELECT_ALL: "mod+shift+a",
+  DESELECT_ALL_ALT: "escape",
+  SELECT_CLIP_AT_PLAYHEAD: "d",
 
   // Timeline editing
+  SPLIT_AT_PLAYHEAD: "mod+k",
   SPLIT_AT_PLAYHEAD_ALT: "alt+c",
+  DUPLICATE_SELECTED: "mod+d",
+  RIPPLE_TRIM_START_TO_PLAYHEAD: "q",
+  RIPPLE_TRIM_END_TO_PLAYHEAD: "w",
   JOIN_ITEMS: "shift+j",
   DELETE_SELECTED: "delete",
   DELETE_SELECTED_ALT: "backspace",
@@ -247,6 +260,10 @@ const BROWSER_HOSTILE_HOTKEYS: readonly BrowserHostileHotkey[] = [
     binding: "mod+e",
     browserAction: "Focus search or address bar in some browsers",
   },
+  {
+    binding: "mod+k",
+    browserAction: "Focus search or address bar in some browsers",
+  },
   { binding: "mod+p", browserAction: "Print page" },
   { binding: "mod+f", browserAction: "Find in page" },
   { binding: "mod+equal", browserAction: "Browser zoom in" },
@@ -289,9 +306,22 @@ export const HOTKEY_DESCRIPTIONS: Record<HotkeyKey, string> = {
   GO_TO_END: "Go to end",
   NEXT_SNAP_POINT: "Next snap point",
   PREVIOUS_SNAP_POINT: "Previous snap point",
+  SHUTTLE_REVERSE: "Shuttle reverse (press again for faster)",
+  SHUTTLE_PAUSE: "Shuttle pause (hold with J or L to step a frame)",
+  SHUTTLE_FORWARD: "Shuttle forward (press again for faster)",
+
+  // Selection
+  SELECT_ALL: "Select all clips",
+  DESELECT_ALL: "Deselect all",
+  DESELECT_ALL_ALT: "Deselect all (alternative)",
+  SELECT_CLIP_AT_PLAYHEAD: "Select clip at playhead",
 
   // Timeline editing
+  SPLIT_AT_PLAYHEAD: "Add edit at playhead (selected or all clips)",
   SPLIT_AT_PLAYHEAD_ALT: "Split at playhead",
+  DUPLICATE_SELECTED: "Duplicate selected clips",
+  RIPPLE_TRIM_START_TO_PLAYHEAD: "Ripple trim clip start to playhead",
+  RIPPLE_TRIM_END_TO_PLAYHEAD: "Ripple trim clip end to playhead",
   JOIN_ITEMS: "Join selected clips",
   DELETE_SELECTED: "Delete selected items",
   DELETE_SELECTED_ALT: "Delete selected items (alternative)",
@@ -683,6 +713,22 @@ export function getHotkeyBindingFromEventData(
   return normalizeHotkeyBinding(tokens.join("+"));
 }
 
+/**
+ * Commands designed to share a binding because they never fire together:
+ * K pauses only while a transport is playing and otherwise yields to the Edit
+ * keyframe shortcut. Sharing a key between these is not a conflict.
+ */
+const CONTEXTUAL_HOTKEY_PARTNERS: ReadonlyArray<readonly [HotkeyKey, HotkeyKey]> = [
+  ["SHUTTLE_PAUSE", "EDIT_KEYFRAME_ADD"],
+];
+
+function areContextualHotkeyPartners(left: HotkeyKey, right: HotkeyKey): boolean {
+  return CONTEXTUAL_HOTKEY_PARTNERS.some(
+    ([first, second]) =>
+      (first === left && second === right) || (first === right && second === left),
+  );
+}
+
 function getHotkeyConflictMap(
   bindings: HotkeyBindingMap,
 ): Record<string, HotkeyKey[]> {
@@ -715,7 +761,9 @@ export function findHotkeyConflicts(
   }
 
   return (getHotkeyConflictMap(bindings)[normalizedBinding] ?? []).filter(
-    (key) => key !== currentKey,
+    (key) =>
+      key !== currentKey &&
+      (currentKey === undefined || !areContextualHotkeyPartners(key, currentKey)),
   );
 }
 

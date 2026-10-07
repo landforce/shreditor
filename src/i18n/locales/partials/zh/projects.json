@@ -328,6 +328,10 @@
             "title": "编辑",
             "blurb": "片段编辑、删除流程和画布的精确微调。"
           },
+          "selection": {
+            "title": "选择",
+            "blurb": "全选、取消选择，以及选择播放头处的片段。"
+          },
           "tools": {
             "title": "工具",
             "blurb": "时间线编辑模式的工具切换。"
@@ -365,7 +369,14 @@
           "goToEnd": "跳到结尾",
           "previousSnapPoint": "上一个吸附点",
           "nextSnapPoint": "下一个吸附点",
+          "shuttleReverse": "倒放穿梭（再按一次加速）",
+          "shuttlePause": "暂停穿梭（按住并配合 J 或 L 逐帧移动）",
+          "shuttleForward": "正放穿梭（再按一次加速）",
           "splitAtPlayhead": "在播放头处分割",
+          "addEditAtPlayhead": "在播放头处添加编辑点（所选或全部片段）",
+          "rippleTrimStartToPlayhead": "将片段开头波纹修剪到播放头",
+          "rippleTrimEndToPlayhead": "将片段结尾波纹修剪到播放头",
+          "duplicateSelectedClips": "复制所选片段",
           "joinSelectedClips": "合并所选片段",
           "deleteSelectedItems": "删除所选项目",
           "rippleDeleteSelectedItems": "波纹删除所选项目",
@@ -375,6 +386,9 @@
           "toggleLinkedSelection": "切换链接选择",
           "nudge1px": "微移（1px）",
           "nudge10px": "微移（10px）",
+          "selectAllClips": "选择所有片段",
+          "deselectAll": "取消全部选择",
+          "selectClipAtPlayhead": "选择播放头处的片段",
           "selectionTool": "选择工具",
           "trimEditTool": "修剪编辑工具",
           "razorTool": "剃刀工具",

@@ -11,7 +11,7 @@ import {
 describe('getHotkeyEditorSearchResults', () => {
   it('filters commands by localized label', () => {
     const results = getHotkeyEditorSearchResults({
-      query: 'ripple',
+      query: 'ripple delete',
       sections: HOTKEY_EDITOR_SECTIONS,
       hotkeys: HOTKEYS,
       translate: (key) =>

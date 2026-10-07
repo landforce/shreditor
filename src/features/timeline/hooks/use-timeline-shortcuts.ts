@@ -6,6 +6,8 @@ import { useInOutShortcuts } from './shortcuts/use-in-out-shortcuts'
 import { useUIShortcuts } from './shortcuts/use-ui-shortcuts'
 import { useClipboardShortcuts } from './shortcuts/use-clipboard-shortcuts'
 import { useSourceMonitorShortcuts } from './shortcuts/use-source-monitor-shortcuts'
+import { useSelectionShortcuts } from './shortcuts/use-selection-shortcuts'
+import { usePlayheadEditShortcuts } from './shortcuts/use-playhead-edit-shortcuts'
 
 export interface TimelineShortcutCallbacks {
   onPlay?: () => void
@@ -21,8 +23,10 @@ export interface TimelineShortcutCallbacks {
  * Timeline keyboard shortcuts hook
  *
  * Composes domain-specific shortcut hooks for:
- * - Playback & navigation (Space, arrows, Home/End, snap points)
+ * - Playback & navigation (Space, J/K/L shuttle, arrows, Home/End, snap points)
+ * - Selection (Cmd/Ctrl+A, Cmd/Ctrl+Shift+A, Escape, D)
  * - Editing (Delete, split, join, keyframes)
+ * - Playhead edits (Cmd/Ctrl+K add edit, Cmd/Ctrl+D duplicate, Q/W ripple trim)
  * - Tools (V/C/R tool switching)
  * - Markers (M add/remove, [ ] navigate)
  * - In/Out markers (I, O, Shift+I/O, Alt+X)
@@ -34,6 +38,8 @@ export interface TimelineShortcutCallbacks {
 export function useTimelineShortcuts(callbacks: TimelineShortcutCallbacks = {}) {
   usePlaybackShortcuts(callbacks)
   useEditingShortcuts(callbacks)
+  useSelectionShortcuts()
+  usePlayheadEditShortcuts(callbacks)
   useToolShortcuts(callbacks)
   useMarkerShortcuts()
   useInOutShortcuts()

@@ -15,6 +15,7 @@ import {
   parseHotkeyImportDocument,
   resolveHotkeys,
   sanitizeHotkeyOverrides,
+  type HotkeyKey,
 } from "./hotkeys";
 
 describe("keyframe productivity hotkeys", () => {
@@ -137,6 +138,59 @@ describe("findHotkeyConflicts", () => {
     expect(findHotkeyConflicts(bindings, "c", "SELECTION_TOOL")).toEqual([
       "RAZOR_TOOL",
     ]);
+  });
+});
+
+describe("standard editing shortcuts", () => {
+  it("ships the NLE defaults", () => {
+    expect({
+      selectAll: HOTKEYS.SELECT_ALL,
+      deselectAll: HOTKEYS.DESELECT_ALL,
+      deselectAllAlt: HOTKEYS.DESELECT_ALL_ALT,
+      selectClipAtPlayhead: HOTKEYS.SELECT_CLIP_AT_PLAYHEAD,
+      addEdit: HOTKEYS.SPLIT_AT_PLAYHEAD,
+      split: HOTKEYS.SPLIT_AT_PLAYHEAD_ALT,
+      duplicate: HOTKEYS.DUPLICATE_SELECTED,
+      trimStart: HOTKEYS.RIPPLE_TRIM_START_TO_PLAYHEAD,
+      trimEnd: HOTKEYS.RIPPLE_TRIM_END_TO_PLAYHEAD,
+      shuttle: [HOTKEYS.SHUTTLE_REVERSE, HOTKEYS.SHUTTLE_PAUSE, HOTKEYS.SHUTTLE_FORWARD],
+    }).toEqual({
+      selectAll: "mod+a",
+      deselectAll: "mod+shift+a",
+      deselectAllAlt: "escape",
+      selectClipAtPlayhead: "d",
+      addEdit: "mod+k",
+      split: "alt+c",
+      duplicate: "mod+d",
+      trimStart: "q",
+      trimEnd: "w",
+      shuttle: ["j", "k", "l"],
+    });
+  });
+
+  it("has no conflicting defaults", () => {
+    const bindings = resolveHotkeys();
+    const conflicting = (Object.keys(HOTKEYS) as HotkeyKey[]).filter(
+      (key) => findHotkeyConflicts(bindings, bindings[key], key).length > 0,
+    );
+    expect(conflicting).toEqual([]);
+  });
+
+  it("lets K pause the transport and add an Edit keyframe without a conflict", () => {
+    const bindings = resolveHotkeys();
+    expect(findHotkeyConflicts(bindings, "k", "SHUTTLE_PAUSE")).toEqual([]);
+    expect(findHotkeyConflicts(bindings, "k", "EDIT_KEYFRAME_ADD")).toEqual([]);
+    // Any other command recorded onto K still sees both owners.
+    expect(findHotkeyConflicts(bindings, "k", "RAZOR_TOOL")).toEqual([
+      "SHUTTLE_PAUSE",
+      "EDIT_KEYFRAME_ADD",
+    ]);
+  });
+
+  it("flags the Cmd/Ctrl combos browsers also use", () => {
+    expect(getBrowserHostileHotkey(HOTKEYS.DUPLICATE_SELECTED)?.binding).toBe("mod+d");
+    expect(getBrowserHostileHotkey(HOTKEYS.SPLIT_AT_PLAYHEAD)?.binding).toBe("mod+k");
+    expect(getBrowserHostileHotkey(HOTKEYS.SELECT_ALL)).toBeNull();
   });
 });
 

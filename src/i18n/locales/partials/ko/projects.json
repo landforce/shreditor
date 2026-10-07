@@ -328,6 +328,10 @@
             "title": "편집",
             "blurb": "클립 편집, 삭제 흐름, 캔버스의 정밀한 조정."
           },
+          "selection": {
+            "title": "선택",
+            "blurb": "모두 선택, 선택 해제, 재생 헤드 위치의 클립 선택."
+          },
           "tools": {
             "title": "도구",
             "blurb": "타임라인 편집 모드를 위한 도구 전환."
@@ -365,7 +369,14 @@
           "goToEnd": "끝으로 이동",
           "previousSnapPoint": "이전 스냅 지점",
           "nextSnapPoint": "다음 스냅 지점",
+          "shuttleReverse": "셔틀 역방향 (다시 누르면 더 빠르게)",
+          "shuttlePause": "셔틀 일시정지 (J 또는 L과 함께 누르고 있으면 한 프레임 이동)",
+          "shuttleForward": "셔틀 정방향 (다시 누르면 더 빠르게)",
           "splitAtPlayhead": "재생 헤드에서 분할",
+          "addEditAtPlayhead": "재생 헤드에 편집점 추가 (선택한 클립 또는 전체)",
+          "rippleTrimStartToPlayhead": "클립 시작을 재생 헤드까지 리플 트림",
+          "rippleTrimEndToPlayhead": "클립 끝을 재생 헤드까지 리플 트림",
+          "duplicateSelectedClips": "선택한 클립 복제",
           "joinSelectedClips": "선택한 클립 결합",
           "deleteSelectedItems": "선택한 항목 삭제",
           "rippleDeleteSelectedItems": "선택한 항목 리플 삭제",
@@ -375,6 +386,9 @@
           "toggleLinkedSelection": "연결된 선택 전환",
           "nudge1px": "이동 (1px)",
           "nudge10px": "이동 (10px)",
+          "selectAllClips": "모든 클립 선택",
+          "deselectAll": "모두 선택 해제",
+          "selectClipAtPlayhead": "재생 헤드 위치의 클립 선택",
           "selectionTool": "선택 도구",
           "trimEditTool": "트림 편집 도구",
           "razorTool": "면도날 도구",

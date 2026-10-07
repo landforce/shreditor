@@ -328,6 +328,10 @@
             "title": "Montage",
             "blurb": "Modifications de clips, flux de suppression et ajustement précis sur le canevas."
           },
+          "selection": {
+            "title": "Sélection",
+            "blurb": "Tout sélectionner, désélectionner et choisir le clip sous la tête de lecture."
+          },
           "tools": {
             "title": "Outils",
             "blurb": "Changement d'outils pour les modes de montage de la timeline."
@@ -365,7 +369,14 @@
           "goToEnd": "Aller à la fin",
           "previousSnapPoint": "Point d'aimantation précédent",
           "nextSnapPoint": "Point d'aimantation suivant",
+          "shuttleReverse": "Shuttle arrière (appuyez à nouveau pour accélérer)",
+          "shuttlePause": "Pause du shuttle (maintenez avec J ou L pour avancer d'une image)",
+          "shuttleForward": "Shuttle avant (appuyez à nouveau pour accélérer)",
           "splitAtPlayhead": "Diviser à la tête de lecture",
+          "addEditAtPlayhead": "Ajouter une coupe à la tête de lecture (clips sélectionnés ou tous)",
+          "rippleTrimStartToPlayhead": "Raccourcir en cascade le début du clip jusqu'à la tête de lecture",
+          "rippleTrimEndToPlayhead": "Raccourcir en cascade la fin du clip jusqu'à la tête de lecture",
+          "duplicateSelectedClips": "Dupliquer les clips sélectionnés",
           "joinSelectedClips": "Joindre les clips sélectionnés",
           "deleteSelectedItems": "Supprimer les éléments sélectionnés",
           "rippleDeleteSelectedItems": "Suppression en cascade des éléments sélectionnés",
@@ -375,6 +386,9 @@
           "toggleLinkedSelection": "Basculer la sélection liée",
           "nudge1px": "Déplacer (1px)",
           "nudge10px": "Déplacer (10px)",
+          "selectAllClips": "Sélectionner tous les clips",
+          "deselectAll": "Tout désélectionner",
+          "selectClipAtPlayhead": "Sélectionner le clip sous la tête de lecture",
           "selectionTool": "Outil de sélection",
           "trimEditTool": "Outil de rognage",
           "razorTool": "Outil rasoir",
