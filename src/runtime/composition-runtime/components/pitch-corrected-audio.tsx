@@ -38,6 +38,9 @@ const PARTIAL_PITCH_WAIT_TIMEOUT_MS = 6000
 const PARTIAL_PITCH_EXTENSION_TRIGGER_SECONDS = 1.25
 const PARTIAL_PITCH_EXTENSION_READY_SECONDS = 3
 const REVERSE_SHUTTLE_PREROLL_SECONDS = 4
+// How close a premounted element must be parked to its first sample to start
+// at the cut without a seek.
+const PARKED_AUDIO_TOLERANCE_SECONDS = 0.02
 
 export interface PitchCorrectedAudioProps extends AudioPlaybackProps {
   src: string
@@ -314,7 +317,25 @@ export const NativePitchCorrectedAudio: React.FC<PitchCorrectedAudioProps> = Rea
         if (!audio.paused) {
           audio.pause()
         }
-        if (canSeek && Math.abs(audio.currentTime - clipStartTimeSeconds) > 0.05) {
+        if (!canSeek) {
+          // A freshly acquired element has no metadata yet, and this effect
+          // won't run again before the cut (the premount frame is constant):
+          // park it on its first sample as soon as it can seek.
+          const parkOnFirstSample = () => {
+            if (audioRef.current !== audio || !audio.paused) return
+            try {
+              audio.currentTime = clipStartTimeSeconds
+            } catch {
+              // Audio is not ready to seek yet.
+            }
+          }
+          audio.addEventListener('loadedmetadata', parkOnFirstSample, { once: true })
+          return () => audio.removeEventListener('loadedmetadata', parkOnFirstSample)
+        }
+        if (
+          canSeek &&
+          Math.abs(audio.currentTime - clipStartTimeSeconds) > PARKED_AUDIO_TOLERANCE_SECONDS
+        ) {
           try {
             audio.currentTime = clipStartTimeSeconds
           } catch {
@@ -353,7 +374,20 @@ export const NativePitchCorrectedAudio: React.FC<PitchCorrectedAudioProps> = Rea
         const needsSync =
           needsInitialSyncRef.current || audioFarAhead || (audioBehind && timeSinceLastSync > 500)
 
-        if (needsSync && canSeek) {
+        // Parked on its first sample ahead of the cut (premount): a seek here,
+        // even to the same time, drops readyState and delays play() a frame or
+        // two, leaving a gap of silence at every cut.
+        const isParkedOnTarget =
+          needsInitialSyncRef.current &&
+          !audioFarAhead &&
+          !audioBehind &&
+          audio.readyState >= 3 &&
+          !audio.seeking &&
+          Math.abs(drift) <= PARKED_AUDIO_TOLERANCE_SECONDS
+        if (isParkedOnTarget) {
+          lastSyncTimeRef.current = now
+          needsInitialSyncRef.current = false
+        } else if (needsSync && canSeek) {
           try {
             audio.currentTime = targetTimeSeconds
             lastSyncTimeRef.current = now
