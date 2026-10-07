@@ -38,26 +38,13 @@ function workspaceBridgePlugin(): Plugin {
       const ws = (await import('./server/workspace-bridge.mjs')).currentWorkspace
       server.middlewares.use((await pageMeta()).createProjectCoverRoute(ws))
       // The built preview serves index.html as is, so the editor link's meta is added here.
-      const meta = await pageMeta()
-      const indexFile = join(server.config.root, server.config.build.outDir, 'index.html')
-      server.middlewares.use(async (req, res, next) => {
-        const id =
-          req.method === 'GET'
-            ? meta.editorProjectId(new URL(req.url ?? '/', 'http://x').pathname)
-            : null
-        if (!id || !String(req.headers.accept ?? '').includes('text/html')) return next()
-        const card = meta.readProjectCard(await workspace(), id)
-        if (!card) return next()
-        const html = meta.injectProjectMeta(
-          readFileSync(indexFile, 'utf8'),
-          card,
-          meta.requestOrigin(req),
-        )
-        res.setHeader('Content-Type', 'text/html; charset=utf-8')
-        for (const [key, value] of Object.entries(crossOriginIsolationHeaders))
-          res.setHeader(key, value)
-        res.end(html)
-      })
+      server.middlewares.use(
+        (await pageMeta()).createProjectPageRoute({
+          workspace: ws,
+          indexFile: join(server.config.root, server.config.build.outDir, 'index.html'),
+          headers: crossOriginIsolationHeaders,
+        }),
+      )
     },
   }
 }

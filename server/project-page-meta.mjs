@@ -90,3 +90,20 @@ export function createProjectCoverRoute(workspace) {
     fs.createReadStream(file).pipe(res)
   }
 }
+
+/**
+ * The built preview serves index.html as is, so an editor link's meta is
+ * added here: GET /editor/<id> asking for HTML gets index.html with the
+ * project's title and cover. Anything else passes through.
+ */
+export function createProjectPageRoute({ workspace, indexFile, headers = {} }) {
+  return function projectPage(req, res, next) {
+    const wantsHtml = req.method === 'GET' && String(req.headers.accept ?? '').includes('text/html')
+    const id = wantsHtml ? editorProjectId(new URL(req.url ?? '/', 'http://x').pathname) : null
+    const card = id ? readProjectCard(workspace(), id) : null
+    if (!card) return next()
+    const html = injectProjectMeta(fs.readFileSync(indexFile, 'utf8'), card, requestOrigin(req))
+    res.writeHead(200, { ...headers, 'content-type': 'text/html; charset=utf-8' })
+    res.end(html)
+  }
+}
