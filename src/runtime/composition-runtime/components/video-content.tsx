@@ -389,10 +389,13 @@ const NativePreviewVideo: React.FC<{
     const initialReverseSourceEnd = reverseSourceEndRef.current
     const initialFps = fpsRef.current
     const initialSequenceFrameOffset = sequenceFrameOffsetRef.current
+    // Mounted ahead of its cut (a prepared lane or a premounted Sequence): park
+    // on the clip's first frame and never play until the cut reaches it.
+    const initialIsPremounted = initialFrame - initialSequenceFrameOffset < 0
     const initialTargetTime = getVideoTargetTimeSeconds(
       initialSafeTrimBefore,
       initialSourceFps,
-      initialFrame,
+      Math.max(initialFrame, initialSequenceFrameOffset),
       initialPlaybackRate,
       initialFps,
       initialSequenceFrameOffset,
@@ -403,7 +406,11 @@ const NativePreviewVideo: React.FC<{
     const currentlyPlaying = usePlaybackStore.getState().isPlaying
     const isNearTarget = Math.abs(element.currentTime - clampedInitial) < 0.2
     const isContinuousPlayback =
-      !initialRequiresVisualSeek && currentlyPlaying && isNearTarget && element.readyState >= 2
+      !initialIsPremounted &&
+      !initialRequiresVisualSeek &&
+      currentlyPlaying &&
+      isNearTarget &&
+      element.readyState >= 2
 
     elementRef.current = element
     syncRegisteredVideoElement(itemIdRef.current, element)
@@ -414,7 +421,10 @@ const NativePreviewVideo: React.FC<{
       audioDynamicsRef.current,
     )
 
-    if (initialRequiresVisualSeek) {
+    if (initialIsPremounted) {
+      element.pause()
+      element.playbackRate = initialMediaPlaybackRate
+    } else if (initialRequiresVisualSeek) {
       element.pause()
       element.playbackRate = 1
       element.currentTime = clampedInitial
@@ -476,6 +486,8 @@ const NativePreviewVideo: React.FC<{
     }
     const handleCanPlay = () => {
       videoLog.debug(`[${shortId}] canplay:`, element.readyState)
+      const isPremountedNow = frameRef.current - sequenceFrameOffsetRef.current < 0
+      if (isPremountedNow && usePlaybackStore.getState().isPlaying) return
       if (usePlaybackStore.getState().isPlaying && element.paused && element.readyState >= 2) {
         syncCanPlayTarget()
         applyCanPlayTransport()
@@ -765,6 +777,7 @@ const NativePreviewVideo: React.FC<{
       targetTime: syncContext.clampedTargetTime,
       isPlaying,
       needsInitialSync: needsInitialSyncRef.current,
+      isFrameReady: video.readyState >= 2 && !video.seeking,
     })
 
     if (layoutPlan.shouldPause && !video.paused) {
@@ -799,11 +812,34 @@ const NativePreviewVideo: React.FC<{
         // Seek failed - element may still be initializing
       }
     }
-    if (layoutPlan.seekTo !== null) applyLayoutSeek(layoutPlan.seekTo)
+    if (layoutPlan.seekTo !== null) {
+      applyLayoutSeek(layoutPlan.seekTo)
+    } else if (layoutPlan.shouldMarkInitialSyncComplete) {
+      // Parked on its first frame ahead of the cut: nothing to seek.
+      needsInitialSyncRef.current = false
+      lastSyncTimeRef.current = Date.now()
+    }
+    // A prepared element reaching its cut starts in the same frame it is
+    // shown, before paint, instead of a passive effect later.
+    if (
+      layoutPlan.shouldMarkInitialSyncComplete &&
+      layoutPlan.seekTo === null &&
+      isPlaying &&
+      !isReversed &&
+      !isReverseShuttle &&
+      video.paused &&
+      video.readyState >= 2
+    ) {
+      video.playbackRate = mediaPlaybackRate
+      video.play().catch(() => {
+        // Autoplay might be blocked - the runtime effect retries.
+      })
+    }
   }, [
     frame,
     isPlaying,
     isReversed,
+    isReverseShuttle,
     mediaPlaybackRate,
     playbackRate,
     reverseSourceEnd,

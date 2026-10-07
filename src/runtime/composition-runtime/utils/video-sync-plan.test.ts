@@ -114,6 +114,30 @@ describe('planLayoutVideoSync', () => {
       shouldMarkInitialSyncComplete: true,
     })
   })
+
+  const firstActivePass = (overrides: { currentTime: number; isFrameReady: boolean }) =>
+    planLayoutVideoSync({
+      isPremounted: false,
+      isTransitionHeld: false,
+      canSeek: true,
+      targetTime: 2,
+      isPlaying: true,
+      needsInitialSync: true,
+      ...overrides,
+    })
+
+  it('does not re-seek an element parked on its first frame ahead of the cut', () => {
+    expect(firstActivePass({ currentTime: 2.0004, isFrameReady: true })).toEqual({
+      shouldPause: false,
+      seekTo: null,
+      shouldMarkInitialSyncComplete: true,
+    })
+  })
+
+  it('still seeks when the parked frame is not decoded or is elsewhere', () => {
+    expect(firstActivePass({ currentTime: 2, isFrameReady: false }).seekTo).toBe(2)
+    expect(firstActivePass({ currentTime: 2.02, isFrameReady: true }).seekTo).toBe(2)
+  })
 })
 
 describe('planPlayingVideoInitialSync', () => {

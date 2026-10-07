@@ -14,6 +14,7 @@ import { CompositionContent } from '../components/composition-content'
 import { PitchCorrectedAudio } from '../components/pitch-corrected-audio'
 import { CustomDecoderAudio } from '../components/custom-decoder-audio'
 import { getSharedPreviewAudioContext } from '../utils/preview-audio-graph'
+import { VIDEO_CUT_PREPARE_LOOKAHEAD_SECONDS } from '../utils/video-cut-prepare'
 import { useMediaLibraryStore } from '@/runtime/composition-runtime/deps/stores'
 import { isNonNativeAudioContainer, needsCustomAudioDecoder } from '../utils/audio-codec-detection'
 import {
@@ -69,13 +70,12 @@ import { getAudioPitchShiftSemitones } from '@/shared/utils/audio-pitch'
 
 const TRANSITION_AUDIO_PREMOUNT_SECONDS = 0.5
 const STANDALONE_AUDIO_PREMOUNT_SECONDS = 2
-// Frames the incoming video clip mounts + seeks to its in-point before it
-// becomes visible, so its pooled <video> reaches readyState >= 2 before the
-// playhead crosses the boundary (avoids the dom-video-not-ready stall at clip
-// entry). The source URL is already kept warm ~8s ahead; this only governs the
-// DOM element/decoder. Well within the pool's element cap (40) since it adds at
-// most ~1 extra mounted element per video track.
-const VIDEO_CLIP_PREMOUNT_SECONDS = 2
+// How long before its start a video clip's group mounts: the stable video
+// sequence prepares its first clip on its own element then (loaded, parked
+// paused and hidden on its first frame), so the cut is a swap, not a load or
+// seek. The source URL is already kept warm ~8s ahead; this only governs the
+// DOM element/decoder, and adds about one mounted element per video track.
+const VIDEO_CLIP_PREMOUNT_SECONDS = VIDEO_CUT_PREPARE_LOOKAHEAD_SECONDS
 
 const ActiveMasksContext = React.createContext<MaskInfo[]>(EMPTY_MASK_INFOS)
 
