@@ -1,4 +1,4 @@
-import { memo } from 'react'
+import { memo, type MouseEventHandler, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
 import {
@@ -175,6 +175,191 @@ function ConciseTrackLabel({
   )
 }
 
+interface TrackHeaderBodyProps {
+  track: TimelineTrack
+  isActive: boolean
+  isSelected: boolean
+  trackDisabled: boolean
+  onSelect: MouseEventHandler<HTMLDivElement>
+  onMouseDown: MouseEventHandler<HTMLDivElement>
+  onToggleDisabled: () => void
+  onToggleLock: () => void
+}
+
+function CompactTrackHeaderBody({
+  track,
+  isActive,
+  isSelected,
+  trackDisabled,
+  onSelect,
+  onMouseDown,
+  onToggleDisabled,
+  onToggleLock,
+}: TrackHeaderBodyProps) {
+  const isTextTrack = useIsTextTrack(track.id)
+  return (
+    <div
+      className={`
+        group/track relative flex overflow-hidden
+        cursor-grab active:cursor-grabbing
+        ${isSelected ? 'bg-primary/10' : trackDisabled ? 'bg-muted/30 hover:bg-muted/40' : 'hover:bg-secondary/50'}
+        ${isActive ? 'border-l-2 border-l-primary' : 'border-l-2 border-l-transparent'}
+        ${trackDisabled ? 'text-muted-foreground' : ''}
+        transition-colors duration-150
+      `}
+      style={{ height: `${track.height}px` }}
+      data-testid="track-header-concise"
+      onClick={onSelect}
+      onMouseDown={onMouseDown}
+    >
+      <ConciseTrackLabel
+        track={track}
+        isTextTrack={isTextTrack}
+        trackDisabled={trackDisabled}
+        onToggleDisabled={onToggleDisabled}
+        onToggleLock={onToggleLock}
+      />
+    </div>
+  )
+}
+
+/** A 20px icon button in the full header's top row; clicks never select or drag the track. */
+function TrackActionButton({
+  label,
+  onClick,
+  children,
+}: {
+  label: string
+  onClick?: () => void
+  children: ReactNode
+}) {
+  return (
+    <Button
+      variant="ghost"
+      size="icon"
+      className="rounded hover:bg-secondary"
+      style={{
+        width: EDITOR_LAYOUT_CSS_VALUES.toolbarButtonSize,
+        height: EDITOR_LAYOUT_CSS_VALUES.toolbarButtonSize,
+      }}
+      onClick={(e) => {
+        e.stopPropagation()
+        onClick?.()
+      }}
+      onMouseDown={(e) => e.stopPropagation()}
+      aria-label={label}
+      data-tooltip={label}
+    >
+      {children}
+    </Button>
+  )
+}
+
+function fullRowStateClass(isSelected: boolean, isActive: boolean, trackDisabled: boolean): string {
+  const background = isSelected
+    ? 'bg-primary/10'
+    : trackDisabled
+      ? 'bg-muted/30 hover:bg-muted/40'
+      : 'hover:bg-secondary/50'
+  const border = isActive ? 'border-l-3 border-l-primary' : 'border-l-3 border-l-transparent'
+  return `${background} ${border} ${trackDisabled ? 'text-muted-foreground' : ''}`
+}
+
+function FullTrackHeaderBody({
+  track,
+  isActive,
+  isSelected,
+  trackDisabled,
+  onSelect,
+  onMouseDown,
+  onToggleDisabled,
+  onToggleLock,
+  onToggleSolo,
+  onToggleSyncLock,
+  onCloseGaps,
+}: TrackHeaderBodyProps & {
+  onToggleSolo: () => void
+  onToggleSyncLock: () => void
+  onCloseGaps?: () => void
+}) {
+  const { t } = useTranslation()
+  const itemCount = useItemsStore((s) => s.itemsByTrackId[track.id]?.length ?? 0)
+  const syncLockEnabled = isTrackSyncLockActive(track)
+  const itemCountLabel = t('timeline.trackHeader.clipCount', { count: itemCount })
+  const toggleLabel = (on: boolean, onKey: string, offKey: string) =>
+    t(`timeline.trackHeader.${on ? onKey : offKey}`)
+  return (
+    <div
+      className={`flex flex-col overflow-hidden px-1 cursor-grab active:cursor-grabbing relative ${fullRowStateClass(isSelected, isActive, trackDisabled)} transition-colors duration-150`}
+      style={{ height: `${track.height}px` }}
+      onClick={onSelect}
+      onMouseDown={onMouseDown}
+    >
+      <div className="flex h-6 shrink-0 items-center gap-0.5 overflow-hidden border-b border-border/60">
+        <div className="flex h-5 w-4 shrink-0 items-center justify-center">
+          <GripVertical className="w-3.5 h-3.5 text-muted-foreground" aria-hidden="true" />
+        </div>
+        <TrackActionButton
+          label={toggleLabel(trackDisabled, 'enableTrack', 'disableTrack')}
+          onClick={onToggleDisabled}
+        >
+          {trackDisabled ? (
+            <PowerOff className="w-3 h-3 text-primary" />
+          ) : (
+            <Power className="w-3 h-3 opacity-70" />
+          )}
+        </TrackActionButton>
+        <TrackActionButton
+          label={toggleLabel(!!track.solo, 'unsoloTrack', 'soloTrack')}
+          onClick={onToggleSolo}
+        >
+          <Radio className={`w-3 h-3 ${track.solo ? 'text-primary' : ''}`} />
+        </TrackActionButton>
+        <TrackActionButton
+          label={toggleLabel(!!track.locked, 'unlockTrack', 'lockTrack')}
+          onClick={onToggleLock}
+        >
+          <Lock className={`w-3 h-3 ${track.locked ? 'text-primary' : 'opacity-70'}`} />
+        </TrackActionButton>
+        <TrackActionButton
+          label={toggleLabel(syncLockEnabled, 'disableSyncLock', 'enableSyncLock')}
+          onClick={onToggleSyncLock}
+        >
+          <Link2 className={`w-3 h-3 ${syncLockEnabled ? 'text-primary' : 'opacity-70'}`} />
+        </TrackActionButton>
+        <TrackActionButton label={t('timeline.trackHeader.closeAllGaps')} onClick={onCloseGaps}>
+          <FoldHorizontal className="w-3 h-3" />
+        </TrackActionButton>
+      </div>
+
+      <div className="flex min-h-0 flex-1 items-center gap-1.5 overflow-hidden px-1.5">
+        <span className="min-w-0 truncate text-xs font-semibold leading-none font-mono">
+          {track.name}
+        </span>
+        {track.formatRole && <FormatRoleBadge role={track.formatRole} trackName={track.name} />}
+        <span className="shrink-0 text-[10px] leading-none text-muted-foreground">
+          {itemCountLabel}
+        </span>
+      </div>
+    </div>
+  )
+}
+
+function useIsTextTrack(trackId: string): boolean {
+  return useItemsStore((s) => {
+    const items = s.itemsByTrackId[trackId]
+    return (
+      !!items && items.length > 0 && items.every((i) => i.type === 'text' || i.type === 'subtitle')
+    )
+  })
+}
+
+function useCompactTrackLabel(): boolean {
+  const concise = useEditorStore((s) => isConciseWorkspace(s.workspace))
+  const conciseFullHeaders = useConciseTimelineStore((s) => s.conciseFullHeaders)
+  return concise && !conciseFullHeaders
+}
+
 /**
  * Track Header Component
  *
@@ -202,22 +387,21 @@ export const TrackHeader = memo(function TrackHeader({
   onDeleteEmptyTracks,
 }: TrackHeaderProps) {
   const { t } = useTranslation()
-  const itemCount = useItemsStore((s) => s.itemsByTrackId[track.id]?.length ?? 0)
-  const syncLockEnabled = isTrackSyncLockActive(track)
   const trackDisabled = isTrackDisabled(track)
-  const compactLabel = useEditorStore((s) => isConciseWorkspace(s.workspace))
-  const conciseFullHeaders = useConciseTimelineStore((s) => s.conciseFullHeaders)
-  const useCompactLabel = compactLabel && !conciseFullHeaders
-  const isTextTrack = useItemsStore((s) => {
-    const items = s.itemsByTrackId[track.id]
-    return (
-      !!items && items.length > 0 && items.every((i) => i.type === 'text' || i.type === 'subtitle')
-    )
-  })
+  const useCompactLabel = useCompactTrackLabel()
 
   // Use track drag hook (visuals handled centrally by timeline.tsx via DOM)
   const { handleDragStart } = useTrackDrag(track)
-  const itemCountLabel = t('timeline.trackHeader.clipCount', { count: itemCount })
+  const bodyProps: TrackHeaderBodyProps = {
+    track,
+    isActive,
+    isSelected,
+    trackDisabled,
+    onSelect,
+    onMouseDown: handleDragStart,
+    onToggleDisabled,
+    onToggleLock,
+  }
 
   return (
     <ContextMenu>
@@ -233,193 +417,14 @@ export const TrackHeader = memo(function TrackHeader({
           data-track-disabled={trackDisabled ? 'true' : undefined}
         >
           {useCompactLabel ? (
-            <div
-              className={`
-                group/track relative flex overflow-hidden
-                cursor-grab active:cursor-grabbing
-                ${isSelected ? 'bg-primary/10' : trackDisabled ? 'bg-muted/30 hover:bg-muted/40' : 'hover:bg-secondary/50'}
-                ${isActive ? 'border-l-2 border-l-primary' : 'border-l-2 border-l-transparent'}
-                ${trackDisabled ? 'text-muted-foreground' : ''}
-                transition-colors duration-150
-              `}
-              style={{ height: `${track.height}px` }}
-              data-testid="track-header-concise"
-              onClick={onSelect}
-              onMouseDown={handleDragStart}
-            >
-              <ConciseTrackLabel
-                track={track}
-                isTextTrack={isTextTrack}
-                trackDisabled={trackDisabled}
-                onToggleDisabled={onToggleDisabled}
-                onToggleLock={onToggleLock}
-              />
-            </div>
+            <CompactTrackHeaderBody {...bodyProps} />
           ) : (
-            <div
-              className={`
-              flex flex-col overflow-hidden px-1
-              cursor-grab active:cursor-grabbing relative
-              ${isSelected ? 'bg-primary/10' : trackDisabled ? 'bg-muted/30 hover:bg-muted/40' : 'hover:bg-secondary/50'}
-              ${isActive ? 'border-l-3 border-l-primary' : 'border-l-3 border-l-transparent'}
-              ${trackDisabled ? 'text-muted-foreground' : ''}
-              transition-colors duration-150
-            `}
-              style={{ height: `${track.height}px` }}
-              onClick={onSelect}
-              onMouseDown={handleDragStart}
-            >
-              <div className="flex h-6 shrink-0 items-center gap-0.5 overflow-hidden border-b border-border/60">
-                <div className="flex h-5 w-4 shrink-0 items-center justify-center">
-                  <GripVertical className="w-3.5 h-3.5 text-muted-foreground" aria-hidden="true" />
-                </div>
-                {/* Disable Button */}
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="rounded hover:bg-secondary"
-                  style={{
-                    width: EDITOR_LAYOUT_CSS_VALUES.toolbarButtonSize,
-                    height: EDITOR_LAYOUT_CSS_VALUES.toolbarButtonSize,
-                  }}
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    onToggleDisabled()
-                  }}
-                  onMouseDown={(e) => e.stopPropagation()}
-                  aria-label={
-                    trackDisabled
-                      ? t('timeline.trackHeader.enableTrack')
-                      : t('timeline.trackHeader.disableTrack')
-                  }
-                  data-tooltip={
-                    trackDisabled
-                      ? t('timeline.trackHeader.enableTrack')
-                      : t('timeline.trackHeader.disableTrack')
-                  }
-                >
-                  {trackDisabled ? (
-                    <PowerOff className="w-3 h-3 text-primary" />
-                  ) : (
-                    <Power className="w-3 h-3 opacity-70" />
-                  )}
-                </Button>
-
-                {/* Solo Button */}
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="rounded hover:bg-secondary"
-                  style={{
-                    width: EDITOR_LAYOUT_CSS_VALUES.toolbarButtonSize,
-                    height: EDITOR_LAYOUT_CSS_VALUES.toolbarButtonSize,
-                  }}
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    onToggleSolo()
-                  }}
-                  onMouseDown={(e) => e.stopPropagation()}
-                  aria-label={
-                    track.solo
-                      ? t('timeline.trackHeader.unsoloTrack')
-                      : t('timeline.trackHeader.soloTrack')
-                  }
-                  data-tooltip={
-                    track.solo
-                      ? t('timeline.trackHeader.unsoloTrack')
-                      : t('timeline.trackHeader.soloTrack')
-                  }
-                >
-                  <Radio className={`w-3 h-3 ${track.solo ? 'text-primary' : ''}`} />
-                </Button>
-
-                {/* Lock Button */}
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="rounded hover:bg-secondary"
-                  style={{
-                    width: EDITOR_LAYOUT_CSS_VALUES.toolbarButtonSize,
-                    height: EDITOR_LAYOUT_CSS_VALUES.toolbarButtonSize,
-                  }}
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    onToggleLock()
-                  }}
-                  onMouseDown={(e) => e.stopPropagation()}
-                  aria-label={
-                    track.locked
-                      ? t('timeline.trackHeader.unlockTrack')
-                      : t('timeline.trackHeader.lockTrack')
-                  }
-                  data-tooltip={
-                    track.locked
-                      ? t('timeline.trackHeader.unlockTrack')
-                      : t('timeline.trackHeader.lockTrack')
-                  }
-                >
-                  <Lock className={`w-3 h-3 ${track.locked ? 'text-primary' : 'opacity-70'}`} />
-                </Button>
-
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="rounded hover:bg-secondary"
-                  style={{
-                    width: EDITOR_LAYOUT_CSS_VALUES.toolbarButtonSize,
-                    height: EDITOR_LAYOUT_CSS_VALUES.toolbarButtonSize,
-                  }}
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    onToggleSyncLock()
-                  }}
-                  onMouseDown={(e) => e.stopPropagation()}
-                  aria-label={
-                    syncLockEnabled
-                      ? t('timeline.trackHeader.disableSyncLock')
-                      : t('timeline.trackHeader.enableSyncLock')
-                  }
-                  data-tooltip={
-                    syncLockEnabled
-                      ? t('timeline.trackHeader.disableSyncLock')
-                      : t('timeline.trackHeader.enableSyncLock')
-                  }
-                >
-                  <Link2 className={`w-3 h-3 ${syncLockEnabled ? 'text-primary' : 'opacity-70'}`} />
-                </Button>
-
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="rounded hover:bg-secondary"
-                  style={{
-                    width: EDITOR_LAYOUT_CSS_VALUES.toolbarButtonSize,
-                    height: EDITOR_LAYOUT_CSS_VALUES.toolbarButtonSize,
-                  }}
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    onCloseGaps?.()
-                  }}
-                  onMouseDown={(e) => e.stopPropagation()}
-                  aria-label={t('timeline.trackHeader.closeAllGaps')}
-                  data-tooltip={t('timeline.trackHeader.closeAllGaps')}
-                >
-                  <FoldHorizontal className="w-3 h-3" />
-                </Button>
-              </div>
-
-              <div className="flex min-h-0 flex-1 items-center gap-1.5 overflow-hidden px-1.5">
-                <span className="min-w-0 truncate text-xs font-semibold leading-none font-mono">
-                  {track.name}
-                </span>
-                {track.formatRole && (
-                  <FormatRoleBadge role={track.formatRole} trackName={track.name} />
-                )}
-                <span className="shrink-0 text-[10px] leading-none text-muted-foreground">
-                  {itemCountLabel}
-                </span>
-              </div>
-            </div>
+            <FullTrackHeaderBody
+              {...bodyProps}
+              onToggleSolo={onToggleSolo}
+              onToggleSyncLock={onToggleSyncLock}
+              onCloseGaps={onCloseGaps}
+            />
           )}
         </div>
       </ContextMenuTrigger>

@@ -208,6 +208,9 @@ function clampDeltaToLastValidValue(
   return sign * low
 }
 
+/** Slip and slide move source content, not cut points, so beats are not snap targets. */
+const SLIP_SLIDE_SNAP_OPTIONS = { includeBeats: false } as const
+
 /**
  * Hook for handling slip and slide editing on timeline items.
  *
@@ -222,13 +225,13 @@ export function useTimelineSlipSlide(
   trackLocked: boolean = false,
 ) {
   const pixelsToTime = pixelsToTimeNow
-  const fps = useTimelineStore((s) => s.fps)
   const setDragState = useSelectionStore((s) => s.setDragState)
+  const fps = useTimelineStore((s) => s.fps)
 
   const { getMagneticSnapTargets, getSnapThresholdFrames, isSnapEnabled } = useSnapCalculator(
     timelineDuration,
     item.id,
-    { includeBeats: false },
+    SLIP_SLIDE_SNAP_OPTIONS,
   )
 
   const [state, setState] = useState<SlipSlideState>({

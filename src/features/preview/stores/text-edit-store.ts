@@ -16,7 +16,7 @@ interface TextEditState {
 }
 
 /** A second click within this window after selecting a text item starts editing. */
-export const DOUBLE_CLICK_WINDOW_MS = 450
+const DOUBLE_CLICK_WINDOW_MS = 450
 
 export const useTextEditStore = create<TextEditState>()((set) => ({
   editingItemId: null,

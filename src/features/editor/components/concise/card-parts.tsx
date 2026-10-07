@@ -1,6 +1,8 @@
 import { useEffect, type ComponentType, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
-import type { LucideProps } from 'lucide-react'
+import { Copy, Ellipsis, Trash2, type LucideProps } from 'lucide-react'
+import { useTimelineStore } from '@/features/editor/deps/timeline-store'
+import type { TimelineItem } from '@/types/timeline'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
 import { useEditorStore } from '@/shared/state/editor'
 import { cn } from '@/shared/ui/cn'
@@ -16,6 +18,37 @@ export interface Verb {
   destructive?: boolean
   disabled?: boolean
   active?: boolean
+}
+
+export function deleteVerb(label: string, ids: string[]): Verb {
+  return {
+    id: 'delete',
+    icon: Trash2,
+    label,
+    onClick: () => useTimelineStore.getState().removeItems(ids),
+    destructive: true,
+  }
+}
+
+/** Copies each item to sit right after itself on its own track. */
+export function duplicateVerb(label: string, items: TimelineItem[]): Verb {
+  return {
+    id: 'duplicate',
+    icon: Copy,
+    label,
+    onClick: () =>
+      useTimelineStore.getState().duplicateItems(
+        items.map((entry) => entry.id),
+        items.map((entry) => ({
+          from: entry.from + entry.durationInFrames,
+          trackId: entry.trackId,
+        })),
+      ),
+  }
+}
+
+export function moreVerb(label: string, onClick: () => void): Verb {
+  return { id: 'more', icon: Ellipsis, label, onClick }
 }
 
 /**

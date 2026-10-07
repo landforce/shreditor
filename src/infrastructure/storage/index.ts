@@ -27,7 +27,6 @@ export {
   readAgentNotes,
   writeAgentNotes,
   type AgentNote,
-  type AgentNotes,
 } from '@/infrastructure/storage/workspace-fs/agent-notes'
 
 // Media

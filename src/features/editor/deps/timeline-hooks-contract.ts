@@ -8,4 +8,3 @@ export { useTransitionBreakageNotifications } from '@/features/timeline/hooks/us
 export { useFilmstrip } from '@/features/timeline/hooks/use-filmstrip'
 export type { FilmstripFrame } from '@/features/timeline/hooks/use-filmstrip'
 export { useTimelineBeats } from '@/features/timeline/hooks/use-timeline-beats'
-export type { TimelineBeats } from '@/features/timeline/hooks/use-timeline-beats'

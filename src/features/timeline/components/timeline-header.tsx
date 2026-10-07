@@ -1,4 +1,12 @@
-import { useEffect, useCallback, memo, useLayoutEffect, useReducer, useRef } from 'react'
+import {
+  useEffect,
+  useCallback,
+  memo,
+  useLayoutEffect,
+  useReducer,
+  useRef,
+  type ReactNode,
+} from 'react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
 import {
@@ -552,6 +560,362 @@ function useTimelineHeaderModel() {
   }
 }
 
+type HeaderModel = ReturnType<typeof useTimelineHeaderModel>
+
+function TimelineToolGroup({ model }: { model: HeaderModel }) {
+  const {
+    t,
+    hotkeys,
+    activeTool,
+    SlipSlideFlyoutIcon,
+    btnSize,
+    selectTool,
+    toggleTrimTool,
+    toggleRazorTool,
+    toggleRateStretchTool,
+    toggleSlipTool,
+    toggleSlideTool,
+  } = model
+  return (
+    <>
+      <div className="flex items-center gap-1">
+        <Button
+          variant="ghost"
+          size="icon"
+          style={btnSize}
+          className={
+            activeTool === 'select' ? 'bg-primary text-primary-foreground hover:bg-primary/90' : ''
+          }
+          onClick={selectTool}
+          aria-label={t('timeline.header.selectTool')}
+          data-tooltip={t('timeline.header.selectToolTooltip')}
+        >
+          <MousePointer2 className="w-3.5 h-3.5" />
+        </Button>
+
+        <Button
+          variant="ghost"
+          size="icon"
+          style={btnSize}
+          className={
+            activeTool === 'trim-edit'
+              ? 'bg-primary text-primary-foreground hover:bg-primary/90'
+              : ''
+          }
+          onClick={toggleTrimTool}
+          aria-label={t('timeline.header.trimEditTool')}
+          data-tooltip={t('timeline.header.trimEditToolTooltip')}
+        >
+          <TrimEditIcon className="w-3.5 h-3.5" />
+        </Button>
+
+        <Button
+          variant="ghost"
+          size="icon"
+          style={btnSize}
+          className={
+            activeTool === 'razor' ? 'bg-primary text-primary-foreground hover:bg-primary/90' : ''
+          }
+          onClick={toggleRazorTool}
+          aria-label={t('timeline.header.razorTool')}
+          data-tooltip={t('timeline.header.razorToolTooltip')}
+        >
+          <Scissors className="w-3.5 h-3.5 -rotate-90" />
+        </Button>
+
+        <Button
+          variant="ghost"
+          size="icon"
+          style={btnSize}
+          className={
+            activeTool === 'rate-stretch'
+              ? 'bg-primary text-primary-foreground hover:bg-primary/90'
+              : ''
+          }
+          onClick={toggleRateStretchTool}
+          aria-label={t('timeline.header.rateStretchTool')}
+          data-tooltip={t('timeline.header.rateStretchToolTooltip')}
+        >
+          <Gauge className="w-3.5 h-3.5" />
+        </Button>
+
+        {SLIP_SLIDE_TOOLS_ENABLED ? (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                style={{ height: EDITOR_LAYOUT_CSS_VALUES.toolbarButtonSize }}
+                className={`gap-1 px-2 ${
+                  activeTool === 'slip' || activeTool === 'slide'
+                    ? 'bg-primary text-primary-foreground hover:bg-primary/90'
+                    : ''
+                }`}
+                aria-label={t('timeline.header.slipSlideTools')}
+                data-tooltip={t('timeline.header.slipSlideToolsTooltip')}
+              >
+                <span className="flex items-center gap-1">
+                  <span className="inline-flex items-center justify-center">
+                    <SlipSlideFlyoutIcon className="w-3.5 h-3.5" />
+                  </span>
+                  <ChevronDown className="w-3 h-3 opacity-70" />
+                </span>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start">
+              <DropdownMenuItem onClick={toggleSlipTool}>
+                <ArrowRightLeft className="w-3.5 h-3.5" />
+                <span className="flex-1">{t('timeline.header.slipTool')}</span>
+                <span className="text-xs text-muted-foreground">
+                  {formatHotkeyBinding(hotkeys.SLIP_TOOL)}
+                </span>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={toggleSlideTool}>
+                <BetweenHorizontalEnd className="w-3.5 h-3.5" />
+                <span className="flex-1">{t('timeline.header.slideTool')}</span>
+                <span className="text-xs text-muted-foreground">
+                  {formatHotkeyBinding(hotkeys.SLIDE_TOOL)}
+                </span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        ) : null}
+      </div>
+    </>
+  )
+}
+
+function UndoRedoGroup({ model }: { model: HeaderModel }) {
+  const { t, btnSize, canUndo, canRedo, undoLabel, redoLabel, handleUndo, handleRedo } = model
+  return (
+    <>
+      <Button
+        variant="ghost"
+        size="icon"
+        style={btnSize}
+        onClick={handleUndo}
+        disabled={!canUndo}
+        aria-label={
+          undoLabel
+            ? t('timeline.header.undoWithLabel', { label: undoLabel })
+            : t('timeline.header.undo')
+        }
+        data-tooltip={
+          undoLabel
+            ? t('timeline.header.undoWithLabelTooltip', { label: undoLabel })
+            : t('timeline.header.undoTooltip')
+        }
+      >
+        <Undo2 className="w-3.5 h-3.5" />
+      </Button>
+
+      <Button
+        variant="ghost"
+        size="icon"
+        style={btnSize}
+        onClick={handleRedo}
+        disabled={!canRedo}
+        aria-label={
+          redoLabel
+            ? t('timeline.header.redoWithLabel', { label: redoLabel })
+            : t('timeline.header.redo')
+        }
+        data-tooltip={
+          redoLabel
+            ? t('timeline.header.redoWithLabelTooltip', { label: redoLabel })
+            : t('timeline.header.redoTooltip')
+        }
+      >
+        <Redo2 className="w-3.5 h-3.5" />
+      </Button>
+    </>
+  )
+}
+
+function InOutPointGroup({ model }: { model: HeaderModel }) {
+  const { t, btnSize, inPoint, outPoint, clearInOutPoints, handleSetInPoint, handleSetOutPoint } =
+    model
+  return (
+    <>
+      <div className="flex items-center gap-1">
+        <Button
+          variant="ghost"
+          size="icon"
+          style={btnSize}
+          onClick={handleSetInPoint}
+          aria-label={t('timeline.header.setInPoint')}
+          data-tooltip={t('timeline.header.setInPointTooltip')}
+        >
+          <span className="text-sm font-bold" style={{ color: 'var(--color-timeline-in)' }}>
+            [
+          </span>
+        </Button>
+
+        <Button
+          variant="ghost"
+          size="icon"
+          style={btnSize}
+          onClick={handleSetOutPoint}
+          aria-label={t('timeline.header.setOutPoint')}
+          data-tooltip={t('timeline.header.setOutPointTooltip')}
+        >
+          <span className="text-sm font-bold" style={{ color: 'var(--color-timeline-out)' }}>
+            ]
+          </span>
+        </Button>
+
+        <Button
+          variant="ghost"
+          size="icon"
+          style={btnSize}
+          onClick={clearInOutPoints}
+          disabled={inPoint === null && outPoint === null}
+          aria-label={t('timeline.header.clearInOutPoints')}
+          data-tooltip={t('timeline.header.clearInOutPointsTooltip')}
+        >
+          <X className="w-3.5 h-3.5" />
+        </Button>
+      </div>
+    </>
+  )
+}
+
+function MarkerGroup({ model }: { model: HeaderModel }) {
+  const {
+    t,
+    btnSize,
+    selectedMarkerId,
+    hasMarkers,
+    clearAllMarkers,
+    handleAddMarker,
+    handleRemoveSelectedMarker,
+  } = model
+  return (
+    <>
+      <div className="flex items-center gap-1">
+        <Button
+          variant="ghost"
+          size="icon"
+          style={btnSize}
+          onClick={handleAddMarker}
+          aria-label={t('timeline.header.addMarker')}
+          data-tooltip={t('timeline.header.addMarkerTooltip')}
+        >
+          <Flag className="w-3.5 h-3.5" style={{ color: 'var(--color-timeline-marker)' }} />
+        </Button>
+
+        <Button
+          variant="ghost"
+          size="icon"
+          style={btnSize}
+          onClick={handleRemoveSelectedMarker}
+          disabled={!selectedMarkerId}
+          aria-label={t('timeline.header.removeSelectedMarker')}
+          data-tooltip={t('timeline.header.removeSelectedMarkerTooltip')}
+        >
+          <FlagOff className="w-3.5 h-3.5" />
+        </Button>
+
+        <Button
+          variant="ghost"
+          size="icon"
+          style={btnSize}
+          onClick={clearAllMarkers}
+          disabled={!hasMarkers}
+          aria-label={t('timeline.header.clearAllMarkers')}
+          data-tooltip={t('timeline.header.clearAllMarkersTooltip')}
+        >
+          <X className="w-3.5 h-3.5" />
+        </Button>
+      </div>
+    </>
+  )
+}
+
+/** An icon button that lights up while its mode is on. */
+function ToggleToolButton({
+  btnSize,
+  active,
+  label,
+  tooltip,
+  exposePressed = false,
+  onClick,
+  children,
+}: {
+  btnSize: HeaderModel['btnSize']
+  active: boolean
+  label: string
+  tooltip: string
+  exposePressed?: boolean
+  onClick: () => void
+  children: ReactNode
+}) {
+  return (
+    <Button
+      variant="ghost"
+      size="icon"
+      style={btnSize}
+      className={active ? 'bg-primary text-primary-foreground hover:bg-primary/90' : ''}
+      onClick={onClick}
+      aria-label={label}
+      aria-pressed={exposePressed ? active : undefined}
+      data-tooltip={tooltip}
+    >
+      {children}
+    </Button>
+  )
+}
+
+function ModeToggleGroup({ model }: { model: HeaderModel }) {
+  const { t, hotkeys, btnSize, snapEnabled, audioSkimmingEnabled, linkedSelectionEnabled } = model
+  const pick = (on: boolean, onKey: string, offKey: string) =>
+    t(`timeline.header.${on ? onKey : offKey}`)
+  return (
+    <>
+      <ToggleToolButton
+        btnSize={btnSize}
+        active={snapEnabled}
+        label={pick(snapEnabled, 'disableSnapping', 'enableSnapping')}
+        tooltip={pick(snapEnabled, 'snapEnabled', 'snapDisabled')}
+        onClick={model.toggleSnap}
+      >
+        <Magnet className="w-3.5 h-3.5" />
+      </ToggleToolButton>
+
+      <ToggleToolButton
+        btnSize={btnSize}
+        active={audioSkimmingEnabled}
+        label={pick(audioSkimmingEnabled, 'disableAudioSkimming', 'enableAudioSkimming')}
+        tooltip={pick(audioSkimmingEnabled, 'audioSkimmingEnabled', 'audioSkimmingDisabled')}
+        exposePressed
+        onClick={model.toggleAudioSkimming}
+      >
+        <Volume2 className="w-3.5 h-3.5" />
+      </ToggleToolButton>
+
+      <Separator orientation="vertical" className="h-5 mx-1.5" />
+
+      <InlineKeyframesToggle
+        isOpen={model.inlineKeyframesOpen}
+        onToggle={model.toggleEditKeyframePanel}
+      />
+
+      <ToggleToolButton
+        btnSize={btnSize}
+        active={linkedSelectionEnabled}
+        label={pick(linkedSelectionEnabled, 'disableLinkedSelection', 'enableLinkedSelection')}
+        tooltip={t('timeline.header.linkedSelectionTooltip', {
+          state: pick(linkedSelectionEnabled, 'linkedSelectionOn', 'linkedSelectionOff'),
+          shortcut: formatHotkeyBinding(hotkeys.TOGGLE_LINKED_SELECTION),
+        })}
+        exposePressed
+        onClick={model.toggleLinkedSelection}
+      >
+        <Link2 className="w-3.5 h-3.5" />
+      </ToggleToolButton>
+    </>
+  )
+}
+
 /**
  * Timeline Toolbar Component
  *
@@ -567,43 +931,8 @@ const FullTimelineHeader = memo(function FullTimelineHeader({
   onZoomOut,
   onZoomToFit,
 }: TimelineHeaderProps) {
-  const {
-    t,
-    hotkeys,
-    snapEnabled,
-    toggleSnap,
-    audioSkimmingEnabled,
-    toggleAudioSkimming,
-    inPoint,
-    outPoint,
-    clearInOutPoints,
-    hasMarkers,
-    clearAllMarkers,
-    activeTool,
-    selectedMarkerId,
-    inlineKeyframesOpen,
-    toggleEditKeyframePanel,
-    linkedSelectionEnabled,
-    canUndo,
-    canRedo,
-    undoLabel,
-    redoLabel,
-    SlipSlideFlyoutIcon,
-    btnSize,
-    handleUndo,
-    handleRedo,
-    selectTool,
-    toggleTrimTool,
-    toggleRazorTool,
-    toggleRateStretchTool,
-    toggleSlipTool,
-    toggleSlideTool,
-    handleSetInPoint,
-    handleSetOutPoint,
-    handleAddMarker,
-    handleRemoveSelectedMarker,
-    toggleLinkedSelection,
-  } = useTimelineHeaderModel()
+  const model = useTimelineHeaderModel()
+  const { t } = model
 
   return (
     <div
@@ -623,241 +952,21 @@ const FullTimelineHeader = memo(function FullTimelineHeader({
       {/* Middle: Timeline Controls */}
       <div className="min-w-0 overflow-x-auto overflow-y-hidden">
         <div className="flex w-max min-w-full items-center justify-center gap-2.5">
-          {/* Timeline Tools */}
+          <TimelineToolGroup model={model} />
+
+          <Separator orientation="vertical" className="h-5 mx-1.5" />
+
           <div className="flex items-center gap-1">
-            <Button
-              variant="ghost"
-              size="icon"
-              style={btnSize}
-              className={
-                activeTool === 'select'
-                  ? 'bg-primary text-primary-foreground hover:bg-primary/90'
-                  : ''
-              }
-              onClick={selectTool}
-              aria-label={t('timeline.header.selectTool')}
-              data-tooltip={t('timeline.header.selectToolTooltip')}
-            >
-              <MousePointer2 className="w-3.5 h-3.5" />
-            </Button>
-
-            <Button
-              variant="ghost"
-              size="icon"
-              style={btnSize}
-              className={
-                activeTool === 'trim-edit'
-                  ? 'bg-primary text-primary-foreground hover:bg-primary/90'
-                  : ''
-              }
-              onClick={toggleTrimTool}
-              aria-label={t('timeline.header.trimEditTool')}
-              data-tooltip={t('timeline.header.trimEditToolTooltip')}
-            >
-              <TrimEditIcon className="w-3.5 h-3.5" />
-            </Button>
-
-            <Button
-              variant="ghost"
-              size="icon"
-              style={btnSize}
-              className={
-                activeTool === 'razor'
-                  ? 'bg-primary text-primary-foreground hover:bg-primary/90'
-                  : ''
-              }
-              onClick={toggleRazorTool}
-              aria-label={t('timeline.header.razorTool')}
-              data-tooltip={t('timeline.header.razorToolTooltip')}
-            >
-              <Scissors className="w-3.5 h-3.5 -rotate-90" />
-            </Button>
-
-            <Button
-              variant="ghost"
-              size="icon"
-              style={btnSize}
-              className={
-                activeTool === 'rate-stretch'
-                  ? 'bg-primary text-primary-foreground hover:bg-primary/90'
-                  : ''
-              }
-              onClick={toggleRateStretchTool}
-              aria-label={t('timeline.header.rateStretchTool')}
-              data-tooltip={t('timeline.header.rateStretchToolTooltip')}
-            >
-              <Gauge className="w-3.5 h-3.5" />
-            </Button>
-
-            {SLIP_SLIDE_TOOLS_ENABLED ? (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    style={{ height: EDITOR_LAYOUT_CSS_VALUES.toolbarButtonSize }}
-                    className={`gap-1 px-2 ${
-                      activeTool === 'slip' || activeTool === 'slide'
-                        ? 'bg-primary text-primary-foreground hover:bg-primary/90'
-                        : ''
-                    }`}
-                    aria-label={t('timeline.header.slipSlideTools')}
-                    data-tooltip={t('timeline.header.slipSlideToolsTooltip')}
-                  >
-                    <span className="flex items-center gap-1">
-                      <span className="inline-flex items-center justify-center">
-                        <SlipSlideFlyoutIcon className="w-3.5 h-3.5" />
-                      </span>
-                      <ChevronDown className="w-3 h-3 opacity-70" />
-                    </span>
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="start">
-                  <DropdownMenuItem onClick={toggleSlipTool}>
-                    <ArrowRightLeft className="w-3.5 h-3.5" />
-                    <span className="flex-1">{t('timeline.header.slipTool')}</span>
-                    <span className="text-xs text-muted-foreground">
-                      {formatHotkeyBinding(hotkeys.SLIP_TOOL)}
-                    </span>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={toggleSlideTool}>
-                    <BetweenHorizontalEnd className="w-3.5 h-3.5" />
-                    <span className="flex-1">{t('timeline.header.slideTool')}</span>
-                    <span className="text-xs text-muted-foreground">
-                      {formatHotkeyBinding(hotkeys.SLIDE_TOOL)}
-                    </span>
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            ) : null}
+            <UndoRedoGroup model={model} />
           </div>
 
           <Separator orientation="vertical" className="h-5 mx-1.5" />
 
-          {/* Undo/Redo */}
-          <div className="flex items-center gap-1">
-            <Button
-              variant="ghost"
-              size="icon"
-              style={btnSize}
-              onClick={handleUndo}
-              disabled={!canUndo}
-              aria-label={
-                undoLabel
-                  ? t('timeline.header.undoWithLabel', { label: undoLabel })
-                  : t('timeline.header.undo')
-              }
-              data-tooltip={
-                undoLabel
-                  ? t('timeline.header.undoWithLabelTooltip', { label: undoLabel })
-                  : t('timeline.header.undoTooltip')
-              }
-            >
-              <Undo2 className="w-3.5 h-3.5" />
-            </Button>
-
-            <Button
-              variant="ghost"
-              size="icon"
-              style={btnSize}
-              onClick={handleRedo}
-              disabled={!canRedo}
-              aria-label={
-                redoLabel
-                  ? t('timeline.header.redoWithLabel', { label: redoLabel })
-                  : t('timeline.header.redo')
-              }
-              data-tooltip={
-                redoLabel
-                  ? t('timeline.header.redoWithLabelTooltip', { label: redoLabel })
-                  : t('timeline.header.redoTooltip')
-              }
-            >
-              <Redo2 className="w-3.5 h-3.5" />
-            </Button>
-          </div>
+          <InOutPointGroup model={model} />
 
           <Separator orientation="vertical" className="h-5 mx-1.5" />
 
-          {/* In/Out Points */}
-          <div className="flex items-center gap-1">
-            <Button
-              variant="ghost"
-              size="icon"
-              style={btnSize}
-              onClick={handleSetInPoint}
-              aria-label={t('timeline.header.setInPoint')}
-              data-tooltip={t('timeline.header.setInPointTooltip')}
-            >
-              <span className="text-sm font-bold" style={{ color: 'var(--color-timeline-in)' }}>
-                [
-              </span>
-            </Button>
-
-            <Button
-              variant="ghost"
-              size="icon"
-              style={btnSize}
-              onClick={handleSetOutPoint}
-              aria-label={t('timeline.header.setOutPoint')}
-              data-tooltip={t('timeline.header.setOutPointTooltip')}
-            >
-              <span className="text-sm font-bold" style={{ color: 'var(--color-timeline-out)' }}>
-                ]
-              </span>
-            </Button>
-
-            <Button
-              variant="ghost"
-              size="icon"
-              style={btnSize}
-              onClick={clearInOutPoints}
-              disabled={inPoint === null && outPoint === null}
-              aria-label={t('timeline.header.clearInOutPoints')}
-              data-tooltip={t('timeline.header.clearInOutPointsTooltip')}
-            >
-              <X className="w-3.5 h-3.5" />
-            </Button>
-          </div>
-
-          <Separator orientation="vertical" className="h-5 mx-1.5" />
-
-          {/* Markers */}
-          <div className="flex items-center gap-1">
-            <Button
-              variant="ghost"
-              size="icon"
-              style={btnSize}
-              onClick={handleAddMarker}
-              aria-label={t('timeline.header.addMarker')}
-              data-tooltip={t('timeline.header.addMarkerTooltip')}
-            >
-              <Flag className="w-3.5 h-3.5" style={{ color: 'var(--color-timeline-marker)' }} />
-            </Button>
-
-            <Button
-              variant="ghost"
-              size="icon"
-              style={btnSize}
-              onClick={handleRemoveSelectedMarker}
-              disabled={!selectedMarkerId}
-              aria-label={t('timeline.header.removeSelectedMarker')}
-              data-tooltip={t('timeline.header.removeSelectedMarkerTooltip')}
-            >
-              <FlagOff className="w-3.5 h-3.5" />
-            </Button>
-
-            <Button
-              variant="ghost"
-              size="icon"
-              style={btnSize}
-              onClick={clearAllMarkers}
-              disabled={!hasMarkers}
-              aria-label={t('timeline.header.clearAllMarkers')}
-              data-tooltip={t('timeline.header.clearAllMarkersTooltip')}
-            >
-              <X className="w-3.5 h-3.5" />
-            </Button>
-          </div>
+          <MarkerGroup model={model} />
 
           <Separator orientation="vertical" className="h-5 mx-1.5" />
 
@@ -866,75 +975,7 @@ const FullTimelineHeader = memo(function FullTimelineHeader({
 
           <Separator orientation="vertical" className="h-5 mx-1.5" />
 
-          {/* Snap Toggle */}
-          <Button
-            variant="ghost"
-            size="icon"
-            style={btnSize}
-            className={snapEnabled ? 'bg-primary text-primary-foreground hover:bg-primary/90' : ''}
-            onClick={toggleSnap}
-            aria-label={
-              snapEnabled
-                ? t('timeline.header.disableSnapping')
-                : t('timeline.header.enableSnapping')
-            }
-            data-tooltip={
-              snapEnabled ? t('timeline.header.snapEnabled') : t('timeline.header.snapDisabled')
-            }
-          >
-            <Magnet className="w-3.5 h-3.5" />
-          </Button>
-
-          <Button
-            variant="ghost"
-            size="icon"
-            style={btnSize}
-            className={
-              audioSkimmingEnabled ? 'bg-primary text-primary-foreground hover:bg-primary/90' : ''
-            }
-            onClick={toggleAudioSkimming}
-            aria-label={
-              audioSkimmingEnabled
-                ? t('timeline.header.disableAudioSkimming')
-                : t('timeline.header.enableAudioSkimming')
-            }
-            aria-pressed={audioSkimmingEnabled}
-            data-tooltip={
-              audioSkimmingEnabled
-                ? t('timeline.header.audioSkimmingEnabled')
-                : t('timeline.header.audioSkimmingDisabled')
-            }
-          >
-            <Volume2 className="w-3.5 h-3.5" />
-          </Button>
-
-          <Separator orientation="vertical" className="h-5 mx-1.5" />
-
-          <InlineKeyframesToggle isOpen={inlineKeyframesOpen} onToggle={toggleEditKeyframePanel} />
-
-          <Button
-            variant="ghost"
-            size="icon"
-            style={btnSize}
-            className={
-              linkedSelectionEnabled ? 'bg-primary text-primary-foreground hover:bg-primary/90' : ''
-            }
-            onClick={toggleLinkedSelection}
-            aria-label={
-              linkedSelectionEnabled
-                ? t('timeline.header.disableLinkedSelection')
-                : t('timeline.header.enableLinkedSelection')
-            }
-            aria-pressed={linkedSelectionEnabled}
-            data-tooltip={t('timeline.header.linkedSelectionTooltip', {
-              state: linkedSelectionEnabled
-                ? t('timeline.header.linkedSelectionOn')
-                : t('timeline.header.linkedSelectionOff'),
-              shortcut: formatHotkeyBinding(hotkeys.TOGGLE_LINKED_SELECTION),
-            })}
-          >
-            <Link2 className="w-3.5 h-3.5" />
-          </Button>
+          <ModeToggleGroup model={model} />
         </div>
       </div>
 
@@ -995,6 +1036,198 @@ function MoreMenuItem({
 const hotkeyHint = (binding: string | undefined): string | undefined =>
   binding ? formatHotkeyBinding(binding) : undefined
 
+function ConciseAddMenu() {
+  const { t } = useTranslation()
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          variant="ghost"
+          style={{ height: EDITOR_LAYOUT_CSS_VALUES.toolbarButtonSize }}
+          className="gap-1 px-2"
+          aria-label={t('timeline.concise.add')}
+          data-tooltip={t('timeline.concise.add')}
+        >
+          <Plus className="w-3.5 h-3.5" />
+          <span className="text-xs">{t('timeline.concise.add')}</span>
+          <ChevronDown className="w-3 h-3 opacity-70" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start">
+        {CONCISE_ADD_TABS.map((tab) => (
+          <DropdownMenuItem key={tab} onClick={() => openSidebarTab(tab)}>
+            {t(`timeline.concise.addItems.${tab}`)}
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
+}
+
+function ConciseMoreMenu({ model: m }: { model: HeaderModel }) {
+  const { t, hotkeys, btnSize } = m
+  const showBeatGrid = useSettingsStore((s) => s.showBeatGrid)
+  const setSetting = useSettingsStore((s) => s.setSetting)
+  const micStatus = useMicRecordingStore((s) => s.status)
+  const micSupported = isMicRecordingSupported()
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          variant="ghost"
+          size="icon"
+          style={btnSize}
+          aria-label={t('timeline.concise.more')}
+          data-tooltip={t('timeline.concise.more')}
+        >
+          <MoreHorizontal className="w-3.5 h-3.5" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="min-w-[14rem]">
+        <MoreMenuItem
+          icon={<TrimEditIcon className="w-3.5 h-3.5" />}
+          label={t('timeline.header.trimEditTool')}
+          hint={hotkeyHint(hotkeys.TRIM_EDIT_TOOL)}
+          checked={m.activeTool === 'trim-edit'}
+          onClick={m.toggleTrimTool}
+        />
+        <MoreMenuItem
+          icon={<Scissors className="w-3.5 h-3.5 -rotate-90" />}
+          label={t('timeline.header.razorTool')}
+          hint={hotkeyHint(hotkeys.RAZOR_TOOL)}
+          checked={m.activeTool === 'razor'}
+          onClick={m.toggleRazorTool}
+        />
+        <MoreMenuItem
+          icon={<Gauge className="w-3.5 h-3.5" />}
+          label={t('timeline.header.rateStretchTool')}
+          hint={hotkeyHint(hotkeys.RATE_STRETCH_TOOL)}
+          checked={m.activeTool === 'rate-stretch'}
+          onClick={m.toggleRateStretchTool}
+        />
+        {SLIP_SLIDE_TOOLS_ENABLED ? (
+          <>
+            <MoreMenuItem
+              icon={<ArrowRightLeft className="w-3.5 h-3.5" />}
+              label={t('timeline.header.slipTool')}
+              hint={hotkeyHint(hotkeys.SLIP_TOOL)}
+              checked={m.activeTool === 'slip'}
+              onClick={m.toggleSlipTool}
+            />
+            <MoreMenuItem
+              icon={<BetweenHorizontalEnd className="w-3.5 h-3.5" />}
+              label={t('timeline.header.slideTool')}
+              hint={hotkeyHint(hotkeys.SLIDE_TOOL)}
+              checked={m.activeTool === 'slide'}
+              onClick={m.toggleSlideTool}
+            />
+          </>
+        ) : null}
+
+        <DropdownMenuSeparator />
+        <MoreMenuItem
+          icon={
+            <span className="text-sm font-bold" style={{ color: 'var(--color-timeline-in)' }}>
+              [
+            </span>
+          }
+          label={t('timeline.header.setInPoint')}
+          hint={hotkeyHint(hotkeys.MARK_IN)}
+          onClick={m.handleSetInPoint}
+        />
+        <MoreMenuItem
+          icon={
+            <span className="text-sm font-bold" style={{ color: 'var(--color-timeline-out)' }}>
+              ]
+            </span>
+          }
+          label={t('timeline.header.setOutPoint')}
+          hint={hotkeyHint(hotkeys.MARK_OUT)}
+          onClick={m.handleSetOutPoint}
+        />
+        <MoreMenuItem
+          icon={<X className="w-3.5 h-3.5" />}
+          label={t('timeline.header.clearInOutPoints')}
+          hint={hotkeyHint(hotkeys.CLEAR_IN_OUT)}
+          disabled={m.inPoint === null && m.outPoint === null}
+          onClick={m.clearInOutPoints}
+        />
+
+        <DropdownMenuSeparator />
+        <MoreMenuItem
+          icon={<Flag className="w-3.5 h-3.5" style={{ color: 'var(--color-timeline-marker)' }} />}
+          label={t('timeline.header.addMarker')}
+          hint={hotkeyHint(hotkeys.ADD_MARKER)}
+          onClick={m.handleAddMarker}
+        />
+        <MoreMenuItem
+          icon={<FlagOff className="w-3.5 h-3.5" />}
+          label={t('timeline.header.removeSelectedMarker')}
+          hint={hotkeyHint(hotkeys.REMOVE_MARKER)}
+          disabled={!m.selectedMarkerId}
+          onClick={m.handleRemoveSelectedMarker}
+        />
+        <MoreMenuItem
+          icon={<X className="w-3.5 h-3.5" />}
+          label={t('timeline.header.clearAllMarkers')}
+          disabled={!m.hasMarkers}
+          onClick={m.clearAllMarkers}
+        />
+
+        <DropdownMenuSeparator />
+        {micSupported ? (
+          <MoreMenuItem
+            icon={<Mic className="w-3.5 h-3.5" style={{ color: 'var(--color-destructive)' }} />}
+            label={t('recording.record')}
+            disabled={micStatus !== 'idle'}
+            onClick={() => void startMicRecording()}
+          />
+        ) : null}
+        <MoreMenuItem
+          icon={<Volume2 className="w-3.5 h-3.5" />}
+          label={
+            m.audioSkimmingEnabled
+              ? t('timeline.header.disableAudioSkimming')
+              : t('timeline.header.enableAudioSkimming')
+          }
+          checked={m.audioSkimmingEnabled}
+          onClick={m.toggleAudioSkimming}
+        />
+        <MoreMenuItem
+          icon={<Diamond className="w-3.5 h-3.5" />}
+          label={t(
+            m.inlineKeyframesOpen
+              ? 'timeline.keyframeEditor.editLane.hide'
+              : 'timeline.keyframeEditor.editLane.show',
+            {
+              defaultValue: m.inlineKeyframesOpen ? 'Hide keyframe panel' : 'Show keyframe panel',
+            },
+          )}
+          checked={m.inlineKeyframesOpen}
+          onClick={m.toggleEditKeyframePanel}
+        />
+        <MoreMenuItem
+          icon={<Link2 className="w-3.5 h-3.5" />}
+          label={
+            m.linkedSelectionEnabled
+              ? t('timeline.header.disableLinkedSelection')
+              : t('timeline.header.enableLinkedSelection')
+          }
+          hint={hotkeyHint(hotkeys.TOGGLE_LINKED_SELECTION)}
+          checked={m.linkedSelectionEnabled}
+          onClick={m.toggleLinkedSelection}
+        />
+        <MoreMenuItem
+          icon={<Music className="w-3.5 h-3.5" />}
+          label={t('timeline.concise.beatGrid')}
+          checked={showBeatGrid}
+          onClick={() => setSetting('showBeatGrid', !showBeatGrid)}
+        />
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
+}
+
 /**
  * Compact 32px toolbar for the Concise workspace. Everything the full toolbar
  * offers is still reachable: the rest lives in the More menu with its shortcut
@@ -1007,15 +1240,11 @@ const ConciseTimelineHeader = memo(function ConciseTimelineHeader({
   onZoomToFit,
 }: TimelineHeaderProps) {
   const m = useTimelineHeaderModel()
-  const { t, hotkeys, btnSize } = m
+  const { t, btnSize } = m
   const conciseFullHeaders = useConciseTimelineStore((s) => s.conciseFullHeaders)
-  const showBeatGrid = useSettingsStore((s) => s.showBeatGrid)
-  const setSetting = useSettingsStore((s) => s.setSetting)
   const toggleConciseFullHeaders = useConciseTimelineStore((s) => s.toggleConciseFullHeaders)
-  const clearAllMarkers = m.clearAllMarkers
   const micStatus = useMicRecordingStore((s) => s.status)
   const micError = useMicRecordingStore((s) => s.error)
-  const micSupported = isMicRecordingSupported()
   const activeClass = 'bg-primary text-primary-foreground hover:bg-primary/90'
   const sep = <Separator orientation="vertical" className="mx-1 h-4" />
   const conciseHeight = 32
@@ -1065,86 +1294,23 @@ const ConciseTimelineHeader = memo(function ConciseTimelineHeader({
         <Trash2 className="w-3.5 h-3.5" />
       </Button>
 
-      <Button
-        variant="ghost"
-        size="icon"
-        style={btnSize}
-        onClick={m.handleUndo}
-        disabled={!m.canUndo}
-        aria-label={
-          m.undoLabel
-            ? t('timeline.header.undoWithLabel', { label: m.undoLabel })
-            : t('timeline.header.undo')
-        }
-        data-tooltip={
-          m.undoLabel
-            ? t('timeline.header.undoWithLabelTooltip', { label: m.undoLabel })
-            : t('timeline.header.undoTooltip')
-        }
-      >
-        <Undo2 className="w-3.5 h-3.5" />
-      </Button>
-
-      <Button
-        variant="ghost"
-        size="icon"
-        style={btnSize}
-        onClick={m.handleRedo}
-        disabled={!m.canRedo}
-        aria-label={
-          m.redoLabel
-            ? t('timeline.header.redoWithLabel', { label: m.redoLabel })
-            : t('timeline.header.redo')
-        }
-        data-tooltip={
-          m.redoLabel
-            ? t('timeline.header.redoWithLabelTooltip', { label: m.redoLabel })
-            : t('timeline.header.redoTooltip')
-        }
-      >
-        <Redo2 className="w-3.5 h-3.5" />
-      </Button>
+      <UndoRedoGroup model={m} />
 
       {sep}
 
-      <Button
-        variant="ghost"
-        size="icon"
-        style={btnSize}
-        className={m.snapEnabled ? activeClass : ''}
+      <ToggleToolButton
+        btnSize={btnSize}
+        active={m.snapEnabled}
+        label={t(
+          m.snapEnabled ? 'timeline.header.disableSnapping' : 'timeline.header.enableSnapping',
+        )}
+        tooltip={t(m.snapEnabled ? 'timeline.header.snapEnabled' : 'timeline.header.snapDisabled')}
         onClick={m.toggleSnap}
-        aria-label={
-          m.snapEnabled ? t('timeline.header.disableSnapping') : t('timeline.header.enableSnapping')
-        }
-        data-tooltip={
-          m.snapEnabled ? t('timeline.header.snapEnabled') : t('timeline.header.snapDisabled')
-        }
       >
         <Magnet className="w-3.5 h-3.5" />
-      </Button>
+      </ToggleToolButton>
 
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button
-            variant="ghost"
-            style={{ height: EDITOR_LAYOUT_CSS_VALUES.toolbarButtonSize }}
-            className="gap-1 px-2"
-            aria-label={t('timeline.concise.add')}
-            data-tooltip={t('timeline.concise.add')}
-          >
-            <Plus className="w-3.5 h-3.5" />
-            <span className="text-xs">{t('timeline.concise.add')}</span>
-            <ChevronDown className="w-3 h-3 opacity-70" />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="start">
-          {CONCISE_ADD_TABS.map((tab) => (
-            <DropdownMenuItem key={tab} onClick={() => openSidebarTab(tab)}>
-              {t(`timeline.concise.addItems.${tab}`)}
-            </DropdownMenuItem>
-          ))}
-        </DropdownMenuContent>
-      </DropdownMenu>
+      <ConciseAddMenu />
 
       {isMicRecordingSupported() && (micStatus !== 'idle' || micError) ? (
         <MicRecordControl />
@@ -1174,162 +1340,7 @@ const ConciseTimelineHeader = memo(function ConciseTimelineHeader({
         <PanelLeft className="w-3.5 h-3.5" />
       </Button>
 
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button
-            variant="ghost"
-            size="icon"
-            style={btnSize}
-            aria-label={t('timeline.concise.more')}
-            data-tooltip={t('timeline.concise.more')}
-          >
-            <MoreHorizontal className="w-3.5 h-3.5" />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="min-w-[14rem]">
-          <MoreMenuItem
-            icon={<TrimEditIcon className="w-3.5 h-3.5" />}
-            label={t('timeline.header.trimEditTool')}
-            hint={hotkeyHint(hotkeys.TRIM_EDIT_TOOL)}
-            checked={m.activeTool === 'trim-edit'}
-            onClick={m.toggleTrimTool}
-          />
-          <MoreMenuItem
-            icon={<Scissors className="w-3.5 h-3.5 -rotate-90" />}
-            label={t('timeline.header.razorTool')}
-            hint={hotkeyHint(hotkeys.RAZOR_TOOL)}
-            checked={m.activeTool === 'razor'}
-            onClick={m.toggleRazorTool}
-          />
-          <MoreMenuItem
-            icon={<Gauge className="w-3.5 h-3.5" />}
-            label={t('timeline.header.rateStretchTool')}
-            hint={hotkeyHint(hotkeys.RATE_STRETCH_TOOL)}
-            checked={m.activeTool === 'rate-stretch'}
-            onClick={m.toggleRateStretchTool}
-          />
-          {SLIP_SLIDE_TOOLS_ENABLED ? (
-            <>
-              <MoreMenuItem
-                icon={<ArrowRightLeft className="w-3.5 h-3.5" />}
-                label={t('timeline.header.slipTool')}
-                hint={hotkeyHint(hotkeys.SLIP_TOOL)}
-                checked={m.activeTool === 'slip'}
-                onClick={m.toggleSlipTool}
-              />
-              <MoreMenuItem
-                icon={<BetweenHorizontalEnd className="w-3.5 h-3.5" />}
-                label={t('timeline.header.slideTool')}
-                hint={hotkeyHint(hotkeys.SLIDE_TOOL)}
-                checked={m.activeTool === 'slide'}
-                onClick={m.toggleSlideTool}
-              />
-            </>
-          ) : null}
-
-          <DropdownMenuSeparator />
-          <MoreMenuItem
-            icon={
-              <span className="text-sm font-bold" style={{ color: 'var(--color-timeline-in)' }}>
-                [
-              </span>
-            }
-            label={t('timeline.header.setInPoint')}
-            hint={hotkeyHint(hotkeys.MARK_IN)}
-            onClick={m.handleSetInPoint}
-          />
-          <MoreMenuItem
-            icon={
-              <span className="text-sm font-bold" style={{ color: 'var(--color-timeline-out)' }}>
-                ]
-              </span>
-            }
-            label={t('timeline.header.setOutPoint')}
-            hint={hotkeyHint(hotkeys.MARK_OUT)}
-            onClick={m.handleSetOutPoint}
-          />
-          <MoreMenuItem
-            icon={<X className="w-3.5 h-3.5" />}
-            label={t('timeline.header.clearInOutPoints')}
-            hint={hotkeyHint(hotkeys.CLEAR_IN_OUT)}
-            disabled={m.inPoint === null && m.outPoint === null}
-            onClick={m.clearInOutPoints}
-          />
-
-          <DropdownMenuSeparator />
-          <MoreMenuItem
-            icon={
-              <Flag className="w-3.5 h-3.5" style={{ color: 'var(--color-timeline-marker)' }} />
-            }
-            label={t('timeline.header.addMarker')}
-            hint={hotkeyHint(hotkeys.ADD_MARKER)}
-            onClick={m.handleAddMarker}
-          />
-          <MoreMenuItem
-            icon={<FlagOff className="w-3.5 h-3.5" />}
-            label={t('timeline.header.removeSelectedMarker')}
-            hint={hotkeyHint(hotkeys.REMOVE_MARKER)}
-            disabled={!m.selectedMarkerId}
-            onClick={m.handleRemoveSelectedMarker}
-          />
-          <MoreMenuItem
-            icon={<X className="w-3.5 h-3.5" />}
-            label={t('timeline.header.clearAllMarkers')}
-            disabled={!m.hasMarkers}
-            onClick={clearAllMarkers}
-          />
-
-          <DropdownMenuSeparator />
-          {micSupported ? (
-            <MoreMenuItem
-              icon={<Mic className="w-3.5 h-3.5" style={{ color: 'var(--color-destructive)' }} />}
-              label={t('recording.record')}
-              disabled={micStatus !== 'idle'}
-              onClick={() => void startMicRecording()}
-            />
-          ) : null}
-          <MoreMenuItem
-            icon={<Volume2 className="w-3.5 h-3.5" />}
-            label={
-              m.audioSkimmingEnabled
-                ? t('timeline.header.disableAudioSkimming')
-                : t('timeline.header.enableAudioSkimming')
-            }
-            checked={m.audioSkimmingEnabled}
-            onClick={m.toggleAudioSkimming}
-          />
-          <MoreMenuItem
-            icon={<Diamond className="w-3.5 h-3.5" />}
-            label={t(
-              m.inlineKeyframesOpen
-                ? 'timeline.keyframeEditor.editLane.hide'
-                : 'timeline.keyframeEditor.editLane.show',
-              {
-                defaultValue: m.inlineKeyframesOpen ? 'Hide keyframe panel' : 'Show keyframe panel',
-              },
-            )}
-            checked={m.inlineKeyframesOpen}
-            onClick={m.toggleEditKeyframePanel}
-          />
-          <MoreMenuItem
-            icon={<Link2 className="w-3.5 h-3.5" />}
-            label={
-              m.linkedSelectionEnabled
-                ? t('timeline.header.disableLinkedSelection')
-                : t('timeline.header.enableLinkedSelection')
-            }
-            hint={hotkeyHint(hotkeys.TOGGLE_LINKED_SELECTION)}
-            checked={m.linkedSelectionEnabled}
-            onClick={m.toggleLinkedSelection}
-          />
-          <MoreMenuItem
-            icon={<Music className="w-3.5 h-3.5" />}
-            label={t('timeline.concise.beatGrid')}
-            checked={showBeatGrid}
-            onClick={() => setSetting('showBeatGrid', !showBeatGrid)}
-          />
-        </DropdownMenuContent>
-      </DropdownMenu>
+      <ConciseMoreMenu model={m} />
     </div>
   )
 })

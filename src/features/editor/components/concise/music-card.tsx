@@ -1,10 +1,9 @@
 import { useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Ellipsis, Replace, Scissors, Trash2, Volume2, VolumeX, Waves } from 'lucide-react'
-import { useTimelineStore } from '@/features/editor/deps/timeline-store'
+import { Replace, Scissors, Volume2, VolumeX, Waves } from 'lucide-react'
 import type { AudioItem } from '@/types/timeline'
 import { getMixedValue, updateItemsInOneStep } from '../properties-sidebar/utils'
-import { Cell, ContextCard, Field, MoreDrawer, type Verb } from './card-parts'
+import { Cell, ContextCard, deleteVerb, Field, MoreDrawer, moreVerb, type Verb } from './card-parts'
 import { focusWithin, formatSeconds, useProjectFps } from './card-helpers'
 import { FOCUS_MEDIA_BIN_EVENT } from './events'
 import { FadeField, VolumeField } from './shot-card'
@@ -53,19 +52,8 @@ export function MusicCard({ items }: { items: AudioItem[] }) {
       hint: t('editor.concise.music.replaceHint'),
       onClick: () => window.dispatchEvent(new CustomEvent(FOCUS_MEDIA_BIN_EVENT)),
     },
-    {
-      id: 'delete',
-      icon: Trash2,
-      label: t('editor.concise.delete'),
-      onClick: () => useTimelineStore.getState().removeItems(ids),
-      destructive: true,
-    },
-    {
-      id: 'more',
-      icon: Ellipsis,
-      label: t('editor.concise.more.label'),
-      onClick: () => setMoreOpen(true),
-    },
+    deleteVerb(t('editor.concise.delete'), ids),
+    moreVerb(t('editor.concise.more.label'), () => setMoreOpen(true)),
   ]
 
   return (

@@ -114,6 +114,225 @@ interface ToolbarProps {
   renderQueueCount?: number
 }
 
+interface ToolbarMenuActions {
+  hasUnseenWhatsNew: boolean
+  onOpenWhatsNew: () => void
+  onOpenSettings: () => void
+  onOpenShortcuts: () => void
+}
+
+/** The concise layout folds docs, what's new, settings, shortcuts and language into one menu. */
+function ConciseSettingsMenu({
+  hasUnseenWhatsNew,
+  onOpenWhatsNew: openWhatsNew,
+  onOpenSettings,
+  onOpenShortcuts,
+}: ToolbarMenuActions) {
+  const { t, i18n: i18nInstance } = useTranslation()
+  const currentLanguage = i18nInstance.resolvedLanguage ?? i18nInstance.language
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          variant="outline"
+          size="icon"
+          className="h-7 w-7 relative"
+          aria-label={t('editor.concise.shell.settingsMenu')}
+          data-tooltip={t('editor.concise.shell.settingsMenu')}
+          data-tooltip-side="bottom"
+        >
+          <Settings className="h-4 w-4" />
+          {hasUnseenWhatsNew && (
+            <span
+              className="absolute top-1 right-1 h-1.5 w-1.5 rounded-full bg-primary"
+              aria-hidden="true"
+            />
+          )}
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-52">
+        <DropdownMenuItem onSelect={() => window.open('/docs', '_blank', 'noopener')}>
+          <BookOpen className="mr-2 h-4 w-4" />
+          {t('editor.concise.shell.docs')}
+        </DropdownMenuItem>
+        <DropdownMenuItem onSelect={openWhatsNew}>
+          <Sparkles className="mr-2 h-4 w-4" />
+          {t('toolbar.whatsNew')}
+        </DropdownMenuItem>
+        <DropdownMenuItem onSelect={onOpenSettings}>
+          <Settings className="mr-2 h-4 w-4" />
+          {t('toolbar.settings')}
+        </DropdownMenuItem>
+        <DropdownMenuItem onSelect={onOpenShortcuts}>
+          <Keyboard className="mr-2 h-4 w-4" />
+          {t('toolbar.keyboardShortcuts')}
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuLabel className="text-[11px] text-muted-foreground">
+          {t('language.label')}
+        </DropdownMenuLabel>
+        {SUPPORTED_LANGUAGES.map((lng) => (
+          <DropdownMenuItem
+            key={lng.code}
+            className="justify-between"
+            onSelect={() => {
+              void changeAppLanguage(lng.code)
+            }}
+          >
+            {lng.nativeName}
+            <Check
+              className={cn('h-4 w-4', lng.code === currentLanguage ? 'opacity-100' : 'opacity-0')}
+            />
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
+}
+
+function UtilityButtons({
+  hasUnseenWhatsNew,
+  onOpenWhatsNew: openWhatsNew,
+  onOpenSettings,
+  onOpenShortcuts,
+}: ToolbarMenuActions) {
+  const { t } = useTranslation()
+  return (
+    <>
+      <Button variant="outline" size="icon" className="h-7 w-7" asChild>
+        <a
+          href="/docs"
+          target="_blank"
+          rel="noopener noreferrer"
+          data-tooltip="User Guide"
+          data-tooltip-side="bottom"
+          aria-label="User Guide"
+        >
+          <BookOpen className="h-4 w-4" />
+        </a>
+      </Button>
+      <Button
+        variant="outline"
+        size="icon"
+        className="h-7 w-7 relative"
+        onClick={openWhatsNew}
+        data-tooltip={t('toolbar.whatsNew')}
+        data-tooltip-side="bottom"
+        aria-label={t('toolbar.whatsNewAria')}
+      >
+        <Sparkles className="h-4 w-4" />
+        {hasUnseenWhatsNew && (
+          <span
+            className="absolute top-1 right-1 h-1.5 w-1.5 rounded-full bg-primary"
+            aria-hidden="true"
+          />
+        )}
+      </Button>
+      <Button
+        variant="outline"
+        size="icon"
+        className="h-7 w-7"
+        onClick={onOpenSettings}
+        data-tooltip={t('toolbar.settings')}
+        data-tooltip-side="bottom"
+        aria-label={t('toolbar.settings')}
+      >
+        <Settings className="h-4 w-4" />
+      </Button>
+      <Button
+        variant="outline"
+        size="icon"
+        className="h-7 w-7"
+        onClick={onOpenShortcuts}
+        data-tooltip={t('toolbar.keyboardShortcuts')}
+        data-tooltip-side="bottom"
+        aria-label={t('toolbar.keyboardShortcutsAria')}
+      >
+        <Keyboard className="h-4 w-4" />
+      </Button>
+      <LanguageSwitcher size="sm" align="end" side="bottom" />
+    </>
+  )
+}
+
+function SaveButton({
+  concise,
+  isSaveAnimating,
+  saveAnimationKey,
+  onSave,
+}: {
+  concise: boolean
+  isSaveAnimating: boolean
+  saveAnimationKey: number
+  onSave: () => void
+}) {
+  const { t } = useTranslation()
+  const isDirty = useTimelineStore((state) => state.isDirty)
+  return (
+    <Button
+      variant="outline"
+      size="sm"
+      className="gap-1.5"
+      onClick={onSave}
+      aria-label={t('toolbar.saveAria')}
+      data-tooltip={
+        concise
+          ? isDirty
+            ? t('editor.concise.shell.unsaved')
+            : t('editor.concise.shell.saved')
+          : undefined
+      }
+      data-tooltip-side="bottom"
+    >
+      <div className="relative">
+        {isSaveAnimating ? (
+          <SaveAnimationIcon key={saveAnimationKey} className="h-5 w-5" />
+        ) : concise ? (
+          <span
+            className={cn(
+              'block h-2 w-2 rounded-full',
+              isDirty ? 'bg-orange-600' : 'bg-muted-foreground/40',
+            )}
+            aria-hidden="true"
+          />
+        ) : (
+          <Save className="h-4 w-4" />
+        )}
+        {!concise && <SaveDirtyIndicator />}
+      </div>
+      {concise ? t('editor.concise.shell.save') : t('toolbar.save')}
+    </Button>
+  )
+}
+
+function ProjectSpecs({
+  project,
+  summary: projectSummary,
+}: {
+  project: ToolbarProps['project']
+  summary: {
+    durationSeconds: number
+    clipCount: number
+    mediaCount: number
+    brokenMediaCount: number
+  }
+}) {
+  const { t } = useTranslation()
+  return (
+    <span className="font-mono text-[11px] text-muted-foreground">
+      {t('toolbar.specsDetailed', {
+        width: project?.width,
+        height: project?.height,
+        fps: project?.fps,
+        duration: formatProjectDuration(projectSummary.durationSeconds),
+        clips: projectSummary.clipCount,
+        media: projectSummary.mediaCount,
+        missing: projectSummary.brokenMediaCount,
+      })}
+    </span>
+  )
+}
+
 export const Toolbar = memo(function Toolbar({
   projectId,
   project,
@@ -124,10 +343,8 @@ export const Toolbar = memo(function Toolbar({
   renderQueueCount = 0,
 }: ToolbarProps) {
   const navigate = useNavigate()
-  const { t, i18n: i18nInstance } = useTranslation()
+  const { t } = useTranslation()
   const concise = isConciseWorkspace(useEditorStore((state) => state.workspace))
-  const isDirty = useTimelineStore((state) => state.isDirty)
-  const currentLanguage = i18nInstance.resolvedLanguage ?? i18nInstance.language
   const [showUnsavedDialog, setShowUnsavedDialog] = useState(false)
   const [showShortcutsDialog, setShowShortcutsDialog] = useState(false)
   const [showSettingsDialog, setShowSettingsDialog] = useState(false)
@@ -240,19 +457,7 @@ export const Toolbar = memo(function Toolbar({
           >
             {project?.name || t('common.untitledProject')}
           </h1>
-          {!concise && (
-            <span className="font-mono text-[11px] text-muted-foreground">
-              {t('toolbar.specsDetailed', {
-                width: project?.width,
-                height: project?.height,
-                fps: project?.fps,
-                duration: formatProjectDuration(projectSummary.durationSeconds),
-                clips: projectSummary.clipCount,
-                media: projectSummary.mediaCount,
-                missing: projectSummary.brokenMediaCount,
-              })}
-            </span>
-          )}
+          {!concise && <ProjectSpecs project={project} summary={projectSummary} />}
         </div>
 
         <FormatChip compact={concise} />
@@ -277,158 +482,30 @@ export const Toolbar = memo(function Toolbar({
         )}
 
         {concise ? (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="outline"
-                size="icon"
-                className="h-7 w-7 relative"
-                aria-label={t('editor.concise.shell.settingsMenu')}
-                data-tooltip={t('editor.concise.shell.settingsMenu')}
-                data-tooltip-side="bottom"
-              >
-                <Settings className="h-4 w-4" />
-                {hasUnseenWhatsNew && (
-                  <span
-                    className="absolute top-1 right-1 h-1.5 w-1.5 rounded-full bg-primary"
-                    aria-hidden="true"
-                  />
-                )}
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-52">
-              <DropdownMenuItem onSelect={() => window.open('/docs', '_blank', 'noopener')}>
-                <BookOpen className="mr-2 h-4 w-4" />
-                {t('editor.concise.shell.docs')}
-              </DropdownMenuItem>
-              <DropdownMenuItem onSelect={openWhatsNew}>
-                <Sparkles className="mr-2 h-4 w-4" />
-                {t('toolbar.whatsNew')}
-              </DropdownMenuItem>
-              <DropdownMenuItem onSelect={() => setShowSettingsDialog(true)}>
-                <Settings className="mr-2 h-4 w-4" />
-                {t('toolbar.settings')}
-              </DropdownMenuItem>
-              <DropdownMenuItem onSelect={() => setShowShortcutsDialog(true)}>
-                <Keyboard className="mr-2 h-4 w-4" />
-                {t('toolbar.keyboardShortcuts')}
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuLabel className="text-[11px] text-muted-foreground">
-                {t('language.label')}
-              </DropdownMenuLabel>
-              {SUPPORTED_LANGUAGES.map((lng) => (
-                <DropdownMenuItem
-                  key={lng.code}
-                  className="justify-between"
-                  onSelect={() => {
-                    void changeAppLanguage(lng.code)
-                  }}
-                >
-                  {lng.nativeName}
-                  <Check
-                    className={cn(
-                      'h-4 w-4',
-                      lng.code === currentLanguage ? 'opacity-100' : 'opacity-0',
-                    )}
-                  />
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <ConciseSettingsMenu
+            hasUnseenWhatsNew={hasUnseenWhatsNew}
+            onOpenWhatsNew={openWhatsNew}
+            onOpenSettings={() => setShowSettingsDialog(true)}
+            onOpenShortcuts={() => setShowShortcutsDialog(true)}
+          />
         ) : (
-          <>
-            <Button variant="outline" size="icon" className="h-7 w-7" asChild>
-              <a
-                href="/docs"
-                target="_blank"
-                rel="noopener noreferrer"
-                data-tooltip="User Guide"
-                data-tooltip-side="bottom"
-                aria-label="User Guide"
-              >
-                <BookOpen className="h-4 w-4" />
-              </a>
-            </Button>
-            <Button
-              variant="outline"
-              size="icon"
-              className="h-7 w-7 relative"
-              onClick={openWhatsNew}
-              data-tooltip={t('toolbar.whatsNew')}
-              data-tooltip-side="bottom"
-              aria-label={t('toolbar.whatsNewAria')}
-            >
-              <Sparkles className="h-4 w-4" />
-              {hasUnseenWhatsNew && (
-                <span
-                  className="absolute top-1 right-1 h-1.5 w-1.5 rounded-full bg-primary"
-                  aria-hidden="true"
-                />
-              )}
-            </Button>
-            <Button
-              variant="outline"
-              size="icon"
-              className="h-7 w-7"
-              onClick={() => setShowSettingsDialog(true)}
-              data-tooltip={t('toolbar.settings')}
-              data-tooltip-side="bottom"
-              aria-label={t('toolbar.settings')}
-            >
-              <Settings className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="outline"
-              size="icon"
-              className="h-7 w-7"
-              onClick={() => setShowShortcutsDialog(true)}
-              data-tooltip={t('toolbar.keyboardShortcuts')}
-              data-tooltip-side="bottom"
-              aria-label={t('toolbar.keyboardShortcutsAria')}
-            >
-              <Keyboard className="h-4 w-4" />
-            </Button>
-            <LanguageSwitcher size="sm" align="end" side="bottom" />
-          </>
+          <UtilityButtons
+            hasUnseenWhatsNew={hasUnseenWhatsNew}
+            onOpenWhatsNew={openWhatsNew}
+            onOpenSettings={() => setShowSettingsDialog(true)}
+            onOpenShortcuts={() => setShowShortcutsDialog(true)}
+          />
         )}
 
         <Separator orientation="vertical" className="h-5" />
 
         {/* Actions */}
-        <Button
-          variant="outline"
-          size="sm"
-          className="gap-1.5"
-          onClick={handleSave}
-          aria-label={t('toolbar.saveAria')}
-          data-tooltip={
-            concise
-              ? isDirty
-                ? t('editor.concise.shell.unsaved')
-                : t('editor.concise.shell.saved')
-              : undefined
-          }
-          data-tooltip-side="bottom"
-        >
-          <div className="relative">
-            {isSaveAnimating ? (
-              <SaveAnimationIcon key={saveAnimationKey} className="h-5 w-5" />
-            ) : concise ? (
-              <span
-                className={cn(
-                  'block h-2 w-2 rounded-full',
-                  isDirty ? 'bg-orange-600' : 'bg-muted-foreground/40',
-                )}
-                aria-hidden="true"
-              />
-            ) : (
-              <Save className="h-4 w-4" />
-            )}
-            {!concise && <SaveDirtyIndicator />}
-          </div>
-          {concise ? t('editor.concise.shell.save') : t('toolbar.save')}
-        </Button>
+        <SaveButton
+          concise={concise}
+          isSaveAnimating={isSaveAnimating}
+          saveAnimationKey={saveAnimationKey}
+          onSave={handleSave}
+        />
 
         {onOpenRenderQueue && (
           <Button

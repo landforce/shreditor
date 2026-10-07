@@ -127,6 +127,18 @@ function toResolvedTransform(transform: Transform): ResolvedTransform {
   }
 }
 
+function isPlainEnter(e: KeyboardEvent): boolean {
+  return e.key === 'Enter' && !e.metaKey && !e.ctrlKey && !e.altKey && !e.shiftKey && !e.repeat
+}
+
+/** True when a key event came from a control that owns the keyboard (inputs, buttons, editable text). */
+function isTypingTarget(target: EventTarget | null): boolean {
+  return (
+    target instanceof HTMLElement &&
+    (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT', 'BUTTON'].includes(target.tagName))
+  )
+}
+
 /**
  * Overlay that renders transform gizmos for selected items
  * and clickable hit areas for all visible items.
@@ -505,16 +517,8 @@ export function GizmoOverlay({
   // Enter on a single selected text item starts editing it (not while typing elsewhere).
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key !== 'Enter' || e.metaKey || e.ctrlKey || e.altKey || e.shiftKey || e.repeat) return
-      if (e.defaultPrevented || isPlaying) return
-      const target = e.target
-      if (
-        target instanceof HTMLElement &&
-        (target.isContentEditable ||
-          ['INPUT', 'TEXTAREA', 'SELECT', 'BUTTON'].includes(target.tagName))
-      ) {
-        return
-      }
+      if (!isPlainEnter(e) || e.defaultPrevented || isPlaying) return
+      if (isTypingTarget(e.target)) return
       const only = selectedItems
       if (only.length !== 1 || !only[0] || !canEditTextInline(only[0])) return
       e.preventDefault()

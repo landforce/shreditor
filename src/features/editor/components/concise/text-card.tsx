@@ -1,12 +1,21 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Clock, Copy, Ellipsis, Move, Palette, Trash2, Type } from 'lucide-react'
+import { Clock, Move, Palette, Type } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { executeTimelineCommand, useTimelineStore } from '@/features/editor/deps/timeline-store'
 import type { TextItem } from '@/types/timeline'
 import { TextContentSection } from '../properties-sidebar/clip-panel/text-section'
 import { TextStylesSection } from '../properties-sidebar/clip-panel/text-styles-section'
-import { Cell, ContextCard, Field, MoreDrawer, type Verb } from './card-parts'
+import {
+  Cell,
+  ContextCard,
+  deleteVerb,
+  duplicateVerb,
+  Field,
+  MoreDrawer,
+  moreVerb,
+  type Verb,
+} from './card-parts'
 import { focusWithin, formatSeconds, useProjectCanvas } from './card-helpers'
 
 export function TextCard({ items }: { items: TextItem[] }) {
@@ -55,32 +64,9 @@ export function TextCard({ items }: { items: TextItem[] }) {
       label: t('editor.concise.text.timing'),
       onClick: () => focusWithin(timingRef.current),
     },
-    {
-      id: 'duplicate',
-      icon: Copy,
-      label: t('editor.concise.duplicate'),
-      onClick: () =>
-        useTimelineStore.getState().duplicateItems(
-          ids,
-          items.map((entry) => ({
-            from: entry.from + entry.durationInFrames,
-            trackId: entry.trackId,
-          })),
-        ),
-    },
-    {
-      id: 'delete',
-      icon: Trash2,
-      label: t('editor.concise.delete'),
-      onClick: () => useTimelineStore.getState().removeItems(ids),
-      destructive: true,
-    },
-    {
-      id: 'more',
-      icon: Ellipsis,
-      label: t('editor.concise.more.label'),
-      onClick: () => setMoreOpen(true),
-    },
+    duplicateVerb(t('editor.concise.duplicate'), items),
+    deleteVerb(t('editor.concise.delete'), ids),
+    moreVerb(t('editor.concise.more.label'), () => setMoreOpen(true)),
   ]
 
   return (

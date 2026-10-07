@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Copy, Ellipsis, Gauge, Replace, Scissors, Trash2, Volume2, VolumeX } from 'lucide-react'
+import type { TFunction } from 'i18next'
+import { Gauge, Replace, Scissors, Volume2, VolumeX } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { usePlaybackStore } from '@/shared/state/playback'
 import {
@@ -18,7 +19,16 @@ import {
 import type { ImageItem, VideoItem } from '@/types/timeline'
 import { SliderInput } from '../properties-sidebar/components'
 import { getMixedValue, updateItemsInOneStep } from '../properties-sidebar/utils'
-import { Cell, ContextCard, Field, MoreDrawer, type Verb } from './card-parts'
+import {
+  Cell,
+  ContextCard,
+  deleteVerb,
+  duplicateVerb,
+  Field,
+  MoreDrawer,
+  moreVerb,
+  type Verb,
+} from './card-parts'
 import { focusWithin, formatSeconds, useProjectFps } from './card-helpers'
 import { FOCUS_MEDIA_BIN_EVENT } from './events'
 import { describeOutPoint, planCutIn, planCutOut } from './beat-cuts'
@@ -100,32 +110,9 @@ export function ShotCard({ items }: { items: ShotItem[] }) {
       disabled: videoIds.length === 0,
       active: muted,
     },
-    {
-      id: 'duplicate',
-      icon: Copy,
-      label: t('editor.concise.duplicate'),
-      onClick: () =>
-        useTimelineStore.getState().duplicateItems(
-          ids,
-          items.map((entry) => ({
-            from: entry.from + entry.durationInFrames,
-            trackId: entry.trackId,
-          })),
-        ),
-    },
-    {
-      id: 'delete',
-      icon: Trash2,
-      label: t('editor.concise.delete'),
-      onClick: () => useTimelineStore.getState().removeItems(ids),
-      destructive: true,
-    },
-    {
-      id: 'more',
-      icon: Ellipsis,
-      label: t('editor.concise.more.label'),
-      onClick: () => setMoreOpen(true),
-    },
+    duplicateVerb(t('editor.concise.duplicate'), items),
+    deleteVerb(t('editor.concise.delete'), ids),
+    moreVerb(t('editor.concise.more.label'), () => setMoreOpen(true)),
   ]
 
   return (
@@ -210,57 +197,81 @@ function BeatCuts({ item, fps }: { item: ShotItem; fps: number }) {
   const cutIn = ready ? planCutIn(beats.beatFrames, item.from) : null
   const readout = ready ? describeOutPoint(beats.beatFrames, end, fps) : null
 
-  const hint =
-    beats.status === 'none'
-      ? t('editor.concise.shot.beatNoMusic')
-      : beats.status === 'pending'
-        ? t('editor.concise.shot.beatPending')
-        : beats.status === 'failed'
-          ? t('editor.concise.shot.beatFailed')
-          : null
-
   return (
     <div className="space-y-2" data-testid="concise-shot-beat">
       <div className="flex gap-1">
-        <Button
-          variant="outline"
-          size="sm"
-          className="h-7 flex-1 px-2 text-xs"
+        <BeatCutButton
+          label={t('editor.concise.shot.cutOutToBeat')}
           disabled={!cutOut}
           title={ready && !cutOut ? t('editor.concise.shot.beatNoBeat') : undefined}
           onClick={() => cutOut && useTimelineStore.getState().trimItemEnd(item.id, cutOut.amount)}
-        >
-          {t('editor.concise.shot.cutOutToBeat')}
-        </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          className="h-7 flex-1 px-2 text-xs"
+        />
+        <BeatCutButton
+          label={t('editor.concise.shot.cutInToBeat')}
           disabled={!cutIn}
           title={ready && !cutIn ? t('editor.concise.shot.beatNoBeat') : undefined}
           onClick={() => cutIn && useTimelineStore.getState().trimItemStart(item.id, cutIn.amount)}
-        >
-          {t('editor.concise.shot.cutInToBeat')}
-        </Button>
+        />
       </div>
       <p
         className="text-xs text-muted-foreground tabular-nums"
         data-testid="concise-shot-beat-readout"
       >
-        {hint ??
-          (readout
-            ? t(
-                readout.direction === 'on'
-                  ? 'editor.concise.shot.beatOutOn'
-                  : readout.direction === 'after'
-                    ? 'editor.concise.shot.beatOutAfter'
-                    : 'editor.concise.shot.beatOutBefore',
-                { ms: readout.ms, time: readout.beatSeconds.toFixed(2) },
-              )
-            : t('editor.concise.shot.beatNoBeat'))}
+        {beatReadoutText(t, beats.status, readout)}
       </p>
     </div>
   )
+}
+
+function BeatCutButton({
+  label,
+  disabled,
+  title,
+  onClick,
+}: {
+  label: string
+  disabled: boolean
+  title?: string
+  onClick: () => void
+}) {
+  return (
+    <Button
+      variant="outline"
+      size="sm"
+      className="h-7 flex-1 px-2 text-xs"
+      disabled={disabled}
+      title={title}
+      onClick={onClick}
+    >
+      {label}
+    </Button>
+  )
+}
+
+const BEAT_STATUS_HINT_KEYS = {
+  none: 'editor.concise.shot.beatNoMusic',
+  pending: 'editor.concise.shot.beatPending',
+  failed: 'editor.concise.shot.beatFailed',
+} as const
+
+const BEAT_OUT_KEYS = {
+  on: 'editor.concise.shot.beatOutOn',
+  after: 'editor.concise.shot.beatOutAfter',
+  before: 'editor.concise.shot.beatOutBefore',
+} as const
+
+/** The line under the cut buttons: why beats are unavailable, or where the out point sits. */
+function beatReadoutText(
+  t: TFunction,
+  status: ReturnType<typeof useTimelineBeats>['status'],
+  readout: ReturnType<typeof describeOutPoint> | null,
+): string {
+  if (status !== 'ready') return t(BEAT_STATUS_HINT_KEYS[status])
+  if (!readout) return t('editor.concise.shot.beatNoBeat')
+  return t(BEAT_OUT_KEYS[readout.direction], {
+    ms: readout.ms,
+    time: readout.beatSeconds.toFixed(2),
+  })
 }
 
 /** Speed slider and presets; applied exactly like the clip panel's playback section. */

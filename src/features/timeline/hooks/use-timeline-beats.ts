@@ -19,7 +19,7 @@ export interface TimelineBeats {
   itemId: string | null
 }
 
-export const NO_TIMELINE_BEATS: TimelineBeats = {
+const NO_TIMELINE_BEATS: TimelineBeats = {
   status: 'none',
   bpm: null,
   beatFrames: [],
@@ -113,7 +113,7 @@ export function computeTimelineBeats(
 }
 
 /** True when the beat grid is on screen (the "Show beat grid" setting, on by default). */
-export function isBeatGridVisible(): boolean {
+function isBeatGridVisible(): boolean {
   return useSettingsStore.getState().showBeatGrid
 }
 

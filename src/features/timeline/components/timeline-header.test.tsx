@@ -1,5 +1,4 @@
 import { act, fireEvent, render, screen } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
 import { usePlaybackStore } from '@/shared/state/playback'
 import type { FocusEventHandler, KeyboardEventHandler, PointerEventHandler } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vite-plus/test'
@@ -333,6 +332,11 @@ describe('TimelineHeader zoom slider', () => {
   })
 })
 
+/** Radix dropdown triggers open on pointerdown rather than click. */
+function openMenu(trigger: HTMLElement) {
+  fireEvent.pointerDown(trigger, { button: 0, ctrlKey: false, pointerType: 'mouse' })
+}
+
 describe('TimelineHeader concise workspace', () => {
   beforeEach(() => {
     splitSpy.mockClear()
@@ -378,22 +382,20 @@ describe('TimelineHeader concise workspace', () => {
 
   it('opens the sidebar tab from the Add menu', async () => {
     useEditorStore.setState({ activeTab: 'media', leftSidebarOpen: false })
-    const user = userEvent.setup()
     render(<TimelineHeader />)
 
-    await user.click(screen.getByRole('button', { name: 'Add' }))
-    await user.click(await screen.findByRole('menuitem', { name: 'Transitions' }))
+    openMenu(screen.getByRole('button', { name: 'Add' }))
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Transitions' }))
 
     expect(useEditorStore.getState().activeTab).toBe('transitions')
     expect(useEditorStore.getState().leftSidebarOpen).toBe(true)
   })
 
   it('runs the same tool handlers from the More menu', async () => {
-    const user = userEvent.setup()
     render(<TimelineHeader />)
 
-    await user.click(screen.getByRole('button', { name: 'More' }))
-    await user.click(await screen.findByRole('menuitem', { name: /Razor Tool/ }))
+    openMenu(screen.getByRole('button', { name: 'More' }))
+    fireEvent.click(await screen.findByRole('menuitem', { name: /Razor Tool/ }))
 
     expect(useSelectionStore.getState().activeTool).toBe('razor')
   })
@@ -401,11 +403,10 @@ describe('TimelineHeader concise workspace', () => {
   it('adds a marker at the playhead from the More menu', async () => {
     usePlaybackStore.setState({ currentFrame: 12 })
     const addMarker = vi.spyOn(useTimelineStore.getState(), 'addMarker')
-    const user = userEvent.setup()
     render(<TimelineHeader />)
 
-    await user.click(screen.getByRole('button', { name: 'More' }))
-    await user.click(await screen.findByRole('menuitem', { name: /Add Marker/ }))
+    openMenu(screen.getByRole('button', { name: 'More' }))
+    fireEvent.click(await screen.findByRole('menuitem', { name: /Add Marker/ }))
 
     expect(addMarker).toHaveBeenCalledWith(12)
     addMarker.mockRestore()

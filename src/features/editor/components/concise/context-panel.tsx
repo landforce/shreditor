@@ -45,5 +45,3 @@ export const ConciseContextPanel = memo(function ConciseContextPanel() {
       return <PropertiesHost />
   }
 })
-
-export default ConciseContextPanel

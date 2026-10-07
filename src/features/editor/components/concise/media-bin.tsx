@@ -19,7 +19,7 @@ import {
   useMediaLibraryStore,
 } from '@/features/editor/deps/media-library'
 
-export type ConciseMediaBinLayout = 'panel' | 'strip'
+type ConciseMediaBinLayout = 'panel' | 'strip'
 
 const FOCUS_EVENT = 'shreditor:focus-media-bin'
 const FLASH_MS = 1200

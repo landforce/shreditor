@@ -516,6 +516,42 @@ const ImageClipVisualContent = memo(function ImageClipVisualContent({
   )
 })
 
+/** A caption over a bold line; concise lanes are too short for the caption, so it drops out there. */
+function CaptionedLabel({
+  singleRow,
+  caption,
+  text,
+}: {
+  singleRow: boolean
+  caption: string
+  text: string
+}) {
+  return (
+    <div
+      className={`absolute inset-0 flex flex-col px-2 overflow-hidden ${singleRow ? 'justify-center' : 'py-1'}`}
+    >
+      {singleRow ? null : (
+        <div className="text-[10px] text-muted-foreground truncate">{caption}</div>
+      )}
+      <div className="text-xs font-medium truncate flex-1">{text}</div>
+    </div>
+  )
+}
+
+function AdjustmentClipLabel({ item }: { item: Extract<TimelineItem, { type: 'adjustment' }> }) {
+  const enabledEffectsCount = item.effects?.filter((effect) => effect.enabled).length ?? 0
+  return (
+    <div className="absolute inset-0 flex flex-col px-2 py-1 overflow-hidden">
+      <div className="text-[10px] text-muted-foreground truncate">Adjustment Layer</div>
+      <div className="text-xs font-medium truncate flex-1">
+        {enabledEffectsCount > 0
+          ? `${enabledEffectsCount} effect${enabledEffectsCount > 1 ? 's' : ''}`
+          : 'No effects'}
+      </div>
+    </div>
+  )
+}
+
 const StaticClipContent = memo(function StaticClipContent({ item }: { item: TimelineItem }) {
   perfMarkRender('ClipContent')
   // Concise text lanes are 28px tall: only the label row fits, no caption row.
@@ -523,49 +559,26 @@ const StaticClipContent = memo(function StaticClipContent({ item }: { item: Time
 
   if (item.type === 'text') {
     return (
-      <div
-        className={`absolute inset-0 flex flex-col px-2 overflow-hidden ${singleRow ? 'justify-center' : 'py-1'}`}
-      >
-        {singleRow ? null : <div className="text-[10px] text-muted-foreground truncate">Text</div>}
-        <div className="text-xs font-medium truncate flex-1">
-          {getTextItemPlainText(item) || 'Empty text'}
-        </div>
-      </div>
+      <CaptionedLabel
+        singleRow={singleRow}
+        caption="Text"
+        text={getTextItemPlainText(item) || 'Empty text'}
+      />
     )
   }
 
   if (item.type === 'subtitle') {
     const cueCount = item.cues.length
-    const firstCueText = item.cues[0]?.text ?? ''
     return (
-      <div
-        className={`absolute inset-0 flex flex-col px-2 overflow-hidden ${singleRow ? 'justify-center' : 'py-1'}`}
-      >
-        {singleRow ? null : (
-          <div className="text-[10px] text-muted-foreground truncate">
-            {`Subtitles · ${cueCount} cue${cueCount === 1 ? '' : 's'}`}
-          </div>
-        )}
-        <div className="text-xs font-medium truncate flex-1">
-          {firstCueText || item.label || 'Subtitles'}
-        </div>
-      </div>
+      <CaptionedLabel
+        singleRow={singleRow}
+        caption={`Subtitles · ${cueCount} cue${cueCount === 1 ? '' : 's'}`}
+        text={item.cues[0]?.text || item.label || 'Subtitles'}
+      />
     )
   }
 
-  if (item.type === 'adjustment') {
-    const enabledEffectsCount = item.effects?.filter((effect) => effect.enabled).length ?? 0
-    return (
-      <div className="absolute inset-0 flex flex-col px-2 py-1 overflow-hidden">
-        <div className="text-[10px] text-muted-foreground truncate">Adjustment Layer</div>
-        <div className="text-xs font-medium truncate flex-1">
-          {enabledEffectsCount > 0
-            ? `${enabledEffectsCount} effect${enabledEffectsCount > 1 ? 's' : ''}`
-            : 'No effects'}
-        </div>
-      </div>
-    )
-  }
+  if (item.type === 'adjustment') return <AdjustmentClipLabel item={item} />
 
   return <div className="px-2 py-1 text-xs font-medium truncate">{item.label}</div>
 })

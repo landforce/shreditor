@@ -1,5 +1,14 @@
 import { cn } from '@/shared/ui/cn'
-import { useEffect, useState, useRef, useCallback, memo, lazy, Suspense } from 'react'
+import {
+  useEffect,
+  useState,
+  useRef,
+  useCallback,
+  memo,
+  lazy,
+  Suspense,
+  type RefObject,
+} from 'react'
 import { useRouter } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 import { createLogger, createOperationId } from '@/shared/logging/logger'
@@ -419,6 +428,159 @@ const TimelineShortcutsController = memo(function TimelineShortcutsController() 
   return null
 })
 
+type EditorProject = EditorProps['project']
+
+/** Color and Concise lay out their own panels instead of the default sidebar columns. */
+function hidesDefaultSidebarsFor(workspace: string): boolean {
+  return workspace === 'color' || workspace === 'concise'
+}
+
+/** The Concise workspace replaces the whole default editor body with its own shell. */
+function ConciseWorkspaceBody({
+  project,
+  onSave,
+  locked,
+}: {
+  project: EditorProject
+  onSave: () => Promise<void>
+  locked: boolean
+}) {
+  return (
+    <InteractionLockRegion locked={locked} className="min-w-0 flex-1">
+      <ErrorBoundary level="feature">
+        <Suspense fallback={null}>
+          <LazyConciseShell project={project} onSave={onSave} />
+        </Suspense>
+      </ErrorBoundary>
+    </InteractionLockRegion>
+  )
+}
+
+/** Color replaces the default shell: preview, timeline navigator and grading dock. */
+function ColorWorkspaceBody({ project, locked }: { project: EditorProject; locked: boolean }) {
+  return (
+    <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+        <ErrorBoundary level="feature">
+          <PreviewArea project={project} />
+        </ErrorBoundary>
+      </div>
+      <Suspense fallback={null}>
+        <LazyColorTimelineNavigator />
+      </Suspense>
+      <InteractionLockRegion
+        locked={locked}
+        className="h-[37%] min-h-[288px] max-h-[39vh] shrink-0"
+      >
+        <ErrorBoundary level="feature">
+          <Suspense fallback={null}>
+            <LazyColorGradingDock />
+          </Suspense>
+        </ErrorBoundary>
+      </InteractionLockRegion>
+    </div>
+  )
+}
+
+/** Preview + sidebars over the timeline, in a resizable vertical split (Motion swaps the surfaces). */
+function DefaultWorkspaceBody({
+  project,
+  locked,
+  isMotionWorkspace,
+  mediaFullColumn,
+  propertiesFullColumn,
+  editorLayout,
+  timelinePanelRef,
+  timelineDuration,
+}: {
+  project: EditorProject
+  locked: boolean
+  isMotionWorkspace: boolean
+  mediaFullColumn: boolean
+  propertiesFullColumn: boolean
+  editorLayout: ReturnType<typeof getEditorLayout>
+  timelinePanelRef: RefObject<ImperativePanelHandle | null>
+  timelineDuration: number
+}) {
+  return (
+    <ResizablePanelGroup
+      direction="vertical"
+      className="flex-1 min-w-0"
+      autoSaveId="editor:timeline-layout"
+    >
+      {/* Top - Preview + Properties (inline mode) */}
+      <ResizablePanel
+        defaultSize={100 - editorLayout.timelineDefaultSize}
+        minSize={100 - editorLayout.timelineMaxSize}
+        maxSize={100 - editorLayout.timelineMinSize}
+      >
+        <div className="h-full flex overflow-hidden relative gap-[var(--panel-gap)]">
+          {/* Left Sidebar - Media Library (inline with preview) */}
+          {!mediaFullColumn && (
+            <InteractionLockRegion locked={locked} className="editor-panel">
+              <ErrorBoundary level="feature">
+                <MediaSidebar />
+              </ErrorBoundary>
+            </InteractionLockRegion>
+          )}
+
+          {/* Center - Preview */}
+          <div className="editor-panel flex min-w-0 flex-1 flex-col">
+            <ErrorBoundary level="feature">
+              {isMotionWorkspace ? (
+                <MotionPreviewArea project={project} />
+              ) : (
+                <PreviewArea project={project} />
+              )}
+            </ErrorBoundary>
+          </div>
+
+          {/* Right Sidebar - Properties (inline with preview) */}
+          {!propertiesFullColumn && (
+            <InteractionLockRegion locked={locked} className="editor-panel">
+              <ErrorBoundary level="feature">
+                <PropertiesSidebar />
+              </ErrorBoundary>
+            </InteractionLockRegion>
+          )}
+        </div>
+      </ResizablePanel>
+
+      <ResizableHandle
+        className={cn(
+          'bg-transparent data-[panel-group-direction=vertical]:h-[var(--panel-gap)] hover:bg-primary/40',
+          locked && 'pointer-events-none opacity-60',
+        )}
+      />
+
+      {/* Bottom - Timeline */}
+      <ResizablePanel
+        ref={timelinePanelRef}
+        defaultSize={editorLayout.timelineDefaultSize}
+        minSize={editorLayout.timelineMinSize}
+        maxSize={editorLayout.timelineMaxSize}
+      >
+        <InteractionLockRegion locked={locked} className="h-full">
+          <ErrorBoundary level="feature">
+            <div className="h-full flex overflow-hidden gap-[var(--panel-gap)]">
+              <div className="editor-panel min-w-0 flex-1">
+                {isMotionWorkspace ? (
+                  <MotionTimelineDock project={project} />
+                ) : (
+                  <Suspense fallback={null}>
+                    <LazyTimeline duration={timelineDuration} />
+                  </Suspense>
+                )}
+              </div>
+              <AudioMeterPanel />
+            </div>
+          </ErrorBoundary>
+        </InteractionLockRegion>
+      </ResizablePanel>
+    </ResizablePanelGroup>
+  )
+}
+
 export const LoadedEditor = memo(function LoadedEditor({
   projectId,
   project,
@@ -734,7 +896,7 @@ export const LoadedEditor = memo(function LoadedEditor({
   const isConciseWorkspace = workspace === 'concise'
   // Color replaces the default editor shell. Motion deliberately keeps it and
   // swaps the preview/timeline surfaces while retaining the shared sidebars.
-  const hidesDefaultSidebars = isColorWorkspace
+  const hidesDefaultSidebars = hidesDefaultSidebarsFor(workspace)
 
   return (
     <div
@@ -766,7 +928,7 @@ export const LoadedEditor = memo(function LoadedEditor({
           floating panels: rounded cards separated by a small gap. */}
       <div className="flex-1 flex overflow-hidden gap-[var(--panel-gap)] px-[var(--panel-gap)] pb-[var(--panel-gap)]">
         {/* Left Sidebar - Media Library (full column mode) */}
-        {mediaFullColumn && !hidesDefaultSidebars && !isConciseWorkspace && (
+        {mediaFullColumn && !hidesDefaultSidebars && (
           <InteractionLockRegion locked={isMaskEditingActive} className="editor-panel">
             <ErrorBoundary level="feature">
               <MediaSidebar />
@@ -776,114 +938,28 @@ export const LoadedEditor = memo(function LoadedEditor({
 
         {/* Right side: Preview/Properties + Timeline */}
         {isConciseWorkspace ? (
-          <InteractionLockRegion locked={isMaskEditingActive} className="min-w-0 flex-1">
-            <ErrorBoundary level="feature">
-              <Suspense fallback={null}>
-                <LazyConciseShell project={project} onSave={handleSave} />
-              </Suspense>
-            </ErrorBoundary>
-          </InteractionLockRegion>
+          <ConciseWorkspaceBody
+            project={project}
+            onSave={handleSave}
+            locked={isMaskEditingActive}
+          />
         ) : isColorWorkspace ? (
-          <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-            <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-              <ErrorBoundary level="feature">
-                <PreviewArea project={project} />
-              </ErrorBoundary>
-            </div>
-            <Suspense fallback={null}>
-              <LazyColorTimelineNavigator />
-            </Suspense>
-            <InteractionLockRegion
-              locked={isMaskEditingActive}
-              className="h-[37%] min-h-[288px] max-h-[39vh] shrink-0"
-            >
-              <ErrorBoundary level="feature">
-                <Suspense fallback={null}>
-                  <LazyColorGradingDock />
-                </Suspense>
-              </ErrorBoundary>
-            </InteractionLockRegion>
-          </div>
+          <ColorWorkspaceBody project={project} locked={isMaskEditingActive} />
         ) : (
-          <ResizablePanelGroup
-            direction="vertical"
-            className="flex-1 min-w-0"
-            autoSaveId="editor:timeline-layout"
-          >
-            {/* Top - Preview + Properties (inline mode) */}
-            <ResizablePanel
-              defaultSize={100 - editorLayout.timelineDefaultSize}
-              minSize={100 - editorLayout.timelineMaxSize}
-              maxSize={100 - editorLayout.timelineMinSize}
-            >
-              <div className="h-full flex overflow-hidden relative gap-[var(--panel-gap)]">
-                {/* Left Sidebar - Media Library (inline with preview) */}
-                {!mediaFullColumn && (
-                  <InteractionLockRegion locked={isMaskEditingActive} className="editor-panel">
-                    <ErrorBoundary level="feature">
-                      <MediaSidebar />
-                    </ErrorBoundary>
-                  </InteractionLockRegion>
-                )}
-
-                {/* Center - Preview */}
-                <div className="editor-panel flex min-w-0 flex-1 flex-col">
-                  <ErrorBoundary level="feature">
-                    {isMotionWorkspace ? (
-                      <MotionPreviewArea project={project} />
-                    ) : (
-                      <PreviewArea project={project} />
-                    )}
-                  </ErrorBoundary>
-                </div>
-
-                {/* Right Sidebar - Properties (inline with preview) */}
-                {!propertiesFullColumn && (
-                  <InteractionLockRegion locked={isMaskEditingActive} className="editor-panel">
-                    <ErrorBoundary level="feature">
-                      <PropertiesSidebar />
-                    </ErrorBoundary>
-                  </InteractionLockRegion>
-                )}
-              </div>
-            </ResizablePanel>
-
-            <ResizableHandle
-              className={cn(
-                'bg-transparent data-[panel-group-direction=vertical]:h-[var(--panel-gap)] hover:bg-primary/40',
-                isMaskEditingActive && 'pointer-events-none opacity-60',
-              )}
-            />
-
-            {/* Bottom - Timeline */}
-            <ResizablePanel
-              ref={timelinePanelRef}
-              defaultSize={editorLayout.timelineDefaultSize}
-              minSize={editorLayout.timelineMinSize}
-              maxSize={editorLayout.timelineMaxSize}
-            >
-              <InteractionLockRegion locked={isMaskEditingActive} className="h-full">
-                <ErrorBoundary level="feature">
-                  <div className="h-full flex overflow-hidden gap-[var(--panel-gap)]">
-                    <div className="editor-panel min-w-0 flex-1">
-                      {isMotionWorkspace ? (
-                        <MotionTimelineDock project={project} />
-                      ) : (
-                        <Suspense fallback={null}>
-                          <LazyTimeline duration={timelineDuration} />
-                        </Suspense>
-                      )}
-                    </div>
-                    <AudioMeterPanel />
-                  </div>
-                </ErrorBoundary>
-              </InteractionLockRegion>
-            </ResizablePanel>
-          </ResizablePanelGroup>
+          <DefaultWorkspaceBody
+            project={project}
+            locked={isMaskEditingActive}
+            isMotionWorkspace={isMotionWorkspace}
+            mediaFullColumn={mediaFullColumn}
+            propertiesFullColumn={propertiesFullColumn}
+            editorLayout={editorLayout}
+            timelinePanelRef={timelinePanelRef}
+            timelineDuration={timelineDuration}
+          />
         )}
 
         {/* Right Sidebar - Properties (full column mode) */}
-        {propertiesFullColumn && !hidesDefaultSidebars && !isConciseWorkspace && (
+        {propertiesFullColumn && !hidesDefaultSidebars && (
           <InteractionLockRegion locked={isMaskEditingActive} className="editor-panel">
             <ErrorBoundary level="feature">
               <PropertiesSidebar />

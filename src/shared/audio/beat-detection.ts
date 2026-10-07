@@ -60,11 +60,7 @@ interface OnsetEnvelope {
   strength: Float32Array
 }
 
-function computeOnsetEnvelope(mono: Float32Array): OnsetEnvelope | null {
-  const blockCount = Math.floor(mono.length / HOP_SIZE)
-  const frameCount = blockCount - 1
-  if (frameCount < 8) return null
-
+function computeBlockEnergy(mono: Float32Array, blockCount: number): Float64Array {
   const blockEnergy = new Float64Array(blockCount)
   for (let b = 0; b < blockCount; b++) {
     let sum = 0
@@ -75,7 +71,10 @@ function computeOnsetEnvelope(mono: Float32Array): OnsetEnvelope | null {
     }
     blockEnergy[b] = sum
   }
+  return blockEnergy
+}
 
+function computeRms(blockEnergy: Float64Array, frameCount: number) {
   const rms = new Float64Array(frameCount)
   let maxRms = 0
   for (let f = 0; f < frameCount; f++) {
@@ -83,15 +82,23 @@ function computeOnsetEnvelope(mono: Float32Array): OnsetEnvelope | null {
     rms[f] = value
     if (value > maxRms) maxRms = value
   }
-  if (maxRms < 1e-6) return null
+  return { rms, maxRms }
+}
 
+/** Positive rise of the log-compressed RMS from one frame to the next. */
+function computeFlux(rms: Float64Array, maxRms: number): Float64Array {
+  const frameCount = rms.length
   const compressed = new Float64Array(frameCount)
   for (let f = 0; f < frameCount; f++) compressed[f] = Math.log1p((100 * rms[f]!) / maxRms)
 
   const flux = new Float64Array(frameCount)
   for (let f = 1; f < frameCount; f++) flux[f] = Math.max(0, compressed[f]! - compressed[f - 1]!)
+  return flux
+}
 
-  // Subtract a short moving average so steady loudness changes do not read as onsets.
+/** Subtract a short moving average so steady loudness changes do not read as onsets. */
+function subtractMovingAverage(flux: Float64Array): Float32Array {
+  const frameCount = flux.length
   const strength = new Float32Array(frameCount)
   const half = (MOVING_AVERAGE_FRAMES - 1) / 2
   let windowSum = 0
@@ -105,7 +112,18 @@ function computeOnsetEnvelope(mono: Float32Array): OnsetEnvelope | null {
     const mean = windowSum / (hi - lo + 1)
     strength[f] = Math.max(0, flux[f]! - mean)
   }
-  return { strength }
+  return strength
+}
+
+function computeOnsetEnvelope(mono: Float32Array): OnsetEnvelope | null {
+  const blockCount = Math.floor(mono.length / HOP_SIZE)
+  const frameCount = blockCount - 1
+  if (frameCount < 8) return null
+
+  const { rms, maxRms } = computeRms(computeBlockEnergy(mono, blockCount), frameCount)
+  if (maxRms < 1e-6) return null
+
+  return { strength: subtractMovingAverage(computeFlux(rms, maxRms)) }
 }
 
 /** Linear interpolation of the envelope at a fractional frame index (0 outside). */
@@ -135,14 +153,12 @@ function lagForBpm(bpm: number, framesPerSecond: number): number {
   return (60 / bpm) * framesPerSecond
 }
 
-function estimateTempo(
-  strength: Float32Array,
-  framesPerSecond: number,
-  options: Required<
-    Pick<BeatDetectionOptions, 'minBpm' | 'maxBpm' | 'preferredMinBpm' | 'preferredMaxBpm'>
-  >,
-): number {
-  const { minBpm, maxBpm, preferredMinBpm, preferredMaxBpm } = options
+type TempoRange = Required<
+  Pick<BeatDetectionOptions, 'minBpm' | 'maxBpm' | 'preferredMinBpm' | 'preferredMaxBpm'>
+>
+
+function strongestBpm(strength: Float32Array, framesPerSecond: number, range: TempoRange): number {
+  const { minBpm, maxBpm, preferredMinBpm, preferredMaxBpm } = range
   const periodicity = (bpm: number) => {
     const lag = lagForBpm(bpm, framesPerSecond)
     return autocorrelationAt(strength, lag) + 0.5 * autocorrelationAt(strength, lag * 2)
@@ -158,17 +174,32 @@ function estimateTempo(
       bestBpm = bpm
     }
   }
-  if (bestBpm === 0) return 0
+  return bestBpm
+}
 
-  // Fold a doubled/halved tempo into the preferred octave when it fits nearly as well.
+/** Fold a doubled/halved tempo into the preferred octave when it fits nearly as well. */
+function foldIntoPreferredOctave(
+  bestBpm: number,
+  strength: Float32Array,
+  framesPerSecond: number,
+  range: TempoRange,
+): number {
+  const { minBpm, maxBpm, preferredMinBpm, preferredMaxBpm } = range
   const fitAt = (bpm: number) => autocorrelationAt(strength, lagForBpm(bpm, framesPerSecond))
   const base = fitAt(bestBpm)
   if (bestBpm < preferredMinBpm && bestBpm * 2 <= maxBpm) {
-    if (fitAt(bestBpm * 2) >= base * 0.7) bestBpm *= 2
-  } else if (bestBpm > preferredMaxBpm && bestBpm / 2 >= minBpm) {
-    if (fitAt(bestBpm / 2) >= base * 0.7) bestBpm /= 2
+    return fitAt(bestBpm * 2) >= base * 0.7 ? bestBpm * 2 : bestBpm
+  }
+  if (bestBpm > preferredMaxBpm && bestBpm / 2 >= minBpm) {
+    return fitAt(bestBpm / 2) >= base * 0.7 ? bestBpm / 2 : bestBpm
   }
   return bestBpm
+}
+
+function estimateTempo(strength: Float32Array, framesPerSecond: number, range: TempoRange): number {
+  const bestBpm = strongestBpm(strength, framesPerSecond, range)
+  if (bestBpm === 0) return 0
+  return foldIntoPreferredOctave(bestBpm, strength, framesPerSecond, range)
 }
 
 function findPhase(strength: Float32Array, periodFrames: number): number {
@@ -193,33 +224,44 @@ interface OnsetPeak {
   strength: number
 }
 
+function maxOf(values: Float32Array): number {
+  let max = 0
+  for (const value of values) if (value > max) max = value
+  return max
+}
+
+/**
+ * The rise first shows in the frame that just took in the onset: its newest
+ * hop of samples holds the attack. Find the loudest sample there.
+ */
+function loudestSampleIndex(mono: Float32Array, frame: number): number {
+  const regionStart = frame * HOP_SIZE + FRAME_SIZE - HOP_SIZE
+  const regionEnd = Math.min(mono.length, regionStart + HOP_SIZE)
+  let loudest = regionStart
+  let loudestValue = 0
+  for (let i = regionStart; i < regionEnd; i++) {
+    const magnitude = Math.abs(mono[i]!)
+    if (magnitude > loudestValue) {
+      loudestValue = magnitude
+      loudest = i
+    }
+  }
+  return loudest
+}
+
 function pickOnsetPeaks(
   strength: Float32Array,
   mono: Float32Array,
   sampleRate: number,
 ): OnsetPeak[] {
-  let max = 0
-  for (const value of strength) if (value > max) max = value
+  const max = maxOf(strength)
   if (max === 0) return []
   const threshold = max * 0.15
   const peaks: OnsetPeak[] = []
   for (let f = 1; f < strength.length - 1; f++) {
     const value = strength[f]!
     if (value < threshold || value <= strength[f - 1]! || value < strength[f + 1]!) continue
-    // The rise first shows in the frame that just took in the onset: its newest
-    // hop of samples holds the attack. Find the loudest sample there.
-    const regionStart = f * HOP_SIZE + FRAME_SIZE - HOP_SIZE
-    const regionEnd = Math.min(mono.length, regionStart + HOP_SIZE)
-    let loudest = regionStart
-    let loudestValue = 0
-    for (let i = regionStart; i < regionEnd; i++) {
-      const magnitude = Math.abs(mono[i]!)
-      if (magnitude > loudestValue) {
-        loudestValue = magnitude
-        loudest = i
-      }
-    }
-    peaks.push({ time: loudest / sampleRate, strength: value })
+    peaks.push({ time: loudestSampleIndex(mono, f) / sampleRate, strength: value })
   }
   return peaks
 }
@@ -278,16 +320,113 @@ function fitGrid(
   return { start: meanT - interval * meanI, interval }
 }
 
+function resolveOptions(options: BeatDetectionOptions) {
+  return {
+    minBpm: options.minBpm ?? 60,
+    maxBpm: options.maxBpm ?? 200,
+    preferredMinBpm: options.preferredMinBpm ?? 80,
+    preferredMaxBpm: options.preferredMaxBpm ?? 160,
+    tolerance: options.snapToleranceSeconds ?? 0.04,
+  }
+}
+
+interface SnapPass {
+  snapped: number[]
+  points: Array<{ index: number; time: number }>
+}
+
+function snapGridToPeaks(
+  peaks: OnsetPeak[],
+  start: number,
+  step: number,
+  duration: number,
+  tolerance: number,
+): SnapPass {
+  const grid = gridTimes(start, step, duration)
+  const points: SnapPass['points'] = []
+  const snapped = grid.map((time, index) => {
+    const peakTime = nearestPeakTime(peaks, time, tolerance)
+    if (peakTime === null) return time
+    points.push({ index, time: peakTime })
+    return peakTime
+  })
+  return { snapped, points }
+}
+
+/** Where the first beat falls: the first grid line at or after 0. */
+function normalizeFirstTime(firstTime: number, interval: number): number {
+  let time = firstTime
+  while (time < 0) time += interval
+  while (time - interval >= 0) time -= interval
+  return time
+}
+
+interface GridSnapContext {
+  peaks: OnsetPeak[]
+  duration: number
+  tolerance: number
+  minBpm: number
+  maxBpm: number
+}
+
+/**
+ * Snap the grid to onset peaks, then re-fit it through the beats that found an
+ * onset so a slightly-off tempo estimate cannot drift away from the music, and
+ * snap once more.
+ */
+function snapAndRefit(
+  ctx: GridSnapContext,
+  bpm: number,
+  firstTime: number,
+  interval: number,
+): { snapped: number[]; interval: number } {
+  const { peaks, duration, tolerance, minBpm, maxBpm } = ctx
+  const pass = snapGridToPeaks(peaks, firstTime, interval, duration, tolerance)
+  const fit = fitGrid(pass.points)
+  if (!fit || fit.interval <= 0) return { snapped: pass.snapped, interval }
+  const fitBpm = 60 / fit.interval
+  if (fitBpm < minBpm || fitBpm > maxBpm || Math.abs(fitBpm - bpm) / bpm >= 0.05) {
+    return { snapped: pass.snapped, interval }
+  }
+  const start = normalizeFirstTime(fit.start, fit.interval)
+  const refit = snapGridToPeaks(peaks, start, fit.interval, duration, tolerance)
+  return { snapped: refit.snapped, interval: fit.interval }
+}
+
+function beatStrengthAt(strength: Float32Array, time: number, sampleRate: number): number {
+  return sampleAt(strength, (time * sampleRate - FRAME_SIZE + HOP_SIZE / 2) / HOP_SIZE)
+}
+
+function computeConfidence(strength: Float32Array, beats: number[], sampleRate: number): number {
+  let onBeat = 0
+  for (const time of beats) onBeat += beatStrengthAt(strength, time, sampleRate)
+  let total = 0
+  for (const value of strength) total += value
+  const meanStrength = total / strength.length
+  const ratio = meanStrength > 0 ? onBeat / beats.length / meanStrength : 1
+  return Math.max(0, Math.min(1, 1 - 1 / Math.max(1, ratio)))
+}
+
+function pickDownbeats(
+  strength: Float32Array,
+  beats: number[],
+  sampleRate: number,
+): number[] | undefined {
+  if (beats.length < 8) return undefined
+  const sums = [0, 0, 0, 0]
+  beats.forEach((time, index) => {
+    sums[index % 4]! += beatStrengthAt(strength, time, sampleRate)
+  })
+  const offset = sums.indexOf(Math.max(...sums))
+  return beats.filter((_, index) => index % 4 === offset)
+}
+
 export function detectBeats(
   buffer: BeatDetectionInput,
   options: BeatDetectionOptions = {},
 ): BeatAnalysis {
   const { sampleRate } = buffer
-  const minBpm = options.minBpm ?? 60
-  const maxBpm = options.maxBpm ?? 200
-  const preferredMinBpm = options.preferredMinBpm ?? 80
-  const preferredMaxBpm = options.preferredMaxBpm ?? 160
-  const tolerance = options.snapToleranceSeconds ?? 0.04
+  const { minBpm, maxBpm, preferredMinBpm, preferredMaxBpm, tolerance } = resolveOptions(options)
 
   if (!(sampleRate > 0)) return { ...EMPTY }
   const mono = mixToMono(buffer)
@@ -312,67 +451,27 @@ export function detectBeats(
   // A strength frame's time is the middle of the hop of samples it just took in.
   const frameToSeconds = (frame: number) =>
     (frame * HOP_SIZE + FRAME_SIZE - HOP_SIZE / 2) / sampleRate
-  let interval = (periodFrames * HOP_SIZE) / sampleRate
-  let firstTime = frameToSeconds(phaseFrames)
+  const interval = (periodFrames * HOP_SIZE) / sampleRate
   // Start at the first beat at or after 0 (the phase can sit anywhere in a period).
-  while (firstTime - interval >= 0) firstTime -= interval
+  const firstTime = normalizeFirstTime(frameToSeconds(phaseFrames), interval)
 
   const peaks = pickOnsetPeaks(strength, mono, sampleRate)
+  const result = snapAndRefit(
+    { peaks, duration, tolerance, minBpm, maxBpm },
+    bpm,
+    firstTime,
+    interval,
+  )
 
-  const snapAll = (start: number, step: number) => {
-    const grid = gridTimes(start, step, duration)
-    const points: Array<{ index: number; time: number }> = []
-    const snapped = grid.map((time, index) => {
-      const peakTime = nearestPeakTime(peaks, time, tolerance)
-      if (peakTime === null) return time
-      points.push({ index, time: peakTime })
-      return peakTime
-    })
-    return { snapped, points }
-  }
-
-  let pass = snapAll(firstTime, interval)
-  // Re-fit the grid through the beats that found an onset, so a slightly-off tempo
-  // estimate cannot drift away from the music, then snap once more.
-  const fit = fitGrid(pass.points)
-  if (fit && fit.interval > 0) {
-    const fitBpm = 60 / fit.interval
-    if (fitBpm >= minBpm && fitBpm <= maxBpm && Math.abs(fitBpm - bpm) / bpm < 0.05) {
-      interval = fit.interval
-      firstTime = fit.start
-      while (firstTime < 0) firstTime += interval
-      while (firstTime - interval >= 0) firstTime -= interval
-      pass = snapAll(firstTime, interval)
-    }
-  }
-
-  const beats = pass.snapped.filter((time, i) => i === 0 || time > pass.snapped[i - 1]!)
+  const { snapped } = result
+  const beats = snapped.filter((time, i) => i === 0 || time > snapped[i - 1]!)
   if (beats.length === 0) return { ...EMPTY }
 
-  let onBeat = 0
-  for (const time of beats)
-    onBeat += sampleAt(strength, (time * sampleRate - FRAME_SIZE + HOP_SIZE / 2) / HOP_SIZE)
-  let total = 0
-  for (const value of strength) total += value
-  const meanStrength = total / strength.length
-  const ratio = meanStrength > 0 ? onBeat / beats.length / meanStrength : 1
-  const confidence = Math.max(0, Math.min(1, 1 - 1 / Math.max(1, ratio)))
-
-  let downbeats: number[] | undefined
-  if (beats.length >= 8) {
-    const sums = [0, 0, 0, 0]
-    beats.forEach((time, index) => {
-      sums[index % 4]! += sampleAt(
-        strength,
-        (time * sampleRate - FRAME_SIZE + HOP_SIZE / 2) / HOP_SIZE,
-      )
-    })
-    const offset = sums.indexOf(Math.max(...sums))
-    downbeats = beats.filter((_, index) => index % 4 === offset)
-  }
+  const downbeats = pickDownbeats(strength, beats, sampleRate)
+  const confidence = computeConfidence(strength, beats, sampleRate)
 
   return {
-    bpm: Math.round((60 / interval) * 100) / 100,
+    bpm: Math.round((60 / result.interval) * 100) / 100,
     beats,
     ...(downbeats ? { downbeats } : {}),
     confidence: Math.round(confidence * 1000) / 1000,
