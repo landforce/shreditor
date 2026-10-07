@@ -649,6 +649,25 @@ const ClipPanelCore = memo(function ClipPanelCore({
         <TabsContent value="video" className="mt-3">
           {showVideoTab && (
             <div className="divide-y divide-border [&>*]:py-4 [&>*:first-child]:pt-0 [&>*:last-child]:pb-0">
+              {/* A title or text overlay opens on its words: the text box first,
+                  then its saved style and look, then position and compositing. */}
+              {isOnlyText && (
+                <Suspense fallback={null}>
+                  <LazyTextContentSection items={selectedItems} canvas={canvas} />
+                </Suspense>
+              )}
+              {isOnlyText && (
+                <Suspense fallback={null}>
+                  <LazyTextStylesSection items={selectedItems} canvas={canvas} />
+                </Suspense>
+              )}
+              {/* Text-only: Style (shadow/stroke) lives with the text, not on
+                  the Effects tab. Mixed selections keep it under Effects. */}
+              {isOnlyText && (
+                <Suspense fallback={null}>
+                  <LazyTextStyleSection items={selectedItems} canvas={canvas} />
+                </Suspense>
+              )}
               {showVideoTab && (
                 <LayoutSection
                   items={layoutFillItems}
@@ -669,21 +688,14 @@ const ClipPanelCore = memo(function ClipPanelCore({
                 />
               )}
               {paintableLayoutItems.length > 0 && <CornerPinSection items={paintableLayoutItems} />}
-              {hasTextItems && (
+              {hasTextItems && !isOnlyText && (
                 <Suspense fallback={null}>
                   <LazyTextStylesSection items={selectedItems} canvas={canvas} />
                 </Suspense>
               )}
-              {hasTextItems && (
+              {hasTextItems && !isOnlyText && (
                 <Suspense fallback={null}>
                   <LazyTextContentSection items={selectedItems} canvas={canvas} />
-                </Suspense>
-              )}
-              {/* Text-only: Style (shadow/stroke) lives with the text, not on
-                  the Effects tab. Mixed selections keep it under Effects. */}
-              {isOnlyText && (
-                <Suspense fallback={null}>
-                  <LazyTextStyleSection items={selectedItems} canvas={canvas} />
                 </Suspense>
               )}
               {hasShapeItems && <ShapeSection items={selectedItems} />}
