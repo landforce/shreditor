@@ -24,6 +24,14 @@ export {
 } from '@/infrastructure/storage/workspace-fs/project-revisions'
 export { readAgentPassLabel } from '@/infrastructure/storage/workspace-fs/agent-passes'
 export {
+  listCutGroup,
+  parkCutMediaLinks,
+  readCutPassCounts,
+  writeNewCutAgentFiles,
+  type CutGroup,
+  type CutSummary,
+} from '@/infrastructure/storage/workspace-fs/cuts'
+export {
   readAgentNotes,
   writeAgentNotes,
   type AgentNote,

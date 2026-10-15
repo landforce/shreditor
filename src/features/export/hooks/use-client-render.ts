@@ -35,6 +35,7 @@ import { useProjectStore } from '@/features/export/deps/projects'
 import { DEFAULT_PROJECT_HEIGHT, DEFAULT_PROJECT_WIDTH } from '@/shared/projects/defaults'
 import { resolveMediaUrls } from '@/features/export/deps/media-library'
 import { usePlaybackStore } from '@/shared/state/playback'
+import { cutExportName } from '@/shared/state/cuts'
 import { createLogger, createOperationId } from '@/shared/logging/logger'
 
 const log = createLogger('Export')
@@ -373,7 +374,9 @@ export function useClientRender(): UseClientRenderReturn {
     else if (mime.includes('audio/wav') || mime.includes('wave')) extension = 'wav'
     else if (mime.includes('audio/aac') || mime.includes('adts')) extension = 'aac'
 
-    const baseName = `export-${Date.now()}`
+    // One of several cuts: named "<project> · <cut label>" (docs/cuts.md).
+    const cutName = cutExportName(useProjectStore.getState().currentProject?.name ?? 'export')
+    const baseName = cutName ? cutName.replace(/[\\/:*?"<>|]+/g, '_') : `export-${Date.now()}`
     a.download = `${baseName}.${extension}`
     document.body.appendChild(a)
     a.click()

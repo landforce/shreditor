@@ -10,8 +10,8 @@ import {
 } from '../typography/text-styles/text-style-family.mjs'
 
 /** The label of a group's main cut until it is renamed. */
-export const MAIN_CUT_LABEL = 'Main'
-export const CUT_LABEL_MAX = 60
+const MAIN_CUT_LABEL = 'Main'
+const CUT_LABEL_MAX = 60
 /** The aspect presets the editor offers for a new cut (besides "same"). */
 export const CUT_ASPECT_PRESETS = Object.freeze(['9:16', '16:9', '1:1', '4:5'])
 

@@ -22,6 +22,8 @@ interface UnsavedChangesDialogProps {
   onOpenChange: (open: boolean) => void
   onSave: () => Promise<void>
   projectName?: string
+  /** Where to go after Save or Discard (default: the project list), e.g. another cut. */
+  onLeave?: () => void
 }
 
 export function UnsavedChangesDialog({
@@ -29,6 +31,7 @@ export function UnsavedChangesDialog({
   onOpenChange,
   onSave,
   projectName,
+  onLeave,
 }: UnsavedChangesDialogProps) {
   const navigate = useNavigate()
   const { t } = useTranslation()
@@ -39,7 +42,8 @@ export function UnsavedChangesDialog({
     try {
       await onSave()
       onOpenChange(false)
-      navigate({ to: '/projects' })
+      if (onLeave) onLeave()
+      else navigate({ to: '/projects' })
     } catch (error) {
       logger.error('Failed to save project:', error)
       // Keep dialog open on error
@@ -50,7 +54,8 @@ export function UnsavedChangesDialog({
 
   const handleDiscard = () => {
     onOpenChange(false)
-    navigate({ to: '/projects' })
+    if (onLeave) onLeave()
+    else navigate({ to: '/projects' })
   }
 
   return (

@@ -1,0 +1,52 @@
+{
+  "cuts": {
+    "switcher": {
+      "add": "Cut",
+      "addAria": "Make another cut of this edit",
+      "open": "Cut: {{label}}. Switch cuts",
+      "title": "Cuts",
+      "count_one": "· {{count}}",
+      "count_other": "· {{count}}",
+      "newCut": "New cut…",
+      "manage": "Manage cuts…",
+      "newPass": "new pass",
+      "freshAria": "Another cut has a new pass",
+      "score": {
+        "pass": "Scorecard: all pass",
+        "warn": "Scorecard: warnings",
+        "fail": "Scorecard: fails"
+      }
+    },
+    "new": {
+      "title": "New cut",
+      "description": "Another version of this edit, side by side: same media, its own timeline, passes and export. It starts as a copy of this cut.",
+      "label": "Label",
+      "labelPlaceholder": "Hook B",
+      "aspect": "Aspect",
+      "sameAspect": "Same ({{aspect}})",
+      "refitHint": "Full-bleed clips are set to cover the new frame and text takes its styles' look for it; check the frames after.",
+      "labelRequired": "Give the cut a label (up to 60 characters).",
+      "labelTaken": "This edit already has a cut with that label.",
+      "failed": "Couldn't make the cut. Try again.",
+      "create": "Make cut",
+      "creating": "Making cut…",
+      "created": "Cut “{{label}}” made",
+      "createdReview_one": "Cut “{{label}}” made: {{count}} item to check on the new frame",
+      "createdReview_other": "Cut “{{label}}” made: {{count}} items to check on the new frame"
+    },
+    "manage": {
+      "title": "Manage cuts",
+      "description": "Rename and reorder cuts. Main stays first. Removing a cut moves it to the Trash; its media stays.",
+      "labelFor": "Label of {{label}}",
+      "moveUp": "Move up",
+      "moveDown": "Move down",
+      "remove": "Remove cut",
+      "mainCantRemove": "Main can't be removed while there are other cuts",
+      "currentCantRemove": "Switch to another cut to remove this one",
+      "confirmTitle": "Remove cut “{{label}}”?",
+      "confirmDescription": "The cut moves to the Trash, where you can restore it from the project list. No media is deleted.",
+      "confirmRemove": "Remove cut",
+      "failed": "Couldn't change the cut. Try again."
+    }
+  }
+}

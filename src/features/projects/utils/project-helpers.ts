@@ -192,9 +192,11 @@ export function createProjectObject(
  */
 export function duplicateProject(project: Project): Project {
   const now = Date.now()
+  // A duplicate is a project of its own, not another cut in the group (docs/cuts.md).
+  const { cut: _cut, ...rest } = project
 
   return {
-    ...project,
+    ...rest,
     id: generateProjectId(),
     name: i18n.t('projects.copySuffix', { name: project.name }),
     createdAt: now,

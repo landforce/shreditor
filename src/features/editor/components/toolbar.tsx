@@ -37,6 +37,7 @@ import { UnsavedChangesDialog } from './unsaved-changes-dialog'
 import { WorkspaceSwitcher } from './workspace-switcher'
 import { WhatsNewDialog } from './whats-new-dialog'
 import { FormatChip } from './format-panel/format-chip'
+import { CutSwitcher } from './cuts/cut-switcher'
 import { hasUnseenChangelog } from './whats-new-seen'
 import { EDITOR_LAYOUT_CSS_VALUES } from '@/config/editor-layout'
 import { cn } from '@/shared/ui/cn'
@@ -461,6 +462,12 @@ export const Toolbar = memo(function Toolbar({
         </div>
 
         <FormatChip compact={concise} />
+        <CutSwitcher
+          projectId={projectId}
+          canvas={{ width: project.width, height: project.height }}
+          compact={concise}
+          onSave={handleSave}
+        />
       </div>
 
       <div className="flex flex-1 items-center justify-center gap-3">

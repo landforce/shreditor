@@ -18,8 +18,6 @@ interface Canvas {
   height: number
 }
 
-export const MAIN_CUT_LABEL: string
-export const CUT_LABEL_MAX: number
 export const CUT_ASPECT_PRESETS: readonly string[]
 
 export function cutGroupOf(project: CutMember | null | undefined): string | undefined
