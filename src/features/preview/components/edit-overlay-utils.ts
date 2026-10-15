@@ -25,6 +25,9 @@ export function getSourceFrameInfo(
     sourceRate,
     timelineFps,
     0,
+    false,
+    undefined,
+    item.speedRamp,
   )
   const sourceFrame = Math.max(0, Math.round(sourceTime * sourceFps))
 

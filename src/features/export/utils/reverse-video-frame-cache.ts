@@ -137,6 +137,7 @@ export class ReverseVideoFrameCache {
       0,
       true,
       reverseSourceEnd,
+      request.item.speedRamp,
     )
     const duration = request.extractor.getDuration()
     return duration > 0

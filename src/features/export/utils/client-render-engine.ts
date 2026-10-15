@@ -161,6 +161,7 @@ function getPrewarmVideoSourceTimeSeconds(item: VideoItem, frame: number, fps: n
     0,
     item.isReversed === true,
     reverseSourceEnd,
+    item.speedRamp,
   )
 }
 

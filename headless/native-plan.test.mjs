@@ -419,3 +419,31 @@ test('audio mix: dB gains, fades, placement, linked audio, mute and fallbacks', 
   })
   assert.equal(disabled.audio.route, 'native')
 })
+
+test('a speed-ramped clip and its audio go to the browser, named "speed ramp"', () => {
+  const ramp = [
+    { frame: 0, speed: 0.5, easing: 'ease-in' },
+    { frame: 60, speed: 2 },
+  ]
+  const tracks = [track('v1', 0), track('a1', 1, { kind: 'audio' })]
+  const items = [
+    clip('v', 'v1', 0, 60, { linkedGroupId: 'g', sourceEnd: 75, speedRamp: ramp }),
+    clip('plain', 'v1', 60, 30),
+    { id: 'va', trackId: 'a1', type: 'audio', mediaId: 'm1', linkedGroupId: 'g', from: 0, durationInFrames: 60, sourceStart: 0, sourceEnd: 75, sourceFps: 30, speedRamp: ramp },
+  ]
+  const plan = planNativeExport({
+    project: project({
+      tracks,
+      items,
+      // The editor mirrors the ramp into a `speed` keyframe lane; it is not "keyframes".
+      keyframes: [{ itemId: 'v', properties: [{ property: 'speed', keyframes: [{ frame: 0 }] }] }],
+    }),
+    media: media({ m1: videoProbe({}, { channels: 2 }) }),
+  })
+  assert.equal(route(plan, 'v').route, 'overlay')
+  assert.match(route(plan, 'v').reasons.join(), /speed ramp/)
+  assert.doesNotMatch(route(plan, 'v').reasons.join(), /keyframes/)
+  assert.equal(route(plan, 'plain').route, 'native')
+  assert.equal(plan.audio.route, 'browser')
+  assert.match(plan.audio.reasons.join(), /speed ramp/)
+})

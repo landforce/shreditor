@@ -3,6 +3,7 @@
  * worker-predecoded bitmap fast path.
  */
 
+import { hasSpeedRamp } from '@/shared/timeline/speed-ramp.mjs'
 import type { VideoItem } from '@/types/timeline'
 import {
   getItemRenderTimelineSpan,
@@ -372,6 +373,9 @@ export async function renderVideoItem(
   const hasActiveRamp =
     !!effectiveRenderSpan.sourceTimeRamp &&
     isFrameInsideSourceTimeRamp(effectiveRenderSpan.sourceTimeRamp, frame)
+  // A speed-ramped clip's DOM element plays at a constant rate, so its frame is
+  // never the ramped source time: always take the exact decode path.
+  const isSpeedRamped = hasSpeedRamp(item)
   const domVideoCandidate =
     isPreviewMode &&
     domVideoElementProvider &&
@@ -379,8 +383,9 @@ export async function renderVideoItem(
     isFrameInsideItemTimelineSpan(effectiveRenderSpan, frame)
       ? domVideoElementProvider(item.id)
       : null
-  const domVideo =
-    !hasActiveRamp || domVideoCandidate?.dataset.transitionSourceRamp === '1'
+  const domVideo = isSpeedRamped
+    ? null
+    : !hasActiveRamp || domVideoCandidate?.dataset.transitionSourceRamp === '1'
       ? domVideoCandidate
       : null
   const canUseDomVideoElement = Boolean(domVideoCandidate)
@@ -486,7 +491,8 @@ export async function renderVideoItem(
     hasMediabunny: useMediabunny.has(item.id),
     isMediabunnyDisabled: mediabunnyDisabledItems.has(item.id),
     hasEnsureVideoItemReady: !!rctx.ensureVideoItemReady,
-    speed,
+    // Ramped clips decode every frame exactly; warm like a 1x clip and continue.
+    speed: isSpeedRamped ? 1 : speed,
   })
   let mediabunnyReadyPromise: Promise<boolean> | null = null
   if (mediabunnyInitAction !== 'none' && rctx.ensureVideoItemReady) {

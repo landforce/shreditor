@@ -4,6 +4,7 @@
  * uploads, and color/path helpers used by the GPU shape pipeline.
  */
 
+import { hasSpeedRamp } from '@/shared/timeline/speed-ramp.mjs'
 import type {
   CompositionItem,
   ImageItem,
@@ -724,8 +725,10 @@ async function resolveGpuMediaParticipantSource(
     participant.renderSpan.sourceTimeRamp !== undefined &&
     frame >= participant.renderSpan.sourceTimeRamp.rampStart &&
     frame <= participant.renderSpan.sourceTimeRamp.rampEnd
+  // A speed-ramped clip never matches its DOM element's constant-rate playback.
   const canUseSynchronizedDomVideo =
-    !hasActiveRamp || domVideo?.dataset.transitionSourceRamp === '1'
+    !hasSpeedRamp(participant.item) &&
+    (!hasActiveRamp || domVideo?.dataset.transitionSourceRamp === '1')
   const domDecision = resolvePreviewDomVideoDrawDecision({
     domVideo: canUseSynchronizedDomVideo ? domVideo : null,
     sourceTime,
