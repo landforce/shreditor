@@ -921,7 +921,7 @@ function AudioSource({ mediaId, src }: { mediaId?: string; src: string }) {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: '#f2f3f5',
+        backgroundColor: '#eef1f8',
         padding: 18,
       }}
     >

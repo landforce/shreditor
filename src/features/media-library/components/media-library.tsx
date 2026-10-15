@@ -1257,7 +1257,7 @@ export const MediaLibrary = memo(function MediaLibrary({ onMediaSelect }: MediaL
       {/* Unified media readiness progress bar */}
       {preparingCount > 0 && (
         <BackgroundTaskProgress
-          icon={<Film className="w-3.5 h-3.5 text-cyan-600 flex-shrink-0" />}
+          icon={<Film className="w-3.5 h-3.5 text-primary flex-shrink-0" />}
           label={t('media.library.preparingMediaWithCount', { count: preparingCount })}
           progressAriaLabel={t('media.library.mediaPreparationProgress')}
           progressPercent={preparingAvgProgress * 100}
@@ -1289,7 +1289,7 @@ export const MediaLibrary = memo(function MediaLibrary({ onMediaSelect }: MediaL
                 : t('media.library.preparationQueued')}
             </span>
           }
-          fillClassName="bg-cyan-500"
+          fillClassName="bg-primary"
         />
       )}
 

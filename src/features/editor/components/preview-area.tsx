@@ -607,10 +607,10 @@ export const PreviewArea = memo(function PreviewArea({
             >
               <div className="flex min-w-0 flex-1 items-center gap-3">
                 <div className="flex items-center gap-2 flex-shrink-0">
-                  <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-cyan-700">
+                  <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-primary">
                     Pen Tool
                   </span>
-                  <span className="rounded-full bg-cyan-600/10 px-2 py-0.5 text-[10px] font-medium text-cyan-700">
+                  <span className="rounded-full bg-primary-soft px-2 py-0.5 text-[10px] font-medium text-primary">
                     {penVertexCount} {penVertexCount === 1 ? 'point' : 'points'}
                   </span>
                 </div>
@@ -653,10 +653,10 @@ export const PreviewArea = memo(function PreviewArea({
             >
               <div className="flex min-w-0 flex-1 items-center gap-3">
                 <div className="flex items-center gap-2 flex-shrink-0">
-                  <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-cyan-700">
+                  <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-primary">
                     Path Edit
                   </span>
-                  <span className="rounded-full bg-cyan-600/10 px-2 py-0.5 text-[10px] font-medium text-cyan-700">
+                  <span className="rounded-full bg-primary-soft px-2 py-0.5 text-[10px] font-medium text-primary">
                     {displayedEditVertexCount} {displayedEditVertexCount === 1 ? 'point' : 'points'}
                   </span>
                 </div>
