@@ -30,6 +30,8 @@
 //         -d '{"paths":["/Volumes/Card/A001.mov"],"projectId":"<project id>"}'
 //     Also available as `shreditor import <file...> [--project <id>]`.
 //     Optional `category` (see below) is written into each file's metadata.
+//     (`importMediaByPath` also takes `generated`, a provenance record such as
+//     `shred tts`'s scratch voiceover, and extra `tags`, written the same way.)
 //
 //     Video Chrome can't decode as it is gets a working copy in the background
 //     (server/media-preparation.mjs): its metadata says compatibility.status
@@ -430,7 +432,7 @@ function associateWithProject(root, projectId, mediaId, resolveInside) {
  * metadata.json and thumbnail, and associate it with `projectId` if given.
  * Used by the HTTP route and by `shreditor import`.
  */
-export async function importMediaByPath(root, paths, { projectId, mode = 'auto', category, resolveInside, prepare = 'background' } = {}) {
+export async function importMediaByPath(root, paths, { projectId, mode = 'auto', category, resolveInside, prepare = 'background', generated, tags } = {}) {
   if (!Array.isArray(paths) || paths.length === 0) throw new MediaBridgeError(400, 'TypeError', 'paths must be a non-empty array')
   if (category !== undefined && category !== null && !CATEGORY_SET.has(category)) {
     throw new MediaBridgeError(400, 'TypeError', `category must be one of ${MEDIA_CATEGORIES.join(', ')}`)
@@ -467,7 +469,7 @@ export async function importMediaByPath(root, paths, { projectId, mode = 'auto',
         const readable = placed.method === 'clone' ? path.join(dir, placed.entryName) : placed.sourcePath
         const probed = await probe(readable)
         let metadata = await writeImportMetadata(readable, dir, {
-          id: placed.id, fileName: placed.fileName, fileSize: placed.size, fileLastModified: placed.mtimeMs, mimeType: placed.mimeType, category,
+          id: placed.id, fileName: placed.fileName, fileSize: placed.size, fileLastModified: placed.mtimeMs, mimeType: placed.mimeType, category, generated, tags,
         }, probed)
         if (projectId) associateWithProject(root, projectId, placed.id, inside)
         if (metadata.compatibility?.status === 'preparing') {
@@ -511,7 +513,7 @@ export async function importMediaByPath(root, paths, { projectId, mode = 'auto',
  * Video the browser can't decode as it is gets a `compatibility` record in
  * state 'preparing'; the caller starts the job. Throws HDR_POLICY_REQUIRED.
  */
-async function writeImportMetadata(readable, dir, { id, fileName, fileSize, fileLastModified, mimeType, category }, probed) {
+async function writeImportMetadata(readable, dir, { id, fileName, fileSize, fileLastModified, mimeType, category, generated, tags }, probed) {
   const { plan, error } = mimeType.startsWith('video/') && probed ? planFor(probed) : { plan: null }
   if (error) throw error
   const details = metadataFromProbe(probed, mimeType)
@@ -528,8 +530,10 @@ async function writeImportMetadata(readable, dir, { id, fileName, fileSize, file
     // Nothing plays until the working copy is ready.
     ...(plan ? { videoCodecSupported: false, compatibility: preparingRecord(plan, probed, mimeType) } : {}),
     ...(hasThumbnail ? { thumbnailId: crypto.randomUUID() } : {}),
-    tags: [],
+    tags: Array.isArray(tags) ? tags.filter((tag) => typeof tag === 'string') : [],
     ...(category ? { category, categorySource: 'agent' } : {}),
+    // Where the file came from when a tool made it (`shred tts`: a scratch voiceover).
+    ...(generated && typeof generated === 'object' ? { generated } : {}),
     createdAt: now,
     updatedAt: now,
   }

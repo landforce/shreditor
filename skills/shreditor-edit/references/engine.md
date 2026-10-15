@@ -106,6 +106,16 @@ Categories don't affect ops or rendering; they do feed the format scorecard's ro
 
 Imported audio/video is transcribed in the background by whisper.cpp (`ggml-large-v3-turbo`, local) into `media/<id>/cache/ai/transcript.json`, the editor's own transcript store. Status is `transcription` in `media/<id>/metadata.json`: `queued`, `running`, `done`, `none` (`reason`: `no-audio`, `silent`, `no-speech`), `failed`, `unavailable` (whisper.cpp or the model missing; `hint` says what to run). Words are in source seconds (`start`, `end`, `confidence`); `sourceStart` for a word is `round(word.start * sourceFps)` (the project fps for audio with no fps). Times come from whisper's DTW alignment, typically within about 0.1 s of the spoken onset; check a tight cut with `shred frames` or by ear. Phantom lines Whisper invents on music, typing or silence ("Thank you.", "See you next time") are dropped. A transcript made or edited in the app is never replaced unless `shred transcribe <id> --force`.
 
+## Scratch voiceover (TTS)
+
+`shred tts --project <id> (--text "..." | --file script.txt) [--engine supertonic|moss] [--voice v] [--speed x] [--language code] [--name label] [--json]` speaks a script with the editor's own local engines, run in the agent service's Chrome (`POST /v1/tts`, one request at a time through the service queue), and imports the WAV like any file (category `voiceover`, transcribed in the background). It prints the `mediaId`, duration, engine/voice and the backend that ran (`webgpu` or `wasm`). The file is kept in `projects/<id>/agent/tts/`, named `scratch-vo-...`; its metadata carries `generated: { kind: 'tts', scratch: true, engine, voice, text, ... }` and the tag `scratch-tts`.
+
+- `shred tts voices [--engine e] [--json]` lists the engines and preset voices (no cloning). **Supertonic 3** (default, voice `M3`): 31 languages (`--language`, default `auto`), speed 0.8-1.3, expressive tags `<laugh>` `<breath>` `<sigh>` inline in the text, WebGPU with a wasm fallback. **MOSS Nano** (voice `Ava`): language from the text, speed 0.5-2 (a resample, pitch moves), wasm only, slower.
+- Long scripts are split by sentence (a blank line ends a paragraph, a line break ends a sentence) into requests of at most 600 characters, then joined with 0.3 s pauses (0.6 s between paragraphs).
+- The first run downloads the model (~400 MB Supertonic, ~785 MB MOSS) into `~/.shreditor/models` (`SHREDITOR_MODEL_CACHE` overrides); later runs and restarts read it from disk. That first request holds the service queue while it downloads.
+- Plans carry no voiceover text, so there is no per-beat mode: run `shred tts --text "<line>" --name <beat id>` per line when you want one clip per beat.
+- It is a placeholder: for timing a Vlog cut before the VO is recorded. Never present it as the final voiceover.
+
 ## Text styles and captions
 
 A text style is a named, reusable look: titles, labels, lower thirds, captions. Use styles instead of styling each item by hand; the user edits a style in the editor (the Saved styles section of a text item) and every item using it follows.

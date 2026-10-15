@@ -46,6 +46,11 @@ const page = {
             ['Supertonic 3', '31 languages', 'Local ONNX'],
           ],
         },
+        {
+          kind: 'note',
+          tone: 'info',
+          text: 'The agent can use MOSS Nano and Supertonic 3 too: `shred tts` generates a scratch voiceover from a script in the agent service, imports it as a **voiceover** and marks it as generated scratch TTS. It is a placeholder for timing the cut, not a final voiceover.',
+        },
       ],
     },
     {

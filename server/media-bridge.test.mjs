@@ -161,6 +161,25 @@ test('importMediaByPath writes the category, and rejects an unknown one', async 
   assert.equal(ws.read(imported.id).category, 'overlay')
 })
 
+test('importMediaByPath records where a made file came from (shred tts)', async (t) => {
+  const ws = makeWorkspace(t)
+  ws.project('p1')
+  const file = path.join(ws.root, 'scratch-vo.wav')
+  fs.writeFileSync(file, 'not really a wav')
+  const generated = { kind: 'tts', scratch: true, engine: 'supertonic', voice: 'M3', text: 'Hi.' }
+  const [imported] = await importMediaByPath(ws.root, [file], {
+    projectId: 'p1',
+    category: 'voiceover',
+    mode: 'link',
+    generated,
+    tags: ['scratch-tts', 7],
+  })
+  const metadata = ws.read(imported.id)
+  assert.deepEqual(metadata.generated, generated)
+  assert.deepEqual(metadata.tags, ['scratch-tts'])
+  assert.equal(metadata.category, 'voiceover')
+})
+
 test('bridge routes: POST media/category, GET media/categories and GET media/version', async (t) => {
   const ws = makeWorkspace(t)
   ws.project('p1')
