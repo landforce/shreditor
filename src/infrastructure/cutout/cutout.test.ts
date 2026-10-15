@@ -101,7 +101,7 @@ describe('compositing and model I/O', () => {
     expect(hi).toBeCloseTo(0.51)
   })
 
-  it('MODNet keeps the aspect at a 512 short edge in multiples of 32; BiRefNet is 1024 square', () => {
+  it('MODNet keeps the aspect at a 512 short edge in multiples of 32; U-2-Net is 320 square', () => {
     expect(cutoutModelInputSize(CUTOUT_MODELS.modnet, 1920, 1080)).toEqual({
       width: 896,
       height: 512,
@@ -110,9 +110,9 @@ describe('compositing and model I/O', () => {
       width: 512,
       height: 896,
     })
-    expect(cutoutModelInputSize(CUTOUT_MODELS['birefnet-lite'], 1920, 1080)).toEqual({
-      width: 1024,
-      height: 1024,
+    expect(cutoutModelInputSize(CUTOUT_MODELS.u2net, 1920, 1080)).toEqual({
+      width: 320,
+      height: 320,
     })
   })
 
@@ -129,5 +129,8 @@ describe('compositing and model I/O', () => {
     expect(logits[0]).toBeLessThan(0.001)
     expect(logits[1]).toBeCloseTo(0.5)
     expect(logits[2]).toBeGreaterThan(0.999)
+    expect([...normalizeModelAlpha([0.2, 0.4, 0.6], true)].map((v) => +v.toFixed(3))).toEqual([
+      0, 0.5, 1,
+    ])
   })
 })

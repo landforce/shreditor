@@ -49,30 +49,35 @@ export const CUTOUT_MODELS = {
       },
     },
   },
-  'birefnet-lite': {
-    id: 'birefnet-lite',
+  // Objects: U-2-Net (salient object detection). BiRefNet lite was the first
+  // choice but does not run in onnxruntime-web here: on WebGPU one of its ops
+  // needs 11 storage buffers per shader stage (Apple adapters allow 10) and on
+  // wasm it runs out of the 4 GB heap (docs/background-removal.md).
+  u2net: {
+    id: 'u2net',
     subject: 'object',
-    label: 'BiRefNet lite',
-    license: 'MIT',
-    repo: 'onnx-community/BiRefNet_lite-ONNX',
-    revision: 'de15b22ba131738a16dff04aab8bdf8dc32e3ac1',
+    label: 'U-2-Net',
+    license: 'Apache-2.0',
+    repo: 'BritishWerewolf/U-2-Net',
+    revision: 'c08042b462485d8597c89d3ce831d00be8582c5c',
     input: {
-      kind: 'birefnet',
-      width: 1024,
-      height: 1024,
+      kind: 'square',
+      width: 320,
+      height: 320,
       mean: [0.485, 0.456, 0.406],
       std: [0.229, 0.224, 0.225],
+      minMax: true,
     },
     files: {
       webgpu: {
-        path: 'onnx/model_fp16.onnx',
-        bytes: 114538221,
-        sha256: 'd39b897ceb16ae654c1731f3dba0cf9b368d9cae74b5a57459b455cc8bfec402',
+        path: 'onnx/model.onnx',
+        bytes: 175997641,
+        sha256: '8d10d2f3bb75ae3b6d527c77944fc5e7dcd94b29809d47a739a7a728a912b491',
       },
       wasm: {
         path: 'onnx/model.onnx',
-        bytes: 224005088,
-        sha256: '5600024376f572a557870a5eb0afb1e5961636bef4e1e22132025467d0f03333',
+        bytes: 175997641,
+        sha256: '8d10d2f3bb75ae3b6d527c77944fc5e7dcd94b29809d47a739a7a728a912b491',
       },
     },
   },
@@ -80,7 +85,7 @@ export const CUTOUT_MODELS = {
 
 /** The model that cuts out a subject ('auto' is resolved per media before this). */
 export function cutoutModelFor(subject) {
-  return subject === 'object' ? CUTOUT_MODELS['birefnet-lite'] : CUTOUT_MODELS.modnet
+  return subject === 'object' ? CUTOUT_MODELS.u2net : CUTOUT_MODELS.modnet
 }
 
 /** Pinned download URL of one model file. */

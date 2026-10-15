@@ -79,10 +79,11 @@ is busy). Its address rides in the harness URL (`?cutoutStore=`).
 | Model | Use | Code licence | Weights licence | ONNX (pinned) | Size | Verdict |
 |---|---|---|---|---|---|---|
 | **MODNet** (ZHKKKe/MODNet) | person (default, `auto` first) | Apache-2.0 | Apache-2.0 (the repo's licence covers "code, models, and demos") | `Xenova/modnet@fa2fa546` `onnx/model.onnx` sha256 `07c308cf…` | 25.9 MB fp32 | **Chosen.** Trimap-free portrait *matting* (soft hair edges), 512 short edge, runs at real-time rates on WebGPU and is usable on wasm. |
-| **BiRefNet lite** (ZhengPeng7/BiRefNet) | object, and `auto` when no person | MIT | MIT (HF model card `license: mit`) | `onnx-community/BiRefNet_lite-ONNX@de15b22b` fp16 sha256 `d39b897c…` (WebGPU), fp32 sha256 `56000243…` (wasm) | 114.5 MB fp16 / 224 MB fp32 | **Chosen** for objects: best quality licence-clean general segmentation at 1024². Slow on wasm (seconds per sample). |
+| **U-2-Net** (xuebinqin/U-2-Net) | object, and `auto` when no person | Apache-2.0 | Apache-2.0 per the repository licence (the README links the weights without a separate licence; the HF conversion is tagged `apache-2.0`) | `BritishWerewolf/U-2-Net@c08042b4` `onnx/model.onnx` sha256 `8d10d2f3…` | 176 MB fp32 | **Chosen** for objects: salient object detection at 320², simple convolutions that run on WebGPU and wasm (about 0.1–2 s per sample). Lower edge detail than BiRefNet. |
+| BiRefNet lite (ZhengPeng7/BiRefNet) | object | MIT | MIT (HF model card `license: mit`) | `onnx-community/BiRefNet_lite-ONNX@de15b22b` fp16 sha256 `d39b897c…`, fp32 `56000243…` | 114.5 MB fp16 / 224 MB fp32 | **First choice, dropped after testing**: with the pinned onnxruntime-web dev build, WebGPU fails at run time ("Too many storage buffers in shader. Current: 11, Max is 10" on an Apple adapter, whose limit is 10) and wasm runs out of memory (`std::bad_alloc`) at 1024², both measured in this repo's editor and headless harness. Worth retrying when onnxruntime-web splits that op. |
 | MediaPipe selfie segmentation | person, fallback | Apache-2.0 | Apache-2.0 (Google, shipped in the MediaPipe repo; `onnx-community/mediapipe_selfie_segmentation` tags apache-2.0) | `model.onnx` 462 KB | 0.46 MB | Not used: a 256² *segmentation* (hard, blocky edges) — clearly worse than MODNet for talking heads, and MODNet is small enough that an offline fallback buys little. The repo has no pattern for bundling model weights in `public/`. |
 | BiRefNet portrait | person | MIT | MIT | `onnx-community/BiRefNet-portrait-ONNX` | 490 MB fp16 | Not used: too large to analyse 10 samples/s in a browser. |
-| BEN2 base | object | MIT | MIT (`PramaLLC/BEN2`) | `onnx-community/BEN2-ONNX` fp16 | 219 MB | Not used: twice BiRefNet lite's size for similar use. A candidate for a future "high quality" object mode. |
+| BEN2 base | object | MIT | MIT (`PramaLLC/BEN2`) | `onnx-community/BEN2-ONNX` fp16 | 219 MB | Not used: twice BiRefNet lite's size; not tested. |
 | ISNet general-use (DIS) | object | Apache-2.0 | not stated upstream; the `onnx-community/ISNet-ONNX` conversion is tagged **agpl-3.0** | 176 MB | | **Excluded**: the only ready ONNX conversion carries AGPL, and the upstream weights' licence is unstated. |
 | SlimSAM-77 | smart brush | Apache-2.0 | Apache-2.0 (`Xenova/slimsam-77-uniform`) | encoder 8.9 MB q8 + decoder 4.9 MB q8 | 14 MB | For the brush (not built yet, see below). |
 | MobileSAM / EfficientSAM | smart brush | Apache-2.0 | Apache-2.0 | conversions exist | 10–40 MB | Alternatives to SlimSAM. |
@@ -90,7 +91,7 @@ is busy). Its address rides in the harness URL (`?cutoutStore=`).
 | BRIA RMBG-1.4 / 2.0 | object | | CC BY-NC 4.0 | | | **Excluded** (non-commercial). |
 
 Licences were read from each project's repository and Hugging Face model card
-(October 2026). Both chosen models are listed in `THIRD_PARTY_NOTICES.md`.
+(October 2026). Both chosen models are listed in `THIRD_PARTY_NOTICES.md`. **Decision for the maintainer:** U-2-Net's weights inherit the repository's Apache-2.0 by reading, not by an explicit statement; if that is not good enough, object mode can switch to BiRefNet lite once it runs, at the cost of a new model id (stored masks are keyed by model).
 
 ## Temporal stability, without a recurrent model
 

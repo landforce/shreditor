@@ -109,11 +109,11 @@ describe('cutout storage keys', () => {
   it('finds the entry for a subject, following the auto decision', () => {
     const index = parseCutoutIndex({
       version: 1,
-      entries: { 'fx-birefnet-lite-r10': { key: 'fx-birefnet-lite-r10', done: [[0, 3]] } },
+      entries: { 'fx-u2net-r10': { key: 'fx-u2net-r10', done: [[0, 3]] } },
       auto: { fx: 'object' },
     })
     expect(findCutoutEntry(index, { fingerprint: 'fx', subject: 'auto', rate: 10 })).toMatchObject({
-      key: 'fx-birefnet-lite-r10',
+      key: 'fx-u2net-r10',
       subject: 'object',
     })
     expect(findCutoutEntry(index, { fingerprint: 'fy', subject: 'auto', rate: 10 })).toEqual({
@@ -141,9 +141,7 @@ describe('cutout storage keys', () => {
     expect(cutoutModelUrl(model, 'webgpu')).toBe(
       `https://huggingface.co/Xenova/modnet/resolve/${model.revision}/onnx/model.onnx`,
     )
-    expect(cutoutModelFileName(CUTOUT_MODELS['birefnet-lite'], 'webgpu')).toBe(
-      'birefnet-lite-d39b897ceb16.onnx',
-    )
+    expect(cutoutModelFileName(CUTOUT_MODELS.u2net, 'webgpu')).toBe('u2net-8d10d2f3bb75.onnx')
   })
 })
 

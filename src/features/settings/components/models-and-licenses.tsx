@@ -22,7 +22,7 @@ const COMPONENTS = [
     license: 'Apache-2.0',
     noteKey: 'settings.models.cutoutModnet',
   },
-  { name: 'BiRefNet lite', license: 'MIT', noteKey: 'settings.models.cutoutBirefnet' },
+  { name: 'U-2-Net', license: 'Apache-2.0', noteKey: 'settings.models.cutoutU2net' },
   {
     name: 'Mediabunny, @mediabunny/prores',
     license: 'MPL-2.0',

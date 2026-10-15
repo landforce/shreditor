@@ -1,5 +1,5 @@
 /**
- * Runs one cutout model (MODNet for people, BiRefNet lite for objects) on
+ * Runs one cutout model (MODNet for people, U-2-Net for objects) on
  * onnxruntime-web: WebGPU when the adapter takes the graph, else wasm. Weights
  * come through the shared ONNX model cache from a pinned URL and are checked
  * against their SHA-256 before a session is made from them.
@@ -86,7 +86,7 @@ export function cutoutModelInputSize(
   height: number,
 ): { width: number; height: number } {
   const input = model.input
-  if (input.kind === 'birefnet') return { width: input.width, height: input.height }
+  if (input.kind === 'square') return { width: input.width, height: input.height }
   const scale = input.shortEdge / Math.min(width, height)
   const snap = (v: number) =>
     Math.max(input.multiple, Math.round(v / input.multiple) * input.multiple)
@@ -111,21 +111,48 @@ export function rgbaToModelInput(
   return out
 }
 
-/** Model output → alpha 0..1 (BiRefNet emits logits; MODNet a matte). */
-export function normalizeModelAlpha(values: ArrayLike<number>): Float32Array {
-  const out = Float32Array.from(values)
+function valueRange(values: Float32Array): [number, number] {
   let min = Infinity
   let max = -Infinity
-  for (const v of out) {
+  for (const v of values) {
     if (v < min) min = v
     if (v > max) max = v
   }
-  if (min < -0.01 || max > 1.01) {
-    for (let i = 0; i < out.length; i++) out[i] = 1 / (1 + Math.exp(-out[i]!))
-  } else {
-    for (let i = 0; i < out.length; i++) out[i] = Math.min(1, Math.max(0, out[i]!))
-  }
+  return [min, max]
+}
+
+const clamp01 = (v: number) => Math.min(1, Math.max(0, v))
+const sigmoid = (v: number) => 1 / (1 + Math.exp(-v))
+
+/**
+ * Model output → alpha 0..1: logits go through a sigmoid, a matte is clamped,
+ * and `minMax` stretches the output to the full range (U-2-Net).
+ */
+export function normalizeModelAlpha(values: ArrayLike<number>, minMax = false): Float32Array {
+  const out = Float32Array.from(values)
+  const [min, max] = valueRange(out)
+  const map =
+    minMax && max > min
+      ? (v: number) => (v - min) / (max - min)
+      : min < -0.01 || max > 1.01
+        ? sigmoid
+        : clamp01
+  for (let i = 0; i < out.length; i++) out[i] = map(out[i]!)
   return out
+}
+
+/** A finished run's first output as alpha at its own size. */
+function outputAlpha(
+  output: { data: unknown; type: string; dims: readonly number[]; dispose?: () => void },
+  minMax: boolean,
+): { alpha: Float32Array; width: number; height: number } {
+  const data = output.data as ArrayLike<number>
+  const values =
+    output.type === 'float16' && data instanceof Uint16Array ? Array.from(data, fromHalf) : data
+  const alpha = normalizeModelAlpha(values, minMax)
+  const { dims } = output
+  output.dispose?.()
+  return { alpha, width: Number(dims[dims.length - 1]), height: Number(dims[dims.length - 2]) }
 }
 
 export class CutoutModelRunner {
@@ -154,70 +181,63 @@ export class CutoutModelRunner {
   }
 
   private async load(onProgress?: (progress: CutoutDownloadProgress) => void): Promise<void> {
-    const ort = await getOrt()
-    this.ort = ort
+    this.ort = await getOrt()
     const gpu = typeof navigator !== 'undefined' ? (navigator as { gpu?: GPU }).gpu : undefined
     const adapter = gpu ? await gpu.requestAdapter().catch(() => null) : null
-    const order: CutoutBackend[] = adapter ? ['webgpu', 'wasm'] : ['wasm']
-    let lastError: unknown = null
-    for (const backend of order) {
+    if (adapter) {
       try {
-        const bytes = await fetchVerifiedModel(this.model, backend, this.urlFor, onProgress)
-        this.session = await ort.InferenceSession.create(new Uint8Array(bytes), {
-          executionProviders: [backend],
-          graphOptimizationLevel: 'all',
-        })
-        this.backend = backend
-        const name = this.session.inputNames[0]!
-        const meta = (
-          this.session as unknown as { inputMetadata?: Array<{ name: string; type?: string }> }
-        ).inputMetadata
-        this.half = Boolean(meta?.find((m) => m.name === name)?.type?.includes('16'))
+        await this.createSession('webgpu', onProgress)
         return
-      } catch (error) {
-        lastError = error
+      } catch {
+        // The WebGPU EP can't take this graph here; wasm can.
       }
     }
-    throw lastError instanceof Error ? lastError : new Error(String(lastError))
+    await this.createSession('wasm', onProgress)
+  }
+
+  private async createSession(
+    backend: CutoutBackend,
+    onProgress?: (progress: CutoutDownloadProgress) => void,
+  ): Promise<void> {
+    const ort = this.ort!
+    const bytes = await fetchVerifiedModel(this.model, backend, this.urlFor, onProgress)
+    const session = await ort.InferenceSession.create(new Uint8Array(bytes), {
+      executionProviders: [backend],
+      graphOptimizationLevel: 'all',
+    })
+    const name = session.inputNames[0]!
+    const meta = (session as unknown as { inputMetadata?: Array<{ name: string; type?: string }> })
+      .inputMetadata
+    await this.session?.release?.()
+    this.session = session
+    this.backend = backend
+    this.half = meta?.find((m) => m.name === name)?.type === 'float16'
   }
 
   /** Alpha (row-major, 0..1, at the model's output size) of one frame given as model-sized RGBA. */
-  // fallow-ignore-next-line unused-class-member complexity
   async run(
     rgba: Uint8ClampedArray,
     width: number,
     height: number,
   ): Promise<{ alpha: Float32Array; width: number; height: number }> {
     const ort = this.ort
-    const session = this.session
-    if (!ort || !session) throw new Error('CutoutModelRunner.ready() must resolve first')
-    const input = rgbaToModelInput(this.model, rgba, width, height)
-    const name = session.inputNames[0]!
-    const feed = (half: boolean) =>
-      half
-        ? new ort.Tensor('float16', Uint16Array.from(input, toHalf), [1, 3, height, width])
-        : new ort.Tensor('float32', input, [1, 3, height, width])
+    if (!ort || !this.session) throw new Error('CutoutModelRunner.ready() must resolve first')
+    const planes = rgbaToModelInput(this.model, rgba, width, height)
+    const tensor = this.half
+      ? new ort.Tensor('float16', Uint16Array.from(planes, toHalf), [1, 3, height, width])
+      : new ort.Tensor('float32', planes, [1, 3, height, width])
     let result: Awaited<ReturnType<OrtSession['run']>>
     try {
-      result = await session.run({ [name]: feed(this.half) })
+      result = await this.session.run({ [this.session.inputNames[0]!]: tensor })
     } catch (error) {
-      // Some exports keep half-precision I/O without saying so in their metadata.
-      this.half = !this.half
-      try {
-        result = await session.run({ [name]: feed(this.half) })
-      } catch {
-        throw error
-      }
+      // A graph WebGPU accepted at load can still fail at run time (shader
+      // limits); finish the job on wasm rather than failing it.
+      if (this.backend !== 'webgpu') throw error
+      await this.createSession('wasm')
+      return this.run(rgba, width, height)
     }
-    const output = result[session.outputNames[0]!]!
-    const data = output.data as ArrayLike<number>
-    const values =
-      output.type === 'float16' && data instanceof Uint16Array ? Array.from(data, fromHalf) : data
-    const alpha = normalizeModelAlpha(values)
-    const dims = output.dims
-    output.dispose?.()
-    const outHeight = Number(dims[dims.length - 2] ?? height)
-    const outWidth = Number(dims[dims.length - 1] ?? width)
-    return { alpha, width: outWidth, height: outHeight }
+    const output = result[this.session.outputNames[0]!]!
+    const input = this.model.input
+    return outputAlpha(output, input.kind === 'square' && input.minMax === true)
   }
 }

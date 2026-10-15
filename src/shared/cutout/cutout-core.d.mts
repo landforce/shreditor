@@ -2,7 +2,7 @@
 import type { CutoutSettings, CutoutSubject } from '../../types/cutout'
 
 export type CutoutBackend = 'webgpu' | 'wasm'
-export type CutoutModelId = 'modnet' | 'birefnet-lite'
+export type CutoutModelId = 'modnet' | 'u2net'
 
 export interface CutoutModelFile {
   path: string
@@ -26,11 +26,13 @@ export interface CutoutModel {
         std: [number, number, number]
       }
     | {
-        kind: 'birefnet'
+        kind: 'square'
         width: number
         height: number
         mean: [number, number, number]
         std: [number, number, number]
+        /** Stretch the output to 0..1 (min-max), as U-2-Net's mattes need. */
+        minMax?: boolean
       }
   files: Record<CutoutBackend, CutoutModelFile>
 }

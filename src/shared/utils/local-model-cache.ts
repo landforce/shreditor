@@ -87,10 +87,9 @@ export const LOCAL_MODEL_CACHE_DEFINITIONS: LocalModelCacheDefinition[] = [
   {
     id: 'cutout',
     label: 'Background removal',
-    description:
-      'MODNet (people) and BiRefNet lite (objects) matting models for Remove background.',
+    description: 'MODNet (people) and U-2-Net (objects) models for Remove background.',
     cacheName: ONNX_MODEL_CACHE_NAME,
-    matchPathFragments: ['/Xenova/modnet/', '/BiRefNet_lite-ONNX/'],
+    matchPathFragments: ['/Xenova/modnet/', '/BritishWerewolf/U-2-Net/'],
   },
 ]
 
