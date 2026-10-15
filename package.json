@@ -52,6 +52,7 @@
     "headless:test:media": "node headless/media-test.mjs",
     "headless:test:fidelity": "node headless/export-fidelity-test.mjs",
     "headless:test:tts": "FREECUT_TTS_E2E=1 node headless/tts-e2e.mjs",
+    "headless:test:cutout": "node headless/cutout-e2e.mjs",
     "headless:test:portable": "npm run headless:test:node && npm run headless:test:chrome && npm run headless:test:media && npm run headless:test:fidelity",
     "headless:gpu:probe": "node headless/probe.mjs",
     "changelog:append": "node scripts/changelog-append.mjs",

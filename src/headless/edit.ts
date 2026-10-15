@@ -78,6 +78,7 @@ import { linkedTimingFollowers } from './linked-timing'
 import { removeItemsOp, runMarkerOp } from './marker-ops'
 import { runReplaceMediaOp } from './replace-media-op'
 import { runSpeedRampOp, speedUpdateTiming, type SpeedRampOperationName } from './speed-ramp-ops'
+import { runCutoutOp } from './cutout-op'
 
 const log = createLogger('HeadlessEdit')
 
@@ -113,6 +114,7 @@ export type EditOperationName =
   | 'upsertTextStyle'
   | 'addCaptions'
   | SpeedRampOperationName
+  | 'setCutout'
 
 /** A wire operation. Node validates its discriminator and fields before this browser boundary. */
 export type EditOp = Record<string, unknown> & { op: EditOperationName }
@@ -868,7 +870,8 @@ function applyOp(op: EditOp): unknown {
         runMarkerOp(op) ??
         runReplaceMediaOp(op, editCanvas.fps) ??
         runSpeedRampOp(op) ??
-        runTextStyleOp(op, context)
+        runTextStyleOp(op, context) ??
+        runCutoutOp(op)
       if (handled) return handled.result
       return applyTemplateOp(op, { overlap: context, canvas: editCanvas })
     }

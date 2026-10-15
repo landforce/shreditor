@@ -1,0 +1,42 @@
+{
+  "editor": {
+    "cutout": {
+      "title": "移除背景",
+      "enable": "移除背景",
+      "hint": "无需绿幕，从真实房间中抠出讲话人。",
+      "subject": "保留",
+      "mixed": "混合",
+      "subjects": {
+        "auto": "自动（人物，否则物体）",
+        "person": "人物",
+        "object": "主要物体"
+      },
+      "feather": "羽化",
+      "refine": "边缘",
+      "refineHint": "0% 保留柔和遮罩（头发）；越高边缘越硬。",
+      "invert": "反转",
+      "everyFrame": "每一帧",
+      "everyFrameHint": "分析每个源帧而不是每秒 10 帧（更慢，用于最终质量）。",
+      "model": "{{model}} · {{license}} · {{size}} MB，只下载一次",
+      "reanalyse": "重新分析",
+      "cancel": "取消",
+      "status": {
+        "queued": "等待分析",
+        "downloading": "正在下载模型 {{percent}}%（{{size}} MB）",
+        "preparing": "正在加载模型",
+        "analyzing": "正在分析 {{done}}/{{count}}",
+        "ready": "就绪（{{count}} 个遮罩）",
+        "partial": "{{count}} 个遮罩中已完成 {{done}} 个；其余在后台分析",
+        "none": "尚未分析",
+        "error": "失败：{{error}}",
+        "noMedia": "剪辑的媒体不在媒体库中"
+      }
+    }
+  },
+  "settings": {
+    "models": {
+      "cutoutModnet": "Remove background (people). Xenova/modnet ONNX, downloaded on first use, SHA-256 checked.",
+      "cutoutU2net": "Remove background (objects). BritishWerewolf/U-2-Net ONNX, downloaded on first use, SHA-256 checked."
+    }
+  }
+}

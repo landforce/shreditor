@@ -18,6 +18,12 @@ const COMPONENTS = [
   { name: 'Transformers.js', license: 'Apache-2.0', noteKey: 'settings.models.transformers' },
   { name: 'ONNX Runtime Web', license: 'MIT', noteKey: 'settings.models.onnx' },
   {
+    name: 'MODNet portrait matting',
+    license: 'Apache-2.0',
+    noteKey: 'settings.models.cutoutModnet',
+  },
+  { name: 'U-2-Net', license: 'Apache-2.0', noteKey: 'settings.models.cutoutU2net' },
+  {
     name: 'Mediabunny, @mediabunny/prores',
     license: 'MPL-2.0',
     noteKey: 'settings.models.mediabunny',

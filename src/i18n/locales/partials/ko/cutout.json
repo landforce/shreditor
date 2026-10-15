@@ -1,0 +1,42 @@
+{
+  "editor": {
+    "cutout": {
+      "title": "배경 제거",
+      "enable": "배경 제거",
+      "hint": "그린스크린 없이 실제 공간에서 화자를 잘라냅니다.",
+      "subject": "유지",
+      "mixed": "혼합",
+      "subjects": {
+        "auto": "자동(사람, 없으면 사물)",
+        "person": "사람",
+        "object": "주요 사물"
+      },
+      "feather": "페더",
+      "refine": "가장자리",
+      "refineHint": "0%는 부드러운 매트(머리카락)를 유지하고, 높을수록 가장자리가 단단해집니다.",
+      "invert": "반전",
+      "everyFrame": "모든 프레임",
+      "everyFrameHint": "초당 10장 대신 모든 원본 프레임을 분석합니다(느리지만 최종 품질용).",
+      "model": "{{model}} · {{license}} · {{size}} MB, 한 번만 다운로드",
+      "reanalyse": "다시 분석",
+      "cancel": "취소",
+      "status": {
+        "queued": "분석 대기 중",
+        "downloading": "모델 다운로드 중 {{percent}}% ({{size}} MB)",
+        "preparing": "모델 불러오는 중",
+        "analyzing": "분석 중 {{done}}/{{count}}",
+        "ready": "준비됨(마스크 {{count}}개)",
+        "partial": "마스크 {{done}}/{{count}}개, 나머지는 백그라운드에서 분석",
+        "none": "아직 분석되지 않음",
+        "error": "실패: {{error}}",
+        "noMedia": "클립의 미디어가 라이브러리에 없습니다"
+      }
+    }
+  },
+  "settings": {
+    "models": {
+      "cutoutModnet": "Remove background (people). Xenova/modnet ONNX, downloaded on first use, SHA-256 checked.",
+      "cutoutU2net": "Remove background (objects). BritishWerewolf/U-2-Net ONNX, downloaded on first use, SHA-256 checked."
+    }
+  }
+}

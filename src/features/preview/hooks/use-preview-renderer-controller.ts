@@ -45,6 +45,8 @@ import { setActivePreviewScrubbingCache } from '../utils/preview-scrubbing-cache
 import { warmDecoderPrewarmWorkerPool } from '../utils/decoder-prewarm'
 import { disposeScrubProxyFallback, warmScrubProxyFallback } from '../utils/scrub-proxy-fallback'
 import { collectVisualInvalidationRanges } from '../utils/preview-frame-invalidation'
+import { onCutoutStoreChange } from '@/infrastructure/cutout/cutout-store'
+import { isCutoutActive } from '@/shared/cutout/cutout-core.mjs'
 import { resolvePreviewCaptureFrame } from '../utils/preview-capture-frame'
 import {
   markPlaybackStartReadiness,
@@ -1112,6 +1114,24 @@ export function usePreviewRendererController({
     }
 
     const invalidateForChangedCompositions = (changedIds: Set<string>) => {
+      // Read the latest items directly — when exitComposition fires, this
+      // subscription runs synchronously inside saveCurrentToComposition,
+      // before restoreTimeline updates the items store. Reading from the
+      // closure would see stale sub-comp items. The microtask defer below
+      // handles the ordering, but we still read live to be safe.
+      const ranges: FrameRange[] = []
+      for (const compItem of useItemsStore.getState().items) {
+        if (compItem.type !== 'composition') continue
+        if (!changedIds.has(compItem.compositionId)) continue
+        ranges.push({
+          startFrame: compItem.from,
+          endFrame: compItem.from + compItem.durationInFrames,
+        })
+      }
+      invalidateRanges(ranges)
+    }
+
+    const invalidateRanges = (ranges: FrameRange[]) => {
       const scrubRenderer = scrubRendererRef.current
       const bgRenderer = bgTransitionRendererRef.current
       const scrubRendererMatchesStructure =
@@ -1121,22 +1141,6 @@ export function usePreviewRendererController({
 
       const playbackState = usePlaybackStore.getState()
       const targetFrame = playbackState.previewFrame ?? playbackState.currentFrame
-
-      // Read the latest items directly — when exitComposition fires, this
-      // subscription runs synchronously inside saveCurrentToComposition,
-      // before restoreTimeline updates the items store. Reading from the
-      // closure would see stale sub-comp items. The microtask defer below
-      // handles the ordering, but we still read live to be safe.
-      const currentItems = useItemsStore.getState().items
-      const ranges: FrameRange[] = []
-      for (const compItem of currentItems) {
-        if (compItem.type !== 'composition') continue
-        if (!changedIds.has(compItem.compositionId)) continue
-        ranges.push({
-          startFrame: compItem.from,
-          endFrame: compItem.from + compItem.durationInFrames,
-        })
-      }
 
       const normalized = normalizeFrameRanges(ranges)
       const request: FrameInvalidationRequest =
@@ -1242,9 +1246,29 @@ export function usePreviewRendererController({
       })
     })
 
+    // Background removal: cut-out clips redraw as their masks are analysed.
+    let cutoutTimer: ReturnType<typeof setTimeout> | null = null
+    const unsubCutout = onCutoutStoreChange(() => {
+      if (cutoutTimer) return
+      cutoutTimer = setTimeout(() => {
+        cutoutTimer = null
+        invalidateRanges(
+          useItemsStore
+            .getState()
+            .items.filter((item) => isCutoutActive(item))
+            .map((item) => ({
+              startFrame: item.from,
+              endFrame: item.from + item.durationInFrames,
+            })),
+        )
+      }, 250)
+    })
+
     return () => {
       unsubCompositions()
       unsubNav()
+      unsubCutout()
+      if (cutoutTimer) clearTimeout(cutoutTimer)
     }
   }, [
     bgTransitionRendererRef,

@@ -100,6 +100,8 @@ import { NativeExportRefused, exportsDir, runNativeExport } from './lib/native-e
 import { projectFormatRecord } from '../formats/registry.mjs'
 import { resolveTtsRequest, ttsRequestSchema } from './lib/tts-contract.mjs'
 import { createModelCacheServer, routeModelDownloads } from './lib/tts-model-cache.mjs'
+import { createCutoutStore } from './lib/cutout-store.mjs'
+import { createCutoutRoutes } from './lib/cutout-service.mjs'
 
 const HELP = `Usage: node headless/serve.mjs --workspace <dir> [options]\n\nOptions:\n  --host <address>           Bind address (default: 127.0.0.1)\n  --port <n>                 HTTP port (default: 8787)\n  --render-timeout-ms <n>    Whole render deadline (default: 1800000)\n  --edit-timeout-ms <n>      Whole edit deadline (default: 120000)\n  --tts-timeout-ms <n>       Whole text-to-speech deadline, first model download included (default: 1200000)\n  --max-queue-depth <n>      Waiting operations allowed behind the active one (default: 8)\n  --shutdown-timeout-ms <n>  Graceful queue drain deadline (default: 30000)\n  --break-lock               Take over a writer lock left by a process that is confirmed dead\n  --build  --head  --harness-url <url>\n`
 const SERVE_OPTIONS = new Set([
@@ -201,6 +203,11 @@ export async function main(argv = process.argv.slice(2)) {
     build: args.build,
   })
 
+  // Background removal: the page reads and writes masks (and fetches models)
+  // through this store; its address rides in the harness URL.
+  const cutoutStore = await createCutoutStore({ workspace, log: (line) => console.log(line) })
+  const harnessPageUrl = `${harnessUrl}${harnessUrl.includes('?') ? '&' : '?'}cutoutStore=${encodeURIComponent(cutoutStore.base)}`
+
   const browser = await chromium.launch({
     channel: 'chrome',
     headless: !args.head,
@@ -208,7 +215,7 @@ export async function main(argv = process.argv.slice(2)) {
   })
   const session = new PageSession({
     browser,
-    harnessUrl,
+    harnessUrl: harnessPageUrl,
     onPageError: (e) => console.error('[pageerror]', e.message),
   })
   await session.open()
@@ -751,9 +758,35 @@ export async function main(argv = process.argv.slice(2)) {
     sendJson(res, 200, layout)
   }
 
+  // Background removal routes answer errors like the other routes (status, code, message).
+  // fallow-ignore-next-line complexity
+  const sendCutoutError = (res, route, e) => {
+    console.error(`${route} failed:`, e.message ?? e)
+    if (res.headersSent) return
+    const status = e instanceof HttpError || e instanceof OperationQueueError ? e.statusCode : 500
+    sendJson(res, status, {
+      ok: false,
+      apiVersion: HEADLESS_API_VERSION,
+      error: { code: e.code ?? 'INTERNAL_ERROR', message: e.message ?? String(e) },
+    })
+  }
+  const cutoutRoutes = createCutoutRoutes({
+    workspace,
+    enqueue: (fn, options) => queue.enqueue(fn, options),
+    page: () => session.page,
+    mediaUrlOf,
+    progress: (job) => cutoutStore.progress(job),
+    timeoutMs: renderTimeoutMs,
+    sendJson,
+  })
+
   const server = http.createServer((req, res) => {
     const url = new URL(req.url ?? '/', 'http://localhost')
     const route = `${req.method} ${url.pathname}`
+    if (cutoutRoutes.matches(url)) {
+      cutoutRoutes.handle(req, res, url).catch((e) => sendCutoutError(res, route, e))
+      return
+    }
     const projectMatch = /^\/v1\/projects\/([A-Za-z0-9][A-Za-z0-9_-]{0,63})$/.exec(url.pathname)
     // .../edit, and .../trash (shred cut remove) on the same branch.
     const projectEditMatch =
@@ -925,6 +958,7 @@ export async function main(argv = process.argv.slice(2)) {
         await browser.close()
         await closeServers()
         await closeModelCache()
+        await cutoutStore.close().catch(() => {})
         await releaseWriterLock()
         let closeTimer
         const closed = await Promise.race([

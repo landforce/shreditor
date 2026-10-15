@@ -17,6 +17,7 @@ import {
 import { hasCornerPin } from '@/features/preview/deps/composition-runtime'
 import { isTextMotionActive } from '@/shared/typography/text-motion'
 import { hasSpeedRamp } from '@/shared/timeline/speed-ramp.mjs'
+import { isCutoutActive } from '@/shared/cutout/cutout-core.mjs'
 
 function hasEnabledGpuEffect(effects: ItemEffect[] | undefined): boolean {
   return effects?.some((e) => e.enabled && e.effect.type === 'gpu-effect') ?? false
@@ -45,6 +46,19 @@ function hasTextMotionSpec(item: TimelineItem): boolean {
   )
 }
 
+/** Effects (incl. live previewed ones), blend mode, corner pin or background removal. */
+function needsRenderedFramePath(
+  item: TimelineItem,
+  previewEffectsByItemId?: ReadonlyMap<string, ItemEffect[]>,
+): boolean {
+  return (
+    hasEnabledGpuEffect(previewEffectsByItemId?.get(item.id) ?? item.effects) ||
+    hasRenderableBlendMode(item) ||
+    hasCornerPin(item.cornerPin) ||
+    isCutoutActive(item)
+  )
+}
+
 function needsRenderedOverlayPath(item: TimelineItem): boolean {
   return (
     // A speed-ramped video is drawn by exact decode, never its constant-rate DOM element.
@@ -52,7 +66,9 @@ function needsRenderedOverlayPath(item: TimelineItem): boolean {
     hasEnabledGpuEffect(item.effects) ||
     hasRenderableBlendMode(item) ||
     hasCornerPin(item.cornerPin) ||
-    hasTextMotionSpec(item)
+    hasTextMotionSpec(item) ||
+    // Background removal draws only through the canvas renderer.
+    isCutoutActive(item)
   )
 }
 
@@ -164,10 +180,7 @@ export function buildContinuousPreviewOverlayIndex(
   compositionById?: Record<string, SubComposition>,
 ): ContinuousPreviewOverlayIndex {
   const candidateItems = items.filter((item) => {
-    const effectiveEffects = previewEffectsByItemId?.get(item.id) ?? item.effects
-    if (hasEnabledGpuEffect(effectiveEffects)) return true
-    if (hasRenderableBlendMode(item)) return true
-    if (hasCornerPin(item.cornerPin)) return true
+    if (needsRenderedFramePath(item, previewEffectsByItemId)) return true
     if (hasTextMotionSpec(item)) return true
     if (item.type === 'composition' && compositionById) {
       const subComp = compositionById[item.compositionId]
@@ -229,10 +242,7 @@ export function shouldForceContinuousPreviewOverlayFromIndex(
     ) {
       return false
     }
-    const effectiveEffects = previewEffectsByItemId?.get(item.id) ?? item.effects
-    if (hasEnabledGpuEffect(effectiveEffects)) return true
-    if (hasRenderableBlendMode(item)) return true
-    if (hasCornerPin(item.cornerPin)) return true
+    if (needsRenderedFramePath(item, previewEffectsByItemId)) return true
     if (
       item.type === 'text' &&
       item.textMotion !== undefined &&
@@ -360,10 +370,7 @@ export function shouldForceContinuousPreviewOverlayInWindow(
     ) {
       return false
     }
-    const effectiveEffects = previewEffectsByItemId?.get(item.id) ?? item.effects
-    if (hasEnabledGpuEffect(effectiveEffects)) return true
-    if (hasRenderableBlendMode(item)) return true
-    if (hasCornerPin(item.cornerPin)) return true
+    if (needsRenderedFramePath(item, previewEffectsByItemId)) return true
     // Keep the continuous GPU overlay on while a text clip's motion window is
     // active — otherwise playback falls to the DOM Player, which cannot render
     // per-glyph motion (fps is unused by isTextMotionActive).

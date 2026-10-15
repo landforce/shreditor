@@ -1,0 +1,42 @@
+{
+  "editor": {
+    "cutout": {
+      "title": "Arka planı kaldır",
+      "enable": "Arka planı kaldır",
+      "hint": "Konuşmacıyı yeşil perde olmadan gerçek bir odadan kesip çıkarın.",
+      "subject": "Koru",
+      "mixed": "Karışık",
+      "subjects": {
+        "auto": "Otomatik (kişi, yoksa nesne)",
+        "person": "Kişi",
+        "object": "Ana nesne"
+      },
+      "feather": "Yumuşatma",
+      "refine": "Kenar",
+      "refineHint": "%0 yumuşak maskeyi (saç) korur; yükseldikçe kenar sertleşir.",
+      "invert": "Ters çevir",
+      "everyFrame": "Her kare",
+      "everyFrameHint": "Saniyede 10 yerine her kaynak kareyi analiz et (daha yavaş, son kalite için).",
+      "model": "{{model}} · {{license}} · {{size}} MB, bir kez indirilir",
+      "reanalyse": "Yeniden analiz et",
+      "cancel": "İptal",
+      "status": {
+        "queued": "Analiz bekleniyor",
+        "downloading": "Model indiriliyor %{{percent}} ({{size}} MB)",
+        "preparing": "Model yükleniyor",
+        "analyzing": "Analiz ediliyor {{done}}/{{count}}",
+        "ready": "Hazır ({{count}} maske)",
+        "partial": "{{count}} maskeden {{done}}; kalanı arka planda analiz ediliyor",
+        "none": "Henüz analiz edilmedi",
+        "error": "Başarısız: {{error}}",
+        "noMedia": "Klibin medyası kitaplıkta yok"
+      }
+    }
+  },
+  "settings": {
+    "models": {
+      "cutoutModnet": "Remove background (people). Xenova/modnet ONNX, downloaded on first use, SHA-256 checked.",
+      "cutoutU2net": "Remove background (objects). BritishWerewolf/U-2-Net ONNX, downloaded on first use, SHA-256 checked."
+    }
+  }
+}

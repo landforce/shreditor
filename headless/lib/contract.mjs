@@ -6,6 +6,7 @@ import {
   TEXT_STYLE_OP_NAMES,
   TEXT_STYLE_OP_SCHEMAS,
 } from './text-styles.mjs'
+import { CUTOUT_OP_DESCRIPTIONS, CUTOUT_OP_NAMES, CUTOUT_OP_SCHEMAS } from './cutout-contract.mjs'
 import {
   TEMPLATE_OP_DESCRIPTIONS,
   TEMPLATE_OP_NAMES,
@@ -326,6 +327,7 @@ const opSchemas = [
   ...TEMPLATE_OP_SCHEMAS,
   ...TEXT_STYLE_OP_SCHEMAS,
   ...SPEED_RAMP_OP_SCHEMAS,
+  ...CUTOUT_OP_SCHEMAS,
 ]
 
 export const EDIT_OPERATION_NAMES = [
@@ -358,6 +360,7 @@ export const EDIT_OPERATION_NAMES = [
   ...TEMPLATE_OP_NAMES,
   ...TEXT_STYLE_OP_NAMES,
   ...SPEED_RAMP_OP_NAMES,
+  ...CUTOUT_OP_NAMES,
 ]
 const EDIT_OPERATION_DESCRIPTIONS = Object.fromEntries(
   EDIT_OPERATION_NAMES.map((name) => [name, samplesDescription(name)]),
@@ -395,6 +398,7 @@ function samplesDescription(name) {
     ...TEMPLATE_OP_DESCRIPTIONS,
     ...TEXT_STYLE_OP_DESCRIPTIONS,
     ...SPEED_RAMP_OP_DESCRIPTIONS,
+    ...CUTOUT_OP_DESCRIPTIONS,
   }
   return descriptions[name]
 }
@@ -824,6 +828,8 @@ export function capabilities() {
         'POST /v1/media/:id/probe',
         'POST /v1/render',
         'POST /v1/tts',
+        'POST /v1/cutout',
+        'GET /v1/cutout',
       ],
       httpMediaUpload: false,
       deleteProject: false,

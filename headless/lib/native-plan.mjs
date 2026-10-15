@@ -390,6 +390,8 @@ const hasCrop = (item) => {
 const VIDEO_ITEM_RULES = [
   [hasSpeedRamp, 'speed ramp'],
   [(i) => i.effects?.some((e) => e.enabled), 'effects'],
+  // The mask is applied in the browser renderer (docs/background-removal.md).
+  [(i) => i.cutout?.enabled, 'background removal'],
   [isKeyframed, 'keyframes'],
   [(i) => i.motionModifiers?.length || i.motionLayers?.length, 'motion modifiers'],
   [(i) => i.cornerPin, 'corner pin'],

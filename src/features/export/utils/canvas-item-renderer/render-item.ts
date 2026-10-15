@@ -35,6 +35,7 @@ import {
   resolveItemTransform,
 } from './shared'
 import { renderVideoItem } from './video'
+import { hasActiveCutout, renderCutoutVideoItem } from './cutout'
 import { renderImageItem } from './image'
 import { renderLottieItem } from './lottie'
 import { getTextRasterCacheKey, renderSubtitleSegmentItem, renderTextItem } from './text'
@@ -196,15 +197,9 @@ async function renderItemContent(
 
   switch (effectiveItem.type) {
     case 'video': {
-      const videoFrameDrawn = await renderVideoItem(
-        ctx,
-        effectiveItem as VideoItem,
-        transform,
-        frame,
-        rctx,
-        sourceFrameOffset,
-        renderSpan,
-      )
+      const videoFrameDrawn = await (
+        hasActiveCutout(effectiveItem) ? renderCutoutVideoItem : renderVideoItem
+      )(ctx, effectiveItem as VideoItem, transform, frame, rctx, sourceFrameOffset, renderSpan)
       if (!videoFrameDrawn) {
         // Preview canvases are cleared before item rendering. A video item is
         // complete only after one of its real frame sources was drawn; every

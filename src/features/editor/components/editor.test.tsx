@@ -160,6 +160,10 @@ vi.mock('../hooks/use-auto-save', () => ({
   useAutoSave: vi.fn(),
 }))
 
+vi.mock('../hooks/use-cutout-runtime', () => ({
+  useCutoutRuntime: vi.fn(),
+}))
+
 vi.mock('@/features/editor/deps/timeline-hooks', () => ({
   useTimelineShortcuts: vi.fn(),
   useTransitionBreakageNotifications: vi.fn(),

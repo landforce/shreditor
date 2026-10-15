@@ -35,6 +35,9 @@ import {
   selectFallbackVideoCodec,
 } from './client-renderer'
 import { renderAudioOnly, renderComposition } from './canvas-render-orchestrator'
+import { isCutoutActive } from '@/shared/cutout/cutout-core.mjs'
+import { cutoutSourceFromUrl, ensureCutoutMasks } from '@/infrastructure/cutout/cutout-ensure'
+import { resolveMediaUrl } from '@/features/export/deps/media-library'
 import type {
   ExportRenderWorkerRequest,
   ExportRenderWorkerResponse,
@@ -257,6 +260,32 @@ export async function runRender({
   signal,
   onProgress,
 }: RunRenderArgs): Promise<RunRenderOutcome> {
+  // Background removal: analyse the masks the clips still need, then render on
+  // the main thread, which holds the workspace's cutout store and media lookup.
+  const cutoutItems = (composition.tracks ?? []).flatMap((track) =>
+    (track.items ?? []).filter((item) => isCutoutActive(item)),
+  )
+  if (exportMode === 'video' && cutoutItems.length > 0) {
+    await ensureCutoutMasks(
+      cutoutItems,
+      composition.fps,
+      async (mediaId) => cutoutSourceFromUrl(await resolveMediaUrl(mediaId)),
+      {
+        onProgress: (fraction, message) =>
+          onProgress({ phase: 'preparing', progress: Math.round(fraction * 100), message }),
+      },
+    )
+    if (signal.aborted) throw new DOMException('Export cancelled', 'AbortError')
+    const result = await renderOnMainThread(
+      exportMode,
+      clientSettings,
+      composition,
+      signal,
+      onProgress,
+    )
+    return { result, renderPath: 'main-thread', fallbackReason: 'background removal' }
+  }
+
   const workerManager = createManagedWorker<Worker>({
     createWorker: () =>
       new Worker(new URL('../workers/export-render.worker.ts', import.meta.url), {

@@ -130,6 +130,7 @@ const samples = {
     ],
   },
   clearSpeedRamp: { op: 'clearSpeedRamp', id: 'c' },
+  setCutout: { op: 'setCutout', id: 'c', enabled: true, subject: 'person', feather: 2 },
 }
 
 test('speed ramp op schemas take keys or a preset, in the speed limits', () => {
@@ -323,7 +324,8 @@ test('validation errors and capabilities are machine-readable and bounded', () =
   assert.ok(result.schemas.frame)
   assert.ok(result.schemas.layout)
   // Bounded so an agent can read it whole (about 34 KB with the speed ramp ops).
-  assert.ok(JSON.stringify(result).length < 35_000)
+  // Raised with the speed ramp, cutout, replaceMedia, TTS and cut-trash additions (37.7 KB).
+  assert.ok(JSON.stringify(result).length < 40_000)
 })
 
 test('CLI rejects unknown options and normalizes aliases', () => {

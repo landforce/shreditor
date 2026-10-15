@@ -25,6 +25,7 @@ import {
   type ItemRenderContext,
 } from './canvas-item-renderer'
 import type { GpuPipelineManager } from './gpu-pipeline-manager'
+import { hasActiveCutout } from './canvas-item-renderer/cutout'
 import type { RenderedTaskResult } from './frame-mask-helpers'
 
 function getLog() {
@@ -168,7 +169,10 @@ export async function renderItemWithEffects(
   // otherwise freeze on effect clips while non-effect clips kept updating.
   // Outside playback (no provider) this returns null and the mediabunny path runs
   // exactly as before, and export (renderMode !== 'preview') is unaffected.
-  if (renderMasks.length === 0 && combinedEffects.length > 0) {
+  // A cut-out clip is drawn by renderItem (the mask is applied in source space
+  // there), so the direct GPU paths below, which draw the raw frame, are skipped.
+  const cutout = hasActiveCutout(effectiveItem)
+  if (!cutout && renderMasks.length === 0 && combinedEffects.length > 0) {
     const directGpuCanvas = renderPreviewVideoGpuEffectsToCanvas(
       effectiveItem,
       transform,
@@ -186,6 +190,7 @@ export async function renderItemWithEffects(
   }
 
   const canRenderDirectGpuEffects =
+    !cutout &&
     allowDirectGpu &&
     preferGpuTextureOutput &&
     gpu.texturePool &&

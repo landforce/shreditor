@@ -54,6 +54,7 @@ What `shred apply` accepts and how the project behaves. Verified against the Shr
 | `updateEffect` | `itemId`, `effectId`, `params?`, `enabled?` | Merges `params` into the effect; `enabled: false` bypasses it (handy for a before/after frame). |
 | `removeEffect` | `itemId`, `effectId` | |
 | `addLut` | `itemId`, `lut`, `intensity?` (0..1, default 1) | Adds a `gpu-lut` effect from `<workspace>/luts/<lut>` (a file name there, e.g. `"Warm.cube"`; `shred lut list`). The LUT is embedded in the effect as the editor's LUT panel does (resampled to 33³), so later changes to the file don't touch the clip. Returns `detail.effectId`. An unknown name fails and lists what `luts/` has. |
+| `setCutout` | `id`, `enabled`, `subject?` auto/person/object, `feather?` (0-100 source px), `invert?`, `refine?` (0..1), `sampleRate?` (1-120 or `"full"`) | Background removal on a video clip, no green screen needed (see Background removal). Fields given merge into the clip's `cutout`; a new one defaults to `subject: "auto"`. Only stores settings: the masks are analysed by `shred cutout` or before any render. Returns `detail.cutout`. Not a video clip fails. |
 | `setTransformParent` | | Parent one item's transform to another. |
 | `createComposition` | `ids`, `name` | Groups items into a layer composition (the editor's compound clip, as a Motion composition) at the project's canvas. The items keep their ids inside it. Returns `detail.id` (the composition item on the timeline), `detail.compositionId`, `detail.items`. |
 | `setCompositionControls` | `compositionId`, `controls: [{ name, targetItemId, property, defaultValue? }]` | Replaces the composition's published controls: what each instance can change. `property` is `text.text`, `text.color`, `shape.fillColor` or `shape.strokeColor` (`shape.strokeColor` needs the stroke on; text with styled spans takes none). Names are unique, case-insensitive. `defaultValue` defaults to the item's current value. Returns the controls. |
@@ -281,6 +282,15 @@ Several versions of one edit side by side (Main, Hook B, 16:9). Each cut is its 
 - Drafts are not cuts (`shred draft` doesn't copy `cut`), and `shred publish <draft> <cutId>` lands only in that cut; it prints which cut it was. `shred project` and `shred status` name the cut groups.
 - The editor's cut switcher (beside the format chip, Concise and Full) switches cuts in the same tab, makes them (label and aspect: same, 9:16, 16:9, 1:1, 4:5) and manages them (rename, reorder, remove with confirmation). It doesn't follow your publishes: it marks a cut with a new pass, and the user switches.
 - A 16:9 cut of a 9:16 format scores against the format's 9:16 targets, and kit geometry checks against the kit's canvas.
+
+## Background removal
+
+`setCutout` (or `shred cutout`) cuts a speaker or object out of footage shot in a real room. Design, models and limits: `docs/background-removal.md` in the repo.
+
+- `shred cutout <draftId> <clipId...> [--subject auto|person|object] [--wait] [--json]` turns it on in one batch (`--off` turns it off), starts the analysis on the service and, with `--wait`, waits for it, printing progress and then each cut-out clip: subject (`auto→person`), model, samples per second, masks stored / needed, `ready` / `partial` / `none`. `shred cutout <id>` alone prints the status. The first run downloads the model once (MODNet 26 MB for people; U-2-Net 176 MB for objects).
+- `person` is portrait matting (soft hair edges); `object` the main salient object (a product, a pet); `auto` tries person and falls back to object when no one is found. The mask covers the clip's whole source frame, so crop, transforms, effects and keyframes work as usual, and the clip stays a separate layer: put the background (plate, b-roll, colour) on a track below it.
+- Masks are sampled 10 times a second and blended between samples; `sampleRate: "full"` analyses every source frame (slower, for a final pass when edges must not lag fast motion). `feather` softens the edge (px), `refine` hardens it (0..1), `invert` keeps the room and removes the subject; none of them re-run the model.
+- `shred frames` renders cut-out frames (it analyses the samples around each frame it needs). **Look at the edges**: hair, hands, the gap between arm and body, the chair. Exports analyse everything first; native export draws the cut-out clip as an overlay (`background removal`), the rest stays native.
 
 ## Export
 

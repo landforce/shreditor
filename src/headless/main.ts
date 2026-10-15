@@ -87,6 +87,7 @@ import {
 } from '@/shared/typography/text-block-layout'
 import { createCanvasTextMeasurer } from '@/shared/typography/text-measurer'
 import { resolveAnimatedTextItem } from '@/features/keyframes/utils/animated-text-item'
+import { analyzeCutout, configureHeadlessCutout, ensureCutout } from './cutout-harness'
 
 const log = createLogger('Headless')
 
@@ -640,6 +641,8 @@ async function renderTimeline(input: HeadlessTimelineInput): Promise<HeadlessRen
   registerMediaUrls(media)
   // Seed media metadata so codec lookups resolve (enables AC-3/E-AC-3 audio).
   seedMediaLibrary(media)
+  // Cut-out clips need their masks analysed before they are drawn.
+  await ensureCutout([...items, ...compositions.flatMap((c) => c.items)], fps)
 
   const { settings, warnings } = await adaptVideoSettings(requestedSettings)
 
@@ -971,6 +974,8 @@ async function renderFrame(input: HeadlessFrameInput): Promise<HeadlessFrameSumm
   useCompositionsStore.getState().setCompositions(view.compositions)
   registerMediaUrls(input.media)
   seedMediaLibrary(input.media)
+  // A frame needs only the cutout samples around it.
+  await ensureCutout(view.items, view.fps, { frames: [frame] })
 
   const composition = buildComposition(view)
   // Same font gate as the full render — a single frame grab that quietly used the
@@ -1253,6 +1258,7 @@ async function renderOverlayFrames(input: HeadlessOverlayInput): Promise<Headles
   useCompositionsStore.getState().setCompositions(view.compositions)
   registerMediaUrls(input.media)
   seedMediaLibrary(input.media)
+  await ensureCutout(items, view.fps)
   const composition = omitTranscriptSubtitleItemsForSoftSubtitleExport(
     buildComposition({ ...view, items, transitions, backgroundColor: 'rgba(0, 0, 0, 0)' }),
   )
@@ -1286,6 +1292,7 @@ interface FreecutHeadlessApi {
   createProject: typeof createProjectForHeadless
   renderOverlayFrames: typeof renderOverlayFrames
   generateSpeech: (input: HeadlessTtsInput) => ReturnType<typeof generateSpeech>
+  analyzeCutout: typeof analyzeCutout
 }
 
 async function createProjectForHeadless(input: {
@@ -1389,5 +1396,7 @@ window.freecut = {
   createProject: createProjectForHeadless,
   renderOverlayFrames,
   generateSpeech: (input) => generateSpeech(input, triggerDownload),
+  analyzeCutout,
 }
+configureHeadlessCutout()
 log.info('Headless harness ready')

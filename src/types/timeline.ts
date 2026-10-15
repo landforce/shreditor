@@ -224,6 +224,8 @@ export type VideoItem = BaseTimelineItem & {
   // Source dimensions (intrinsic size from media metadata)
   sourceWidth?: number
   sourceHeight?: number
+  /** Background removal (docs/background-removal.md). */
+  cutout?: import('./cutout').CutoutSettings
 }
 
 export type AudioItem = BaseTimelineItem & {

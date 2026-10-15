@@ -17,6 +17,18 @@ The editor lists the transcription entries under Settings > AI > Models and lice
 | [Transformers.js](https://github.com/huggingface/transformers.js) (`@huggingface/transformers`) | Apache-2.0 | Runs Whisper and other models in the browser. |
 | [ONNX Runtime Web](https://github.com/microsoft/onnxruntime) (`onnxruntime-web`) | MIT | In-browser inference runtime. |
 
+## Background removal
+
+Runs on the user's computer (onnxruntime-web, WebGPU or wasm). Weights are
+downloaded on first use from a URL pinned to a Hugging Face commit and checked
+against their SHA-256; nothing is bundled. Design and the models considered:
+`docs/background-removal.md`.
+
+| Component | License | How Shreditor uses it |
+|---|---|---|
+| [MODNet](https://github.com/ZHKKKe/MODNet) (Zhanghan Ke et al.) | Apache-2.0 (code and pre-trained models) | Person matting for Remove background. ONNX conversion [Xenova/modnet](https://huggingface.co/Xenova/modnet) (`license: apache-2.0`), `onnx/model.onnx` at revision `fa2fa546052fba4c08921230a26cc69a333fca12`, sha256 `07c308cf0fc7e6e8b2065a12ed7fc07e1de8febb7dc7839d7b7f15dd66584df9`. |
+| [U-2-Net](https://github.com/xuebinqin/U-2-Net) (Xuebin Qin et al.) | Apache-2.0 (repository licence; the upstream README does not state a separate licence for the weights) | Object segmentation for Remove background. ONNX conversion [BritishWerewolf/U-2-Net](https://huggingface.co/BritishWerewolf/U-2-Net) (`license: apache-2.0`), `onnx/model.onnx` at revision `c08042b462485d8597c89d3ce831d00be8582c5c`, sha256 `8d10d2f3bb75ae3b6d527c77944fc5e7dcd94b29809d47a739a7a728a912b491`. |
+
 ## Media
 
 | Component | License | How Shreditor uses it |
