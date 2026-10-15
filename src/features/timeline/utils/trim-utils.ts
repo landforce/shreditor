@@ -9,6 +9,14 @@ import {
 import { useCompositionsStore } from '../stores/compositions-store'
 import { isCompositionAudioItem } from '@/shared/utils/linked-media'
 import { isHeldTemplateInstance } from '@/shared/motion-templates/instance-time'
+import {
+  getSpeedRamp,
+  localFrameAtSourceFrames,
+  pruneSpeedRamp,
+  shiftSpeedRamp,
+  sourceFramesAtLocalFrame,
+  type SpeedRampKey,
+} from '@/shared/timeline/speed-ramp.mjs'
 
 export type TrimHandle = 'start' | 'end'
 
@@ -63,7 +71,14 @@ export function clampTrimAmount(
   let maxExtend: number | null = null
 
   // A held template instance maps any length onto its template: no source edges.
-  if (isMediaItem(item) && !isHeldTemplateInstance(item)) {
+  if (isMediaItem(item) && !isHeldTemplateInstance(item) && getSpeedRamp(item)) {
+    maxExtend = clampRampedTrim(item, handle, trimAmount, timelineFps)
+    if (maxExtend !== null) {
+      if (handle === 'start' && trimAmount < 0 && -trimAmount > maxExtend)
+        clampedAmount = -maxExtend
+      if (handle === 'end' && trimAmount > maxExtend) clampedAmount = maxExtend
+    }
+  } else if (isMediaItem(item) && !isHeldTemplateInstance(item)) {
     const { sourceStart, sourceEnd, sourceFps, speed } = getSourceProperties(item)
     const sourceDuration = getEffectiveSourceDuration(item)
     const effectiveSourceFps = sourceFps ?? timelineFps
@@ -117,6 +132,44 @@ export function clampTrimAmount(
   clampedAmount = clampToMinDuration(item.durationInFrames, handle, clampedAmount)
 
   return { clampedAmount, maxExtend }
+}
+
+/**
+ * How far a speed-ramped clip can extend at a handle: the curve holds its edge
+ * speed past the clip, and the source it would play must exist. Null when the
+ * media length is unknown (end handle).
+ */
+function clampRampedTrim(
+  item: TimelineItem,
+  handle: TrimHandle,
+  trimAmount: number,
+  timelineFps: number,
+): number | null {
+  const { sourceStart, sourceEnd } = getSourceProperties(item)
+  const sourceDuration = getEffectiveSourceDuration(item)
+  const reversed = item.isReversed === true
+  if (handle === 'start') {
+    if (trimAmount >= 0) return null
+    // Source before the first played frame: below sourceStart, or above sourceEnd reversed.
+    const available = reversed
+      ? sourceDuration !== undefined
+        ? Math.max(0, sourceDuration - (sourceEnd ?? sourceDuration))
+        : 0
+      : sourceStart
+    return Math.max(0, Math.floor(-localFrameAtSourceFrames(item, -available, timelineFps) + 1e-6))
+  }
+  if (reversed) {
+    // Reversed playback reads down from sourceEnd: everything to frame 0 is available.
+    const end = sourceEnd ?? sourceDuration
+    if (end === undefined) return null
+    const maxDuration = Math.floor(localFrameAtSourceFrames(item, end, timelineFps) + 1e-6)
+    return Math.max(0, maxDuration - item.durationInFrames)
+  }
+  if (sourceDuration === undefined) return null
+  const maxDuration = Math.floor(
+    localFrameAtSourceFrames(item, sourceDuration - sourceStart, timelineFps) + 1e-6,
+  )
+  return Math.max(0, maxDuration - item.durationInFrames)
 }
 
 /**
@@ -209,6 +262,56 @@ function clampToMinDuration(
 interface TrimSourceUpdate {
   sourceStart?: number
   sourceEnd?: number
+  /** A ramped clip's keys after the trim (a start trim moves them with the clip's start). */
+  speedRamp?: SpeedRampKey[]
+}
+
+/** Source window and keys of a speed-ramped clip after a trim (the time map's integral). */
+function calculateRampedTrimSourceUpdate(
+  item: TimelineItem,
+  keys: readonly SpeedRampKey[],
+  handle: TrimHandle,
+  clampedAmount: number,
+  newDuration: number,
+  timelineFps: number,
+): TrimSourceUpdate {
+  const { sourceStart, sourceEnd } = getSourceProperties(item)
+  const sourceDuration = getEffectiveSourceDuration(item)
+  const reversed = item.isReversed === true
+  const nextKeys =
+    handle === 'start'
+      ? pruneSpeedRamp(shiftSpeedRamp(keys, -clampedAmount), newDuration)
+      : pruneSpeedRamp(keys, newDuration)
+  const next = { ...item, durationInFrames: newDuration, speedRamp: nextKeys }
+  const span = Math.max(1, Math.round(sourceFramesAtLocalFrame(next, newDuration, timelineFps)))
+  if (handle === 'start') {
+    const removed = Math.round(sourceFramesAtLocalFrame(item, clampedAmount, timelineFps))
+    if (reversed) {
+      const currentEnd = sourceEnd ?? sourceDuration ?? sourceStart + span
+      const nextEnd = currentEnd - removed
+      return {
+        sourceStart: Math.max(0, nextEnd - span),
+        sourceEnd: sourceDuration !== undefined ? Math.min(sourceDuration, nextEnd) : nextEnd,
+        speedRamp: nextKeys,
+      }
+    }
+    const nextStart = Math.max(0, sourceStart + removed)
+    const nextEnd = nextStart + span
+    return {
+      sourceStart: nextStart,
+      sourceEnd: sourceDuration !== undefined ? Math.min(sourceDuration, nextEnd) : nextEnd,
+      speedRamp: nextKeys,
+    }
+  }
+  if (reversed) {
+    const currentEnd = sourceEnd ?? sourceDuration ?? sourceStart + span
+    return { sourceStart: Math.max(0, currentEnd - span), speedRamp: nextKeys }
+  }
+  const nextEnd = sourceStart + span
+  return {
+    sourceEnd: sourceDuration !== undefined ? Math.min(sourceDuration, nextEnd) : nextEnd,
+    speedRamp: nextKeys,
+  }
 }
 
 export function calculateTrimSourceUpdate(
@@ -219,6 +322,18 @@ export function calculateTrimSourceUpdate(
   timelineFps: number = 30,
 ): TrimSourceUpdate | null {
   if (!isMediaItem(item) || isHeldTemplateInstance(item)) return null
+
+  const rampKeys = getSpeedRamp(item)
+  if (rampKeys) {
+    return calculateRampedTrimSourceUpdate(
+      item,
+      rampKeys,
+      handle,
+      clampedAmount,
+      newDuration,
+      timelineFps,
+    )
+  }
 
   const { sourceStart, sourceEnd, sourceFps, speed } = getSourceProperties(item)
   const sourceDuration = getEffectiveSourceDuration(item)

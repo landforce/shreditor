@@ -4,6 +4,7 @@
  * variant for the canvas and written as caption text items that use the style.
  */
 
+import { hasSpeedRamp, sourceSpanFrames } from '@/shared/timeline/speed-ramp.mjs'
 import type { MediaTranscriptSegment, MediaTranscriptWord } from '@/types/storage'
 import type { AudioItem, TextItem, VideoItem } from '@/types/timeline'
 import type { CaptionChunkRules, TextStyleDefinition } from '@/types/text-style'
@@ -145,7 +146,10 @@ export function buildStyledCaptionItems({
   )
   const limits = limitsFor(rules, {
     language,
-    sourceSecondsPerFrame: (clip.speed || 1) / timelineFps,
+    // A speed ramp's average rate (its integral over the clip) stands in for the speed.
+    sourceSecondsPerFrame: hasSpeedRamp(clip)
+      ? sourceSpanFrames(clip, timelineFps) / bounds.sourceFps / Math.max(1, clip.durationInFrames)
+      : (clip.speed || 1) / timelineFps,
   })
   const english = usesEnglishPhraseRules(
     spoken.flatMap((segment) => segment.words ?? []),

@@ -1,3 +1,4 @@
+import { joinedSpeedRamp, sourceSpanFrames } from '@/shared/timeline/speed-ramp.mjs'
 import type { TimelineItem } from '@/types/timeline'
 import { areFramesAligned } from './frame-alignment'
 
@@ -24,11 +25,13 @@ export function canJoinItems(leftItem: TimelineItem, rightItem: TimelineItem): b
   if (!areFramesAligned(leftItem.from + leftItem.durationInFrames, rightItem.from)) return false
   // Must have same speed
   if ((leftItem.speed || 1) !== (rightItem.speed || 1)) return false
+  // Speed ramps join only when the right curve continues the left (halves of one clip).
+  if (joinedSpeedRamp(leftItem, rightItem) === null) return false
 
   // Verify source continuity (no trim gap between clips)
   const leftSourceEnd =
     leftItem.sourceEnd ??
-    (leftItem.sourceStart ?? 0) + leftItem.durationInFrames * (leftItem.speed || 1)
+    (leftItem.sourceStart ?? 0) + sourceSpanFrames(leftItem, leftItem.sourceFps ?? 30)
   const rightSourceStart = rightItem.sourceStart ?? 0
   if (Math.abs(leftSourceEnd - rightSourceStart) > 0.5) return false // Allow small floating point tolerance
 

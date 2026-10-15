@@ -25,6 +25,8 @@ const VIDEO_ANIMATABLE_PROPERTIES: AnimatableProperty[] = [
 ]
 
 const AUDIO_ANIMATABLE_PROPERTIES: AnimatableProperty[] = ['volume']
+// The clip's speed ramp (src/shared/timeline/speed-ramp.mjs), on clips that play media.
+const TIME_ANIMATABLE_PROPERTIES: AnimatableProperty[] = ['speed']
 const CONTROLLER_ANIMATABLE_PROPERTIES: AnimatableProperty[] = [
   'x',
   'y',
@@ -38,12 +40,13 @@ export function getAnimatablePropertiesForItem(item: TimelineItem): AnimatablePr
 
   switch (item.type) {
     case 'audio':
-      return [...AUDIO_ANIMATABLE_PROPERTIES, ...effectProperties]
+      return [...AUDIO_ANIMATABLE_PROPERTIES, ...TIME_ANIMATABLE_PROPERTIES, ...effectProperties]
     case 'video':
       return [
         ...VISUAL_ANIMATABLE_PROPERTIES,
         ...VIDEO_ANIMATABLE_PROPERTIES,
         ...AUDIO_ANIMATABLE_PROPERTIES,
+        ...TIME_ANIMATABLE_PROPERTIES,
         ...effectProperties,
       ]
     case 'composition':
@@ -65,9 +68,7 @@ export function getAnimatablePropertiesForItem(item: TimelineItem): AnimatablePr
         'taperEndWidth',
         'taperStartLength',
         'taperEndLength',
-        ...(item.shapeType === 'path'
-          ? getPathVertexAnimatableProperties(item.pathVertices)
-          : []),
+        ...(item.shapeType === 'path' ? getPathVertexAnimatableProperties(item.pathVertices) : []),
         ...effectProperties,
       ]
     case 'controller':

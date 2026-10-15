@@ -6,6 +6,11 @@ import {
   timelineToSourceFrames,
 } from '../deps/timeline-caption-utils-contract'
 import type { MediaTranscriptSegment } from '@/types/storage'
+import {
+  hasSpeedRamp,
+  localFrameAtSourceFrames,
+  sourceSpanFrames,
+} from '@/shared/timeline/speed-ramp.mjs'
 import type { MediaCaption } from '@/infrastructure/analysis/media-tagger'
 import type { SubtitleCue, SubtitleFormat } from '@/shared/utils/subtitles'
 import type {
@@ -136,32 +141,48 @@ function toSourceEndFrame(seconds: number, sourceFps: number): number {
   return Math.max(0, Math.ceil(seconds * sourceFps))
 }
 
+/**
+ * Clip-local timeline frames until `sourceFrames` (from the clip's sourceStart)
+ * have played: through the clip's speed, or its speed ramp's time map.
+ */
+function sourceFramesToLocalFrames(
+  sourceFrames: number,
+  clip: AudioItem | VideoItem,
+  timelineFps: number,
+): number {
+  return localFrameAtSourceFrames(clip, sourceFrames, timelineFps)
+}
+
 function sourceFramesToTimelineFramesFloor(
   sourceFrames: number,
-  speed: number,
-  sourceFps: number,
+  clip: AudioItem | VideoItem,
   timelineFps: number,
 ): number {
   if (sourceFrames <= 0) {
     return 0
   }
-
-  const sourceSeconds = sourceFrames / sourceFps
-  return Math.max(0, Math.floor((sourceSeconds * timelineFps) / speed))
+  return Math.max(0, Math.floor(sourceFramesToLocalFrames(sourceFrames, clip, timelineFps) + 1e-9))
 }
 
 function sourceFramesToTimelineFramesCeil(
   sourceFrames: number,
-  speed: number,
-  sourceFps: number,
+  clip: AudioItem | VideoItem,
   timelineFps: number,
 ): number {
   if (sourceFrames <= 0) {
     return 0
   }
+  return Math.max(0, Math.ceil(sourceFramesToLocalFrames(sourceFrames, clip, timelineFps) - 1e-9))
+}
 
-  const sourceSeconds = sourceFrames / sourceFps
-  return Math.max(0, Math.ceil((sourceSeconds * timelineFps) / speed))
+/** Timeline seconds after the clip's start where `offsetSeconds` of its source have played. */
+function sourceOffsetToTimelineSeconds(
+  offsetSeconds: number,
+  clip: AudioItem | VideoItem,
+  sourceFps: number,
+  timelineFps: number,
+): number {
+  return sourceFramesToLocalFrames(offsetSeconds * sourceFps, clip, timelineFps) / timelineFps
 }
 
 export function getClipSourceBounds(
@@ -176,8 +197,9 @@ export function getClipSourceBounds(
   const speed = clip.speed ?? 1
   const sourceStart = clip.sourceStart ?? 0
   const sourceFps = clip.sourceFps ?? timelineFps
-  const derivedSourceEnd =
-    sourceStart + timelineToSourceFrames(clip.durationInFrames, speed, timelineFps, sourceFps)
+  const derivedSourceEnd = hasSpeedRamp(clip)
+    ? sourceStart + Math.round(sourceSpanFrames(clip, timelineFps))
+    : sourceStart + timelineToSourceFrames(clip.durationInFrames, speed, timelineFps, sourceFps)
 
   return {
     sourceStart,
@@ -197,7 +219,7 @@ export function getCaptionRangeForClip(
     return null
   }
 
-  const { sourceStart, sourceEnd, sourceFps, speed } = getClipSourceBounds(clip, timelineFps)
+  const { sourceStart, sourceEnd, sourceFps } = getClipSourceBounds(clip, timelineFps)
   let firstFrame: number | null = null
   let lastFrame: number | null = null
 
@@ -213,16 +235,10 @@ export function getCaptionRangeForClip(
 
     const startOffset = sourceFramesToTimelineFramesFloor(
       overlapStart - sourceStart,
-      speed,
-      sourceFps,
+      clip,
       timelineFps,
     )
-    const endOffset = sourceFramesToTimelineFramesCeil(
-      overlapEnd - sourceStart,
-      speed,
-      sourceFps,
-      timelineFps,
-    )
+    const endOffset = sourceFramesToTimelineFramesCeil(overlapEnd - sourceStart, clip, timelineFps)
 
     const startFrame = clip.from + Math.min(startOffset, clip.durationInFrames - 1)
     const endFrame =
@@ -564,7 +580,7 @@ export function buildCaptionTextItems({
   sourceType = 'transcript',
 }: BuildCaptionTextItemsOptions): TextItem[] {
   const normalizedSegments = normalizeCaptionSegments(segments)
-  const { sourceStart, sourceEnd, sourceFps, speed } = getClipSourceBounds(clip, timelineFps)
+  const { sourceStart, sourceEnd, sourceFps } = getClipSourceBounds(clip, timelineFps)
 
   return normalizedSegments.flatMap((segment) => {
     const segmentSourceStart = toSourceStartFrame(segment.start, sourceFps)
@@ -578,16 +594,10 @@ export function buildCaptionTextItems({
 
     const startOffset = sourceFramesToTimelineFramesFloor(
       overlapStart - sourceStart,
-      speed,
-      sourceFps,
+      clip,
       timelineFps,
     )
-    const endOffset = sourceFramesToTimelineFramesCeil(
-      overlapEnd - sourceStart,
-      speed,
-      sourceFps,
-      timelineFps,
-    )
+    const endOffset = sourceFramesToTimelineFramesCeil(overlapEnd - sourceStart, clip, timelineFps)
     const from = clip.from + Math.min(startOffset, clip.durationInFrames - 1)
     const endFrame =
       clip.from + Math.min(clip.durationInFrames, Math.max(startOffset + 1, endOffset))
@@ -725,7 +735,7 @@ export function buildSubtitleTextItemsForClip({
   styleTemplate,
   sourceType = 'embedded-subtitles',
 }: BuildSubtitleTextItemsForClipOptions): TextItem[] {
-  const { sourceStart, sourceEnd, sourceFps, speed } = getClipSourceBounds(clip, timelineFps)
+  const { sourceStart, sourceEnd, sourceFps } = getClipSourceBounds(clip, timelineFps)
   const sourceStartSeconds = sourceStart / sourceFps
   const sourceEndSeconds = sourceEnd / sourceFps
   const clipEndFrame = clip.from + clip.durationInFrames
@@ -736,9 +746,25 @@ export function buildSubtitleTextItemsForClip({
     if (overlapEndSec <= overlapStartSec) return []
 
     const fromOffsetFrames = Math.floor(
-      ((overlapStartSec - sourceStartSeconds) * timelineFps) / speed,
+      sourceOffsetToTimelineSeconds(
+        overlapStartSec - sourceStartSeconds,
+        clip,
+        sourceFps,
+        timelineFps,
+      ) *
+        timelineFps +
+        1e-9,
     )
-    const endOffsetFrames = Math.ceil(((overlapEndSec - sourceStartSeconds) * timelineFps) / speed)
+    const endOffsetFrames = Math.ceil(
+      sourceOffsetToTimelineSeconds(
+        overlapEndSec - sourceStartSeconds,
+        clip,
+        sourceFps,
+        timelineFps,
+      ) *
+        timelineFps -
+        1e-9,
+    )
     const from = clip.from + Math.max(0, Math.min(fromOffsetFrames, clip.durationInFrames - 1))
     const endFrame = Math.min(
       clipEndFrame,
@@ -867,7 +893,7 @@ export function buildSubtitleSegmentForClip(
     styleTemplate,
     label,
   } = options
-  const { sourceStart, sourceEnd, sourceFps, speed } = getClipSourceBounds(clip, timelineFps)
+  const { sourceStart, sourceEnd, sourceFps } = getClipSourceBounds(clip, timelineFps)
   const sourceStartSeconds = sourceStart / sourceFps
   const sourceEndSeconds = sourceEnd / sourceFps
 
@@ -882,8 +908,18 @@ export function buildSubtitleSegmentForClip(
 
     // Convert source seconds → timeline seconds relative to clip.from / speed,
     // then keep cue times relative to the segment's eventual `from`.
-    const cueStartTimeline = (overlapStartSec - sourceStartSeconds) / speed
-    const cueEndTimeline = (overlapEndSec - sourceStartSeconds) / speed
+    const cueStartTimeline = sourceOffsetToTimelineSeconds(
+      overlapStartSec - sourceStartSeconds,
+      clip,
+      sourceFps,
+      timelineFps,
+    )
+    const cueEndTimeline = sourceOffsetToTimelineSeconds(
+      overlapEndSec - sourceStartSeconds,
+      clip,
+      sourceFps,
+      timelineFps,
+    )
     const cueStartFrames = Math.floor(cueStartTimeline * timelineFps)
     const cueEndFrames = Math.ceil(cueEndTimeline * timelineFps)
     if (cueEndFrames <= cueStartFrames) continue

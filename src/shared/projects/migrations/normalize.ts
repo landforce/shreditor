@@ -18,6 +18,7 @@
 
 import type { Project, ProjectTimeline } from '@/types/project'
 import { DEFAULT_TRACK_HEIGHT, DEFAULT_FPS } from '@/shared/timeline/defaults'
+import { MAX_SPEED, MIN_SPEED, normalizeSpeedRamp } from '@/shared/timeline/speed-ramp.mjs'
 import { normalizeAudioEqSettings } from '@/shared/utils/audio-eq'
 import { applyOptionalClamps } from '@/shared/timeline/item-clamps'
 import { sanitizeTextMotion } from './sanitize-text-motion'
@@ -88,9 +89,16 @@ function normalizeItem(
     normalized.textMotion = sanitizeTextMotion(normalized.textMotion)
   }
 
-  // Ensure speed is valid (default 1.0, range 0.1-10.0)
+  // Ensure speed is valid (default 1.0, range MIN_SPEED-MAX_SPEED)
   if (normalized.speed !== undefined) {
-    normalized.speed = Math.max(0.1, Math.min(10.0, normalized.speed))
+    normalized.speed = Math.max(MIN_SPEED, Math.min(MAX_SPEED, normalized.speed))
+  }
+
+  // Speed ramp keys: sorted, whole frames, speeds in range; an empty ramp is none.
+  if (normalized.speedRamp !== undefined) {
+    const keys = normalizeSpeedRamp(normalized.speedRamp)
+    if (keys.length > 0) normalized.speedRamp = keys
+    else delete normalized.speedRamp
   }
 
   // Ensure volume is valid (default 0dB, range -60 to +12)

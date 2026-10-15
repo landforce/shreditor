@@ -28,3 +28,8 @@ export * from './actions/composition-actions'
 export * from './actions/project-item-actions'
 export * from './actions/legacy-av-actions'
 export * from './actions/export-snapshot'
+export {
+  setSpeedRamp,
+  clearSpeedRamp,
+  commitSpeedRampPlan,
+} from './actions/speed-ramp-edit-actions'

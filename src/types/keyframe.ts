@@ -20,6 +20,7 @@ export type BuiltInAnimatableProperty =
   | 'cropBottom'
   | 'cropSoftness'
   | 'volume'
+  | 'speed'
   | 'textStyleScale'
   | 'fontSize'
   | 'lineHeight'
@@ -473,6 +474,7 @@ const BUILT_IN_PROPERTY_LABELS: Record<BuiltInAnimatableProperty, string> = {
   cropBottom: 'Crop Bottom',
   cropSoftness: 'Crop Softness',
   volume: 'Volume (dB)',
+  speed: 'Speed (x)',
   textStyleScale: 'Style Preset Scale',
   fontSize: 'Font Size',
   lineHeight: 'Line Height',

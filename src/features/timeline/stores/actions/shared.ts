@@ -17,6 +17,7 @@ import { useCompositionsStore, type SubComposition } from '../compositions-store
 import { useCompositionNavigationStore } from '../composition-navigation-store'
 import { repairTransitions } from '../../utils/transition-auto-repair'
 import { isFrameInTransitionRegion } from '@/features/timeline/deps/keyframes'
+import { runWithSpeedRampReconcile } from './speed-ramp-actions'
 
 // Use function declarations (not const) to avoid temporal dead zone errors
 // in production chunk ordering — see CLAUDE.md gotchas.
@@ -26,7 +27,9 @@ export function getLogger() {
 
 export function execute<T>(type: string, action: () => T, payload?: Record<string, unknown>): T {
   return withPerfMeasure(`tl.action.${type}`, () =>
-    useTimelineCommandStore.getState().execute({ type, payload }, action),
+    useTimelineCommandStore
+      .getState()
+      .execute({ type, payload }, () => runWithSpeedRampReconcile(action)),
   )
 }
 

@@ -1,3 +1,4 @@
+import { sameSpeedRamp } from '@/shared/timeline/speed-ramp.mjs'
 import type { TimelineItem, TimelineTrack } from '@/types/timeline'
 import { applyMovePreview, type PreviewItemUpdate } from './item-edit-preview'
 import { getSourceProperties } from './source-calculations'
@@ -129,7 +130,8 @@ export function getSynchronizedLinkedItems(items: TimelineItem[], itemId: string
         item.durationInFrames === anchor.durationInFrames &&
         (item.sourceStart ?? null) === (anchor.sourceStart ?? null) &&
         (item.sourceEnd ?? null) === (anchor.sourceEnd ?? null) &&
-        (item.speed ?? 1) === (anchor.speed ?? 1)),
+        (item.speed ?? 1) === (anchor.speed ?? 1) &&
+        sameSpeedRamp(item.speedRamp, anchor.speedRamp)),
   )
 
   return synchronizedItems.length > 0 ? synchronizedItems : [anchor]

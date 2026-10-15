@@ -35,6 +35,7 @@ import { useZoomStore } from './zoom-store'
 import { useItemsStore } from './items-store'
 import { useTransitionsStore } from './transitions-store'
 import { useKeyframesStore } from './keyframes-store'
+import { syncSpeedRampLanes } from './actions/speed-ramp-actions'
 import { useMarkersStore } from './markers-store'
 import { useProjectTextStylesStore } from '@/shared/state/text-styles'
 import { sanitizeTextStyles } from '@/shared/typography/text-styles/text-style-schema'
@@ -1173,6 +1174,8 @@ export async function hydrateTimelineStoresFromProject(
     useItemsStore.getState().setItems(hydratedItems)
     useTransitionsStore.getState().setTransitions((t.transitions || []) as Transition[])
     useKeyframesStore.getState().setKeyframes((t.keyframes || []) as ItemKeyframes[])
+    // Each clip's speed curve is the truth; its `speed` keyframe lane mirrors it.
+    syncSpeedRampLanes()
     useMarkersStore.getState().setMarkers(t.markers || [])
     useMarkersStore.getState().setInPoint(sanitizedInOutPoints.inPoint)
     useMarkersStore.getState().setOutPoint(sanitizedInOutPoints.outPoint)

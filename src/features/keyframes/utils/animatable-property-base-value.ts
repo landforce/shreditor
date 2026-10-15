@@ -14,7 +14,9 @@ import {
   isPathVertexAnimatableProperty,
 } from './path-animatable-properties'
 
-function isCropAnimatableProperty(property: AnimatableProperty): property is CropAnimatableProperty {
+function isCropAnimatableProperty(
+  property: AnimatableProperty,
+): property is CropAnimatableProperty {
   return (
     property === 'cropLeft' ||
     property === 'cropRight' ||
@@ -29,6 +31,7 @@ function getItemSpecificBaseValue(
   property: AnimatableProperty,
 ): number | undefined {
   if (property === 'volume') return item.volume ?? 0
+  if (property === 'speed') return item.speed ?? 1
   if (item.type === 'text' && isTextAnimatableProperty(property)) {
     return getTextAnimatableBaseValue(item, property)
   }
