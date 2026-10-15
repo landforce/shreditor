@@ -138,7 +138,7 @@ describe('local-model-cache', () => {
   it('inspects configured local model caches without creating missing caches', async () => {
     const summaries = await inspectAllLocalModelCaches()
 
-    expect(summaries).toHaveLength(7)
+    expect(summaries).toHaveLength(8)
     expect(summaries.map((summary) => summary.id)).toEqual([
       'whisper',
       ...SCENE_VERIFICATION_MODEL_IDS,
@@ -146,6 +146,7 @@ describe('local-model-cache', () => {
       'parakeet',
       'supertonic-tts',
       'rife',
+      'cutout',
     ])
 
     expect(summaries).toContainEqual(
