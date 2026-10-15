@@ -228,6 +228,12 @@ export interface MediaMetadata {
    */
   attribution?: MediaAttribution
   /**
+   * Set when a tool made the file rather than a camera or the user: `shred tts`
+   * writes `{ kind: 'tts', scratch: true, engine, voice, text, ... }` for a
+   * scratch voiceover, a placeholder until the real VO is recorded.
+   */
+  generated?: { kind: string; scratch?: boolean; [key: string]: unknown }
+  /**
    * Native background transcription (whisper.cpp in the local bridge,
    * `server/transcription.mjs`). The transcript itself is the regular
    * transcript store entry; this only reports progress and outcome.

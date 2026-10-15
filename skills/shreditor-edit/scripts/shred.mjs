@@ -154,6 +154,13 @@
 //   shred export <id> [--native|--browser] [--codec h264|hevc|prores] [--quality low|medium|high|ultra] [--out name]
 //                                        final export to <workspace>/projects/<id>/exports/; default: native
 //                                        (ffmpeg from the originals) when the plan allows it, else browser
+//   shred tts voices [--engine supertonic|moss] [--json]   the local TTS engines, preset voices and options
+//   shred tts --project <id> (--text "..." | --file script.txt) [--engine supertonic|moss] [--voice v]
+//             [--speed x] [--language code] [--name label] [--json]
+//                                        a SCRATCH voiceover (placeholder, never final): the editor's local
+//                                        TTS in the service's page, long scripts split by sentence; imported
+//                                        as voiceover, marked generated scratch TTS; prints mediaId, duration,
+//                                        engine/voice and backend (webgpu|wasm). First run downloads the model
 //
 // Service: 127.0.0.1:8787 (SHRED_SERVICE to override). Workspace: SHRED_WORKSPACE,
 // else ~/.shreditor/config.json, else ~/Movies/Shreditor. Times are frames at the
@@ -196,6 +203,7 @@ import { motionCommands } from './motion.mjs'
 import { describeNote, markRead, markSeen, noteSpan, openNotes } from './notes.mjs'
 import { createActivity } from './activity.mjs'
 import { draftPlanGate, planCheck, planCommands, printPlanCheck } from './plan.mjs'
+import { ttsCommand } from './tts.mjs'
 import { runBuild, gitHead, staleBuild } from '../../../server/install/build-state.mjs'
 import { DEFAULT_LABEL_PREFIX, jobLabel, jobStatus } from '../../../server/install/launchd.mjs'
 import { logFile, spawnEditor, spawnService } from '../../../server/install/processes.mjs'
@@ -280,6 +288,11 @@ const { values: opt, positionals } = parseArgs({
     item: { type: 'string' },
     'keep-audio': { type: 'boolean' },
     why: { type: 'string' },
+    text: { type: 'string' },
+    engine: { type: 'string' },
+    voice: { type: 'string' },
+    speed: { type: 'string' },
+    language: { type: 'string' },
   },
 })
 const [command, ...args] = positionals
@@ -1721,6 +1734,18 @@ const commands = {
     })[sub]
     if (!run) throw new Error('Usage: shred motion new|add|render|list|vars (see shred help)')
     await run(rest)
+  },
+
+  async tts(rest) {
+    await ttsCommand(rest, {
+      opt,
+      say,
+      workspace: workspace(),
+      service: SERVICE,
+      editor: EDITOR,
+      repo: REPO,
+      getProject,
+    })
   },
 
   async templates(rest) {

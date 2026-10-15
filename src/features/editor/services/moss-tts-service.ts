@@ -497,12 +497,12 @@ class MossTtsService {
     localInferenceRuntimeRegistry.unregisterRuntime(this.getRuntimeId())
   }
 
-  async generateSpeechFile({
-    text,
-    voice,
-    speed,
-    onProgress,
-  }: GenerateSpeechOptions): Promise<{ blob: Blob; file: File; duration: number }> {
+  async generateSpeechFile({ text, voice, speed, onProgress }: GenerateSpeechOptions): Promise<{
+    blob: Blob
+    file: File
+    duration: number
+    backend: 'wasm'
+  }> {
     const trimmedText = validateTtsGenerateRequest({
       text,
       isSupported: this.isSupported(),
@@ -545,6 +545,8 @@ class MossTtsService {
           blob,
           file,
           duration: getAudioDurationSeconds(spedUpChannels, mergedAudio.sampleRate),
+          // The MOSS worker runs onnxruntime-web on wasm only.
+          backend: 'wasm' as const,
         }
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error)

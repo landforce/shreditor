@@ -12,6 +12,9 @@
 //                                              worker); import waits for it, printing progress,
 //                                              unless --no-wait. Same as
 //                                              POST /__shreditor/media/import (server/media-bridge.mjs).
+//                                              --generated <file.json> ({ generated, tags }) records where
+//                                              a made file came from (shred tts); --json ends with the
+//                                              results as one JSON line.
 //   shreditor media <mediaId...> | --project <id> [--wait] [--retry] [--json]
 //                                              working-copy state: ready (and from -> to), preparing
 //                                              NN%, or failed (why); --wait until none is preparing,
@@ -79,6 +82,7 @@ const { values: opt, positionals } = parseArgs({
     force: { type: 'boolean', default: false },
     yes: { type: 'boolean', default: false },
     verify: { type: 'boolean', default: false },
+    generated: { type: 'string' },
   },
 })
 const [command, folder, ...rest] = positionals
@@ -156,11 +160,14 @@ try {
       // (not rendered graphics: shred motion imports with --no-transcribe).
       if (!opt['no-transcribe']) enableAutoTranscription({ mode: 'handoff', bridgeUrl: base })
       // Working copies are made by a detached worker, so --no-wait can return.
+      const provenance = opt.generated ? JSON.parse(fs.readFileSync(opt.generated, 'utf8')) : {}
       const results = await importMediaByPath(root, files, {
         projectId: opt.project,
         mode: opt.link ? 'link' : 'auto',
         category: opt.category,
         prepare: 'detached',
+        generated: provenance.generated,
+        tags: provenance.tags,
       })
       const handedOff = new Set(await settleHandoffs())
       for (const r of results) {
@@ -181,6 +188,21 @@ try {
       }
       if (queued.some((r) => !handedOff.has(r.id))) {
         say(`Queued for transcription; no editor at ${base} for this workspace, so it starts when the editor next runs (or now: shreditor transcribe <mediaId>)`)
+      }
+      if (opt.json) {
+        say(JSON.stringify({
+          media: results.map((r) => ({
+            id: r.id ?? null,
+            fileName: r.fileName ?? null,
+            sourcePath: r.sourcePath,
+            duplicate: Boolean(r.duplicate),
+            method: r.method ?? null,
+            category: r.metadata?.category ?? null,
+            duration: r.metadata?.duration ?? null,
+            transcription: r.id ? readTranscriptionStatus(root, r.id)?.status ?? null : null,
+            ...(r.error ? { error: r.error.message } : {}),
+          })),
+        }))
       }
       if (results.some((r) => r.error)) process.exitCode = 1
       break

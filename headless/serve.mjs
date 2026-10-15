@@ -22,6 +22,10 @@
 //                                      -> one composited frame image (attachment; default full-res PNG)
 //   POST /layout  { project|projectObject, at?|frame? }
 //                                      -> [{ id, type, x, y, width, height, opacity, z, ... }] (no render)
+//   POST /v1/tts  { text, engine?, voice?, language?, speed? }
+//                                      -> audio/wav (attachment); X-Freecut-Tts: { engine, voice, backend, ... }
+//                   the editor's Supertonic / MOSS engines in the page; models cached on disk
+//                   (headless/lib/tts-model-cache.mjs)
 //
 // Example:
 //   curl -X POST localhost:8787/render -H 'content-type: application/json' \
@@ -92,8 +96,10 @@ import {
 import { withIdempotency } from './lib/idempotency.mjs'
 import { NativeExportRefused, exportsDir, runNativeExport } from './lib/native-export.mjs'
 import { projectFormatRecord } from '../formats/registry.mjs'
+import { resolveTtsRequest, ttsRequestSchema } from './lib/tts-contract.mjs'
+import { createModelCacheServer, routeModelDownloads } from './lib/tts-model-cache.mjs'
 
-const HELP = `Usage: node headless/serve.mjs --workspace <dir> [options]\n\nOptions:\n  --host <address>           Bind address (default: 127.0.0.1)\n  --port <n>                 HTTP port (default: 8787)\n  --render-timeout-ms <n>    Whole render deadline (default: 1800000)\n  --edit-timeout-ms <n>      Whole edit deadline (default: 120000)\n  --max-queue-depth <n>      Waiting operations allowed behind the active one (default: 8)\n  --shutdown-timeout-ms <n>  Graceful queue drain deadline (default: 30000)\n  --break-lock               Take over a writer lock left by a process that is confirmed dead\n  --build  --head  --harness-url <url>\n`
+const HELP = `Usage: node headless/serve.mjs --workspace <dir> [options]\n\nOptions:\n  --host <address>           Bind address (default: 127.0.0.1)\n  --port <n>                 HTTP port (default: 8787)\n  --render-timeout-ms <n>    Whole render deadline (default: 1800000)\n  --edit-timeout-ms <n>      Whole edit deadline (default: 120000)\n  --tts-timeout-ms <n>       Whole text-to-speech deadline, first model download included (default: 1200000)\n  --max-queue-depth <n>      Waiting operations allowed behind the active one (default: 8)\n  --shutdown-timeout-ms <n>  Graceful queue drain deadline (default: 30000)\n  --break-lock               Take over a writer lock left by a process that is confirmed dead\n  --build  --head  --harness-url <url>\n`
 const SERVE_OPTIONS = new Set([
   'workspace',
   'host',
@@ -104,6 +110,7 @@ const SERVE_OPTIONS = new Set([
   'help',
   'render-timeout-ms',
   'edit-timeout-ms',
+  'tts-timeout-ms',
   'max-queue-depth',
   'shutdown-timeout-ms',
   'break-lock',
@@ -182,6 +189,7 @@ export async function main(argv = process.argv.slice(2)) {
     throw new Error('--port must be an integer between 0 and 65535')
   const renderTimeoutMs = positiveInt('render-timeout-ms', 30 * 60_000)
   const editTimeoutMs = positiveInt('edit-timeout-ms', 2 * 60_000)
+  const ttsTimeoutMs = positiveInt('tts-timeout-ms', 20 * 60_000)
   const maxQueueDepth = positiveInt('max-queue-depth', 8, { min: 0, max: 10_000 })
   const shutdownTimeoutMs = positiveInt('shutdown-timeout-ms', 30_000)
 
@@ -637,6 +645,77 @@ export async function main(argv = process.argv.slice(2)) {
     stream.on('close', () => fs.rm(outPath, () => {}))
   }
 
+  // Text to speech with the editor's engines in the page. The first request
+  // starts the model cache (weights on disk, served to the page in place of
+  // Hugging Face), so only the first run on a machine downloads. One request at
+  // a time through the queue, like every page operation.
+  let modelCache
+  const closeModelCache = async () => (await modelCache?.catch(() => null))?.close()
+  const handleV1Tts = async (req, res) => {
+    const body = validate(ttsRequestSchema, await readJsonBody(req, { maxBytes: 1024 * 1024 }))
+    const request = resolveTtsRequest(body)
+    modelCache ??= createModelCacheServer({ log: (line) => console.log(line) })
+    const cache = await modelCache
+    const outPath = path.join(tmpDir, `tts-${process.pid}-${++counter}.wav`)
+    const t0 = Date.now()
+    const summary = await queue
+      .enqueue(
+        async () => {
+          const page = session.page
+          await routeModelDownloads(page.context(), cache)
+          const downloadPromise = page.waitForEvent('download', { timeout: ttsTimeoutMs })
+          downloadPromise.catch(() => {})
+          const result = await page
+            .evaluate((payload) => window.freecut.generateSpeech(payload), {
+              ...request,
+              fileName: path.basename(outPath),
+            })
+            // Text the engine can't read is the caller's input: no page reset.
+            .catch((error) => {
+              const unsupported = /Unsupported characters: [^\n]*/.exec(error.message)
+              if (!unsupported) throw error
+              return { unsupported: unsupported[0] }
+            })
+          if (result.unsupported) return result
+          const download = await downloadPromise
+          await download.saveAs(outPath)
+          return result
+        },
+        { timeoutMs: ttsTimeoutMs, kind: 'tts' },
+      )
+      .catch((error) => {
+        if (error.code !== 'BROWSER_OPERATION_FAILED') throw error
+        const reason = String(error.cause?.message ?? error.message)
+          .replace(/^page\.evaluate: (Error: )?/, '')
+          .split('\n')[0]
+        throw new HttpError(500, 'TTS_FAILED', reason)
+      })
+    if (summary.unsupported) throw new HttpError(422, 'TTS_UNSUPPORTED_TEXT', summary.unsupported)
+    console.log(
+      `tts ${summary.engine}/${summary.voice} on ${summary.backend}: ${request.text.length} chars -> ` +
+        `${summary.durationSeconds.toFixed(2)}s in ${Date.now() - t0}ms ` +
+        `(model cache ${cache.stats.hits} hit, ${cache.stats.misses} miss)`,
+    )
+    res.writeHead(200, {
+      'Content-Type': 'audio/wav',
+      'Content-Length': fs.statSync(outPath).size,
+      'Content-Disposition': `attachment; filename="${path.basename(outPath)}"`,
+      'X-Freecut-Tts': asciiHeader({
+        engine: summary.engine,
+        voice: summary.voice,
+        ...(summary.language ? { language: summary.language } : {}),
+        speed: summary.speed,
+        backend: summary.backend,
+        durationSeconds: summary.durationSeconds,
+        generationMs: summary.generationMs,
+        modelCache: { dir: cache.dir, ...cache.stats },
+      }),
+    })
+    const stream = fs.createReadStream(outPath)
+    stream.pipe(res)
+    stream.on('close', () => fs.rm(outPath, () => {}))
+  }
+
   // Dump computed on-canvas bounding boxes at a frame (no render/GPU) — trust
   // coordinates without a render round-trip.
   const handleLayout = async (req, res) => {
@@ -753,6 +832,8 @@ export async function main(argv = process.argv.slice(2)) {
                                   )
                               : route === 'POST /v1/render'
                                 ? () => handleRender(req, res, { normalizeInline: true })
+                                : route === 'POST /v1/tts'
+                                  ? () => handleV1Tts(req, res)
                                 : route === 'GET /projects'
                                   ? async () => sendJson(res, 200, listProjects(workspace))
                                   : route === 'POST /render'
@@ -828,6 +909,7 @@ export async function main(argv = process.argv.slice(2)) {
         await session.close()
         await browser.close()
         await closeServers()
+        await closeModelCache()
         await releaseWriterLock()
         let closeTimer
         const closed = await Promise.race([
