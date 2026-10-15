@@ -53,7 +53,7 @@ export interface ScoreOptions {
 
 interface ScorableProject {
   metadata?: { fps?: number; height?: number }
-  format?: { id: string; variant?: string }
+  format?: { id: string; variant?: string; options?: { speedRamps?: 'none' | 'allowed' } }
   timeline?: { tracks: unknown[]; items: unknown[]; transitions?: unknown[] }
 }
 

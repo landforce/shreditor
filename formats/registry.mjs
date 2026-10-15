@@ -151,6 +151,7 @@ const graphicYap = {
     sfx: 'optional',
     syncSound: 'allowed',
     transitions: 'none',
+    speedRamps: 'none',
   },
   targets: [
     t('lengthSec', 'Length', 's', { min: 40, max: 80, ideal: 63, seen: [28, 116] }),
@@ -257,6 +258,7 @@ const greenscreen = {
     sfx: 'none',
     syncSound: 'allowed',
     transitions: 'none',
+    speedRamps: 'none',
   },
   targets: [
     t('lengthSec', 'Length', 's', { min: 20, max: 65, ideal: 45, seen: [19, 176] }),
@@ -381,6 +383,7 @@ const vlog = {
     sfx: 'optional',
     syncSound: 'allowed',
     transitions: 'none',
+    speedRamps: 'none',
   },
   targets: [
     t('lengthSec', 'Length', 's', {
@@ -488,6 +491,7 @@ const tenShot = {
     sfx: 'none',
     syncSound: 'none',
     transitions: 'none',
+    speedRamps: 'none',
   },
   targets: [
     t('lengthSec', 'Length', 's', { min: 13, max: 15, seen: [8.3, 29] }),
@@ -574,22 +578,44 @@ const mergeTargets = (base, patches = {}) => {
 }
 
 /**
+ * Per-project choices a format leaves open, with their defaults. Every format
+ * forbids speed ramps unless the project allows them (`options.speedRamps`).
+ */
+export const FORMAT_OPTION_DEFAULTS = Object.freeze({ speedRamps: 'none' })
+const FORMAT_OPTION_VALUES = Object.freeze({ speedRamps: ['none', 'allowed'] })
+
+/** A project's format options without the defaults (undefined when all are default). */
+export function normalizeFormatOptions(options) {
+  if (!options || typeof options !== 'object') return undefined
+  const kept = Object.fromEntries(
+    Object.entries(FORMAT_OPTION_VALUES)
+      .filter(([key, values]) => values.includes(options[key]) && options[key] !== FORMAT_OPTION_DEFAULTS[key])
+      .map(([key]) => [key, options[key]]),
+  )
+  return Object.keys(kept).length ? kept : undefined
+}
+
+/**
  * A format with one variant's overrides merged in: targets patched by key (null
  * removes one, an unknown key adds it), rules merged, checklist extended. With
  * no variant the format's defaultVariant applies; formats without one resolve
- * to their base (pooled) targets. Throws on an unknown format or variant.
+ * to their base (pooled) targets. A project's `options` (normalizeFormatOptions)
+ * set the rules they name, e.g. `{ speedRamps: 'allowed' }`. Throws on an
+ * unknown format or variant.
  */
-export function resolveFormat(id, variant) {
+export function resolveFormat(id, variant, options) {
   const format = getFormat(typeof id === 'object' ? id?.id : id)
   if (!format) throw new Error(`Unknown format "${id}". Formats: ${FORMAT_IDS.join(', ')}`)
   const chosen = findVariant(format, variant ?? format.defaultVariant)
   const overrides = chosen?.overrides ?? {}
+  const projectOptions = normalizeFormatOptions(options ?? (typeof id === 'object' ? id?.options : undefined))
   return {
     ...format,
     variant: chosen ? { id: chosen.id, name: chosen.name, description: chosen.description } : null,
-    rules: mergeRules(format.rules, overrides.rules),
+    rules: { ...mergeRules(format.rules, overrides.rules), ...projectOptions },
     targets: mergeTargets(format.targets, overrides.targets),
     checklist: [...format.checklist, ...(overrides.checklist ?? [])],
+    options: { ...FORMAT_OPTION_DEFAULTS, ...projectOptions },
   }
 }
 
@@ -611,16 +637,18 @@ const mergeRules = (rules, patch = {}) => ({
 export function projectFormat(project) {
   const recorded = project?.format
   if (!recorded?.id || !getFormat(recorded.id)) return null
-  return resolveFormat(recorded.id, recorded.variant)
+  return resolveFormat(recorded.id, recorded.variant, recorded.options)
 }
 
-/** The `format` value to store on a project. */
-export function projectFormatRecord(id, variant) {
+/** The `format` value to store on a project (options only when they differ from the defaults). */
+export function projectFormatRecord(id, variant, options) {
   const format = resolveFormat(id, variant)
+  const kept = normalizeFormatOptions(options)
   return {
     id: format.id,
     ...(format.variant ? { variant: format.variant.id } : {}),
     reviewedHash: format.guide.reviewedHash,
+    ...(kept ? { options: kept } : {}),
   }
 }
 

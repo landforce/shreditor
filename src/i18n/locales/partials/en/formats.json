@@ -35,6 +35,9 @@
       "sfx": "SFX",
       "transitions": "Transitions",
       "transitionsNone": "None: hard cuts only",
+      "speedRamps": "Speed ramps",
+      "speedRampsNone": "None: constant speed",
+      "speedRampsAllowed": "Allowed in this project",
       "hookFrom": "Required from {{from}} s",
       "hookHoldMin": "held {{min}} s or more",
       "hookHoldMax": "held up to {{max}} s",
@@ -73,6 +76,8 @@
       "jump_other": "Jump through {{count}} spots",
       "jumpedTo": "At {{index}} of {{count}}: click for the next",
       "showRanges": "Mark failing ranges on the timeline",
+      "allowSpeedRamps": "Allow speed ramps",
+      "allowSpeedRampsHint": "No format uses speed ramps. Allow them here and the scorecard stops warning about ramped clips in this project.",
       "saveFailed": "Could not save the format"
     },
     "change": {

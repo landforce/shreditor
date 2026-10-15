@@ -15,12 +15,20 @@ export type FormatRole =
   | 'music'
   | 'sfx'
 
+/** Choices a format leaves to the project (absent = the default). */
+export interface FormatOptions {
+  /** Speed ramps on clips: every format forbids them unless the project allows them. */
+  speedRamps?: 'none' | 'allowed'
+}
+
 /** Stored on a project: which format defines it. */
 export interface ProjectFormat {
   id: FormatId
   variant?: string
   /** Guide hash the format's targets were reviewed against when it was set. */
   reviewedHash?: string
+  /** Project-level options, only those that differ from the defaults. */
+  options?: FormatOptions
 }
 
 export type Presence = 'required' | 'default' | 'optional' | 'none'
@@ -58,6 +66,8 @@ export interface FormatRules {
   /** Audible sound from b-roll/shots/images/plates clips. */
   syncSound: 'allowed' | 'none'
   transitions: 'none'
+  /** Speed-ramped clips: 'none' in every format; a project can allow them (FormatOptions). */
+  speedRamps: 'none' | 'allowed'
 }
 
 export interface FormatTrackSpec {
@@ -133,6 +143,8 @@ export interface ResolvedFormat extends Omit<FormatDefinition, 'targets' | 'chec
   variant: { id: string; name: string; description: string } | null
   targets: FormatTarget[]
   checklist: string[]
+  /** The project's options with the defaults filled in. */
+  options: Required<FormatOptions>
 }
 
 /** A timeline track as createFormatTracks builds it (TimelineTrack-compatible). */
@@ -159,11 +171,21 @@ export const FORMAT_IDS: readonly FormatId[]
 export const CHOOSING_GUIDE: { path: string; source: string; reviewedHash: string }
 
 export function getFormat(id: unknown): FormatDefinition | undefined
-export function resolveFormat(id: string | { id: string }, variant?: string | null): ResolvedFormat
+export const FORMAT_OPTION_DEFAULTS: Readonly<Required<FormatOptions>>
+export function normalizeFormatOptions(options: unknown): FormatOptions | undefined
+export function resolveFormat(
+  id: string | { id: string; options?: FormatOptions },
+  variant?: string | null,
+  options?: FormatOptions | null,
+): ResolvedFormat
 export function projectFormat(
   project: { format?: ProjectFormat } | null | undefined,
 ): ResolvedFormat | null
-export function projectFormatRecord(id: string, variant?: string | null): ProjectFormat
+export function projectFormatRecord(
+  id: string,
+  variant?: string | null,
+  options?: FormatOptions | null,
+): ProjectFormat
 export function createFormatTracks(
   format: string | FormatDefinition | ResolvedFormat,
   options?: { height?: number; idFor?: (entry: FormatTrackSpec, index: number) => string },
