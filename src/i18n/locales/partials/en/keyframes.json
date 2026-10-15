@@ -125,6 +125,7 @@
       "textAppearance": "Text Appearance",
       "crop": "Crop",
       "audio": "Audio",
+      "time": "Time",
       "effects": "Effects",
       "other": "Other"
     },
@@ -144,6 +145,7 @@
       "cropBottom": "Crop Bottom",
       "cropSoftness": "Crop Softness",
       "volume": "Volume (dB)",
+      "speed": "Speed (x)",
       "textStyleScale": "Style Preset Scale",
       "fontSize": "Font Size",
       "lineHeight": "Line Height",

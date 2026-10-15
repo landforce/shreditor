@@ -1,10 +1,15 @@
 import { memo, type SyntheticEvent } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Link2Off, Diamond, WandSparkles } from 'lucide-react'
+import { ChartSpline, Link2Off, Diamond, WandSparkles } from 'lucide-react'
 import { cn } from '@/shared/ui/cn'
 import { EDITOR_LAYOUT_CSS_VALUES } from '@/config/editor-layout'
 
 type ReverseConformStatus = 'pending' | 'ready' | 'error'
+type SpeedRampRange = { min: number; max: number }
+
+function formatRampSpeed(speed: number): string {
+  return String(Math.round(speed * 100) / 100)
+}
 
 interface ClipIndicatorsProps {
   /** Whether the item has keyframe animations */
@@ -15,6 +20,8 @@ interface ClipIndicatorsProps {
   hasMotion: boolean
   /** Current playback speed (1 = normal) */
   currentSpeed: number
+  /** Slowest and fastest speed of the clip's speed ramp; null/undefined when it has none */
+  speedRampRange?: SpeedRampRange | null
   /** Whether media playback is reversed */
   isReversed: boolean
   reverseConformStatus?: ReverseConformStatus
@@ -104,6 +111,7 @@ interface ClipLabelIndicatorsProps {
   isShapeMask: boolean
   showSpeedBadge: boolean
   currentSpeed: number
+  speedRampRange: SpeedRampRange | null
   isReversed: boolean
   reverseConformStatus?: ReverseConformStatus
   onKeyframesToggle?: () => void
@@ -115,6 +123,7 @@ function hasClipLabelIndicators({
   hasMotion,
   isShapeMask,
   showSpeedBadge,
+  speedRampRange,
   isReversed,
   reverseConformStatus,
 }: ClipLabelIndicatorsProps): boolean {
@@ -123,6 +132,7 @@ function hasClipLabelIndicators({
     hasMotion ||
     isShapeMask ||
     showSpeedBadge ||
+    speedRampRange !== null ||
     isReversed ||
     reverseConformStatus === 'pending' ||
     reverseConformStatus === 'error'
@@ -136,12 +146,19 @@ const ClipLabelIndicators = memo(function ClipLabelIndicators({
   isShapeMask,
   showSpeedBadge,
   currentSpeed,
+  speedRampRange,
   isReversed,
   reverseConformStatus,
   onKeyframesToggle,
   onMotionOpen,
 }: ClipLabelIndicatorsProps) {
   const { t } = useTranslation()
+  const speedRampLabel = speedRampRange
+    ? t('timeline.clipIndicators.speedRamp', {
+        min: formatRampSpeed(speedRampRange.min),
+        max: formatRampSpeed(speedRampRange.max),
+      })
+    : null
 
   return (
     <div
@@ -183,6 +200,16 @@ const ClipLabelIndicators = memo(function ClipLabelIndicators({
           {currentSpeed.toFixed(2)}x
         </span>
       )}
+      {speedRampLabel && (
+        <span
+          className="flex items-center px-1 py-0.5 bg-black/60 text-white rounded"
+          title={speedRampLabel}
+          aria-label={speedRampLabel}
+          data-testid="clip-speed-ramp-badge"
+        >
+          <ChartSpline className="w-3 h-3" />
+        </span>
+      )}
       {isReversed && <ReverseIndicator status={reverseConformStatus} />}
       {reverseConformStatus === 'pending' && (
         <span
@@ -210,6 +237,7 @@ export const ClipIndicators = memo(function ClipIndicators({
   keyframesExpanded,
   hasMotion,
   currentSpeed,
+  speedRampRange = null,
   isReversed,
   reverseConformStatus,
   isStretching,
@@ -222,7 +250,8 @@ export const ClipIndicators = memo(function ClipIndicators({
   onMotionOpen,
 }: ClipIndicatorsProps) {
   const { t } = useTranslation()
-  const showSpeedBadge = Math.abs(currentSpeed - 1) > 0.005 && !isStretching
+  // A ramped clip shows its ramp badge in place of the constant speed.
+  const showSpeedBadge = !speedRampRange && Math.abs(currentSpeed - 1) > 0.005 && !isStretching
   const labelIndicatorProps: ClipLabelIndicatorsProps = {
     hasKeyframes,
     keyframesExpanded,
@@ -230,6 +259,7 @@ export const ClipIndicators = memo(function ClipIndicators({
     isShapeMask: isShape && isMask,
     showSpeedBadge,
     currentSpeed,
+    speedRampRange,
     isReversed,
     reverseConformStatus,
     onKeyframesToggle,

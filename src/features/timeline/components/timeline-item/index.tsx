@@ -28,6 +28,7 @@ import { DRAG_OPACITY } from '../../constants'
 import { cn } from '@/shared/ui/cn'
 import { ClipContent } from './clip-content'
 import { ClipIndicators } from './clip-indicators'
+import { hasSpeedRamp, speedRange } from '@/shared/timeline/speed-ramp.mjs'
 import { TrimHandles } from './trim-handles'
 import { type ActiveEdgeState } from './trim-constants'
 import { StretchHandles } from './stretch-handles'
@@ -426,6 +427,12 @@ export const TimelineItem = memo(function TimelineItem({
 
   // Current speed for badge display
   const currentSpeed = previewBaseItem.speed || 1
+  // The ramp badge reads only the curve and the clip's length.
+  const { speedRamp: previewSpeedRamp, durationInFrames: previewDurationInFrames } = previewBaseItem
+  const speedRampRange = useMemo(() => {
+    const timed = { speedRamp: previewSpeedRamp, durationInFrames: previewDurationInFrames }
+    return hasSpeedRamp(timed) ? speedRange(timed) : null
+  }, [previewSpeedRamp, previewDurationInFrames])
 
   const draggedTransition = useTransitionDragStore((s) => s.draggedTransition)
   const transitionDragPreview = useTransitionDragStore(
@@ -822,6 +829,7 @@ export const TimelineItem = memo(function TimelineItem({
     hasKeyframes ||
     isBroken ||
     Math.abs(currentSpeed - 1) > SPEED_BADGE_EPSILON ||
+    speedRampRange !== null ||
     linkedSyncOffsetFrames !== null ||
     (item.type === 'shape' && (item.isMask ?? false))
   // hasActiveClipInteraction is hoisted before fade memos (see above)
@@ -1080,6 +1088,7 @@ export const TimelineItem = memo(function TimelineItem({
                 keyframesExpanded={keyframesExpanded}
                 hasMotion={hasMotion}
                 currentSpeed={currentSpeed}
+                speedRampRange={speedRampRange}
                 isReversed={item.isReversed === true}
                 reverseConformStatus={item.reverseConformStatus}
                 isStretching={isStretching}

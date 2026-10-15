@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vite-plus/test'
 import { useItemsStore, useTimelineCommandStore } from '@/features/editor/deps/timeline-store'
 import { useSelectionStore } from '@/shared/state/selection'
@@ -95,5 +95,32 @@ describe('ConciseContextPanel', () => {
     useSelectionStore.setState({ selectedMarkerId: 'm1', selectedItemIds: [] })
     render(<ConciseContextPanel />)
     expect(screen.getByText('Properties Sidebar')).toBeInTheDocument()
+  })
+
+  it('gives a shot a ramp preset from the Speed field, shows it and clears it', () => {
+    select(['v1'])
+    render(<ConciseContextPanel />)
+    const ramps = screen.getByTestId('concise-shot-speed-ramp')
+    const hero = within(ramps).getByRole('button', { name: 'Hero slow-mo' })
+    expect(within(ramps).getByRole('button', { name: 'None' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    )
+
+    fireEvent.click(hero)
+    const item = useItemsStore.getState().itemById.v1
+    expect(item?.speedRamp?.length).toBeGreaterThan(0)
+    expect(within(ramps).getByRole('button', { name: 'Hero slow-mo' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    )
+    expect(screen.getByTestId('concise-shot-speed-ramp-readout')).toHaveTextContent(
+      'Speed ramp: 0.3x–2x',
+    )
+    expect(screen.getByRole('button', { name: '1x' })).toBeDisabled()
+
+    fireEvent.click(within(ramps).getByRole('button', { name: 'None' }))
+    expect(useItemsStore.getState().itemById.v1?.speedRamp).toBeUndefined()
+    expect(screen.queryByTestId('concise-shot-speed-ramp-readout')).toBeNull()
   })
 })

@@ -8,6 +8,7 @@ import {
   pickFilmstripTargetFrames,
 } from './filmstrip-target-frames'
 import { useFilmstrip, type FilmstripFrame } from '../../hooks/use-filmstrip'
+import type { SourceSecondsAt } from '../../utils/speed-ramp-source-time'
 import { resolveMediaUrl, resolveProxyUrl } from '@/features/timeline/deps/media-library-resolver'
 import { useMediaBlobUrl } from '../../hooks/use-media-blob-url'
 import { filmstripCache, THUMBNAIL_WIDTH } from '../../services/filmstrip-cache'
@@ -49,6 +50,8 @@ interface ClipFilmstripProps {
   speed: number
   /** Whether the clip plays source media in reverse */
   isReversed?: boolean
+  /** A speed-ramped clip's time map; replaces `speed` for mapping pixels to source time */
+  sourceSecondsAt?: SourceSecondsAt
   /** Frames per second */
   fps: number
   /** Whether the clip is visible (from IntersectionObserver) */
@@ -80,6 +83,7 @@ export const ClipFilmstrip = memo(function ClipFilmstrip({
   trimStart,
   speed,
   isReversed = false,
+  sourceSecondsAt,
   isVisible,
   visibleStartRatio = 0,
   visibleEndRatio = 1,
@@ -121,7 +125,11 @@ export const ClipFilmstrip = memo(function ClipFilmstrip({
     sourceDuration,
     Math.max(
       effectiveStart,
-      sourceEnd ?? effectiveStart + (visibleClipWidth / Math.max(1, renderPixelsPerSecond)) * speed,
+      sourceEnd ??
+        effectiveStart +
+          (sourceSecondsAt
+            ? sourceSecondsAt(visibleClipWidth / Math.max(1, renderPixelsPerSecond))
+            : (visibleClipWidth / Math.max(1, renderPixelsPerSecond)) * speed),
     ),
   )
   const initialPriorityWindowRef = useRef<{
@@ -188,6 +196,7 @@ export const ClipFilmstrip = memo(function ClipFilmstrip({
         renderWindow: filmstripRenderWindow,
         tileWidth: thumbnailWidth,
         sampleWidth,
+        sourceSecondsAt,
       }),
     [
       isVisible,
@@ -201,6 +210,7 @@ export const ClipFilmstrip = memo(function ClipFilmstrip({
       filmstripRenderWindow,
       thumbnailWidth,
       sampleWidth,
+      sourceSecondsAt,
     ],
   )
   const [coarseFramesLoaded, setCoarseFramesLoaded] = useState(false)
@@ -345,6 +355,7 @@ export const ClipFilmstrip = memo(function ClipFilmstrip({
         effectiveEnd={effectiveEnd}
         speed={speed}
         isReversed={isReversed}
+        sourceSecondsAt={sourceSecondsAt}
         tileWidth={thumbnailWidth}
         coverFrame={coverFrame}
         onSourceError={handleFrameSourceError}

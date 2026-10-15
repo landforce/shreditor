@@ -18,6 +18,10 @@ export { execute as executeTimelineCommand } from '@/features/timeline/stores/ac
 export { captureSnapshot } from '@/features/timeline/stores/commands/snapshot'
 export { rateStretchItemWithoutHistory } from '@/features/timeline/stores/actions/item-edit-actions'
 export {
+  clearSpeedRamp,
+  setSpeedRamp,
+} from '@/features/timeline/stores/actions/speed-ramp-edit-actions'
+export {
   addCompositionControl,
   removeCompositionControl,
   renameCompositionControl,

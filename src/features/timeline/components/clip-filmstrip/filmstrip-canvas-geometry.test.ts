@@ -109,6 +109,32 @@ describe('computeFilmstripCanvasTiles', () => {
       }).map((tile) => tile.frame.index),
     ).toEqual([7, 6, 5, 4])
   })
+
+  it('maps slots through a speed ramp time map when one is given', () => {
+    const base = {
+      frames,
+      renderWidth: 320,
+      visibleStartPx: 0,
+      visibleEndPx: 320,
+      tileWidth: 80,
+      pixelsPerSecond: 80,
+      effectiveStart: 0,
+      effectiveEnd: 8,
+      speed: 1,
+    }
+    // Slot centres sit at 0.5, 1.5, 2.5, 3.5 timeline seconds; the map doubles them.
+    const double = (seconds: number) => seconds * 2
+    expect(
+      computeFilmstripCanvasTiles({ ...base, isReversed: false, sourceSecondsAt: double }).map(
+        (tile) => tile.frame.index,
+      ),
+    ).toEqual([1, 3, 5, 7])
+    expect(
+      computeFilmstripCanvasTiles({ ...base, isReversed: true, sourceSecondsAt: double }).map(
+        (tile) => tile.frame.index,
+      ),
+    ).toEqual([7, 5, 3, 1])
+  })
 })
 
 describe('computeCoverDrawRect', () => {

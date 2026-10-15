@@ -50,6 +50,28 @@ describe('computeFilmstripTargetFrameIndices', () => {
     ).toEqual([0, 5, 15, 25])
   })
 
+  it('maps slot centres through a speed ramp time map with the timeline zoom', () => {
+    // 10 px per timeline second: centres at 5, 15, 25, 35 s, squared by the map.
+    expect(
+      computeFilmstripTargetFrameIndices({
+        ...base,
+        sampleWidth: 100,
+        pixelsPerSecond: 10,
+        sourceSecondsAt: (seconds) => (seconds * seconds) / 20,
+      }),
+    ).toEqual([1, 11, 31, 61])
+  })
+
+  it('keeps the linear mapping when the ramp map has no timeline zoom', () => {
+    expect(
+      computeFilmstripTargetFrameIndices({
+        ...base,
+        sampleWidth: 100,
+        sourceSecondsAt: () => 0,
+      }),
+    ).toEqual([5, 15, 25, 35])
+  })
+
   it('returns nothing for an empty range or unusable spacing', () => {
     expect(computeFilmstripTargetFrameIndices({ ...base, endPx: 0, sampleWidth: 100 })).toEqual([])
     expect(computeFilmstripTargetFrameIndices({ ...base, sampleWidth: 0 })).toEqual([])
