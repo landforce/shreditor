@@ -581,11 +581,11 @@ const mergeTargets = (base, patches = {}) => {
  * Per-project choices a format leaves open, with their defaults. Every format
  * forbids speed ramps unless the project allows them (`options.speedRamps`).
  */
-export const FORMAT_OPTION_DEFAULTS = Object.freeze({ speedRamps: 'none' })
+const FORMAT_OPTION_DEFAULTS = Object.freeze({ speedRamps: 'none' })
 const FORMAT_OPTION_VALUES = Object.freeze({ speedRamps: ['none', 'allowed'] })
 
 /** A project's format options without the defaults (undefined when all are default). */
-export function normalizeFormatOptions(options) {
+function normalizeFormatOptions(options) {
   if (!options || typeof options !== 'object') return undefined
   const kept = Object.fromEntries(
     Object.entries(FORMAT_OPTION_VALUES)

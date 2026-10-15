@@ -171,8 +171,6 @@ export const FORMAT_IDS: readonly FormatId[]
 export const CHOOSING_GUIDE: { path: string; source: string; reviewedHash: string }
 
 export function getFormat(id: unknown): FormatDefinition | undefined
-export const FORMAT_OPTION_DEFAULTS: Readonly<Required<FormatOptions>>
-export function normalizeFormatOptions(options: unknown): FormatOptions | undefined
 export function resolveFormat(
   id: string | { id: string; options?: FormatOptions },
   variant?: string | null,
