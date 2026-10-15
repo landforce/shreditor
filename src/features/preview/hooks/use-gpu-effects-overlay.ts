@@ -16,6 +16,7 @@ import {
 } from '@/shared/timeline/transitions/transition-planner'
 import { hasCornerPin } from '@/features/preview/deps/composition-runtime'
 import { isTextMotionActive } from '@/shared/typography/text-motion'
+import { isCutoutActive } from '@/shared/cutout/cutout-core.mjs'
 
 function hasEnabledGpuEffect(effects: ItemEffect[] | undefined): boolean {
   return effects?.some((e) => e.enabled && e.effect.type === 'gpu-effect') ?? false
@@ -49,7 +50,9 @@ function needsRenderedOverlayPath(item: TimelineItem): boolean {
     hasEnabledGpuEffect(item.effects) ||
     hasRenderableBlendMode(item) ||
     hasCornerPin(item.cornerPin) ||
-    hasTextMotionSpec(item)
+    hasTextMotionSpec(item) ||
+    // Background removal draws only through the canvas renderer.
+    isCutoutActive(item)
   )
 }
 
@@ -222,12 +225,7 @@ export function shouldForceContinuousPreviewOverlayFromIndex(
 
   return index.candidateItems.some((item) => {
     if (
-      !rangesOverlap(
-        startFrame,
-        endFrameExclusive,
-        item.from,
-        item.from + item.durationInFrames,
-      )
+      !rangesOverlap(startFrame, endFrameExclusive, item.from, item.from + item.durationInFrames)
     ) {
       return false
     }
@@ -235,6 +233,7 @@ export function shouldForceContinuousPreviewOverlayFromIndex(
     if (hasEnabledGpuEffect(effectiveEffects)) return true
     if (hasRenderableBlendMode(item)) return true
     if (hasCornerPin(item.cornerPin)) return true
+    if (isCutoutActive(item)) return true
     if (
       item.type === 'text' &&
       item.textMotion !== undefined &&

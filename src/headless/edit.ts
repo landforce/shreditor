@@ -76,6 +76,7 @@ import {
 import { buildLutEffect, type HeadlessLutFile } from './lut-op'
 import { linkedTimingFollowers } from './linked-timing'
 import { removeItemsOp, runMarkerOp } from './marker-ops'
+import { runCutoutOp } from './cutout-op'
 
 const log = createLogger('HeadlessEdit')
 
@@ -109,6 +110,7 @@ export type EditOperationName =
   | 'applyTextStyle'
   | 'upsertTextStyle'
   | 'addCaptions'
+  | 'setCutout'
 
 /** A wire operation. Node validates its discriminator and fields before this browser boundary. */
 export type EditOp = Record<string, unknown> & { op: EditOperationName }
@@ -859,7 +861,7 @@ function applyOp(op: EditOp): unknown {
       return { id }
     }
     default: {
-      const handled = runMarkerOp(op) ?? runTextStyleOp(op, context)
+      const handled = runMarkerOp(op) ?? runTextStyleOp(op, context) ?? runCutoutOp(op)
       if (handled) return handled.result
       return applyTemplateOp(op, { overlap: context, canvas: editCanvas })
     }

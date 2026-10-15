@@ -442,6 +442,31 @@ const cropSchema = z.object({
   refit: z.boolean().optional(),
 })
 
+// Background removal on a video clip (src/types/cutout.ts). Same ranges as
+// cutoutSettingsProblem in src/shared/cutout/cutout-core.mjs (the setCutout op).
+const cutoutSchema = z
+  .object({
+    enabled: z.boolean(),
+    subject: z.enum(['auto', 'person', 'object']),
+    feather: z.number().min(0).max(100).optional(),
+    invert: z.boolean().optional(),
+    refine: z.number().min(0).max(1).optional(),
+    sampleRate: z.union([z.literal('full'), z.number().min(1).max(120)]).optional(),
+    strokes: z
+      .array(
+        z
+          .object({
+            mode: z.enum(['add', 'remove', 'smart']),
+            time: z.number().min(0),
+            radius: z.number().min(0).max(1),
+            points: z.array(z.object({ x: z.number(), y: z.number() }).strict()),
+          })
+          .strict(),
+      )
+      .optional(),
+  })
+  .strict()
+
 const cornerPinSchema = z.object({
   topLeft: z.tuple([z.number(), z.number()]),
   topRight: z.tuple([z.number(), z.number()]),
@@ -642,6 +667,8 @@ const timelineItemSchema = z
     // Layer compositing
     blendMode: z.string().optional(),
     cornerPin: cornerPinSchema.optional(),
+    // Background removal (docs/background-removal.md)
+    cutout: cutoutSchema.optional(),
   })
   .passthrough()
 

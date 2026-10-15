@@ -101,6 +101,7 @@ original and decides per item. `headless/lib/native-export.mjs` runs the plan.
 | ... with constant speed (rational, up to 4 decimals) or a different source frame rate (24/25/50/60 into 30 ...) | **native** when the frame sequence is a constant ratio (checked), else overlay |
 | ... with alpha (ProRes 4444, PNG MOV, VP9 alpha) | **native** (straight alpha) |
 | ... with effects, keyframes (own or inherited by a split), motion modifiers, corner pin, blend mode, rotation, corner radius, video fade, reverse, soft crop, transitions, transform parenting | overlay (browser draws that clip from its working copy) |
+| ... with background removal (`cutout` enabled) | overlay, reason `background removal`: the browser draws the cut-out clip as a transparent layer (its masks are analysed first, docs/background-removal.md); the rest stays native |
 | ... needing frames past the end of the source, VFR, rotation metadata, non-square pixels, interlaced, non-zero start time | overlay |
 | Text, shapes, images, lottie, compound clips, subtitles, text motion | overlay |
 | Any mask shape, adjustment layer, non-normal blend mode, transform parenting or transcript captions in the project | every visual item is an overlay (they read across layers) |

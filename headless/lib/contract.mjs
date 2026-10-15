@@ -6,6 +6,7 @@ import {
   TEXT_STYLE_OP_NAMES,
   TEXT_STYLE_OP_SCHEMAS,
 } from './text-styles.mjs'
+import { CUTOUT_OP_DESCRIPTIONS, CUTOUT_OP_NAMES, CUTOUT_OP_SCHEMAS } from './cutout-contract.mjs'
 import {
   TEMPLATE_OP_DESCRIPTIONS,
   TEMPLATE_OP_NAMES,
@@ -307,6 +308,7 @@ const opSchemas = [
   z.object({ op: z.literal('removeMarkers'), ids: z.array(id).min(1) }).strict(),
   ...TEMPLATE_OP_SCHEMAS,
   ...TEXT_STYLE_OP_SCHEMAS,
+  ...CUTOUT_OP_SCHEMAS,
 ]
 
 export const EDIT_OPERATION_NAMES = [
@@ -337,6 +339,7 @@ export const EDIT_OPERATION_NAMES = [
   'removeMarkers',
   ...TEMPLATE_OP_NAMES,
   ...TEXT_STYLE_OP_NAMES,
+  ...CUTOUT_OP_NAMES,
 ]
 const EDIT_OPERATION_DESCRIPTIONS = Object.fromEntries(
   EDIT_OPERATION_NAMES.map((name) => [name, samplesDescription(name)]),
@@ -371,6 +374,7 @@ function samplesDescription(name) {
     removeMarkers: 'Remove markers by id',
     ...TEMPLATE_OP_DESCRIPTIONS,
     ...TEXT_STYLE_OP_DESCRIPTIONS,
+    ...CUTOUT_OP_DESCRIPTIONS,
   }
   return descriptions[name]
 }
@@ -765,6 +769,8 @@ export function capabilities() {
         'GET /v1/media/:id',
         'POST /v1/media/:id/probe',
         'POST /v1/render',
+        'POST /v1/cutout',
+        'GET /v1/cutout',
       ],
       httpMediaUpload: false,
       deleteProject: false,
