@@ -7,6 +7,7 @@
  * The actual remux execution stays in the orchestrator.
  */
 
+import { hasSpeedRamp } from '@/shared/timeline/speed-ramp.mjs'
 import type { CompositionInputProps } from '@/types/export'
 import type { TimelineTrack, TimelineItem, VideoItem } from '@/types/timeline'
 import type { ClientExportSettings } from './client-renderer'
@@ -78,6 +79,7 @@ export function clipBlocksRemux(videoItem: VideoItem, composition: CompositionIn
 
   const speed = videoItem.speed ?? 1
   if (Math.abs(speed - 1) > EPSILON) return true
+  if (hasSpeedRamp(videoItem)) return true
 
   return Math.abs(videoItem.fadeIn ?? 0) > EPSILON || Math.abs(videoItem.fadeOut ?? 0) > EPSILON
 }

@@ -6,6 +6,7 @@ import { getOrDecodeAudioSliceForPlayback } from '../utils/audio-decode-cache'
 import { audioBufferToWavBlob } from '../utils/audio-buffer-wav'
 import { createReversedAudioBuffer } from '../utils/audio-buffer-utils'
 import { getAudioTargetTimeSeconds } from '../utils/video-timing'
+import { speedAtFrame } from '@/shared/timeline/speed-ramp.mjs'
 import { needsDecodedPitchSourceExtension } from '../utils/decoded-pitch-source'
 import {
   acquirePreviewAudioElement,
@@ -144,7 +145,8 @@ export const NativePitchCorrectedAudio: React.FC<PitchCorrectedAudioProps> = Rea
     src,
     itemId,
     volume = 0,
-    playbackRate = 1,
+    playbackRate: constantPlaybackRate = 1,
+    speedRamp,
     isReversed = false,
     reverseSourceEnd,
     trimBefore = 0,
@@ -202,6 +204,11 @@ export const NativePitchCorrectedAudio: React.FC<PitchCorrectedAudioProps> = Rea
       volumeMultiplier,
     })
     const isReverseShuttle = transportPlaybackRate < 0
+    // A speed ramp sets the element's rate to the curve's speed every frame
+    // (the browser keeps the pitch); drift is corrected against the time map.
+    const playbackRate = speedRamp
+      ? speedAtFrame(speedRamp, Math.max(0, frame))
+      : constantPlaybackRate
     const mediaPlaybackRate = getBrowserMediaPlaybackRate(playbackRate, transportPlaybackRate)
 
     const audioRef = useRef<HTMLAudioElement | null>(null)
@@ -292,6 +299,7 @@ export const NativePitchCorrectedAudio: React.FC<PitchCorrectedAudioProps> = Rea
           fps,
           isReversed,
           reverseSourceEnd,
+          speedRamp,
         ) - sourceStartOffsetSec
       const clipStartTimeSeconds = Math.max(
         0,
@@ -485,6 +493,7 @@ export const NativePitchCorrectedAudio: React.FC<PitchCorrectedAudioProps> = Rea
       reverseSourceEnd,
       sourceFps,
       sourceStartOffsetSec,
+      speedRamp,
       trimBefore,
     ])
 
@@ -806,7 +815,7 @@ export const PitchCorrectedAudio: React.FC<PitchCorrectedAudioProps> = React.mem
     props.isReversed !== true &&
     !isReverseShuttle &&
     !requiresPitchCorrection &&
-    Math.abs(playbackRate - 1) <= PLAYBACK_RATE_TOLERANCE
+    (Math.abs(playbackRate - 1) <= PLAYBACK_RATE_TOLERANCE || Boolean(props.speedRamp))
 
   if (shouldUseNativePath) {
     return <NativePitchCorrectedAudio {...props} playbackRate={playbackRate} />

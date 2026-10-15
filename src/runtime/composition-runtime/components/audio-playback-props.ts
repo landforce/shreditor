@@ -1,5 +1,6 @@
 import type { AudioClipFadeSpan } from '@/shared/utils/audio-fade-curve'
 import type { ResolvedAudioDynamics, ResolvedAudioEqSettings } from '@/types/audio'
+import type { SpeedRampKey } from '@/shared/timeline/speed-ramp.mjs'
 
 /**
  * Shared clip-level playback controls used by all preview audio backends.
@@ -12,6 +13,11 @@ export interface AudioPlaybackProps {
   sourceFps?: number
   volume?: number
   playbackRate?: number
+  /**
+   * A speed ramp in Sequence-local frames (replaces playbackRate). Preview plays
+   * it on the native element, pitch kept, with the rate set every frame.
+   */
+  speedRamp?: readonly SpeedRampKey[]
   isReversed?: boolean
   reverseSourceEnd?: number
   muted?: boolean

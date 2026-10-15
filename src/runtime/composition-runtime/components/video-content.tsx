@@ -13,6 +13,7 @@ import { isVideoPoolAbortError } from '@/runtime/composition-runtime/deps/player
 import { createLogger } from '@/shared/logging/logger'
 import { blobUrlManager } from '@/infrastructure/browser/blob-url-manager'
 import { getVideoTargetTimeSeconds } from '../utils/video-timing'
+import { speedAtFrame, type SpeedRampKey } from '@/shared/timeline/speed-ramp.mjs'
 import {
   getVideoSyncTargetContext,
   isVideoSyncTargetDiscontinuity,
@@ -97,6 +98,8 @@ const NativePreviewVideo: React.FC<{
   sequenceFrameOffset?: number
   sourceFps: number
   playbackRate: number
+  /** A speed ramp (clip-local frames): the element's rate follows it frame by frame. */
+  speedRamp?: readonly SpeedRampKey[]
   isReversed?: boolean
   reverseSourceEnd?: number
   audioVolume: number
@@ -115,7 +118,8 @@ const NativePreviewVideo: React.FC<{
   safeTrimBefore,
   sequenceFrameOffset = 0,
   sourceFps,
-  playbackRate,
+  playbackRate: constantPlaybackRate,
+  speedRamp,
   isReversed = false,
   reverseSourceEnd,
   audioVolume,
@@ -133,6 +137,13 @@ const NativePreviewVideo: React.FC<{
   const sequenceContext = useSequenceContext()
   const frame = sequenceContext?.localFrame ?? 0
   const { fps } = useVideoConfig()
+  // A ramped clip's DOM element plays at the curve's speed at this frame (the
+  // preview draws the clip itself by exact decode; this keeps the element close).
+  const playbackRate = speedRamp
+    ? speedAtFrame(speedRamp, frame - sequenceFrameOffset)
+    : constantPlaybackRate
+  const speedRampRef = useRef(speedRamp)
+  speedRampRef.current = speedRamp
   const pool = useVideoSourcePool()
   const elementRef = useRef<HTMLVideoElement | null>(null)
   const preWarmTimerRef = useRef<number | null>(null)
@@ -273,6 +284,7 @@ const NativePreviewVideo: React.FC<{
     sequenceFrameOffset,
     isReversed,
     reverseSourceEnd,
+    speedRamp,
   )
   const frameRef = useRef(frame)
   frameRef.current = frame
@@ -401,6 +413,7 @@ const NativePreviewVideo: React.FC<{
       initialSequenceFrameOffset,
       initialIsReversed,
       initialReverseSourceEnd,
+      speedRampRef.current,
     )
     const clampedInitial = Math.min(initialTargetTime, (element.duration || Infinity) - 0.1)
     const currentlyPlaying = usePlaybackStore.getState().isPlaying
@@ -463,6 +476,7 @@ const NativePreviewVideo: React.FC<{
         sequenceFrameOffsetRef.current,
         isReversedRef.current,
         reverseSourceEndRef.current,
+        speedRampRef.current,
       )
       const clampedLiveTargetTime = Math.min(
         Math.max(0, liveTargetTime),
@@ -1147,6 +1161,7 @@ const NativePreviewVideo: React.FC<{
         sequenceFrameOffsetRef.current,
         isReversedRef.current,
         reverseSourceEndRef.current,
+        speedRampRef.current,
       )
       const dur = v.duration || Infinity
       const clamped = Math.min(Math.max(0, target), dur - 0.05)
@@ -1425,6 +1440,7 @@ export const VideoContent: React.FC<{
       sequenceFrameOffset={item._sequenceFrameOffset ?? 0}
       sourceFps={sourceFps}
       playbackRate={playbackRate}
+      speedRamp={item.speedRamp}
       isReversed={isReversed}
       reverseSourceEnd={reverseSourceEnd}
       audioVolume={audioVolume}

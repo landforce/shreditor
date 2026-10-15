@@ -5,7 +5,12 @@ type StableVideoGroupItem = {
   from: number
   durationInFrames: number
   speed?: number
+  speedRamp?: readonly unknown[]
 }
+
+/** Constant non-1x speed or a speed ramp: the clip keeps its own element timing. */
+const hasCustomSpeed = (item: StableVideoGroupItem) =>
+  (item.speed ?? 1) !== 1 || (item.speedRamp?.length ?? 0) > 0
 
 export interface StableVideoGroup<TItem extends StableVideoGroupItem = StableVideoGroupItem> {
   originKey: string
@@ -80,8 +85,8 @@ export function groupStableVideoItems<TItem extends StableVideoGroupItem>(
 
     for (let i = 1; i < sortedItems.length; i++) {
       const item = sortedItems[i]!
-      const itemHasCustomSpeed = (item.speed ?? 1) !== 1
-      const groupHasCustomSpeed = currentGroup.some((groupItem) => (groupItem.speed ?? 1) !== 1)
+      const itemHasCustomSpeed = hasCustomSpeed(item)
+      const groupHasCustomSpeed = currentGroup.some(hasCustomSpeed)
       const speedMismatch = itemHasCustomSpeed || groupHasCustomSpeed
 
       if (item.from <= currentEnd + 1 && !speedMismatch) {

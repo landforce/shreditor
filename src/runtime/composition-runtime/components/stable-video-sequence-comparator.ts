@@ -22,6 +22,7 @@ export type StableVideoSequenceComparatorItem = VideoItem & {
 type StableVideoRenderBaseSignature = {
   id: string
   speed: number | undefined
+  speedRamp: unknown
   sourceStart: number | undefined
   sourceEnd: number | undefined
   from: number
@@ -61,6 +62,7 @@ function getStableVideoRenderBaseSignature(
   return {
     id: item.id,
     speed: item.speed,
+    speedRamp: item.speedRamp,
     sourceStart: item.sourceStart,
     sourceEnd: item.sourceEnd,
     from: item.from,
@@ -111,6 +113,7 @@ function areStableVideoRenderBaseSignaturesEqual(
   return (
     prevSignature.id === nextSignature.id &&
     prevSignature.speed === nextSignature.speed &&
+    prevSignature.speedRamp === nextSignature.speedRamp &&
     prevSignature.sourceStart === nextSignature.sourceStart &&
     prevSignature.sourceEnd === nextSignature.sourceEnd &&
     prevSignature.from === nextSignature.from &&
