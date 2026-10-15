@@ -33,6 +33,7 @@ import { EDITOR_LAYOUT_CSS_VALUES } from '@/config/editor-layout'
 import { useItemsStore } from '../stores/items-store'
 import { getTrackKind, isTrackDisabled } from '@/features/timeline/utils/classic-tracks'
 import { isTrackSyncLockActive } from '../utils/track-sync-lock'
+import { AddAgentNoteMenuItem } from './timeline-agent-comments'
 
 interface TrackHeaderProps {
   track: TimelineTrack
@@ -430,6 +431,7 @@ export const TrackHeader = memo(function TrackHeader({
       </ContextMenuTrigger>
 
       <ContextMenuContent className="w-52">
+        <AddAgentNoteMenuItem atPlayhead />
         <ContextMenuItem onClick={onCloseGaps}>
           {t('timeline.trackHeader.closeAllGaps')}
         </ContextMenuItem>

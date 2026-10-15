@@ -17,6 +17,7 @@ import {
   MediaLibrary,
   setMediaDragData,
   useMediaLibraryStore,
+  useSupersededMotionRenders,
 } from '@/features/editor/deps/media-library'
 
 type ConciseMediaBinLayout = 'panel' | 'strip'
@@ -153,13 +154,16 @@ export const ConciseMediaBin = memo(function ConciseMediaBin({
     setLeftSidebarOpen(true)
   }, [setActiveTab, setLeftSidebarOpen])
 
+  // Motion renders a re-render replaced stay in the project (undo needs them) but not in the strip.
+  const supersededRenders = useSupersededMotionRenders()
   const stripItems = useMemo(() => {
     if (!isStrip) return []
     const query = searchQuery.trim().toLowerCase()
-    return query
-      ? mediaItems.filter((item) => item.fileName.toLowerCase().includes(query))
-      : mediaItems
-  }, [isStrip, mediaItems, searchQuery])
+    return mediaItems.filter(
+      (item) =>
+        !supersededRenders.has(item.id) && (!query || item.fileName.toLowerCase().includes(query)),
+    )
+  }, [isStrip, mediaItems, searchQuery, supersededRenders])
 
   return (
     <div

@@ -65,7 +65,7 @@ const GraphCurve = memo(function GraphCurve({
         <path
           d={path}
           fill="none"
-          stroke="#00b5c9"
+          stroke="#2551a3"
           strokeWidth={5}
           strokeLinecap="round"
           strokeLinejoin="round"

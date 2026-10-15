@@ -258,8 +258,8 @@ function ProjectsIndex() {
 
   return (
     <>
-      {/* CapCut-style home: a pale cyan wash fading into the grey ground */}
-      <div className="min-h-screen bg-background bg-[linear-gradient(180deg,#d7f5fa_0%,#eaf8fb_180px,var(--background)_420px)] bg-no-repeat">
+      {/* Cut30 Paper home: a pale VDB-blue wash fading into the cream ground */}
+      <div className="min-h-screen bg-[linear-gradient(180deg,rgb(214_226_250)_0%,rgb(230_237_251)_180px,transparent_420px)] bg-no-repeat">
         {/* Header */}
         <div data-no-marquee>
           <div className="max-w-[1920px] mx-auto px-6 py-5 flex items-center justify-between">

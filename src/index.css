@@ -33,81 +33,144 @@ body.canvas-translate-cursor-not-allowed * {
   src: url('/fonts/InterVariable.woff2') format('woff2');
 }
 
+/* Display type - Neue Haas Grotesk Display, the Cut30 / VideoDatabase family
+   face. Named apart for the same reason as the UI face. */
+@font-face {
+  font-display: swap;
+  font-family: 'Shreditor Display';
+  font-style: normal;
+  font-weight: 400;
+  src: url('/fonts/NeueHaasDisplayRoman.ttf') format('truetype');
+}
+
+@font-face {
+  font-display: swap;
+  font-family: 'Shreditor Display';
+  font-style: normal;
+  font-weight: 500 600;
+  src: url('/fonts/NeueHaasDisplayMediu.ttf') format('truetype');
+}
+
+@font-face {
+  font-display: swap;
+  font-family: 'Shreditor Display';
+  font-style: normal;
+  font-weight: 700 900;
+  src: url('/fonts/NeueHaasDisplayBold.ttf') format('truetype');
+}
+
+@font-face {
+  font-display: swap;
+  font-family: 'Shreditor Display';
+  font-style: italic;
+  font-weight: 500 600;
+  src: url('/fonts/NeueHaasDisplayMediumItalic.ttf') format('truetype');
+}
+
 @layer base {
   :root {
-    /* Light CapCut - modelled on CapCut's light (mobile) surfaces mapped onto
-       its desktop editor layout: white rounded panels on a pale grey ground,
-       near-black text, one cyan accent, heavy bold headings. */
+    /* Cut30 Paper - Shreditor's seat in the Cut30 / VideoDatabase family.
+       Cool cream ground with fiber grain, paper panels, navy ink, and the
+       family's VDB blue as the one accent. Ramps are lifted straight from
+       cut30-site globals.css and the VideoDatabase tailwind config. */
+
+    /* Family ramps */
+    --family-cream-100: rgb(245 247 251);
+    --family-cream-200: rgb(238 241 248);
+    --family-cream-300: rgb(229 235 245);
+    --family-cream-500: rgb(204 215 232);
+    --family-paper: rgb(251 252 255);
+    --family-blue-900: rgb(1 15 42);
+    --family-blue-800: rgb(8 23 39);
+    --family-blue-700: rgb(12 24 36);
+    --family-blue-600: rgb(28 84 141);
+    --family-blue-500: rgb(37 81 163);
+    --family-blue-400: rgb(82 131 178);
+    --family-blue-300: rgb(94 150 255);
+    --family-blue-200: rgb(177 200 244);
+    --family-green-600: rgb(30 104 54);
+    --family-green-500: rgb(58 158 84);
+    --family-red-500: rgb(218 55 48);
+    --family-warm-600: rgb(216 86 0);
+    --family-alert-300: rgb(255 150 79);
+
+    /* The family's dark material: navy radial used on ink surfaces */
+    --material-dark: radial-gradient(ellipse at 30% 0%, #2954a2 0%, #152e65 38%, #070f28 100%);
+    --grain-url: url('/textures/fiber.webp');
 
     /* Ground the panels float on */
-    --background: #f2f3f5;
-    --foreground: #1d2129;
+    --background: var(--family-cream-200);
+    --foreground: var(--family-blue-700);
 
     /* Panels */
-    --card: #ffffff;
-    --card-foreground: #1d2129;
+    --card: var(--family-paper);
+    --card-foreground: var(--family-blue-700);
 
-    --popover: #ffffff;
-    --popover-foreground: #1d2129;
+    --popover: var(--family-paper);
+    --popover-foreground: var(--family-blue-700);
 
-    /* Primary - CapCut cyan (Export, selection, active tools) */
-    --primary: #00b5c9;
+    /* Primary - VDB blue (Export, selection, active tools) */
+    --primary: var(--family-blue-500);
     --primary-foreground: #ffffff;
-    /* Cyan dark enough for text and icons on white */
-    --primary-text: #0094a6;
-    /* Selected-item wash (cyan border + this fill) */
-    --primary-soft: #e3f9fb;
+    --primary-text: var(--family-blue-500);
+    /* Selected-item wash (blue border + this fill) */
+    --primary-soft: rgb(230 237 251);
 
-    /* Secondary - grey fills */
-    --secondary: #f2f3f5;
-    --secondary-foreground: #4e5969;
+    /* Secondary - cream fills */
+    --secondary: var(--family-cream-100);
+    --secondary-foreground: rgb(67 78 98);
 
     /* Muted - quiet fills and secondary text */
-    --muted: #f2f3f5;
-    --muted-foreground: #6b7785;
+    --muted: var(--family-cream-100);
+    --muted-foreground: rgb(98 110 130);
 
     /* Accent - hover fills */
-    --accent: #e8eaed;
-    --accent-foreground: #1d2129;
+    --accent: var(--family-cream-300);
+    --accent-foreground: var(--family-blue-700);
 
-    --destructive: #f53f3f;
+    --destructive: var(--family-red-500);
     --destructive-foreground: #ffffff;
 
     /* Hairlines */
-    --border: #e5e6eb;
-    --input: #dcdfe5;
-    --ring: #00c8dc;
+    --border: rgb(222 228 239);
+    --input: var(--family-cream-500);
+    --ring: var(--family-blue-300);
 
     /* Panel system */
-    --panel-bg: #ffffff;
-    --panel-header: #ffffff;
-    --timeline-bg: #ffffff;
+    --panel-bg: var(--family-paper);
+    --panel-header: var(--family-paper);
+    --timeline-bg: var(--family-paper);
 
-    --sidebar: #ffffff;
-    --sidebar-foreground: #1d2129;
-    --sidebar-primary: #00b5c9;
+    --sidebar: var(--family-paper);
+    --sidebar-foreground: var(--family-blue-700);
+    --sidebar-primary: var(--family-blue-500);
     --sidebar-primary-foreground: #ffffff;
-    --sidebar-accent: #e8eaed;
-    --sidebar-accent-foreground: #1d2129;
-    --sidebar-border: #e5e6eb;
-    --sidebar-ring: #00c8dc;
+    --sidebar-accent: var(--family-cream-300);
+    --sidebar-accent-foreground: var(--family-blue-700);
+    --sidebar-border: rgb(222 228 239);
+    --sidebar-ring: var(--family-blue-300);
 
-    /* Near-black for tooltips and the strongest controls */
-    --ink: #1d2129;
+    /* Navy ink for tooltips and the strongest controls */
+    --ink: var(--family-blue-900);
     --ink-foreground: #ffffff;
 
-    /* CapCut panels are flat; only floating layers cast a shadow */
-    --shadow-panel: 0 1px 2px rgb(29 33 41 / 0.04);
-    --shadow-float: 0 4px 10px rgb(29 33 41 / 0.08), 0 12px 32px rgb(29 33 41 / 0.12);
+    /* Family shadows, tinted navy rather than grey */
+    --shadow-panel: 0 1px 2px rgb(1 15 42 / 0.04), 0 2px 12px rgb(1 15 42 / 0.04);
+    --shadow-float: 0 2px 1.6px rgb(1 15 42 / 0.02), 0 8px 30px rgb(1 15 42 / 0.13);
+    /* Cut30 control gloss: soft inner glow + white rim on filled buttons */
+    --control-gloss:
+      inset 0 0 18px rgb(255 255 255 / 0.22), inset 0 0 0 1px rgb(255 255 255 / 0.16);
 
     /* Gap between the editor's floating panels */
-    --panel-gap: 4px;
-    --panel-radius: 8px;
+    --panel-gap: 5px;
+    --panel-radius: 12px;
 
     --font-ui: 'Shreditor UI', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    --font-display: 'Shreditor UI', -apple-system, BlinkMacSystemFont, sans-serif;
+    --font-display:
+      'Shreditor Display', 'Shreditor UI', -apple-system, BlinkMacSystemFont, sans-serif;
+    --font-editorial: Georgia, 'Times New Roman', serif;
 
-    --radius: 0.5rem;
+    --radius: 0.625rem;
   }
 }
 
@@ -138,12 +201,34 @@ body.canvas-translate-cursor-not-allowed * {
     color-scheme: light;
   }
 
-  /* Heavy headings, after CapCut */
+  /* Cut30 fiber grain on the ground only. It sits behind all content, and
+     panels are opaque, so footage is never judged through texture. Same
+     multiply / 13% recipe as the family's light material. */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background: var(--grain-url) 0 0 / 768px;
+    mix-blend-mode: multiply;
+    opacity: 0.13;
+  }
+
+  /* Neue Haas display headings, after the Cut30 / VDB family */
   h1,
   h2,
   h3,
   .font-display {
     font-family: var(--font-display);
+    letter-spacing: -0.012em;
+  }
+
+  /* The family's editorial serif italic, for one accented word in a heading */
+  .font-editorial {
+    font-family: var(--font-editorial);
+    font-style: italic;
+    font-weight: 400;
     letter-spacing: -0.01em;
   }
 
@@ -171,14 +256,14 @@ body.canvas-translate-cursor-not-allowed * {
   }
 
   ::-webkit-scrollbar-thumb {
-    background: rgb(29 33 41 / 0.16);
+    background: rgb(12 24 36 / 0.16);
     border-radius: 6px;
     border: 3px solid transparent;
     background-clip: padding-box;
   }
 
   ::-webkit-scrollbar-thumb:hover {
-    background: rgb(29 33 41 / 0.28);
+    background: rgb(12 24 36 / 0.28);
     background-clip: padding-box;
   }
 
@@ -235,7 +320,7 @@ body.canvas-translate-cursor-not-allowed * {
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
 
-  /* Light CapCut extras */
+  /* Cut30 Paper extras */
   --color-primary-text: var(--primary-text);
   --color-primary-soft: var(--primary-soft);
   --color-ink: var(--ink);
@@ -243,19 +328,21 @@ body.canvas-translate-cursor-not-allowed * {
   --shadow-panel: var(--shadow-panel);
   --shadow-float: var(--shadow-float);
   --font-display: var(--font-display);
+  --font-editorial: var(--font-editorial);
+  --shadow-control-gloss: var(--control-gloss);
 }
 
 /* Professional video editor utility classes */
 @layer utilities {
-  /* CapCut-style floating panel: a rounded white card on the grey ground */
+  /* Floating panel: a rounded paper card on the grained cream ground */
   .editor-panel {
     background-color: var(--card);
     border-radius: var(--panel-radius);
     overflow: hidden;
   }
 
-  /* Cyan text/icons use the deeper cyan so they stay legible on white;
-     fills (bg-primary) keep the bright CapCut cyan. */
+  /* Primary text/icons resolve through --primary-text so the accent can be
+     tuned for legibility apart from fills. */
   .text-primary {
     color: var(--primary-text);
   }
@@ -270,6 +357,53 @@ body.canvas-translate-cursor-not-allowed * {
 
   .timeline-bg {
     background-color: var(--timeline-bg);
+  }
+
+  /* Navy material surface - the family's dark gradient for ink moments */
+  .material-dark {
+    background: var(--material-dark);
+    color: #ffffff;
+  }
+
+  /* Ink surface - a navy material band with the family's dark grain. It
+     re-points the shared tokens for its subtree, so any component dropped in
+     (ghost/outline buttons, chips, switches) turns light-on-navy without
+     per-component dark styles. Portaled menus and dialogs escape it. */
+  .surface-ink {
+    --background: rgb(255 255 255 / 0.14);
+    --foreground: #ffffff;
+    --card: rgb(255 255 255 / 0.07);
+    --card-foreground: #ffffff;
+    --secondary: rgb(255 255 255 / 0.08);
+    --secondary-foreground: rgb(255 255 255 / 0.86);
+    --muted: rgb(0 0 0 / 0.22);
+    --muted-foreground: rgb(255 255 255 / 0.64);
+    --accent: rgb(255 255 255 / 0.12);
+    --accent-foreground: #ffffff;
+    --border: rgb(255 255 255 / 0.14);
+    --input: rgb(255 255 255 / 0.2);
+    --primary: var(--family-blue-300);
+    --primary-foreground: var(--family-blue-900);
+    --primary-text: var(--family-blue-200);
+    --primary-soft: rgb(94 150 255 / 0.2);
+    --ring: var(--family-blue-200);
+    --ink: #ffffff;
+    --ink-foreground: var(--family-blue-900);
+    position: relative;
+    isolation: isolate;
+    background: var(--material-dark);
+    color: var(--foreground);
+  }
+
+  .surface-ink::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background: var(--grain-url) 0 0 / 768px;
+    mix-blend-mode: soft-light;
+    opacity: 0.18;
   }
 
   /* Subtle glow for active elements */
