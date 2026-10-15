@@ -13,7 +13,8 @@ import { useProjectFps } from '../concise/card-helpers'
  * Notes for the agent's next pass: a general note (no timecode) written here,
  * and every open note listed, timed ones with a chip that seeks to them. Timed
  * notes are written on the timeline's Notes tray. Notes reach the agent only
- * when it is asked to read them, so the open ones come with a prompt to copy.
+ * when it is asked to read them, so the open ones come with a prompt to copy
+ * (highlighted while the agent hasn't picked them up).
  */
 export function NotesTab() {
   const { t } = useTranslation()
@@ -22,7 +23,7 @@ export function NotesTab() {
   const failed = useAgentNotesStore((s) => s.failed)
   const [draft, setDraft] = useState('')
   const open = useMemo(() => openAgentNotes(notes), [notes])
-  const { unsent, copied, copy } = useNotesHandOff()
+  const { waiting, copied, copy } = useNotesHandOff()
 
   const addNote = async () => {
     const text = draft.trim()
@@ -61,15 +62,15 @@ export function NotesTab() {
           size="sm"
           className={cn(
             'h-7 w-full justify-start gap-1.5 text-xs',
-            unsent > 0 && !copied && 'border-amber-500/50 bg-amber-500/10',
+            waiting > 0 && !copied && 'border-amber-500/50 bg-amber-500/10',
           )}
           onClick={copy}
         >
           {copied ? <Check className="h-3.5 w-3.5" /> : <ClipboardCopy className="h-3.5 w-3.5" />}
           {copied
             ? t('editor.concise.pass.promptCopied')
-            : unsent > 0
-              ? t('editor.concise.pass.copyPromptUnsent', { count: unsent })
+            : waiting > 0
+              ? t('editor.concise.pass.copyPromptWaiting', { count: waiting })
               : t('editor.concise.pass.copyPrompt')}
         </Button>
       )}

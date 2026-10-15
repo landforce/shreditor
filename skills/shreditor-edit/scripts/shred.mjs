@@ -193,7 +193,7 @@ import {
 } from '../../../headless/lib/luts.mjs'
 import { templatesCommand } from './templates.mjs'
 import { motionCommands } from './motion.mjs'
-import { describeNote, markRead, noteSpan, openNotes } from './notes.mjs'
+import { describeNote, markRead, markSeen, noteSpan, openNotes } from './notes.mjs'
 import { createActivity } from './activity.mjs'
 import { draftPlanGate, planCheck, planCommands, printPlanCheck } from './plan.mjs'
 import { runBuild, gitHead, staleBuild } from '../../../server/install/build-state.mjs'
@@ -570,6 +570,22 @@ const key = (tag) => `${tag}-${crypto.randomUUID()}`
 const getProject = (id) => call('GET', `/v1/projects/${encodeURIComponent(id)}`)
 
 const notesFile = (id) => path.join(workspace(), 'projects', id, 'agent', 'notes.json')
+
+/** Replace the project's notes file (atomically). */
+function writeNotes(id, notes) {
+  const file = notesFile(id)
+  fs.writeFileSync(`${file}.tmp`, `${JSON.stringify({ version: 1, notes }, null, 2)}\n`)
+  fs.renameSync(`${file}.tmp`, file)
+}
+
+/** Record that the agent was shown these open notes (the editor stops pulsing for them). */
+function noteSeen(id, shown) {
+  const { notes, changed } = markSeen(
+    readNotes(id),
+    shown.map((note) => note.id),
+  )
+  if (changed) writeNotes(id, notes)
+}
 
 /** The project's notes (open and read); none when the file is missing or unreadable. */
 function readNotes(id) {
@@ -1481,9 +1497,7 @@ const commands = {
       })
       if (unknown.length)
         throw new Error(`No note ${unknown.join(', ')} (shred notes ${id} lists them)`)
-      const file = notesFile(id)
-      fs.writeFileSync(`${file}.tmp`, `${JSON.stringify({ version: 1, notes }, null, 2)}\n`)
-      fs.renameSync(`${file}.tmp`, file)
+      writeNotes(id, notes)
       const pass = latestPassLabel(id)
       return say(
         `Marked ${marked} note${marked === 1 ? '' : 's'} read${pass ? ` (${pass})` : ''}.` +
@@ -1506,6 +1520,7 @@ const commands = {
         const fresh = openNotes(readNotes(id)).filter((note) => !seen.has(note.id))
         if (fresh.length) {
           const { timeline, fps } = await context()
+          noteSeen(id, fresh)
           for (const note of fresh) {
             seen.add(note.id)
             say(
@@ -1523,10 +1538,12 @@ const commands = {
       const { timeline, fps } = await context()
       // `span` is where each note sits now (it follows the clip it was pinned to).
       const notes = open.map((note) => ({ ...note, span: noteSpan(note, timeline, fps) }))
+      noteSeen(id, open)
       return say(JSON.stringify({ fps, notes, hasTimeline: Boolean(timeline) }, null, 2))
     }
     if (!open.length) return say('No open notes from the user.')
     const { timeline, fps } = await context()
+    noteSeen(id, open)
     say(`${open.length} open note${open.length === 1 ? '' : 's'} from the user`)
     for (const note of open) {
       say()
@@ -1700,8 +1717,7 @@ const commands = {
       getProject,
       applyBatch,
       baseProjectId,
-      importFile: (file, projectId) =>
-        importOne(file, projectId, 'overlay', { transcribe: false }),
+      importFile: (file, projectId) => importOne(file, projectId, 'overlay', { transcribe: false }),
     })[sub]
     if (!run) throw new Error('Usage: shred motion new|add|render|list|vars (see shred help)')
     await run(rest)
@@ -1814,7 +1830,8 @@ const commands = {
 
   async kit([sub, ...rest]) {
     const run = kitCommands({ say, opt, workspace, getProject, applyBatch, call, key })[sub]
-    if (!run) throw new Error('Usage: shred kit apply|status|show|set|detach|save-back (see shred help)')
+    if (!run)
+      throw new Error('Usage: shred kit apply|status|show|set|detach|save-back (see shred help)')
     await run(rest)
   },
 

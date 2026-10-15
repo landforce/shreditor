@@ -15,7 +15,7 @@ vi.mock('@/infrastructure/storage', () => ({
   }),
 }))
 
-const { doneAgentNotes, openAgentNotes, unsentAgentNotes, useAgentNotesStore } =
+const { doneAgentNotes, openAgentNotes, useAgentNotesStore, waitingAgentNotes } =
   await import('./agent-notes')
 
 const note = (id: string, extra: Partial<AgentNote> = {}): AgentNote => ({
@@ -91,26 +91,20 @@ describe('agent notes store', () => {
   })
 })
 
-describe('handing notes to the agent', () => {
-  it('counts open notes written since the prompt was last copied', () => {
+describe('notes waiting for the agent', () => {
+  it('are the open notes no shred notes has shown yet', () => {
     const notes = [
-      note('a', { createdAt: '2026-10-14T10:00:00Z' }),
-      note('b', { createdAt: '2026-10-14T12:00:00Z' }),
-      note('c', { createdAt: '2026-10-14T13:00:00Z', status: 'read' }),
+      note('a'),
+      note('b', { seenAt: '2026-10-14T12:00:00Z' }),
+      note('c', { status: 'read' }),
     ]
-    expect(unsentAgentNotes(notes, null).map((n) => n.id)).toEqual(['a', 'b'])
-    expect(unsentAgentNotes(notes, '2026-10-14T11:00:00Z').map((n) => n.id)).toEqual(['b'])
+    expect(waitingAgentNotes(notes).map((n) => n.id)).toEqual(['a'])
   })
 
-  it('remembers the hand-off per project', async () => {
-    localStorage.removeItem('shreditor.notes.handedOff.p2')
-    await useAgentNotesStore.getState().load('p2')
-    expect(useAgentNotesStore.getState().handedOffAt).toBeNull()
-    useAgentNotesStore.getState().markHandedOff()
-    const at = useAgentNotesStore.getState().handedOffAt
-    expect(localStorage.getItem('shreditor.notes.handedOff.p2')).toBe(at)
-    await useAgentNotesStore.getState().load('p1')
-    await useAgentNotesStore.getState().load('p2')
-    expect(useAgentNotesStore.getState().handedOffAt).toBe(at)
+  it('wait again once reopened', async () => {
+    file = { version: 1, notes: [note('a', { status: 'read', seenAt: 'x', readAt: 'y' })] }
+    await useAgentNotesStore.getState().reopen('a')
+    expect(file.notes[0]).not.toHaveProperty('seenAt')
+    expect(waitingAgentNotes(file.notes)).toHaveLength(1)
   })
 })

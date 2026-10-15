@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import {
   describeNote,
   markRead,
+  markSeen,
   noteSpan,
   openNotes,
   timecode,
@@ -121,4 +122,14 @@ test('a reopened note shows the agent its last answer', () => {
     30,
   )
   assert.equal(lines[1], '    reopened; your last answer (Pass 2: trims): "Shortened it"')
+})
+
+test('notes the agent is shown are marked picked up once', () => {
+  const notes = [note('a'), note('b', { seenAt: 'earlier' }), note('c', { status: 'read' })]
+  const { notes: next, changed } = markSeen(notes, ['a', 'b', 'c'], 'now')
+  assert.equal(changed, 1)
+  assert.equal(next[0].seenAt, 'now')
+  assert.equal(next[1].seenAt, 'earlier')
+  assert.equal(next[2].seenAt, undefined)
+  assert.equal(markSeen(next, ['a'], 'later').changed, 0)
 })

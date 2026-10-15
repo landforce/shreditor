@@ -94,6 +94,21 @@ export function describeNote(note, timeline, fps) {
 }
 
 /**
+ * Stamp `seenAt` on the open notes the agent was just shown (ids), so the
+ * editor stops calling them waiting. Notes already seen keep their time.
+ */
+export function markSeen(notes, ids, now = new Date().toISOString()) {
+  const shown = new Set(ids)
+  let changed = 0
+  const next = notes.map((note) => {
+    if (note.status !== 'open' || note.seenAt || !shown.has(note.id)) return note
+    changed += 1
+    return { ...note, seenAt: now }
+  })
+  return { notes: next, changed }
+}
+
+/**
  * Mark notes read. `which` is "all" or a comma list of ids or id prefixes
  * (the 8-character short ids `shred notes` prints). `reply` (what was done, in
  * a line) and `pass` (the pass that did it) are kept on each note, so the user

@@ -16,9 +16,9 @@
         "noteFailed": "Couldn't save the note. Try again.",
         "addNote": "Add note",
         "copyPrompt": "Copy the prompt for Claude",
-        "copyPromptUnsent_one": "Copy the prompt for Claude ({{count}} new note)",
-        "copyPromptUnsent_other": "Copy the prompt for Claude ({{count}} new notes)",
-        "promptCopied": "Copied: paste it to Claude"
+        "promptCopied": "Copied: paste it to Claude",
+        "copyPromptWaiting_one": "Copy the prompt for Claude ({{count}} note not picked up yet)",
+        "copyPromptWaiting_other": "Copy the prompt for Claude ({{count}} notes not picked up yet)"
       },
       "shot": {
         "title": "Shot {{n}} of {{m}}",

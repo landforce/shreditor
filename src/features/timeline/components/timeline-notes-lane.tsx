@@ -2,8 +2,6 @@ import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useStat
 import { useTranslation } from 'react-i18next'
 import {
   Check,
-  ChevronDown,
-  ChevronUp,
   ClipboardCopy,
   Eye,
   EyeOff,
@@ -29,6 +27,7 @@ import {
   startAgentComment,
   useAgentNotesStore,
   useNotesHandOff,
+  waitingAgentNotes,
 } from '@/shared/state/agent-notes'
 import { usePlaybackStore } from '@/shared/state/playback'
 import { useSelectionStore } from '@/shared/state/selection'
@@ -38,7 +37,6 @@ import { useTimelineCommittedZoomContext } from '../contexts/timeline-zoom-conte
 import { AddAgentNoteMenuItem } from './timeline-agent-comments'
 import {
   MAX_CARD_PX,
-  MAX_PILL_PX,
   placeNotes,
   useNotesLaneHeight,
   useNotesLaneVisible,
@@ -85,53 +83,50 @@ function TrayButton({
   )
 }
 
-/** A small pinging dot: something here is waiting on the user. */
-function PingDot() {
+/** A slow amber pulse behind the tray while notes wait for the agent to pick them up. */
+function WaitingPulse() {
   return (
-    <span className="pointer-events-none absolute -right-0.5 -top-0.5 flex h-2 w-2" aria-hidden>
-      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-500 opacity-75" />
-      <span className="relative inline-flex h-2 w-2 rounded-full bg-amber-500" />
-    </span>
+    <span
+      className="pointer-events-none absolute inset-0 animate-pulse bg-amber-400/25 dark:bg-amber-400/15"
+      aria-hidden
+      data-testid="timeline-notes-waiting"
+    />
   )
 }
 
 /**
  * Copies "check my notes and edit" for the user to paste to the agent: notes
- * only reach it when it is asked to read them. Pulses while open notes were
- * written since the last copy.
+ * only reach it when it is asked to read them.
  */
 function CopyForAgentButton() {
   const { t } = useTranslation()
-  const { open, unsent, copied, copy } = useNotesHandOff()
+  const { open, waiting, copied, copy } = useNotesHandOff()
   if (!open) return null
-  const waiting = unsent > 0 && !copied
   const label = copied
     ? t('timeline.notes.copied')
-    : t(waiting ? 'timeline.notes.copyUnsent' : 'timeline.notes.copy', { count: unsent })
+    : t(waiting ? 'timeline.notes.copyWaiting' : 'timeline.notes.copy', { count: waiting })
   return (
     <Button
       variant="ghost"
       size="icon"
       className={cn(
-        'relative h-5 w-5 shrink-0',
-        waiting && 'bg-amber-500/20 text-amber-700 dark:text-amber-300',
+        'h-5 w-5 shrink-0',
+        waiting > 0 && !copied && 'bg-amber-500/20 text-amber-700 dark:text-amber-300',
       )}
       onClick={copy}
       aria-label={label}
       data-tooltip={label}
       data-testid="timeline-notes-copy"
-      data-unsent={unsent || undefined}
     >
       {copied ? <Check className="h-3 w-3" /> : <ClipboardCopy className="h-3 w-3" />}
-      {waiting && <PingDot />}
     </Button>
   )
 }
 
 /**
  * The tray's cell in the track-header column: label, open count and the copy
- * for the agent, then the show-done eye, add, and fold. Open, the label sits
- * above the buttons; folded (or in Concise's narrow column) it all fits one row.
+ * for the agent above the show-done eye and add. It pulses, with the lane,
+ * while open notes wait for the agent to pick them up.
  */
 export const TimelineNotesLaneHeader = memo(function TimelineNotesLaneHeader({
   compact,
@@ -143,30 +138,28 @@ export const TimelineNotesLaneHeader = memo(function TimelineNotesLaneHeader({
   const height = useNotesLaneHeight()
   const notes = useAgentNotesStore((s) => s.notes)
   const showDone = useAgentNotesStore((s) => s.showDone)
-  const collapsed = useAgentNotesStore((s) => s.trayCollapsed)
   const openCount = useMemo(() => openAgentNotes(notes).length, [notes])
   const doneCount = useMemo(() => doneAgentNotes(notes).length, [notes])
+  const waiting = useMemo(() => waitingAgentNotes(notes).length, [notes])
   if (!visible) return null
 
   const store = useAgentNotesStore.getState()
   const toggleLabel = showDone
     ? t('timeline.notes.hideDone')
     : t('timeline.notes.showDone', { count: doneCount })
-  const foldLabel = collapsed ? t('timeline.notes.expand') : t('timeline.notes.collapse')
-  const stacked = !collapsed
   // Concise's narrow column has no room for the word; the icon and count say it.
   const showLabel = !compact
   return (
     <div
       className={cn(
-        'flex shrink-0 border-b border-border bg-amber-500/[0.06]',
-        stacked ? 'flex-col justify-center gap-1' : 'items-center gap-0.5',
+        'relative flex shrink-0 flex-col justify-center gap-1 border-b border-border bg-amber-500/[0.06]',
         compact ? 'px-1' : 'px-3',
       )}
       style={{ height }}
       data-testid="timeline-notes-header"
     >
-      <div className="flex min-w-0 items-center gap-1">
+      {waiting > 0 && <WaitingPulse />}
+      <div className="relative flex min-w-0 items-center gap-1">
         {!(compact && openCount > 0) && (
           <MessageSquare
             className="h-3.5 w-3.5 shrink-0 text-amber-600 dark:text-amber-400"
@@ -183,7 +176,7 @@ export const TimelineNotesLaneHeader = memo(function TimelineNotesLaneHeader({
         )}
         <CopyForAgentButton />
       </div>
-      <div className={cn('flex shrink-0 items-center', !stacked && 'ml-auto')}>
+      <div className="relative flex shrink-0 items-center">
         <TrayButton
           label={toggleLabel}
           onClick={() => store.setShowDone(!showDone)}
@@ -199,14 +192,6 @@ export const TimelineNotesLaneHeader = memo(function TimelineNotesLaneHeader({
           testId="timeline-notes-add"
         >
           <Plus className="h-3 w-3" />
-        </TrayButton>
-        <TrayButton
-          label={foldLabel}
-          onClick={() => store.setTrayCollapsed(!collapsed)}
-          pressed={!collapsed}
-          testId="timeline-notes-fold"
-        >
-          {collapsed ? <ChevronDown className="h-3 w-3" /> : <ChevronUp className="h-3 w-3" />}
         </TrayButton>
       </div>
     </div>
@@ -230,6 +215,7 @@ export const TimelineNotesLaneSurface = memo(function TimelineNotesLaneSurface({
 }: NotesLaneSurfaceProps) {
   const visible = useNotesLaneVisible()
   const height = useNotesLaneHeight()
+  const waiting = useAgentNotesStore((s) => waitingAgentNotes(s.notes).length > 0)
   const outerRef = useRef<HTMLDivElement>(null)
   const surfaceRef = useRef<HTMLDivElement>(null)
 
@@ -267,6 +253,7 @@ export const TimelineNotesLaneSurface = memo(function TimelineNotesLaneSurface({
       data-marquee-ignore
       data-testid="timeline-notes-lane"
     >
+      {waiting && <WaitingPulse />}
       <div
         ref={surfaceRef}
         className="absolute inset-y-0 left-0"
@@ -283,7 +270,6 @@ export const TimelineNotesLane = memo(function TimelineNotesLane() {
   const { t } = useTranslation()
   const notes = useAgentNotesStore((s) => s.notes)
   const showDone = useAgentNotesStore((s) => s.showDone)
-  const tray = !useAgentNotesStore((s) => s.trayCollapsed)
   const composer = useAgentNotesStore((s) => s.composer)
   const items = useItemsStore((s) => s.items)
   const fps = useTimelineStore((s) => s.fps) || 30
@@ -301,9 +287,9 @@ export const TimelineNotesLane = memo(function TimelineNotesLane() {
         showDone,
         (note) => resolveNoteSpan(note, items, fps),
         frameToPixels,
-        tray ? MAX_CARD_PX : MAX_PILL_PX,
+        MAX_CARD_PX,
       ),
-    [notes, showDone, items, fps, frameToPixels, tray],
+    [notes, showDone, items, fps, frameToPixels],
   )
   const active = placed.find((entry) => entry.note.id === activeId) ?? null
 
@@ -379,7 +365,6 @@ export const TimelineNotesLane = memo(function TimelineNotesLane() {
               key={entry.note.id}
               entry={entry}
               fps={fps}
-              tray={tray}
               onOpen={() => openNote(entry)}
               onMenu={() => setMenuNoteId(entry.note.id)}
             />
@@ -480,44 +465,19 @@ function NotesTrayMenu({
   )
 }
 
-/** A note block's look: open amber, done greyed; a dashed edge when its moment moved off its clip. */
-function noteBlockClass({ done, span }: PlacedNote, tray: boolean): string {
+/** A note card's look: open amber, done greyed; a dashed edge when its moment moved off its clip. */
+function noteBlockClass({ done, span }: PlacedNote): string {
   const lost = span.state === 'trimmed' || span.state === 'detached'
-  const tone = tray
-    ? done
-      ? 'border-l-[3px] border-muted-foreground/40 bg-muted text-muted-foreground hover:bg-muted/80'
-      : 'border-l-[3px] border-amber-500 bg-amber-100 text-amber-950 hover:bg-amber-200 dark:bg-amber-500/20 dark:text-amber-50 dark:hover:bg-amber-500/30'
-    : done
-      ? 'bg-muted text-muted-foreground opacity-80 hover:opacity-100'
-      : 'bg-amber-500 text-white hover:bg-amber-400'
   return cn(
-    'absolute overflow-hidden text-left shadow-sm',
-    tray
-      ? 'top-1 bottom-1 flex flex-col gap-0.5 rounded-md px-1.5 py-1'
-      : cn(
-          'top-0.5 bottom-0.5 flex min-w-0 items-center gap-1 rounded-sm text-[10px] leading-none',
-          span.endFrame === undefined ? 'pr-1' : 'px-1',
-        ),
-    tone,
+    'absolute top-1 bottom-1 flex flex-col gap-0.5 overflow-hidden rounded-md border-l-[3px] px-1.5 py-1 text-left shadow-sm',
+    done
+      ? 'border-muted-foreground/40 bg-muted text-muted-foreground hover:bg-muted/80'
+      : 'border-amber-500 bg-amber-100 text-amber-950 hover:bg-amber-200 dark:bg-amber-500/20 dark:text-amber-50 dark:hover:bg-amber-500/30',
     lost && 'outline-dashed outline-1 outline-offset-[-1px] outline-current',
   )
 }
 
-/** The square at the start of a single-moment pill (folded tray). */
-function NotePin({ done }: { done: boolean }) {
-  return (
-    <span
-      className={cn(
-        'flex h-full w-3.5 shrink-0 items-center justify-center',
-        done ? 'bg-foreground/10' : 'bg-amber-600',
-      )}
-    >
-      {done ? <Check className="h-2.5 w-2.5" /> : <MessageSquare className="h-2.5 w-2.5" />}
-    </span>
-  )
-}
-
-/** A card in the open tray: timecode (or range), then up to two lines of the note. */
+/** A note card: timecode (or range), then up to two lines of the note. */
 function NoteCardBody({ entry, fps }: { entry: PlacedNote; fps: number }) {
   const { note, span, done } = entry
   const time =
@@ -544,13 +504,11 @@ function NoteCardBody({ entry, fps }: { entry: PlacedNote; fps: number }) {
 const NoteBlock = memo(function NoteBlock({
   entry,
   fps,
-  tray,
   onOpen,
   onMenu,
 }: {
   entry: PlacedNote
   fps: number
-  tray: boolean
   onOpen: () => void
   onMenu: () => void
 }) {
@@ -559,7 +517,7 @@ const NoteBlock = memo(function NoteBlock({
   return (
     <button
       type="button"
-      className={noteBlockClass(entry, tray)}
+      className={noteBlockClass(entry)}
       style={{ left, width }}
       onMouseDown={(event) => {
         event.preventDefault()
@@ -578,18 +536,7 @@ const NoteBlock = memo(function NoteBlock({
       data-tooltip-side="bottom"
       data-testid={done ? 'timeline-note-done' : 'timeline-note-open'}
     >
-      {tray ? (
-        <NoteCardBody entry={entry} fps={fps} />
-      ) : (
-        <>
-          {span.endFrame === undefined ? (
-            <NotePin done={done} />
-          ) : (
-            done && <Check className="h-2.5 w-2.5 shrink-0" />
-          )}
-          <span className="truncate">{note.text}</span>
-        </>
-      )}
+      <NoteCardBody entry={entry} fps={fps} />
     </button>
   )
 })

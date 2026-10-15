@@ -3,7 +3,8 @@
  * `projects/{id}/agent/notes.json`.
  *
  * The editor adds and removes notes; the agent reads the open ones (`shred
- * notes`), acts on them and marks them `read` with what it did. A note left on
+ * notes`, which stamps `seenAt`: the note was picked up), acts on them and
+ * marks them `read` with what it did. A note left on
  * the timeline carries the frame (or range) it is about, the clip it is pinned
  * to and the items that were selected. The user can mark a note done or reopen
  * it. Every write replaces the whole file, so callers read, change and write
@@ -28,6 +29,8 @@ export interface AgentNote {
   anchor?: NoteAnchor
   /** Items selected when the note was left. */
   itemIds?: string[]
+  /** When the agent first read the open note (`shred notes`); cleared when it is reopened. */
+  seenAt?: string
   /** When the note was marked read (by the agent or the user). */
   readAt?: string
   /** What the agent did about it, in a line. */
@@ -74,6 +77,7 @@ const NOTE_FIELDS: Record<keyof AgentNote, (value: unknown) => boolean> = {
   endFrame: isFrame,
   anchor: isAnchor,
   itemIds: isIdList,
+  seenAt: isOptionalString,
   readAt: isOptionalString,
   reply: isOptionalString,
   pass: isOptionalString,

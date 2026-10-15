@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vite-plus/test'
-import { fireEvent, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen } from '@testing-library/react'
 import type { AgentNote } from '@/infrastructure/storage'
 
 let stored: { version: 1; notes: AgentNote[] } = { version: 1, notes: [] }
@@ -26,7 +26,8 @@ vi.mock('react-i18next', () => ({
 
 const { useAgentNotesStore } = await import('@/shared/state/agent-notes')
 const { useItemsStore } = await import('../stores/items-store')
-const { TimelineNotesLane, TimelineNotesLaneHeader } = await import('./timeline-notes-lane')
+const { TimelineNotesLane, TimelineNotesLaneHeader, TimelineNotesLaneSurface } =
+  await import('./timeline-notes-lane')
 const { placeNotes } = await import('./timeline-notes-lane-layout')
 
 const note = (id: string, extra: Partial<AgentNote> = {}): AgentNote => ({
@@ -65,7 +66,7 @@ describe('placeNotes', () => {
     )
     expect(placed.map((p) => [p.note.id, p.left, p.width])).toEqual([
       ['a', 0, 100],
-      ['b', 200, 220],
+      ['b', 200, 260],
     ])
   })
 
@@ -154,8 +155,7 @@ describe('Notes lane', () => {
     expect(useAgentNotesStore.getState().composer).toBeNull()
   })
 
-  it('opens as a tray of cards and folds to a strip, remembering it', async () => {
-    useAgentNotesStore.setState({ trayCollapsed: false })
+  it('shows the notes as a tray of cards', async () => {
     await loadNotes([note('n1', { frame: 30, text: 'Punch in here' })])
     render(
       <>
@@ -163,38 +163,37 @@ describe('Notes lane', () => {
         <TimelineNotesLane />
       </>,
     )
-    const header = screen.getByTestId('timeline-notes-header')
-    expect(header.style.height).toBe('64px')
+    expect(screen.getByTestId('timeline-notes-header').style.height).toBe('64px')
     expect(screen.getByTestId('timeline-note-open').textContent).toContain('Punch in here')
-    fireEvent.click(screen.getByTestId('timeline-notes-fold'))
-    expect(header.style.height).toBe('22px')
-    expect(localStorage.getItem('shreditor.notesTray.collapsed')).toBe('1')
-    fireEvent.click(screen.getByTestId('timeline-notes-fold'))
-    expect(header.style.height).toBe('64px')
   })
 
-  it('pulses the copy for the agent until the prompt is copied, then again for a new note', async () => {
+  it('pulses the whole tray until the agent picks the notes up, and again when one is reopened', async () => {
     const writeText = vi.fn(async () => {})
     Object.assign(navigator, { clipboard: { writeText } })
-    localStorage.removeItem('shreditor.notes.handedOff.p1')
     await loadNotes([note('n1', { frame: 30 })])
-    render(<TimelineNotesLaneHeader compact={false} />)
-    const copy = screen.getByTestId('timeline-notes-copy')
-    expect(copy.dataset.unsent).toBe('1')
-    fireEvent.click(copy)
+    render(
+      <>
+        <TimelineNotesLaneHeader compact={false} />
+        <TimelineNotesLaneSurface duration={10} containerWidth={1000} initialWidth={1000} />
+      </>,
+    )
+    // Header cell and lane both pulse.
+    expect(screen.getAllByTestId('timeline-notes-waiting')).toHaveLength(2)
+    fireEvent.click(screen.getByTestId('timeline-notes-copy'))
     await vi.waitFor(() =>
       expect(writeText).toHaveBeenCalledWith(
         'Check my notes on the timeline and edit. Shreditor project p1: read them with shred notes p1.',
       ),
     )
-    await vi.waitFor(() =>
-      expect(screen.getByTestId('timeline-notes-copy').dataset.unsent).toBeUndefined(),
-    )
-    expect(localStorage.getItem('shreditor.notes.handedOff.p1')).toBeTruthy()
-    await useAgentNotesStore.getState().add({ text: 'One more', frame: 60 })
-    await vi.waitFor(() =>
-      expect(screen.getByTestId('timeline-notes-copy').dataset.unsent).toBe('1'),
-    )
+    // Copying is not picking up: it keeps pulsing until `shred notes` stamps seenAt.
+    expect(screen.getAllByTestId('timeline-notes-waiting')).toHaveLength(2)
+    stored = { version: 1, notes: [note('n1', { frame: 30, seenAt: '2026-10-14T01:00:00Z' })] }
+    await act(() => useAgentNotesStore.getState().refresh())
+    expect(screen.queryByTestId('timeline-notes-waiting')).toBeNull()
+    await act(() => useAgentNotesStore.getState().markDone('n1'))
+    await act(() => useAgentNotesStore.getState().reopen('n1'))
+    expect(stored.notes[0]?.seenAt).toBeUndefined()
+    expect(screen.getAllByTestId('timeline-notes-waiting')).toHaveLength(2)
   })
 
   it('has no copy for the agent without open notes', async () => {

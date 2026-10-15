@@ -1,11 +1,10 @@
 import type { AgentNote } from '@/infrastructure/storage'
 import type { NoteSpan } from '@/shared/projects/note-anchor.mjs'
 import { doneAgentNotes, openAgentNotes, useAgentNotesStore } from '@/shared/state/agent-notes'
-import { TIMELINE_NOTES_LANE_HEIGHT, TIMELINE_NOTES_TRAY_HEIGHT } from '../constants'
+import { TIMELINE_NOTES_TRAY_HEIGHT } from '../constants'
 
-/** Widest a single-moment note runs before the next note: a tray card, or a strip pill. */
+/** Widest a single-moment note card runs before the next note. */
 export const MAX_CARD_PX = 260
-export const MAX_PILL_PX = 220
 const PIN_PX = 14
 
 /** The Notes lane shows for a project whose notes the editor has loaded. */
@@ -13,12 +12,9 @@ export function useNotesLaneVisible(): boolean {
   return useAgentNotesStore((s) => s.projectId !== null)
 }
 
-/** Height the Notes tray takes in the timeline: open, folded, or 0 when it isn't shown. */
+/** Height the Notes tray takes in the timeline, or 0 when it isn't shown. */
 export function useNotesLaneHeight(): number {
-  const visible = useNotesLaneVisible()
-  const collapsed = useAgentNotesStore((s) => s.trayCollapsed)
-  if (!visible) return 0
-  return collapsed ? TIMELINE_NOTES_LANE_HEIGHT : TIMELINE_NOTES_TRAY_HEIGHT
+  return useNotesLaneVisible() ? TIMELINE_NOTES_TRAY_HEIGHT : 0
 }
 
 export interface PlacedNote {
@@ -38,7 +34,7 @@ export function placeNotes(
   showDone: boolean,
   resolve: (note: AgentNote) => NoteSpan | undefined,
   frameToPixels: (frame: number) => number,
-  maxWidth = MAX_PILL_PX,
+  maxWidth = MAX_CARD_PX,
 ): PlacedNote[] {
   const visible = [...openAgentNotes(notes), ...(showDone ? doneAgentNotes(notes) : [])]
   const placed = visible
