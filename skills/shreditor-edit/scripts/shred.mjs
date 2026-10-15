@@ -122,11 +122,12 @@
 //   shred motion new <projectId> --name "..." [--duration 3]
 //                                        scaffold a HyperFrames motion graphic at the project's canvas
 //                                        (projects/<id>/motion/<slug>/, transparent starter)
-//   shred motion add <draftId> <motion folder|.html> [--at <frame|2.5s>] [--variables JSON]
-//                                        [--item <clipId>] [--keep-audio]   render it to a transparent
-//                                        WebM and put it on the Motion track (or swap the render into
-//                                        that clip); its own audio is muted unless --keep-audio
-//   shred motion render <motion folder|.html> [--variables JSON]   render only
+//   shred motion add <draftId> <name|folder|.html> [--at <frame|2.5s>] [--variables JSON]
+//                                        [--item <clipId> [--force]] [--keep-audio]   render it to a
+//                                        transparent WebM (reused when nothing changed) and put it on the
+//                                        first free Motion lane, or swap it into that motion clip keeping
+//                                        its place and look; its own audio is dropped unless --keep-audio
+//   shred motion render <folder|.html> [--variables JSON] [--fps 30]   render only
 //   shred motion list <id>               the motion graphics on a timeline, with their folders
 //   shred templates list [--category c] [--json]   the motion graphics template library: name,
 //                                        category, size, duration, controls (with defaults)
@@ -843,19 +844,26 @@ function printScorecard(card, project) {
   if (s.warn) say('WARNs are guidelines from videos that work, not quotas: look, then decide.')
 }
 
-/**
- * Apply an op batch to a project atomically at a known revision (ops get
- * callerIds op0, op1, ... unless they carry their own). A revision the project
- * has moved past fails the whole batch.
- */
 /** Import one file into a project's media (waiting for a working copy); returns its media id. */
 function importOne(file, projectId, category) {
   const out = execFileSync(
     process.execPath,
-    [path.join(REPO, 'bin/shreditor.mjs'), 'import', file, '--project', projectId, '--category', category],
+    [
+      path.join(REPO, 'bin/shreditor.mjs'),
+      'import',
+      file,
+      '--project',
+      projectId,
+      '--category',
+      category,
+    ],
     {
       encoding: 'utf8',
-      env: { ...process.env, SHREDITOR_WORKSPACE: workspace(), SHREDITOR_PORT: new URL(EDITOR).port },
+      env: {
+        ...process.env,
+        SHREDITOR_WORKSPACE: workspace(),
+        SHREDITOR_PORT: new URL(EDITOR).port,
+      },
     },
   )
   const id = /^(?:clone|link|copy|exists)\s+([0-9a-f-]{36})\s/m.exec(out)?.[1]
@@ -863,6 +871,11 @@ function importOne(file, projectId, category) {
   return id
 }
 
+/**
+ * Apply an op batch to a project atomically at a known revision (ops get
+ * callerIds op0, op1, ... unless they carry their own). A revision the project
+ * has moved past fails the whole batch.
+ */
 async function applyBatch(id, batch, revision) {
   const ops = batch.map((op, i) => ({ callerId: `op${i}`, ...op }))
   const logStart = serviceLogSize()

@@ -4,7 +4,7 @@ Taken from [Prompt Motion](https://prompt-motion.com/) on 2026-10-06. I left out
 
 ## Using these in Shreditor
 
-These prompts were written for a standalone HTML-to-MP4 pipeline. In Shreditor each one becomes a HyperFrames composition that `shred motion add` renders onto the timeline's Motion track: `skills/shreditor-edit/references/motion.md` has the steps and how each prompt section maps (keep inputs, direction, structure and the pure-function-of-time build rules; drop the render steps; use the project's canvas, fps and music). "Full frame" pieces fill the canvas (an intro, a section, a whole film); "Overlay" pieces keep a transparent background and sit over the footage. Any prompt's sizes become the project's canvas.
+These prompts were written for a standalone HTML-to-MP4 pipeline. In Shreditor each one becomes a HyperFrames composition that `shred motion add` renders onto the timeline's Motion track: `skills/shreditor-edit/references/motion.md` has the steps and how a prompt maps (five prompts have `<inputs>`/`<direction>`/`<structure>`/`<build>`/`<gotchas>` sections; the rest are freeform briefs: keep what they ask for, drop their render steps, use the project's canvas, fps and music). "Full frame" pieces fill the canvas (an intro, a section, a whole film); "Overlay" pieces keep a transparent background and sit over the footage. Any prompt's sizes become the project's canvas. Nearly all of these are full-frame films: for a title, lower third or callout over footage, start from `shred motion new` or a HyperFrames registry block instead (motion.md, Quick graphics).
 
 | Prompt | Makes | Needs from the user | Notes |
 |---|---|---|---|
