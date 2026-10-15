@@ -101,11 +101,12 @@ original and decides per item. `headless/lib/native-export.mjs` runs the plan.
 | ... with constant speed (rational, up to 4 decimals) or a different source frame rate (24/25/50/60 into 30 ...) | **native** when the frame sequence is a constant ratio (checked), else overlay |
 | ... with alpha (ProRes 4444, PNG MOV, VP9 alpha) | **native** (straight alpha) |
 | ... with effects, keyframes (own or inherited by a split), motion modifiers, corner pin, blend mode, rotation, corner radius, video fade, reverse, soft crop, transitions, transform parenting | overlay (browser draws that clip from its working copy) |
+| ... with a speed ramp (`speedRamp`: variable speed has no constant frame ratio) | overlay, reason `speed ramp` (the editor's mirrored `speed` keyframe lane is not counted as keyframes) |
 | ... needing frames past the end of the source, VFR, rotation metadata, non-square pixels, interlaced, non-zero start time | overlay |
 | Text, shapes, images, lottie, compound clips, subtitles, text motion | overlay |
 | Any mask shape, adjustment layer, non-normal blend mode, transform parenting or transcript captions in the project | every visual item is an overlay (they read across layers) |
 | Audio and video clip audio, gain, track gain, linear fades, mute, master bus | **native** mix |
-| Audio with speed, reverse, pitch, EQ (clip, track or bus), ducking, volume keyframes, curved fades, solo tracks, transitions, compound clips, more than 2 channels, non-zero start | the whole mix comes from the browser (WAV PCM, 16-bit) |
+| Audio with speed, a speed ramp, reverse, pitch, EQ (clip, track or bus), ducking, volume keyframes, curved fades, solo tracks, transitions, compound clips, more than 2 channels, non-zero start | the whole mix comes from the browser (WAV PCM, 16-bit) |
 | HDR or BT.2020 source (PQ, HLG, BT.2020 primaries or matrix) | refused: native never tone-maps; auto does not fall back either. `--browser` makes the browser's own SDR conversion on request. |
 | Odd canvas size, non-hex background, unsupported fps | refused; auto falls back to the browser render |
 
