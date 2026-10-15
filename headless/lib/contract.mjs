@@ -11,6 +11,7 @@ import {
   TEMPLATE_OP_NAMES,
   TEMPLATE_OP_SCHEMAS,
 } from './template-contract.mjs'
+import { ttsCapabilities, ttsRequestSchema } from './tts-contract.mjs'
 
 export const HEADLESS_API_VERSION = 1
 
@@ -751,7 +752,9 @@ export function capabilities() {
       projectUpdate: z.toJSONSchema(projectUpdateRequestSchema, { target: 'draft-7' }),
       lifecycleEdit: z.toJSONSchema(lifecycleEditRequestSchema, { target: 'draft-7' }),
       mediaProbe: z.toJSONSchema(mediaProbeRequestSchema, { target: 'draft-7' }),
+      tts: z.toJSONSchema(ttsRequestSchema, { target: 'draft-7' }),
     },
+    tts: ttsCapabilities(),
     lifecycle: {
       routes: [
         'GET /v1/capabilities',
@@ -765,6 +768,7 @@ export function capabilities() {
         'GET /v1/media/:id',
         'POST /v1/media/:id/probe',
         'POST /v1/render',
+        'POST /v1/tts',
       ],
       httpMediaUpload: false,
       deleteProject: false,

@@ -65,6 +65,7 @@ import {
 } from '@/features/export/deps/timeline-compositions'
 import { editProject } from './edit'
 import { seedMediaLibrary } from './seed-media'
+import { generateSpeech, type HeadlessTtsInput } from './tts'
 import {
   buildMediaMetadataMap,
   collectSourceRangeFindings,
@@ -1284,6 +1285,7 @@ interface FreecutHeadlessApi {
   probeMedia: typeof probeMedia
   createProject: typeof createProjectForHeadless
   renderOverlayFrames: typeof renderOverlayFrames
+  generateSpeech: (input: HeadlessTtsInput) => ReturnType<typeof generateSpeech>
 }
 
 async function createProjectForHeadless(input: {
@@ -1386,5 +1388,6 @@ window.freecut = {
   probeMedia,
   createProject: createProjectForHeadless,
   renderOverlayFrames,
+  generateSpeech: (input) => generateSpeech(input, triggerDownload),
 }
 log.info('Headless harness ready')

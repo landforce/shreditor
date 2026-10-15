@@ -886,7 +886,12 @@ class SupertonicTtsService {
     language,
     speed,
     onProgress,
-  }: GenerateSpeechOptions): Promise<{ blob: Blob; file: File; duration: number }> {
+  }: GenerateSpeechOptions): Promise<{
+    blob: Blob
+    file: File
+    duration: number
+    backend: 'webgpu' | 'wasm'
+  }> {
     const trimmedText = validateTtsGenerateRequest({
       text,
       isSupported: this.isSupported(),
@@ -935,6 +940,7 @@ class SupertonicTtsService {
           blob,
           file,
           duration: mergedAudio.length / runtime.config.ae.sample_rate,
+          backend: runtime.backend,
         }
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error)
