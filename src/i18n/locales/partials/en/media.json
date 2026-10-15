@@ -263,7 +263,15 @@
       "importFailed_one": "{{count}} file failed to import. Check the file and try again.",
       "importFailed_other": "{{count}} files failed to import. Check the files and try again.",
       "upscalingVideo": "Upscaling Video",
-      "upscaleProgress": "Upscale Progress"
+      "upscaleProgress": "Upscale Progress",
+      "olderRenders": {
+        "hidden_one": "1 older motion render is hidden (a re-render replaced it).",
+        "hidden_other": "{{count}} older motion renders are hidden (re-renders replaced them).",
+        "shown_one": "Showing 1 older motion render.",
+        "shown_other": "Showing {{count}} older motion renders.",
+        "show": "Show",
+        "hide": "Hide"
+      }
     },
     "missingMedia": {
       "title": "Missing Media",

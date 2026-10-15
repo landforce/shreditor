@@ -18,6 +18,7 @@ import {
 } from '@/features/editor/deps/timeline-utils'
 import type { ImageItem, VideoItem } from '@/types/timeline'
 import { SliderInput } from '../properties-sidebar/components'
+import { MotionGraphicControls } from '../properties-sidebar/clip-panel/motion-graphic-section'
 import { getMixedValue, updateItemsInOneStep } from '../properties-sidebar/utils'
 import {
   Cell,
@@ -137,6 +138,14 @@ export function ShotCard({ items }: { items: ShotItem[] }) {
       <Cell title={t('editor.concise.shot.fades')} span={2} className="@3xl:col-span-1">
         <FadeFields items={videoItems} />
       </Cell>
+      <MotionGraphicControls
+        items={items}
+        wrap={(body) => (
+          <Cell title={t('editor.motionGraphic.title')} span={2} className="@3xl:col-span-3">
+            {body}
+          </Cell>
+        )}
+      />
       <Cell title={t('editor.concise.shot.beat')} span={2} className="@3xl:col-span-3">
         <BeatCuts item={item} fps={fps} />
       </Cell>

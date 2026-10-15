@@ -6,6 +6,7 @@ import {
   useItemsStore,
 } from '@/features/editor/deps/timeline-store'
 import { useEditorStore } from '@/shared/state/editor'
+import { useFormatPanelStore } from '../../stores/format-panel-store'
 import { useSelectionStore } from '@/shared/state/selection'
 import type { AudioItem, VideoItem } from '@/types/timeline'
 import { PropertiesSidebar } from './index'
@@ -16,10 +17,6 @@ const panelModuleLoads = vi.hoisted(() => ({
 
 vi.mock('./canvas-panel', () => ({
   CanvasPanel: () => <div>Canvas Panel</div>,
-}))
-
-vi.mock('../format-panel/format-panel', () => ({
-  FormatPanel: () => <div>Format Panel</div>,
 }))
 
 vi.mock('./clip-panel', () => ({
@@ -111,11 +108,20 @@ describe('PropertiesSidebar', () => {
     await waitFor(() => {
       expect(panelModuleLoads.clip).toHaveBeenCalledTimes(1)
     })
-    // With nothing selected the format leads; the canvas is one tab away.
-    expect(screen.getByText('Format Panel')).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('tab', { name: 'Canvas' }))
-    expect(screen.getByText('Canvas Panel')).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('tab', { name: 'Format' }))
+    // With nothing selected the format and canvas are one click away, in Project specs.
+    expect(screen.getByTestId('properties-nothing-selected')).toBeInTheDocument()
+    expect(screen.queryByText('Canvas Panel')).toBeNull()
+    useFormatPanelStore.setState({ specsOpen: false, tab: 'canvas' })
+    fireEvent.click(screen.getByRole('button', { name: /Project specs/ }))
+    expect(useFormatPanelStore.getState()).toMatchObject({ specsOpen: true, tab: 'format' })
+  })
+
+  it('fills its host when embedded, without the docked sidebar controls', () => {
+    resetStores([CLIP_A], [])
+    render(<PropertiesSidebar embedded />)
+    expect(screen.getByTestId('properties-nothing-selected')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Collapse panel' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Expand full column' })).toBeNull()
   })
 
   it('identifies the active composition when Motion has no layer selection', () => {

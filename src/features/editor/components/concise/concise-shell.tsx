@@ -5,8 +5,6 @@ import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@/componen
 import { ErrorBoundary } from '@/app/error-boundary'
 import { Button } from '@/components/ui/button'
 import { useEditorStore } from '@/shared/state/editor'
-import { useAgentNotesSync } from '@/shared/state/agent-notes'
-import { useProjectStore } from '@/features/editor/deps/projects'
 import { importTimeline } from '@/features/editor/deps/timeline-ui'
 import { PreviewArea } from '../preview-area'
 import { MediaSidebar } from '../media-sidebar'
@@ -31,7 +29,6 @@ type PreviewProject = React.ComponentProps<typeof PreviewArea>['project']
 
 interface ConciseShellProps {
   project: PreviewProject
-  onSave: () => void
 }
 
 function rowPercent(rowHeight: number, shellHeight: number): number {
@@ -44,7 +41,7 @@ function rowPercent(rowHeight: number, shellHeight: number): number {
  * preview and the agent context panel sit above a full-width timeline; below
  * 1100px the media bin collapses into a strip under the timeline.
  */
-export const ConciseShell = memo(function ConciseShell({ project, onSave }: ConciseShellProps) {
+export const ConciseShell = memo(function ConciseShell({ project }: ConciseShellProps) {
   const { t } = useTranslation()
   const rootRef = useRef<HTMLDivElement>(null)
   const [size, setSize] = useState({ width: 0, height: 0 })
@@ -52,9 +49,6 @@ export const ConciseShell = memo(function ConciseShell({ project, onSave }: Conc
   const setLeftSidebarOpen = useEditorStore((s) => s.setLeftSidebarOpen)
   const activeTab = useEditorStore((s) => s.activeTab)
   const sidebarWidth = useEditorStore((s) => s.sidebarWidth)
-  const onSaveRef = useRef(onSave)
-  onSaveRef.current = onSave
-  useAgentNotesSync(useProjectStore((s) => s.currentProject?.id))
 
   useLayoutEffect(() => {
     const element = rootRef.current
@@ -76,12 +70,6 @@ export const ConciseShell = memo(function ConciseShell({ project, onSave }: Conc
   useEffect(() => {
     setLeftSidebarOpen(false)
   }, [setLeftSidebarOpen])
-
-  useEffect(() => {
-    const handleSave = () => onSaveRef.current()
-    window.addEventListener('shreditor:save-project', handleSave)
-    return () => window.removeEventListener('shreditor:save-project', handleSave)
-  }, [])
 
   const narrow = size.width < NARROW_BREAKPOINT
   const previewWidth = narrow ? NARROW_PREVIEW_WIDTH : WIDE_PREVIEW_WIDTH
@@ -123,7 +111,7 @@ export const ConciseShell = memo(function ConciseShell({ project, onSave }: Conc
               <div className={narrow ? 'min-h-0 flex-1' : 'min-h-0 flex-shrink-0 overflow-auto'}>
                 <ErrorBoundary level="feature">
                   <Suspense fallback={null}>
-                    <LazyConciseContextPanel />
+                    <LazyConciseContextPanel hintWhenEmpty={narrow} />
                   </Suspense>
                 </ErrorBoundary>
               </div>

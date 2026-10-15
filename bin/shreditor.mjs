@@ -4,7 +4,7 @@
 //   shreditor open [folder] [--project <id>]   use a folder as the workspace and print the editor URL
 //   shreditor where                            print the current workspace folder
 //   shreditor choose                           pick the workspace folder in a Finder dialog
-//   shreditor import <file...> [--project <id>] [--link] [--category <category>] [--no-wait]
+//   shreditor import <file...> [--project <id>] [--link] [--category <category>] [--no-wait] [--no-transcribe]
 //                                              import footage in place: an APFS clone on the
 //                                              workspace's volume, else a link to the original
 //                                              (--link always links). Video Chrome can't decode
@@ -69,6 +69,7 @@ const { values: opt, positionals } = parseArgs({
   options: {
     project: { type: 'string' },
     link: { type: 'boolean', default: false },
+    'no-transcribe': { type: 'boolean', default: false },
     category: { type: 'string' },
     'no-wait': { type: 'boolean', default: false },
     wait: { type: 'boolean', default: false },
@@ -149,10 +150,11 @@ try {
     }
     case 'import': {
       const files = [folder, ...rest].filter(Boolean).map((file) => path.resolve(file))
-      if (!files.length) throw new Error('Usage: shreditor import <file...> [--project <id>] [--link]')
+      if (!files.length) throw new Error('Usage: shreditor import <file...> [--project <id>] [--link] [--category <c>] [--no-wait] [--no-transcribe]')
       const root = currentWorkspace()
-      // New audio/video is transcribed by the editor's bridge when it is running.
-      enableAutoTranscription({ mode: 'handoff', bridgeUrl: base })
+      // New audio/video is transcribed by the editor's bridge when it is running
+      // (not rendered graphics: shred motion imports with --no-transcribe).
+      if (!opt['no-transcribe']) enableAutoTranscription({ mode: 'handoff', bridgeUrl: base })
       // Working copies are made by a detached worker, so --no-wait can return.
       const results = await importMediaByPath(root, files, {
         projectId: opt.project,
@@ -249,7 +251,7 @@ try {
       break
     }
     default:
-      say('Usage: shreditor open [folder] [--project <id>] | shreditor where | shreditor choose | shreditor import <file...> [--project <id>] [--link] [--category <c>] [--no-wait] | shreditor media <mediaId...> | --project <id> [--wait] [--retry] [--json] | shreditor categorize <mediaId>=<category>... | shreditor transcribe <mediaId...> | --project <id> [--force] | shreditor setup whisper [--yes] | shreditor install [--yes] | shreditor update [--force] | shreditor restart | shreditor status | shreditor uninstall')
+      say('Usage: shreditor open [folder] [--project <id>] | shreditor where | shreditor choose | shreditor import <file...> [--project <id>] [--link] [--category <c>] [--no-wait] [--no-transcribe] | shreditor media <mediaId...> | --project <id> [--wait] [--retry] [--json] | shreditor categorize <mediaId>=<category>... | shreditor transcribe <mediaId...> | --project <id> [--force] | shreditor setup whisper [--yes] | shreditor install [--yes] | shreditor update [--force] | shreditor restart | shreditor status | shreditor uninstall')
       process.exit(command ? 1 : 0)
   }
 } catch (error) {

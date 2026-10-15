@@ -60,10 +60,12 @@ describe('ConciseContextPanel', () => {
     select([])
   })
 
-  it('shows the Pass card when nothing is selected', () => {
-    render(<ConciseContextPanel />)
-    expect(screen.getByTestId('concise-pass-card')).toBeInTheDocument()
-    expect(screen.getByText('Pass')).toBeInTheDocument()
+  it('shows nothing with nothing selected, or a hint where the panel has its own room', () => {
+    const { container, unmount } = render(<ConciseContextPanel />)
+    expect(container).toBeEmptyDOMElement()
+    unmount()
+    render(<ConciseContextPanel hintWhenEmpty />)
+    expect(screen.getByTestId('concise-nothing-selected')).toBeInTheDocument()
   })
 
   it('shows the Shot card for a video item, numbered on its track', () => {

@@ -2,6 +2,53 @@
 
 Taken from [Prompt Motion](https://prompt-motion.com/) on 2026-10-06. I left out the generic prompts (the many copies of "make a dynamic 15-second showreel… go all out", plain product promos and talking-head edits). Each heading links to the entry, and the prompts are copied exactly as written.
 
+## Using these in Shreditor
+
+These prompts were written for a standalone HTML-to-MP4 pipeline. In Shreditor each one becomes a HyperFrames composition that `shred motion add` renders onto the timeline's Motion track: `skills/shreditor-edit/references/motion.md` has the steps and how a prompt maps (five prompts have `<inputs>`/`<direction>`/`<structure>`/`<build>`/`<gotchas>` sections; the rest are freeform briefs: keep what they ask for, drop their render steps, use the project's canvas, fps and music). "Full frame" pieces fill the canvas (an intro, a section, a whole film); "Overlay" pieces keep a transparent background and sit over the footage. Any prompt's sizes become the project's canvas. Nearly all of these are full-frame films: for a title, lower third or callout over footage, start from `shred motion new` or a HyperFrames registry block instead (motion.md, Quick graphics).
+
+| Prompt | Makes | Needs from the user | Notes |
+|---|---|---|---|
+| Shape morphing through UI states | Full frame | Your UI states, a ~120 BPM song | Square 1440 in the prompt; recompose to the canvas |
+| Badge unlock screen animation | Full frame | A Figma frame (badge design) | 3D tilt + particles |
+| TypingMind logo reveal | Overlay or end card | Your logo | Logo sting; transparent background works over footage |
+| Poster breaking its frame | Full frame | The poster art |  |
+| Speech built as architecture | Full frame | The spoken lines; a track or VO | Kinetic type |
+| Synced lyrics motion video | Overlay | The song and its lyrics | Lyrics over the footage, on the beat |
+| Claude self-intro motion graphic | Full frame | The intro copy |  |
+| Sahi trading terminal reveal | Full frame | The product UI | Landscape in the prompt |
+| Photo print app launch film | Full frame | The photos, product shots, a song | Long brief; one continuous take |
+| Cycle of life animation | Full frame | None | Seamless loop |
+| Four seasons train window | Full frame | None |  |
+| Engraving-style Claude ad | Full frame | Logo, photos to paint on |  |
+| Paper-style product launch film | Full frame | Logo, product notes, a song |  |
+| UGC ad generator promo | Full frame | Your vertical clips, logo, a song | Vertical footage inside the film |
+| Risograph studio intro | Full frame | Studio name |  |
+| Oscilloscope-style studio motion graphic | Full frame | Studio name |  |
+| Shadow theatre home story | Full frame | The story beats | 9:16 in the prompt |
+| DeFi Saver stop-motion explainer | Full frame | Script, narration | Narrated |
+| Replica symmetry breaking whiteboard | Full frame | Script, narration | Narrated |
+| Whiteboard skill tutorial | Full frame | Script, narration | Narrated |
+| Clay-style music video | Full frame | A song |  |
+| Pixel art LLM history | Full frame | None | Boomerang loop |
+| Psychedelic hypnotic eye showreel | Full frame | None |  |
+| Chaotic Claude POV video | Full frame | None | Prompt renders with Python + ffmpeg: write it in HyperFrames instead |
+| Porco Rosso sunset dogfight | Full frame | None | Web 3D (WebGL) |
+| Recursion explained in genres | Full frame | A track | One style per beat |
+| Supademo launch video | Full frame | Product UI, a song | Cuts on beats and drops |
+| Collision-driven music machine | Full frame | A song or score |  |
+| Beat-synced bouncing 3D ball | Full frame | A song | Web 3D (WebGL) |
+| Negroni recipe animation | Full frame | The recipe |  |
+| Prompt Motion site promo | Full frame | The site (captures), a song | Long brief |
+| Developer portfolio site showreel | Full frame | The site pages, a song | Browser and phone frames |
+| SaaS launch video | Full frame | Codebase/product, logo, a song | Prompt uses Remotion: write it in HyperFrames instead |
+| Frame by Frame launch video | Full frame | Product copy and UI, logo, a song | Very long brief |
+| Motion techniques showreel | Full frame | None | Technique checklist |
+| Reflex brand motion reel | Full frame | Brand, a song |  |
+| Spotify product film | Full frame | Product UI, logo, a song | 18 s / 60 fps brief with a self-review loop |
+| Taxtello bookkeeping app film | Full frame | App UI, logo, a song | Very long brief; shot rules |
+| SaaS product launch video | Full frame | Product UI | Its render pipeline is replaced by shred motion add |
+| Token bucket rate limiter | Full frame | The concept to explain | Canvas, pure function of time |
+
 ## Shape, morph & UI motion
 
 ### [Shape morphing through UI states](https://prompt-motion.com/twoclipping-5cba86)

@@ -1,19 +1,18 @@
-import { memo, useMemo, useState } from 'react'
+import { memo } from 'react'
 import { useTranslation } from 'react-i18next'
-import { MessageSquare, MessageSquarePlus, Send } from 'lucide-react'
+import { MessageSquarePlus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import { Textarea } from '@/components/ui/textarea'
-import { openAgentNotes, startAgentComment, useAgentNotesStore } from '@/shared/state/agent-notes'
+import { ContextMenuItem, ContextMenuSeparator } from '@/components/ui/context-menu'
+import { startAgentComment, useAgentNotesStore } from '@/shared/state/agent-notes'
 import { usePlaybackStore } from '@/shared/state/playback'
-import { formatTimecodeCompact } from '@/shared/utils/time-utils'
-import { useTimelineCommittedZoomContext } from '../contexts/timeline-zoom-context'
+import { useSelectionStore } from '@/shared/state/selection'
 import { useTimelineStore } from '../stores/timeline-store'
+import { useZoomStore } from '../stores/zoom-store'
 
 /**
- * Concise toolbar button (and the N shortcut's target): write a comment for the
- * agent pinned to the playhead. It lands in the project's agent notes, which
- * `shred notes` reads.
+ * Concise toolbar button (the N shortcut does the same): write a note for the
+ * agent at the playhead. The composer opens on the Notes tray, where the note
+ * then sits; `shred notes` reads it.
  */
 export const AgentCommentButton = memo(function AgentCommentButton({
   btnSize,
@@ -21,130 +20,82 @@ export const AgentCommentButton = memo(function AgentCommentButton({
   btnSize: React.CSSProperties
 }) {
   const { t } = useTranslation()
-  const composer = useAgentNotesStore((s) => s.composer)
-  const failed = useAgentNotesStore((s) => s.failed)
   const hasProject = useAgentNotesStore((s) => s.projectId !== null)
-  const fps = useTimelineStore((s) => s.fps) || 30
-  const [draft, setDraft] = useState('')
   const label = t('timeline.concise.comment.button')
 
-  const send = async () => {
-    const text = draft.trim()
-    const store = useAgentNotesStore.getState()
-    if (!text || !store.composer) return
-    const { frame, itemIds } = store.composer
-    if (await store.add({ text, frame, itemIds })) {
-      setDraft('')
-      store.closeComposer()
-    }
-  }
-
   return (
-    <Popover
-      open={composer !== null}
-      onOpenChange={(open) =>
-        open ? startAgentComment() : useAgentNotesStore.getState().closeComposer()
-      }
+    <Button
+      variant="ghost"
+      size="icon"
+      style={btnSize}
+      disabled={!hasProject}
+      onClick={() => startAgentComment()}
+      aria-label={label}
+      data-tooltip={label}
+      data-testid="timeline-agent-comment-button"
     >
-      <PopoverTrigger asChild>
-        <Button
-          variant="ghost"
-          size="icon"
-          style={btnSize}
-          disabled={!hasProject}
-          aria-label={label}
-          data-tooltip={label}
-          data-testid="timeline-agent-comment-button"
-        >
-          <MessageSquarePlus className="w-3.5 h-3.5" />
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent align="start" className="w-80 space-y-2 p-2">
-        {composer && (
-          <>
-            <div className="flex items-center gap-1.5 text-xs">
-              <span className="rounded bg-amber-500/15 px-1 font-mono text-[10px] leading-4 text-amber-700 tabular-nums dark:text-amber-400">
-                {formatTimecodeCompact(composer.frame, fps)}
-              </span>
-              <span className="whitespace-nowrap font-medium">
-                {t('timeline.concise.comment.title')}
-              </span>
-              {composer.itemIds.length > 0 && (
-                <span className="ml-auto whitespace-nowrap text-muted-foreground">
-                  {t('timeline.concise.comment.selected', { count: composer.itemIds.length })}
-                </span>
-              )}
-            </div>
-            <Textarea
-              autoFocus
-              value={draft}
-              onChange={(event) => setDraft(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
-                  event.preventDefault()
-                  void send()
-                }
-              }}
-              placeholder={t('timeline.concise.comment.placeholder')}
-              aria-label={t('timeline.concise.comment.title')}
-              className="min-h-20 resize-none text-xs"
-              data-testid="timeline-agent-comment-input"
-            />
-            {failed && (
-              <p className="text-xs text-destructive">{t('editor.concise.pass.noteFailed')}</p>
-            )}
-            <div className="flex items-center justify-between gap-2">
-              <span className="text-[11px] text-muted-foreground">
-                {t('timeline.concise.comment.hint')}
-              </span>
-              <Button
-                size="sm"
-                className="h-7 gap-1.5 text-xs"
-                onClick={() => void send()}
-                disabled={!draft.trim()}
-              >
-                <Send className="h-3.5 w-3.5" />
-                {t('timeline.concise.comment.send')}
-              </Button>
-            </div>
-          </>
-        )}
-      </PopoverContent>
-    </Popover>
+      <MessageSquarePlus className="w-3.5 h-3.5" />
+    </Button>
   )
 })
 
-/** Open comments for the agent as pins along the ruler; a click moves the playhead there. */
-export const TimelineAgentCommentPins = memo(function TimelineAgentCommentPins() {
+// Where the last context menu was opened, so "Add note for agent" can note the
+// frame that was right-clicked. One capture listener serves every timeline menu.
+let lastMenuClientX: number | null = null
+if (typeof window !== 'undefined') {
+  window.addEventListener(
+    'contextmenu',
+    (event) => {
+      lastMenuClientX = event.clientX
+    },
+    true,
+  )
+}
+
+/** The timeline frame under a screen x (follows scroll and zoom); null off the timeline. */
+export function timelineFrameAtClientX(clientX: number): number | null {
+  const ruler = document.querySelector<HTMLElement>('[data-timeline-committed-surface="ruler"]')
+  const pixelsPerSecond = useZoomStore.getState().pixelsPerSecond
+  if (!ruler || !(pixelsPerSecond > 0)) return null
+  const fps = useTimelineStore.getState().fps || 30
+  const offset = clientX - ruler.getBoundingClientRect().left
+  if (offset < 0) return null
+  return Math.round((offset / pixelsPerSecond) * fps)
+}
+
+/** Pause, move to `frame` and open the note composer there with the selected clips. */
+export function noteForAgentAt(frame: number): void {
+  const playback = usePlaybackStore.getState()
+  playback.pause()
+  playback.setCurrentFrame(frame)
+  useAgentNotesStore.getState().openComposer(frame, useSelectionStore.getState().selectedItemIds)
+}
+
+/**
+ * "Add note for agent", the first item of every timeline context menu. It
+ * notes the right-clicked frame (or the playhead, with `atPlayhead` or off the
+ * timeline), with whatever is selected.
+ */
+export function AddAgentNoteMenuItem({ atPlayhead = false }: { atPlayhead?: boolean }) {
   const { t } = useTranslation()
-  const notes = useAgentNotesStore((s) => s.notes)
-  const { frameToPixels } = useTimelineCommittedZoomContext()
-  const pins = useMemo(
-    () => openAgentNotes(notes).filter((note) => note.frame !== undefined),
-    [notes],
-  )
-
-  if (pins.length === 0) return null
+  const hasProject = useAgentNotesStore((s) => s.projectId !== null)
   return (
-    <div className="absolute inset-0 pointer-events-none" data-testid="timeline-agent-comments">
-      {pins.map((note) => (
-        <button
-          key={note.id}
-          type="button"
-          className="pointer-events-auto absolute bottom-0.5 flex h-3.5 w-3.5 -translate-x-1/2 items-center justify-center rounded-sm bg-amber-500 text-white shadow-sm hover:bg-amber-400"
-          style={{ left: `${frameToPixels(note.frame!)}px`, zIndex: 16 }}
-          onMouseDown={(event) => {
-            event.preventDefault()
-            event.stopPropagation()
-            usePlaybackStore.getState().setCurrentFrame(note.frame!)
-          }}
-          aria-label={t('timeline.concise.comment.pin', { text: note.text })}
-          data-tooltip={note.text}
-          data-tooltip-side="bottom"
-        >
-          <MessageSquare className="h-2.5 w-2.5" />
-        </button>
-      ))}
-    </div>
+    <>
+      <ContextMenuItem
+        disabled={!hasProject}
+        onSelect={() => {
+          const clicked =
+            atPlayhead || lastMenuClientX === null ? null : timelineFrameAtClientX(lastMenuClientX)
+          const frame = clicked ?? usePlaybackStore.getState().currentFrame
+          // After the menu has closed and handed focus back, so the composer keeps it.
+          window.setTimeout(() => noteForAgentAt(frame), 0)
+        }}
+        data-testid="context-menu-add-agent-note"
+      >
+        <MessageSquarePlus className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+        {t('timeline.notes.addForAgent')}
+      </ContextMenuItem>
+      <ContextMenuSeparator />
+    </>
   )
-})
+}

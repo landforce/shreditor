@@ -53,7 +53,9 @@ export function ShreditorLogo({ variant = 'full', size = 'md', className }: Shre
   return (
     <div className={cn('flex items-center', config.gap, className)}>
       <ShredMark className={cn(config.icon, 'text-ink')} />
-      <span className={cn(config.text, 'font-semibold tracking-tight text-ink')}>Shreditor</span>
+      <span className={cn(config.text, 'font-display font-bold tracking-[-0.02em] text-ink')}>
+        Shreditor
+      </span>
     </div>
   )
 }

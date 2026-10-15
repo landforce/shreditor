@@ -120,7 +120,7 @@ function drawPlayhead(
   x: number,
   y: number,
   height: number,
-  color = '#1d2129',
+  color = '#0c1824',
 ) {
   context.strokeStyle = color
   context.lineWidth = 1
@@ -319,7 +319,7 @@ export function SourceAudioWaveform({
       endTimeSeconds: detailWindow.end,
     }
 
-    context.fillStyle = '#f2f3f5'
+    context.fillStyle = '#eef1f8'
     context.fillRect(0, 0, size.layoutWidth, SOURCE_WAVEFORM_OVERVIEW_HEIGHT)
     context.fillStyle = '#ffffff'
     context.fillRect(0, detailRegion.y, size.layoutWidth, detailRegion.height)

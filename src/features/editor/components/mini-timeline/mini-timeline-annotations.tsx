@@ -70,7 +70,7 @@ export const MiniTimelineAnnotations = memo(function MiniTimelineAnnotations({
             />
             <span
               className="absolute left-1/2 top-0 h-0 w-0 -translate-x-1/2 border-x-[6px] border-t-[9px] border-x-transparent drop-shadow"
-              style={{ borderTopColor: selected ? '#1d2129' : marker.color }}
+              style={{ borderTopColor: selected ? '#0c1824' : marker.color }}
               aria-hidden="true"
             />
             {selected ? (
