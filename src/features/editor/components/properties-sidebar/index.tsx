@@ -13,7 +13,14 @@ import { motion, useReducedMotion } from 'motion/react'
 import { useTranslation } from 'react-i18next'
 import { i18n } from '@/i18n'
 import { Button } from '@/components/ui/button'
-import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Settings2 } from 'lucide-react'
+import {
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  ChevronUp,
+  LayoutTemplate,
+  Settings2,
+} from 'lucide-react'
 import {
   useCompositionNavigationStore,
   useCompositionsStore,
@@ -23,8 +30,7 @@ import { useEditorStore } from '@/shared/state/editor'
 import { useSelectionStore } from '@/shared/state/selection'
 import type { TimelineItem } from '@/types/timeline'
 import { CanvasPanel } from './canvas-panel'
-import { FormatPanel } from '../format-panel/format-panel'
-import { useFormatPanelStore, type NoSelectionTab } from '../../stores/format-panel-store'
+import { openProjectSpecs } from '../../stores/format-panel-store'
 import { cn } from '@/shared/ui/cn'
 import { useSettingsStore } from '@/features/editor/deps/settings'
 import {
@@ -122,43 +128,23 @@ function getClipHeader(items: HeaderItem[]) {
   }
 }
 
-const NO_SELECTION_TABS: { id: NoSelectionTab; labelKey: string }[] = [
-  { id: 'format', labelKey: 'formats.panel.tab' },
-  { id: 'canvas', labelKey: 'formats.panel.canvasTab' },
-]
-
 /**
- * With nothing selected: the project's format (scorecard) or the canvas
- * settings. Inside a composition only its canvas applies.
+ * With nothing selected: a pointer to Project specs, where the format, its
+ * scorecard and the canvas live (the top-bar format chip opens it too). Inside
+ * a composition its own canvas applies, so that stays here.
  */
 function NoSelectionInspector() {
   const { t } = useTranslation()
-  const tab = useFormatPanelStore((s) => s.tab)
-  const setTab = useFormatPanelStore((s) => s.setTab)
   const inComposition = useCompositionNavigationStore((s) => s.activeCompositionId !== null)
   if (inComposition) return <CanvasPanel />
   return (
-    <div className="space-y-3">
-      <div role="tablist" className="flex gap-1 rounded-lg bg-secondary p-1">
-        {NO_SELECTION_TABS.map((entry) => (
-          <button
-            key={entry.id}
-            type="button"
-            role="tab"
-            aria-selected={tab === entry.id}
-            onClick={() => setTab(entry.id)}
-            className={cn(
-              'flex-1 rounded-md px-2 py-1 text-xs font-semibold transition-colors',
-              tab === entry.id
-                ? 'bg-card text-foreground shadow-[0_1px_2px_rgb(29_33_41/0.08)]'
-                : 'text-muted-foreground hover:text-foreground',
-            )}
-          >
-            {t(entry.labelKey)}
-          </button>
-        ))}
-      </div>
-      {tab === 'format' ? <FormatPanel /> : <CanvasPanel />}
+    <div className="space-y-3 py-6 text-center" data-testid="properties-nothing-selected">
+      <p className="text-sm font-medium">{t('formats.specs.nothingSelected')}</p>
+      <p className="text-xs text-muted-foreground">{t('formats.specs.nothingSelectedBody')}</p>
+      <Button variant="outline" size="sm" onClick={() => openProjectSpecs('format')}>
+        <LayoutTemplate className="mr-1.5 h-3.5 w-3.5" />
+        {t('formats.specs.open')}
+      </Button>
     </div>
   )
 }
@@ -168,7 +154,16 @@ function NoSelectionInspector() {
  * Shows TransitionPanel when a transition is selected, MarkerPanel when a marker
  * is selected, ClipPanel when clips are selected, CanvasPanel otherwise.
  */
-export const PropertiesSidebar = memo(function PropertiesSidebar() {
+export const PropertiesSidebar = memo(function PropertiesSidebar({
+  embedded = false,
+}: {
+  /**
+   * Inside another panel (Concise's context panel and More drawer): fill it,
+   * without the sidebar's own width, collapse and full-column toggles or resize
+   * handle, which belong to the docked sidebar.
+   */
+  embedded?: boolean
+} = {}) {
   const { t } = useTranslation()
   const editorDensity = useSettingsStore((s) => s.editorDensity)
   const editorLayout = getEditorLayout(editorDensity)
@@ -287,6 +282,124 @@ export const PropertiesSidebar = memo(function PropertiesSidebar() {
     }
   }, [editorLayout, setRightSidebarWidth])
 
+  // The header: title, plus the docked sidebar's full-column and collapse toggles.
+  const renderHeader = (inPanel: boolean) => (
+    <div
+      className={cn(
+        'flex items-center justify-between px-3 border-b border-border flex-shrink-0',
+        // In a drawer: as tall as the drawer's close button, and clear of it.
+        inPanel && 'h-11 pr-12',
+      )}
+      style={inPanel ? undefined : { height: EDITOR_LAYOUT_CSS_VALUES.sidebarHeaderHeight }}
+    >
+      <div className="min-w-0 flex items-center gap-1">
+        {!inPanel && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="shrink-0"
+            style={{
+              width: EDITOR_LAYOUT_CSS_VALUES.sidebarHeaderButtonSize,
+              height: EDITOR_LAYOUT_CSS_VALUES.sidebarHeaderButtonSize,
+            }}
+            onClick={togglePropertiesFullColumn}
+            aria-label={
+              propertiesFullColumn
+                ? t('editor.propertiesSidebar.dockToPreview')
+                : t('editor.propertiesSidebar.expandFullColumn')
+            }
+            data-tooltip={
+              propertiesFullColumn
+                ? t('editor.propertiesSidebar.dockToPreview')
+                : t('editor.propertiesSidebar.expandFullColumn')
+            }
+            data-tooltip-side="bottom"
+          >
+            {propertiesFullColumn ? (
+              <ChevronUp className="w-3 h-3" />
+            ) : (
+              <ChevronDown className="w-3 h-3" />
+            )}
+          </Button>
+        )}
+        <Settings2 className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />
+        <h2 className="min-w-0 flex items-center gap-1.5 text-[13px] font-semibold text-foreground">
+          <span className="shrink-0">{headerLabel}</span>
+          {headerContext && (
+            <>
+              <span className="shrink-0">-</span>
+              <span className="truncate font-normal text-muted-foreground" title={headerTitle}>
+                {headerContext}
+              </span>
+            </>
+          )}
+        </h2>
+      </div>
+      {!inPanel && (
+        <Button
+          variant="ghost"
+          size="icon"
+          style={{
+            width: EDITOR_LAYOUT_CSS_VALUES.sidebarHeaderButtonSize,
+            height: EDITOR_LAYOUT_CSS_VALUES.sidebarHeaderButtonSize,
+          }}
+          onClick={toggleRightSidebar}
+          aria-label={t('editor.mediaSidebar.collapsePanel')}
+        >
+          <ChevronRight className="w-3.5 h-3.5" />
+        </Button>
+      )}
+    </div>
+  )
+
+  const panel = (
+    <div
+      className={
+        workspace === 'motion' && clipInspectorTab === 'motion' && hasClipSelection
+          ? 'min-h-0 flex-1 overflow-hidden p-3'
+          : 'flex-1 overflow-y-auto overflow-x-hidden p-3 [scrollbar-gutter:stable]'
+      }
+    >
+      {selectedTransitionId ? (
+        <Suspense fallback={null}>
+          <LazyTransitionPanel />
+        </Suspense>
+      ) : selectedMarkerId ? (
+        <Suspense fallback={null}>
+          <LazyMarkerPanel />
+        </Suspense>
+      ) : (
+        <>
+          {/* Mount the lazy inspector before the first selection. Once
+          its chunk resolves it stays subscribed while hidden, so a
+          selection made during playback can commit synchronously
+          instead of waiting for a starved Suspense retry. */}
+          <div
+            data-testid="properties-clip-panel-host"
+            hidden={!hasClipSelection}
+            className={
+              workspace === 'motion' && clipInspectorTab === 'motion' ? 'h-full min-h-0' : undefined
+            }
+          >
+            <Suspense fallback={<PropertiesPanelLoadingFallback />}>
+              <LazyClipPanel />
+            </Suspense>
+          </div>
+          {!hasClipSelection && <NoSelectionInspector />}
+        </>
+      )}
+    </div>
+  )
+
+  if (embedded) {
+    return (
+      <div className="flex h-full min-h-0 w-full min-w-0 flex-col bg-panel-bg">
+        {renderHeader(true)}
+        {panel}
+      </div>
+    )
+  }
+
   return (
     <>
       {/* Right Sidebar — width animated via motion for the open/close toggle.
@@ -312,108 +425,8 @@ export const PropertiesSidebar = memo(function PropertiesSidebar() {
         {/* Use Activity for React 19 performance optimization */}
         <Activity mode={contentVisible ? 'visible' : 'hidden'}>
           <div className="h-full flex flex-col" style={{ width: rightSidebarWidth }}>
-            {/* Sidebar Header */}
-            <div
-              className="flex items-center justify-between px-3 border-b border-border flex-shrink-0"
-              style={{ height: EDITOR_LAYOUT_CSS_VALUES.sidebarHeaderHeight }}
-            >
-              <div className="min-w-0 flex items-center gap-1">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="shrink-0"
-                  style={{
-                    width: EDITOR_LAYOUT_CSS_VALUES.sidebarHeaderButtonSize,
-                    height: EDITOR_LAYOUT_CSS_VALUES.sidebarHeaderButtonSize,
-                  }}
-                  onClick={togglePropertiesFullColumn}
-                  aria-label={
-                    propertiesFullColumn
-                      ? t('editor.propertiesSidebar.dockToPreview')
-                      : t('editor.propertiesSidebar.expandFullColumn')
-                  }
-                  data-tooltip={
-                    propertiesFullColumn
-                      ? t('editor.propertiesSidebar.dockToPreview')
-                      : t('editor.propertiesSidebar.expandFullColumn')
-                  }
-                  data-tooltip-side="bottom"
-                >
-                  {propertiesFullColumn ? (
-                    <ChevronUp className="w-3 h-3" />
-                  ) : (
-                    <ChevronDown className="w-3 h-3" />
-                  )}
-                </Button>
-                <Settings2 className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />
-                <h2 className="min-w-0 flex items-center gap-1.5 text-[13px] font-semibold text-foreground">
-                  <span className="shrink-0">{headerLabel}</span>
-                  {headerContext && (
-                    <>
-                      <span className="shrink-0">-</span>
-                      <span
-                        className="truncate font-normal text-muted-foreground"
-                        title={headerTitle}
-                      >
-                        {headerContext}
-                      </span>
-                    </>
-                  )}
-                </h2>
-              </div>
-              <Button
-                variant="ghost"
-                size="icon"
-                style={{
-                  width: EDITOR_LAYOUT_CSS_VALUES.sidebarHeaderButtonSize,
-                  height: EDITOR_LAYOUT_CSS_VALUES.sidebarHeaderButtonSize,
-                }}
-                onClick={toggleRightSidebar}
-                aria-label={t('editor.mediaSidebar.collapsePanel')}
-              >
-                <ChevronRight className="w-3.5 h-3.5" />
-              </Button>
-            </div>
-
-            {/* Properties Panel */}
-            <div
-              className={
-                workspace === 'motion' && clipInspectorTab === 'motion' && hasClipSelection
-                  ? 'min-h-0 flex-1 overflow-hidden p-3'
-                  : 'flex-1 overflow-y-auto overflow-x-hidden p-3 [scrollbar-gutter:stable]'
-              }
-            >
-              {selectedTransitionId ? (
-                <Suspense fallback={null}>
-                  <LazyTransitionPanel />
-                </Suspense>
-              ) : selectedMarkerId ? (
-                <Suspense fallback={null}>
-                  <LazyMarkerPanel />
-                </Suspense>
-              ) : (
-                <>
-                  {/* Mount the lazy inspector before the first selection. Once
-                      its chunk resolves it stays subscribed while hidden, so a
-                      selection made during playback can commit synchronously
-                      instead of waiting for a starved Suspense retry. */}
-                  <div
-                    data-testid="properties-clip-panel-host"
-                    hidden={!hasClipSelection}
-                    className={
-                      workspace === 'motion' && clipInspectorTab === 'motion'
-                        ? 'h-full min-h-0'
-                        : undefined
-                    }
-                  >
-                    <Suspense fallback={<PropertiesPanelLoadingFallback />}>
-                      <LazyClipPanel />
-                    </Suspense>
-                  </div>
-                  {!hasClipSelection && <NoSelectionInspector />}
-                </>
-              )}
-            </div>
+            {renderHeader(false)}
+            {panel}
           </div>
         </Activity>
         {/* Resize Handle */}

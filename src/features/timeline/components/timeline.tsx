@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState, memo, useCallback, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
+import { TimelineNotesLaneHeader } from './timeline-notes-lane'
 import { TimelineHeader } from './timeline-header'
 import { TimelineContent } from './timeline-content'
 import { TimelineNavigator } from './timeline-navigator'
@@ -1061,6 +1062,9 @@ export const Timeline = memo(function Timeline({ duration }: TimelineProps) {
               </Button>
             </div>
           </div>
+
+          {/* The Notes lane's cell (the lane sits under the ruler) */}
+          <TimelineNotesLaneHeader compact={useConciseLayout} />
 
           {/* Track labels - synced scroll (no scrollbar) */}
           <div ref={trackHeadersViewportRef} className="flex-1 overflow-hidden relative">

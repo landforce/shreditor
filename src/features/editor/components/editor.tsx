@@ -39,6 +39,7 @@ import { useEditorHotkeys } from '@/features/editor/hooks/use-editor-hotkeys'
 import { useAutoSave } from '../hooks/use-auto-save'
 import { ProjectSyncBanner } from '../agent-sync/sync-banner'
 import { AgentActivityBanner } from '../agent-sync/agent-activity-banner'
+import { useAgentNotesSync } from '@/shared/state/agent-notes'
 import { isAgentEditLocked, refuseEditWhileAgentWorks } from '@/shared/state/agent-edit-lock'
 import { useProjectSyncStore } from '../agent-sync/sync-store'
 import { useProjectFileWatcher } from '../agent-sync/use-project-file-watcher'
@@ -86,6 +87,7 @@ import {
 import { IoDragReadout } from '@/shared/timeline/io-range'
 import type { ProjectFormat } from '@formats/registry.mjs'
 import { FormatScorecardController } from './format-panel/format-scorecard-controller'
+import { ProjectSpecsDrawer } from './format-panel/project-specs-drawer'
 const logger = createLogger('Editor')
 const LazyTimeline = lazy(() => importTimeline().then(({ Timeline }) => ({ default: Timeline })))
 const LazyColorGradingDock = lazy(() =>
@@ -236,6 +238,8 @@ const startedUpgradeBackups = new Map<string, Promise<void>>()
  * snapshotted first (best-effort safety net), then the editor loads. No prompt.
  */
 export const Editor = memo(function Editor({ projectId, project, migration }: EditorProps) {
+  // The user's notes for the agent: the Notes lane and the Pass card read them in every layout.
+  useAgentNotesSync(projectId)
   const { t } = useTranslation()
   const [upgradeApproved, setUpgradeApproved] = useState(!migration.requiresUpgrade)
   const backupName = formatProjectUpgradeBackupName(
@@ -907,6 +911,7 @@ export const LoadedEditor = memo(function LoadedEditor({
     >
       <AutoSaveController onSave={handleSave} projectId={projectId} />
       <FormatScorecardController />
+      <ProjectSpecsDrawer />
       <AgentActivityBanner projectId={projectId} />
       <ProjectSyncBanner projectId={projectId} />
       <TimelineShortcutsController />

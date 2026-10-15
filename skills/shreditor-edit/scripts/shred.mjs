@@ -112,7 +112,9 @@
 //   shred notes <id> [--json]            the user's open notes: comments pinned to a timecode (with
 //                                        what sits at that frame and what they had selected) and
 //                                        general notes from the Pass card
-//   shred notes <id> --read <id,...|all> mark notes read once acted on (the editor clears them)
+//   shred notes <id> --read <id,...|all> [--reply "what you did"]
+//                                        mark notes read once acted on; the reply and the latest
+//                                        pass show on the done note in the editor's Notes lane
 //   shred notes <id> --watch             print each note as the user sends it (run it under a monitor)
 //   shred master <audio|video> [--lufs -14] [--tp -1.5] [--out file.wav]
 //                                        loudness-master to a new WAV (two-pass loudnorm)
@@ -171,7 +173,7 @@ import {
   readCubeFileHeader,
 } from '../../../headless/lib/luts.mjs'
 import { templatesCommand } from './templates.mjs'
-import { describeNote, markRead, openNotes } from './notes.mjs'
+import { describeNote, markRead, noteSpan, openNotes } from './notes.mjs'
 import { createActivity } from './activity.mjs'
 import { draftPlanGate, planCheck, planCommands, printPlanCheck } from './plan.mjs'
 import { runBuild, gitHead, staleBuild } from '../../../server/install/build-state.mjs'
@@ -235,6 +237,7 @@ const { values: opt, positionals } = parseArgs({
     scaffold: { type: 'boolean' },
     'no-plan': { type: 'boolean' },
     read: { type: 'string' },
+    reply: { type: 'string' },
     watch: { type: 'boolean' },
   },
 })
@@ -531,6 +534,23 @@ function readNotes(id) {
     return Array.isArray(stored?.notes) ? stored.notes : []
   } catch {
     return []
+  }
+}
+
+/** "Pass 5: <label>" for the project's latest published pass; undefined before the first. */
+function latestPassLabel(id) {
+  const dir = path.join(workspace(), 'projects', id, 'agent', 'passes')
+  try {
+    const last = fs
+      .readdirSync(dir)
+      .filter((f) => /^\d+\.json$/.test(f))
+      .sort()
+      .at(-1)
+    if (!last) return undefined
+    const pass = JSON.parse(fs.readFileSync(path.join(dir, last), 'utf8'))
+    return `Pass ${Number(pass.id ?? last.slice(0, -5))}${pass.label ? `: ${pass.label}` : ''}`
+  } catch {
+    return undefined
   }
 }
 
@@ -1380,13 +1400,20 @@ const commands = {
     if (opt.read) {
       const stored = readNotes(id)
       if (!stored.length) return say('No notes from the user.')
-      const { notes, marked, unknown } = markRead(stored, opt.read)
+      const { notes, marked, unknown } = markRead(stored, opt.read, {
+        reply: opt.reply?.trim() || undefined,
+        pass: latestPassLabel(id),
+      })
       if (unknown.length)
         throw new Error(`No note ${unknown.join(', ')} (shred notes ${id} lists them)`)
       const file = notesFile(id)
       fs.writeFileSync(`${file}.tmp`, `${JSON.stringify({ version: 1, notes }, null, 2)}\n`)
       fs.renameSync(`${file}.tmp`, file)
-      return say(`Marked ${marked} note${marked === 1 ? '' : 's'} read.`)
+      const pass = latestPassLabel(id)
+      return say(
+        `Marked ${marked} note${marked === 1 ? '' : 's'} read${pass ? ` (${pass})` : ''}.` +
+          (opt.reply ? '' : ' Add --reply "<what you did>" so the user sees it on the Notes lane.'),
+      )
     }
     // Frames are read against the saved timeline; the user's unsaved tweaks need `shred sync`.
     const context = async () => {
@@ -1419,7 +1446,9 @@ const commands = {
     const open = openNotes(readNotes(id))
     if (opt.json) {
       const { timeline, fps } = await context()
-      return say(JSON.stringify({ fps, notes: open, hasTimeline: Boolean(timeline) }, null, 2))
+      // `span` is where each note sits now (it follows the clip it was pinned to).
+      const notes = open.map((note) => ({ ...note, span: noteSpan(note, timeline, fps) }))
+      return say(JSON.stringify({ fps, notes, hasTimeline: Boolean(timeline) }, null, 2))
     }
     if (!open.length) return say('No open notes from the user.')
     const { timeline, fps } = await context()
@@ -1429,7 +1458,7 @@ const commands = {
       for (const line of describeNote(note, timeline, fps)) say(line)
     }
     say()
-    say(`Once acted on: shred notes ${id} --read <id,...> (or --read all)`)
+    say(`Once acted on: shred notes ${id} --read <id,...> --reply "what you did" (or --read all)`)
   },
 
   async start() {

@@ -15,7 +15,7 @@ vi.mock('@/infrastructure/storage', () => ({
   }),
 }))
 
-const { openAgentNotes, useAgentNotesStore } = await import('./agent-notes')
+const { doneAgentNotes, openAgentNotes, useAgentNotesStore } = await import('./agent-notes')
 
 const note = (id: string, extra: Partial<AgentNote> = {}): AgentNote => ({
   id,
@@ -53,5 +53,39 @@ describe('agent notes store', () => {
       note('early', { frame: 20 }),
     ]
     expect(openAgentNotes(notes).map((n) => n.id)).toEqual(['early', 'late', 'general'])
+  })
+
+  it('keeps a range and an anchor on a timed note', async () => {
+    const anchor = { itemId: 'c1', offset: 4, sourceFrame: 208 }
+    await useAgentNotesStore.getState().add({ text: 'Slow', frame: 40, endFrame: 70.4, anchor })
+    expect(file.notes[0]).toMatchObject({ frame: 40, endFrame: 70, anchor })
+  })
+
+  it('drops a zero-length range and an anchor without a frame', async () => {
+    const anchor = { itemId: 'c1', offset: 0 }
+    await useAgentNotesStore.getState().add({ text: 'Here', frame: 40, endFrame: 40 })
+    await useAgentNotesStore.getState().add({ text: 'General', anchor })
+    expect(file.notes[0]).not.toHaveProperty('endFrame')
+    expect(file.notes[1]).not.toHaveProperty('anchor')
+  })
+
+  it('marks a note done and reopens it, keeping the agent answer', async () => {
+    file = { version: 1, notes: [note('n1', { frame: 10, reply: 'Moved it', pass: 'Pass 5' })] }
+    await useAgentNotesStore.getState().load('p1')
+    await useAgentNotesStore.getState().markDone('n1')
+    expect(file.notes[0]).toMatchObject({ status: 'read' })
+    expect(file.notes[0]?.readAt).toBeTypeOf('string')
+    await useAgentNotesStore.getState().reopen('n1')
+    expect(file.notes[0]).toMatchObject({ status: 'open', reply: 'Moved it', pass: 'Pass 5' })
+    expect(file.notes[0]).not.toHaveProperty('readAt')
+  })
+
+  it('lists done notes, most recently done first', () => {
+    const notes = [
+      note('a', { status: 'read', readAt: '2026-10-02' }),
+      note('b', { status: 'read', readAt: '2026-10-05' }),
+      note('c'),
+    ]
+    expect(doneAgentNotes(notes).map((n) => n.id)).toEqual(['b', 'a'])
   })
 })

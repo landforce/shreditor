@@ -5,8 +5,6 @@ import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@/componen
 import { ErrorBoundary } from '@/app/error-boundary'
 import { Button } from '@/components/ui/button'
 import { useEditorStore } from '@/shared/state/editor'
-import { useAgentNotesSync } from '@/shared/state/agent-notes'
-import { useProjectStore } from '@/features/editor/deps/projects'
 import { importTimeline } from '@/features/editor/deps/timeline-ui'
 import { PreviewArea } from '../preview-area'
 import { MediaSidebar } from '../media-sidebar'
@@ -54,7 +52,6 @@ export const ConciseShell = memo(function ConciseShell({ project, onSave }: Conc
   const sidebarWidth = useEditorStore((s) => s.sidebarWidth)
   const onSaveRef = useRef(onSave)
   onSaveRef.current = onSave
-  useAgentNotesSync(useProjectStore((s) => s.currentProject?.id))
 
   useLayoutEffect(() => {
     const element = rootRef.current
@@ -123,7 +120,7 @@ export const ConciseShell = memo(function ConciseShell({ project, onSave }: Conc
               <div className={narrow ? 'min-h-0 flex-1' : 'min-h-0 flex-shrink-0 overflow-auto'}>
                 <ErrorBoundary level="feature">
                   <Suspense fallback={null}>
-                    <LazyConciseContextPanel />
+                    <LazyConciseContextPanel hintWhenEmpty={narrow} />
                   </Suspense>
                 </ErrorBoundary>
               </div>

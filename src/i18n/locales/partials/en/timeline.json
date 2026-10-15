@@ -267,14 +267,13 @@
       "beatGrid": "Beat grid",
       "bpm": "{{bpm}} BPM",
       "comment": {
-        "button": "Comment for the agent (N)",
-        "title": "Comment for the agent",
+        "button": "Note for the agent (N)",
+        "title": "Note for the agent",
         "placeholder": "What should change here?",
         "selected_one": "{{count}} clip selected",
         "selected_other": "{{count}} clips selected",
         "hint": "⌘↵ to send",
-        "send": "Send",
-        "pin": "Comment: {{text}}"
+        "send": "Send"
       },
       "compactTracks": "Compact track labels",
       "deleteSelected": "Delete selected",
@@ -368,6 +367,26 @@
       "adjustClipVolume": "Adjust clip volume"
     },
     "emptyTitle": "Drag media here to start editing",
-    "emptyDescription": "Drop clips on tracks, then press Space to preview."
+    "emptyDescription": "Drop clips on tracks, then press Space to preview.",
+    "notes": {
+      "label": "Notes",
+      "showDone_one": "Show {{count}} done note",
+      "showDone_other": "Show {{count}} done notes",
+      "hideDone": "Hide done notes",
+      "laneHint": "Drag across the Notes tray to leave a note on a stretch, or double-click for one moment.",
+      "openNote": "Open note at {{time}}: {{text}}",
+      "doneNote": "Done note at {{time}}: {{text}}",
+      "statusOpen": "Open",
+      "statusDone": "Done",
+      "trimmed": "The moment this note was about was trimmed out of its clip, so it sits at the clip's edge.",
+      "detached": "The clip this note was about is gone; it sits where it was written.",
+      "reply": "Agent",
+      "replyIn": "Agent, {{pass}}",
+      "delete": "Delete",
+      "reopen": "Reopen",
+      "markDone": "Mark done",
+      "expand": "Open the Notes tray",
+      "collapse": "Fold the Notes tray"
+    }
   }
 }

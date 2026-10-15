@@ -92,7 +92,7 @@
     },
     "chip": {
       "none": "No format",
-      "open": "Format and scorecard",
+      "open": "Project specs: format, scorecard, canvas and notes",
       "fail": "{{count}} fail",
       "warn": "{{count}} warn",
       "pass": "✓"
@@ -105,6 +105,14 @@
     },
     "timeline": {
       "roleBadge": "Format role: {{role}}"
+    },
+    "specs": {
+      "title": "Project specs",
+      "description": "The project's format, its scorecard, the canvas and the notes for the agent.",
+      "open": "Project specs",
+      "nothingSelected": "Nothing selected",
+      "nothingSelectedBody": "Select a clip to edit it. The format, scorecard, canvas and notes are in Project specs.",
+      "notesTab": "Notes"
     }
   }
 }

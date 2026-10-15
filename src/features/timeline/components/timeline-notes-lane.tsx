@@ -1,0 +1,643 @@
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
+import {
+  Check,
+  ChevronDown,
+  ChevronUp,
+  Eye,
+  EyeOff,
+  MessageSquare,
+  Plus,
+  RotateCcw,
+  Send,
+  Trash2,
+} from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Popover, PopoverAnchor, PopoverContent } from '@/components/ui/popover'
+import { Textarea } from '@/components/ui/textarea'
+import { noteAnchorFor, resolveNoteSpan } from '@/shared/projects/note-anchor.mjs'
+import {
+  doneAgentNotes,
+  openAgentNotes,
+  startAgentComment,
+  useAgentNotesStore,
+} from '@/shared/state/agent-notes'
+import { usePlaybackStore } from '@/shared/state/playback'
+import { useSelectionStore } from '@/shared/state/selection'
+import { formatTimecodeCompact } from '@/shared/utils/time-utils'
+import { cn } from '@/shared/ui/cn'
+import { useTimelineCommittedZoomContext } from '../contexts/timeline-zoom-context'
+import {
+  MAX_CARD_PX,
+  MAX_PILL_PX,
+  placeNotes,
+  useNotesLaneHeight,
+  useNotesLaneVisible,
+  type PlacedNote,
+} from './timeline-notes-lane-layout'
+import { useItemsStore } from '../stores/items-store'
+import { useTimelineStore } from '../stores/timeline-store'
+import { useZoomStore } from '../stores/zoom-store'
+import { applyTimelineLiveGeometry } from '../utils/timeline-live-geometry'
+
+/** Pixels the pointer moves before a press on the lane becomes a range drag. */
+const DRAG_START_PX = 4
+
+/** A small icon button in the tray's header cell. */
+function TrayButton({
+  label,
+  onClick,
+  disabled,
+  pressed,
+  testId,
+  children,
+}: {
+  label: string
+  onClick: () => void
+  disabled?: boolean
+  pressed?: boolean
+  testId: string
+  children: React.ReactNode
+}) {
+  return (
+    <Button
+      variant="ghost"
+      size="icon"
+      className="h-5 w-5 shrink-0"
+      onClick={onClick}
+      disabled={disabled}
+      aria-label={label}
+      aria-pressed={pressed}
+      data-tooltip={label}
+      data-testid={testId}
+    >
+      {children}
+    </Button>
+  )
+}
+
+/**
+ * The tray's cell in the track-header column: label and open count, then the
+ * show-done eye, add, and fold. Open, the label sits above the buttons; folded
+ * (or in Concise's narrow column) it all fits one row.
+ */
+export const TimelineNotesLaneHeader = memo(function TimelineNotesLaneHeader({
+  compact,
+}: {
+  compact: boolean
+}) {
+  const { t } = useTranslation()
+  const visible = useNotesLaneVisible()
+  const height = useNotesLaneHeight()
+  const notes = useAgentNotesStore((s) => s.notes)
+  const showDone = useAgentNotesStore((s) => s.showDone)
+  const collapsed = useAgentNotesStore((s) => s.trayCollapsed)
+  const openCount = useMemo(() => openAgentNotes(notes).length, [notes])
+  const doneCount = useMemo(() => doneAgentNotes(notes).length, [notes])
+  if (!visible) return null
+
+  const store = useAgentNotesStore.getState()
+  const toggleLabel = showDone
+    ? t('timeline.notes.hideDone')
+    : t('timeline.notes.showDone', { count: doneCount })
+  const foldLabel = collapsed ? t('timeline.notes.expand') : t('timeline.notes.collapse')
+  const stacked = !collapsed
+  const showLabel = !compact || stacked
+  return (
+    <div
+      className={cn(
+        'flex shrink-0 border-b border-border bg-amber-500/[0.06]',
+        stacked ? 'flex-col justify-center gap-1' : 'items-center gap-0.5',
+        compact ? 'px-1' : 'px-3',
+      )}
+      style={{ height }}
+      data-testid="timeline-notes-header"
+    >
+      <div className="flex min-w-0 items-center gap-1">
+        {!(compact && !stacked && openCount > 0) && (
+          <MessageSquare
+            className="h-3.5 w-3.5 shrink-0 text-amber-600 dark:text-amber-400"
+            aria-hidden="true"
+          />
+        )}
+        {showLabel && (
+          <span className="truncate text-xs font-semibold">{t('timeline.notes.label')}</span>
+        )}
+        {openCount > 0 && (
+          <span className="rounded bg-amber-500 px-1 text-[10px] leading-4 font-semibold text-white tabular-nums">
+            {openCount}
+          </span>
+        )}
+      </div>
+      <div className={cn('flex shrink-0 items-center', !stacked && 'ml-auto')}>
+        <TrayButton
+          label={toggleLabel}
+          onClick={() => store.setShowDone(!showDone)}
+          disabled={doneCount === 0 && !showDone}
+          pressed={showDone}
+          testId="timeline-notes-show-done"
+        >
+          {showDone ? <Eye className="h-3 w-3" /> : <EyeOff className="h-3 w-3" />}
+        </TrayButton>
+        <TrayButton
+          label={t('timeline.concise.comment.button')}
+          onClick={() => startAgentComment()}
+          testId="timeline-notes-add"
+        >
+          <Plus className="h-3 w-3" />
+        </TrayButton>
+        <TrayButton
+          label={foldLabel}
+          onClick={() => store.setTrayCollapsed(!collapsed)}
+          pressed={!collapsed}
+          testId="timeline-notes-fold"
+        >
+          {collapsed ? <ChevronDown className="h-3 w-3" /> : <ChevronUp className="h-3 w-3" />}
+        </TrayButton>
+      </div>
+    </div>
+  )
+})
+
+interface NotesLaneSurfaceProps {
+  duration: number
+  containerWidth: number
+  initialWidth: number
+}
+
+/**
+ * The lane under the ruler. Sized like the ruler (live wheel zoom resizes it
+ * imperatively), so note positions line up with the clips below.
+ */
+export const TimelineNotesLaneSurface = memo(function TimelineNotesLaneSurface({
+  duration,
+  containerWidth,
+  initialWidth,
+}: NotesLaneSurfaceProps) {
+  const visible = useNotesLaneVisible()
+  const height = useNotesLaneHeight()
+  const outerRef = useRef<HTMLDivElement>(null)
+  const surfaceRef = useRef<HTMLDivElement>(null)
+
+  const applyZoom = useCallback(() => {
+    const outer = outerRef.current
+    const surface = surfaceRef.current
+    if (!outer || !surface) return
+    applyTimelineLiveGeometry({
+      outer,
+      surface,
+      duration,
+      viewportWidth: containerWidth,
+      livePixelsPerSecond: useZoomStore.getState().pixelsPerSecond,
+    })
+  }, [containerWidth, duration])
+
+  useLayoutEffect(() => {
+    applyZoom()
+  }, [applyZoom, visible])
+
+  useEffect(
+    () =>
+      useZoomStore.subscribe((state, previous) => {
+        if (state.pixelsPerSecond !== previous.pixelsPerSecond) applyZoom()
+      }),
+    [applyZoom],
+  )
+
+  if (!visible) return null
+  return (
+    <div
+      ref={outerRef}
+      className="relative z-20 shrink-0 border-b border-border bg-amber-500/[0.06]"
+      style={{ width: `${initialWidth}px`, height }}
+      data-marquee-ignore
+      data-testid="timeline-notes-lane"
+    >
+      <div
+        ref={surfaceRef}
+        className="absolute inset-y-0 left-0"
+        style={{ width: `${initialWidth}px`, contain: 'layout style' }}
+      >
+        <TimelineNotesLane />
+      </div>
+    </div>
+  )
+})
+
+/** Note blocks, drag-to-add, the composer and a note's details. */
+export const TimelineNotesLane = memo(function TimelineNotesLane() {
+  const { t } = useTranslation()
+  const notes = useAgentNotesStore((s) => s.notes)
+  const showDone = useAgentNotesStore((s) => s.showDone)
+  const tray = !useAgentNotesStore((s) => s.trayCollapsed)
+  const composer = useAgentNotesStore((s) => s.composer)
+  const items = useItemsStore((s) => s.items)
+  const fps = useTimelineStore((s) => s.fps) || 30
+  const { frameToPixels, pixelsToFrame } = useTimelineCommittedZoomContext()
+  const laneRef = useRef<HTMLDivElement>(null)
+  const [activeId, setActiveId] = useState<string | null>(null)
+  const [dragSpan, setDragSpan] = useState<{ start: number; end: number } | null>(null)
+
+  const placed = useMemo(
+    () =>
+      placeNotes(
+        notes,
+        showDone,
+        (note) => resolveNoteSpan(note, items, fps),
+        frameToPixels,
+        tray ? MAX_CARD_PX : MAX_PILL_PX,
+      ),
+    [notes, showDone, items, fps, frameToPixels, tray],
+  )
+  const active = placed.find((entry) => entry.note.id === activeId) ?? null
+
+  const frameAt = (clientX: number) => {
+    const rect = laneRef.current?.getBoundingClientRect()
+    return Math.max(0, pixelsToFrame(clientX - (rect?.left ?? 0)))
+  }
+
+  // Press on empty lane: a drag across it notes a stretch; a double-click notes a moment.
+  const onLaneMouseDown = (event: React.MouseEvent) => {
+    if (event.button !== 0 || event.target !== event.currentTarget) return
+    event.preventDefault()
+    event.stopPropagation()
+    setActiveId(null)
+    const startX = event.clientX
+    const start = frameAt(startX)
+    let dragging = false
+    const move = (moveEvent: MouseEvent) => {
+      if (!dragging && Math.abs(moveEvent.clientX - startX) < DRAG_START_PX) return
+      dragging = true
+      setDragSpan({ start, end: frameAt(moveEvent.clientX) })
+    }
+    const up = (upEvent: MouseEvent) => {
+      window.removeEventListener('mousemove', move)
+      window.removeEventListener('mouseup', up)
+      setDragSpan(null)
+      if (!dragging) return
+      const end = frameAt(upEvent.clientX)
+      usePlaybackStore.getState().pause()
+      useAgentNotesStore
+        .getState()
+        .openComposer(
+          Math.min(start, end),
+          useSelectionStore.getState().selectedItemIds,
+          Math.max(start, end),
+        )
+    }
+    window.addEventListener('mousemove', move)
+    window.addEventListener('mouseup', up)
+  }
+
+  const onLaneDoubleClick = (event: React.MouseEvent) => {
+    if (event.target !== event.currentTarget) return
+    event.stopPropagation()
+    const frame = frameAt(event.clientX)
+    usePlaybackStore.getState().pause()
+    usePlaybackStore.getState().setCurrentFrame(frame)
+    useAgentNotesStore.getState().openComposer(frame, useSelectionStore.getState().selectedItemIds)
+  }
+
+  return (
+    <div
+      ref={laneRef}
+      className="absolute inset-0 cursor-crosshair"
+      onMouseDown={onLaneMouseDown}
+      onDoubleClick={onLaneDoubleClick}
+      onClick={(event) => event.stopPropagation()}
+    >
+      {placed.map((entry) => (
+        <NoteBlock
+          key={entry.note.id}
+          entry={entry}
+          fps={fps}
+          tray={tray}
+          onOpen={() => {
+            usePlaybackStore.getState().setCurrentFrame(entry.span.frame)
+            setActiveId(entry.note.id)
+          }}
+        />
+      ))}
+
+      {dragSpan && (
+        <div
+          className="pointer-events-none absolute inset-y-0.5 rounded-sm border border-amber-500 bg-amber-500/20"
+          style={{
+            left: frameToPixels(Math.min(dragSpan.start, dragSpan.end)),
+            width: Math.max(2, frameToPixels(Math.abs(dragSpan.end - dragSpan.start))),
+          }}
+        />
+      )}
+
+      {active && (
+        <Popover open onOpenChange={(open) => !open && setActiveId(null)}>
+          <PopoverAnchor asChild>
+            <span className="absolute inset-y-0 w-px" style={{ left: active.left }} />
+          </PopoverAnchor>
+          <PopoverContent align="start" className="w-72 space-y-2 p-2 text-xs">
+            <NoteDetails entry={active} fps={fps} onClose={() => setActiveId(null)} />
+          </PopoverContent>
+        </Popover>
+      )}
+
+      {composer && (
+        <Popover
+          open
+          onOpenChange={(open) => !open && useAgentNotesStore.getState().closeComposer()}
+        >
+          <PopoverAnchor asChild>
+            <span
+              className="absolute inset-y-0 w-px"
+              style={{ left: frameToPixels(composer.frame) }}
+            />
+          </PopoverAnchor>
+          <PopoverContent align="start" className="w-80 space-y-2 p-2">
+            <NoteComposer fps={fps} />
+          </PopoverContent>
+        </Popover>
+      )}
+      <span className="sr-only">{t('timeline.notes.laneHint')}</span>
+    </div>
+  )
+})
+
+/** A note block's look: open amber, done greyed; a dashed edge when its moment moved off its clip. */
+function noteBlockClass({ done, span }: PlacedNote, tray: boolean): string {
+  const lost = span.state === 'trimmed' || span.state === 'detached'
+  const tone = tray
+    ? done
+      ? 'border-l-[3px] border-muted-foreground/40 bg-muted text-muted-foreground hover:bg-muted/80'
+      : 'border-l-[3px] border-amber-500 bg-amber-100 text-amber-950 hover:bg-amber-200 dark:bg-amber-500/20 dark:text-amber-50 dark:hover:bg-amber-500/30'
+    : done
+      ? 'bg-muted text-muted-foreground opacity-80 hover:opacity-100'
+      : 'bg-amber-500 text-white hover:bg-amber-400'
+  return cn(
+    'absolute overflow-hidden text-left shadow-sm',
+    tray
+      ? 'top-1 bottom-1 flex flex-col gap-0.5 rounded-md px-1.5 py-1'
+      : cn(
+          'top-0.5 bottom-0.5 flex min-w-0 items-center gap-1 rounded-sm text-[10px] leading-none',
+          span.endFrame === undefined ? 'pr-1' : 'px-1',
+        ),
+    tone,
+    lost && 'outline-dashed outline-1 outline-offset-[-1px] outline-current',
+  )
+}
+
+/** The square at the start of a single-moment pill (folded tray). */
+function NotePin({ done }: { done: boolean }) {
+  return (
+    <span
+      className={cn(
+        'flex h-full w-3.5 shrink-0 items-center justify-center',
+        done ? 'bg-foreground/10' : 'bg-amber-600',
+      )}
+    >
+      {done ? <Check className="h-2.5 w-2.5" /> : <MessageSquare className="h-2.5 w-2.5" />}
+    </span>
+  )
+}
+
+/** A card in the open tray: timecode (or range), then up to two lines of the note. */
+function NoteCardBody({ entry, fps }: { entry: PlacedNote; fps: number }) {
+  const { note, span, done } = entry
+  const time =
+    span.endFrame === undefined
+      ? formatTimecodeCompact(span.frame, fps)
+      : `${formatTimecodeCompact(span.frame, fps)}–${formatTimecodeCompact(span.endFrame, fps)}`
+  return (
+    <>
+      <span className="flex min-w-0 items-center gap-1 font-mono text-[10px] leading-none tabular-nums opacity-80">
+        {done ? (
+          <Check className="h-2.5 w-2.5 shrink-0" />
+        ) : (
+          <MessageSquare className="h-2.5 w-2.5 shrink-0" />
+        )}
+        <span className="truncate">{time}</span>
+      </span>
+      <span className="line-clamp-2 min-w-0 text-[11px] leading-tight font-medium break-words">
+        {note.text}
+      </span>
+    </>
+  )
+}
+
+const NoteBlock = memo(function NoteBlock({
+  entry,
+  fps,
+  tray,
+  onOpen,
+}: {
+  entry: PlacedNote
+  fps: number
+  tray: boolean
+  onOpen: () => void
+}) {
+  const { t } = useTranslation()
+  const { note, span, left, width, done } = entry
+  return (
+    <button
+      type="button"
+      className={noteBlockClass(entry, tray)}
+      style={{ left, width }}
+      onMouseDown={(event) => {
+        event.preventDefault()
+        event.stopPropagation()
+      }}
+      onClick={(event) => {
+        event.stopPropagation()
+        onOpen()
+      }}
+      aria-label={t(done ? 'timeline.notes.doneNote' : 'timeline.notes.openNote', {
+        time: formatTimecodeCompact(span.frame, fps),
+        text: note.text,
+      })}
+      data-tooltip={note.text}
+      data-tooltip-side="bottom"
+      data-testid={done ? 'timeline-note-done' : 'timeline-note-open'}
+    >
+      {tray ? (
+        <NoteCardBody entry={entry} fps={fps} />
+      ) : (
+        <>
+          {span.endFrame === undefined ? (
+            <NotePin done={done} />
+          ) : (
+            done && <Check className="h-2.5 w-2.5 shrink-0" />
+          )}
+          <span className="truncate">{note.text}</span>
+        </>
+      )}
+    </button>
+  )
+})
+
+function NoteDetails({
+  entry,
+  fps,
+  onClose,
+}: {
+  entry: PlacedNote
+  fps: number
+  onClose: () => void
+}) {
+  const { t } = useTranslation()
+  const { note, span, done } = entry
+  const store = useAgentNotesStore.getState()
+  const when =
+    span.endFrame === undefined
+      ? formatTimecodeCompact(span.frame, fps)
+      : `${formatTimecodeCompact(span.frame, fps)} – ${formatTimecodeCompact(span.endFrame, fps)}`
+  return (
+    <>
+      <div className="flex items-center gap-1.5">
+        <span
+          className={cn(
+            'rounded px-1 font-mono text-[10px] leading-4 tabular-nums',
+            done
+              ? 'bg-muted text-muted-foreground'
+              : 'bg-amber-500/15 text-amber-700 dark:text-amber-400',
+          )}
+        >
+          {when}
+        </span>
+        <span className="font-medium">
+          {done ? t('timeline.notes.statusDone') : t('timeline.notes.statusOpen')}
+        </span>
+      </div>
+      <p className="whitespace-pre-wrap">{note.text}</p>
+      {span.state === 'trimmed' && (
+        <p className="text-muted-foreground">{t('timeline.notes.trimmed')}</p>
+      )}
+      {span.state === 'detached' && (
+        <p className="text-muted-foreground">{t('timeline.notes.detached')}</p>
+      )}
+      {note.reply && (
+        <div
+          className="rounded border border-border bg-muted/40 p-1.5"
+          data-testid="timeline-note-reply"
+        >
+          <p className="text-[10px] font-medium text-muted-foreground">
+            {note.pass
+              ? t('timeline.notes.replyIn', { pass: note.pass })
+              : t('timeline.notes.reply')}
+          </p>
+          <p className="whitespace-pre-wrap">{note.reply}</p>
+        </div>
+      )}
+      <div className="flex items-center justify-between gap-2 pt-1">
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-7 gap-1.5 text-xs text-muted-foreground"
+          onClick={() => {
+            void store.remove(note.id)
+            onClose()
+          }}
+        >
+          <Trash2 className="h-3.5 w-3.5" />
+          {t('timeline.notes.delete')}
+        </Button>
+        {done ? (
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-7 gap-1.5 text-xs"
+            onClick={() => {
+              void store.reopen(note.id)
+              onClose()
+            }}
+            data-testid="timeline-note-reopen"
+          >
+            <RotateCcw className="h-3.5 w-3.5" />
+            {t('timeline.notes.reopen')}
+          </Button>
+        ) : (
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-7 gap-1.5 text-xs"
+            onClick={() => {
+              void store.markDone(note.id)
+              onClose()
+            }}
+            data-testid="timeline-note-mark-done"
+          >
+            <Check className="h-3.5 w-3.5" />
+            {t('timeline.notes.markDone')}
+          </Button>
+        )}
+      </div>
+    </>
+  )
+}
+
+function NoteComposer({ fps }: { fps: number }) {
+  const { t } = useTranslation()
+  const composer = useAgentNotesStore((s) => s.composer)
+  const failed = useAgentNotesStore((s) => s.failed)
+  const [draft, setDraft] = useState('')
+  if (!composer) return null
+
+  const send = async () => {
+    const text = draft.trim()
+    const store = useAgentNotesStore.getState()
+    if (!text || !store.composer) return
+    const { frame, endFrame, itemIds } = store.composer
+    const anchor = noteAnchorFor(frame, itemIds, useItemsStore.getState().items, fps)
+    if (await store.add({ text, frame, endFrame, itemIds, anchor })) {
+      setDraft('')
+      store.closeComposer()
+    }
+  }
+
+  const when =
+    composer.endFrame === undefined
+      ? formatTimecodeCompact(composer.frame, fps)
+      : `${formatTimecodeCompact(composer.frame, fps)} – ${formatTimecodeCompact(composer.endFrame, fps)}`
+  return (
+    <>
+      <div className="flex items-center gap-1.5 text-xs">
+        <span className="rounded bg-amber-500/15 px-1 font-mono text-[10px] leading-4 text-amber-700 tabular-nums dark:text-amber-400">
+          {when}
+        </span>
+        <span className="whitespace-nowrap font-medium">{t('timeline.concise.comment.title')}</span>
+        {composer.itemIds.length > 0 && (
+          <span className="ml-auto whitespace-nowrap text-muted-foreground">
+            {t('timeline.concise.comment.selected', { count: composer.itemIds.length })}
+          </span>
+        )}
+      </div>
+      <Textarea
+        autoFocus
+        value={draft}
+        onChange={(event) => setDraft(event.target.value)}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
+            event.preventDefault()
+            void send()
+          }
+        }}
+        placeholder={t('timeline.concise.comment.placeholder')}
+        aria-label={t('timeline.concise.comment.title')}
+        className="min-h-20 resize-none text-xs"
+        data-testid="timeline-agent-comment-input"
+      />
+      {failed && <p className="text-xs text-destructive">{t('editor.concise.pass.noteFailed')}</p>}
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-[11px] text-muted-foreground">
+          {t('timeline.concise.comment.hint')}
+        </span>
+        <Button
+          size="sm"
+          className="h-7 gap-1.5 text-xs"
+          onClick={() => void send()}
+          disabled={!draft.trim()}
+        >
+          <Send className="h-3.5 w-3.5" />
+          {t('timeline.concise.comment.send')}
+        </Button>
+      </div>
+    </>
+  )
+}
