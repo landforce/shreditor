@@ -13,6 +13,7 @@ import { perfMarkRender } from '@/shared/logging/perf-marks'
 import { TimelineInOutMarkers } from './timeline-in-out-markers'
 import { TimelineProjectMarkers } from './timeline-project-markers'
 import { TimelineBeatGrid } from './timeline-beat-grid'
+import { TimelineAgentCommentPins } from './timeline-agent-comments'
 import { TimelineFormatRanges } from './timeline-format-ranges'
 import { previewScrubberSuppressRef } from './preview-scrubber-suppress'
 import { beginIoPointerDrag, IoRangeStrip } from '@/shared/timeline/io-range'
@@ -1177,6 +1178,9 @@ export const TimelineMarkers = memo(function TimelineMarkers({
 
       {/* Project markers (DOM - minimal count) */}
       <TimelineProjectMarkers />
+
+      {/* Comments for the agent (Concise loads them) */}
+      <TimelineAgentCommentPins />
     </div>
   )
 })

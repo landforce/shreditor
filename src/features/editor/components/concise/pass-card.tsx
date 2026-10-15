@@ -1,9 +1,11 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Ellipsis, LayoutTemplate, Save, Send, TriangleAlert, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
-import { readAgentNotes, writeAgentNotes, type AgentNote } from '@/infrastructure/storage'
+import { openAgentNotes, useAgentNotesStore } from '@/shared/state/agent-notes'
+import { usePlaybackStore } from '@/shared/state/playback'
+import { formatTimecodeCompact } from '@/shared/utils/time-utils'
 import { useFormatScorecardStore } from '@/shared/state/format-scorecard'
 import { useSelectionStore } from '@/shared/state/selection'
 import { variantName } from '@/shared/formats/format-text'
@@ -13,16 +15,14 @@ import {
   useTimelineCommandStore,
   useTimelineStore,
 } from '@/features/editor/deps/timeline-store'
-import { createLogger } from '@/shared/logging/logger'
 import { useProjectSyncStore } from '../../agent-sync/sync-store'
 import { useFormatPanelStore } from '../../stores/format-panel-store'
 import { ChangeFormatDialog } from '../format-panel/change-format-dialog'
 import { useResolvedProjectFormat } from '../format-panel/project-format'
+import { useProjectFps } from './card-helpers'
 import { changesSincePass } from './changes-since-pass'
 import { SAVE_PROJECT_EVENT } from './events'
 import { Cell, ContextCard, MoreDrawer, type Verb } from './card-parts'
-
-const logger = createLogger('ConcisePassCard')
 
 export function PassCard() {
   const { t } = useTranslation()
@@ -82,7 +82,7 @@ export function PassCard() {
       </Cell>
       <Cell title={t('editor.concise.pass.note')} span={2} className="@3xl:col-span-1">
         {projectId ? (
-          <NotesCell projectId={projectId} />
+          <NotesCell />
         ) : (
           <p className="text-xs text-muted-foreground">{t('editor.concise.pass.noProject')}</p>
         )}
@@ -188,54 +188,20 @@ function ChangesCell({ isDirty, onSave }: { isDirty: boolean; onSave: () => void
   )
 }
 
-function NotesCell({ projectId }: { projectId: string }) {
+function NotesCell() {
   const { t } = useTranslation()
-  const [notes, setNotes] = useState<AgentNote[]>([])
+  const fps = useProjectFps()
+  const notes = useAgentNotesStore((s) => s.notes)
+  const failed = useAgentNotesStore((s) => s.failed)
   const [draft, setDraft] = useState('')
-  const [failed, setFailed] = useState(false)
-
-  useEffect(() => {
-    let cancelled = false
-    setNotes([])
-    readAgentNotes(projectId)
-      .then((stored) => {
-        if (!cancelled) setNotes(stored.notes)
-      })
-      .catch((error) => logger.warn('Reading agent notes failed', error))
-    return () => {
-      cancelled = true
-    }
-  }, [projectId])
-
-  /** Re-read the file, apply one change and write it back, so the agent's marks survive. */
-  const update = async (change: (current: AgentNote[]) => AgentNote[]) => {
-    try {
-      const stored = await readAgentNotes(projectId)
-      const next = { version: 1 as const, notes: change(stored.notes) }
-      await writeAgentNotes(projectId, next)
-      setNotes(next.notes)
-      setFailed(false)
-      return true
-    } catch (error) {
-      logger.warn('Saving agent notes failed', error)
-      setFailed(true)
-      return false
-    }
-  }
+  const open = useMemo(() => openAgentNotes(notes), [notes])
 
   const send = async () => {
     const text = draft.trim()
     if (!text) return
-    const note: AgentNote = {
-      id: crypto.randomUUID(),
-      text,
-      createdAt: new Date().toISOString(),
-      status: 'open',
-    }
-    if (await update((current) => [...current, note])) setDraft('')
+    if (await useAgentNotesStore.getState().add({ text })) setDraft('')
   }
 
-  const open = notes.filter((note) => note.status === 'open')
   return (
     <div className="space-y-2">
       <div className="flex items-end gap-1.5">
@@ -266,14 +232,25 @@ function NotesCell({ projectId }: { projectId: string }) {
           {open.map((note) => (
             <li
               key={note.id}
-              className="flex items-start gap-1 rounded-md bg-secondary/50 px-2 py-1 text-xs"
+              className="flex items-start gap-1.5 rounded-md bg-secondary/50 px-2 py-1 text-xs"
             >
+              {note.frame !== undefined && (
+                <button
+                  type="button"
+                  className="shrink-0 rounded bg-amber-500/15 px-1 font-mono text-[10px] leading-4 text-amber-700 tabular-nums hover:bg-amber-500/25 dark:text-amber-400"
+                  onClick={() => usePlaybackStore.getState().setCurrentFrame(note.frame!)}
+                  aria-label={t('editor.concise.pass.goToNote')}
+                  data-tooltip={t('editor.concise.pass.goToNote')}
+                >
+                  {formatTimecodeCompact(note.frame, fps)}
+                </button>
+              )}
               <span className="min-w-0 flex-1 whitespace-pre-wrap break-words">{note.text}</span>
               <button
                 type="button"
                 className="shrink-0 text-muted-foreground hover:text-foreground"
                 aria-label={t('editor.concise.pass.removeNote')}
-                onClick={() => void update((current) => current.filter((n) => n.id !== note.id))}
+                onClick={() => void useAgentNotesStore.getState().remove(note.id)}
               >
                 <X className="h-3 w-3" />
               </button>

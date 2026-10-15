@@ -61,6 +61,7 @@ import { MicRecordControl } from './mic-record-control'
 import { isConciseWorkspace } from '@/config/editor-workspaces'
 import type { EditorSidebarTab } from '@/config/editor-workspaces'
 import { useMicRecordingStore } from '@/shared/state/mic-recording-store'
+import { AgentCommentButton } from './timeline-agent-comments'
 import { useConciseTimelineStore } from '../stores/concise-timeline-store'
 import { deleteSelectionFromStores, splitAtPlayhead } from '../utils/editing-commands'
 import { isMicRecordingSupported, startMicRecording } from '../services/mic-recording-controller'
@@ -1311,6 +1312,8 @@ const ConciseTimelineHeader = memo(function ConciseTimelineHeader({
       </ToggleToolButton>
 
       <ConciseAddMenu />
+
+      <AgentCommentButton btnSize={btnSize} />
 
       {isMicRecordingSupported() && (micStatus !== 'idle' || micError) ? (
         <MicRecordControl />

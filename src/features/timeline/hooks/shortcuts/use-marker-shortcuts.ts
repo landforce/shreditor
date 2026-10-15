@@ -1,5 +1,6 @@
 /**
- * Marker shortcuts: M (add), Shift+M (remove), [ ] (navigate).
+ * Marker shortcuts: M (add), Shift+M (remove), [ ] (navigate), and N (a
+ * comment for the agent at the playhead, in Concise).
  */
 
 import { useHotkeys } from 'react-hotkeys-hook'
@@ -9,6 +10,9 @@ import { useSelectionStore } from '@/shared/state/selection'
 import { HOTKEY_OPTIONS } from '@/config/hotkeys'
 import { addMarker, removeMarker } from '../../stores/actions/marker-actions'
 import { useResolvedHotkeys } from '@/features/timeline/deps/settings'
+import { startAgentComment } from '@/shared/state/agent-notes'
+import { useEditorStore } from '@/shared/state/editor'
+import { isConciseWorkspace } from '@/config/editor-workspaces'
 
 export function useMarkerShortcuts() {
   const hotkeys = useResolvedHotkeys()
@@ -22,6 +26,18 @@ export function useMarkerShortcuts() {
       event.preventDefault()
       const { previewFrame, currentFrame } = usePlaybackStore.getState()
       addMarker(previewFrame ?? currentFrame)
+    },
+    HOTKEY_OPTIONS,
+    [],
+  )
+
+  // N - Comment for the agent at the playhead (the composer lives in Concise)
+  useHotkeys(
+    hotkeys.COMMENT_FOR_AGENT,
+    (event) => {
+      if (!isConciseWorkspace(useEditorStore.getState().workspace)) return
+      event.preventDefault()
+      startAgentComment()
     },
     HOTKEY_OPTIONS,
     [],

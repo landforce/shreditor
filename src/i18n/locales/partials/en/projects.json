@@ -411,6 +411,7 @@
           "paste": "Paste items or keyframes",
           "addMarker": "Add marker at playhead",
           "removeMarker": "Remove selected marker",
+          "commentForAgent": "Comment for the agent at playhead",
           "previousMarker": "Jump to previous marker",
           "nextMarker": "Jump to next marker",
           "clearKeyframes": "Clear all keyframes from selected items",

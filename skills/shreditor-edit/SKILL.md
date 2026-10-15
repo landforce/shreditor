@@ -74,7 +74,9 @@ Every edit starts here; nothing is planned or cut until the format is agreed. A 
 
 ### 5. Iterate until done
 
-- When the user comes back: `shred sync <id>` (the editor saves what it holds), then `shred changes <id>` lists what they changed since your last pass. Those are decisions; build on them. Read their notes if any.
+- When the user comes back: `shred sync <id>` (the editor saves what it holds), then `shred changes <id>` lists what they changed since your last pass. Those are decisions; build on them.
+- `shred notes <id>` lists their open notes: comments pinned to a timecode on the timeline (Concise view: the comment button or N), each with what sits at that frame and what they had selected, plus general notes from the Pass card. When the user says "check my feedback" or "see my comments", this is where it is. Go to each frame (`shred frames`), act on it in the pass, and mark it done with `shred notes <id> --read <id,...>` (or `--read all`) once the pass that addresses it is published; the editor then clears its pin. Say in the hand-over which notes you acted on and any you didn't, and why.
+- While you wait for the user, `shred notes <id> --watch` (run under a monitor, it never exits) prints one line per note the moment they send it, so their comments reach you without them coming back to the chat. Let a few arrive before starting a pass unless one is urgent.
 - It lists markers (added, moved, relabelled) and in/out points too. Markers are often the user's notes to you: read each label and go to its frame.
 - The user may undo a whole pass with Cmd+Z: each pass is one undo step in the editor, named by its label. `shred changes` then says the pass was undone (its changes reverted) and lists anything they did after. Respect it: don't reapply that pass unless they ask; the next draft starts from the undone state.
 - Scope the next pass to what they asked. `shred draft <id> --label "..."` again (from their current state), apply, verify, `shred check`, publish with a new label, hand over, wait.

@@ -313,6 +313,10 @@ export const HOTKEY_EDITOR_SECTIONS: readonly HotkeyEditorSection[] = [
         labelKey: 'projects.settings.hotkeys.items.nextMarker',
         keys: ['NEXT_MARKER'],
       },
+      {
+        labelKey: 'projects.settings.hotkeys.items.commentForAgent',
+        keys: ['COMMENT_FOR_AGENT'],
+      },
     ],
   },
   {

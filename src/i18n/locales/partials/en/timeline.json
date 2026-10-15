@@ -266,6 +266,16 @@
       },
       "beatGrid": "Beat grid",
       "bpm": "{{bpm}} BPM",
+      "comment": {
+        "button": "Comment for the agent (N)",
+        "title": "Comment for the agent",
+        "placeholder": "What should change here?",
+        "selected_one": "{{count}} clip selected",
+        "selected_other": "{{count}} clips selected",
+        "hint": "⌘↵ to send",
+        "send": "Send",
+        "pin": "Comment: {{text}}"
+      },
       "compactTracks": "Compact track labels",
       "deleteSelected": "Delete selected",
       "fullTracks": "Full track headers",

@@ -91,6 +91,7 @@ export const HOTKEYS = {
   REMOVE_MARKER: 'shift+m',
   PREVIOUS_MARKER: 'bracketleft',
   NEXT_MARKER: 'bracketright',
+  COMMENT_FOR_AGENT: 'n',
 
   // Keyframes
   CLEAR_KEYFRAMES: 'shift+a',
@@ -384,6 +385,7 @@ export const HOTKEY_DESCRIPTIONS: Record<HotkeyKey, string> = {
   REMOVE_MARKER: 'Remove selected marker',
   PREVIOUS_MARKER: 'Jump to previous marker',
   NEXT_MARKER: 'Jump to next marker',
+  COMMENT_FOR_AGENT: 'Comment for the agent at the playhead (Concise)',
 
   // Keyframes
   CLEAR_KEYFRAMES: 'Clear all keyframes from selected items',

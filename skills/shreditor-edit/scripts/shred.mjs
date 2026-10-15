@@ -109,6 +109,11 @@
 //                                        project's thumbnail in the project list)
 //   shred thumbnail <id> [--at frame]    re-render the project's thumbnail
 //   shred changes <id>                   what the user changed since the last published pass
+//   shred notes <id> [--json]            the user's open notes: comments pinned to a timecode (with
+//                                        what sits at that frame and what they had selected) and
+//                                        general notes from the Pass card
+//   shred notes <id> --read <id,...|all> mark notes read once acted on (the editor clears them)
+//   shred notes <id> --watch             print each note as the user sends it (run it under a monitor)
 //   shred master <audio|video> [--lufs -14] [--tp -1.5] [--out file.wav]
 //                                        loudness-master to a new WAV (two-pass loudnorm)
 //   shred sync <id> [--timeout 20]       make the open editor save now, so the agent sees unsaved tweaks
@@ -166,6 +171,7 @@ import {
   readCubeFileHeader,
 } from '../../../headless/lib/luts.mjs'
 import { templatesCommand } from './templates.mjs'
+import { describeNote, markRead, openNotes } from './notes.mjs'
 import { createActivity } from './activity.mjs'
 import { draftPlanGate, planCheck, planCommands, printPlanCheck } from './plan.mjs'
 import { runBuild, gitHead, staleBuild } from '../../../server/install/build-state.mjs'
@@ -228,6 +234,8 @@ const { values: opt, positionals } = parseArgs({
     'markers-only': { type: 'boolean' },
     scaffold: { type: 'boolean' },
     'no-plan': { type: 'boolean' },
+    read: { type: 'string' },
+    watch: { type: 'boolean' },
   },
 })
 const [command, ...args] = positionals
@@ -513,6 +521,18 @@ const shreditorCli = (args) => {
 
 const key = (tag) => `${tag}-${crypto.randomUUID()}`
 const getProject = (id) => call('GET', `/v1/projects/${encodeURIComponent(id)}`)
+
+const notesFile = (id) => path.join(workspace(), 'projects', id, 'agent', 'notes.json')
+
+/** The project's notes (open and read); none when the file is missing or unreadable. */
+function readNotes(id) {
+  try {
+    const stored = JSON.parse(fs.readFileSync(notesFile(id), 'utf8'))
+    return Array.isArray(stored?.notes) ? stored.notes : []
+  } catch {
+    return []
+  }
+}
 
 /** Last frame any root item reaches (0 for an empty timeline). */
 const timelineEnd = (project) =>
@@ -1351,8 +1371,65 @@ const commands = {
       return say(JSON.stringify({ ...report, ...(editor ? { editor } : {}) }, null, 2))
     }
     for (const line of describeChangesSincePass(last, since)) say(line)
-    const notes = path.join(workspace(), 'projects', id, 'agent', 'notes.json')
-    if (fs.existsSync(notes)) say(`Notes from the user: ${notes}`)
+    const open = openNotes(readNotes(id)).length
+    if (open) say(`${open} open note${open === 1 ? '' : 's'} from the user: shred notes ${id}`)
+  },
+
+  async notes([id]) {
+    if (!id) throw new Error('Pass a project id: shred notes <id>')
+    if (opt.read) {
+      const stored = readNotes(id)
+      if (!stored.length) return say('No notes from the user.')
+      const { notes, marked, unknown } = markRead(stored, opt.read)
+      if (unknown.length)
+        throw new Error(`No note ${unknown.join(', ')} (shred notes ${id} lists them)`)
+      const file = notesFile(id)
+      fs.writeFileSync(`${file}.tmp`, `${JSON.stringify({ version: 1, notes }, null, 2)}\n`)
+      fs.renameSync(`${file}.tmp`, file)
+      return say(`Marked ${marked} note${marked === 1 ? '' : 's'} read.`)
+    }
+    // Frames are read against the saved timeline; the user's unsaved tweaks need `shred sync`.
+    const context = async () => {
+      try {
+        const { project } = await getProject(id)
+        return { timeline: project.timeline, fps: project.metadata?.fps ?? 30 }
+      } catch {
+        return { timeline: null, fps: 30 }
+      }
+    }
+    if (opt.watch) {
+      const seen = new Set()
+      say(`Watching for the user's notes on ${id} (stop with Ctrl+C)`)
+      for (;;) {
+        const fresh = openNotes(readNotes(id)).filter((note) => !seen.has(note.id))
+        if (fresh.length) {
+          const { timeline, fps } = await context()
+          for (const note of fresh) {
+            seen.add(note.id)
+            say(
+              `note ${describeNote(note, timeline, fps)
+                .map((l) => l.trim())
+                .join(' | ')}`,
+            )
+          }
+        }
+        await new Promise((resolve) => setTimeout(resolve, 2000))
+      }
+    }
+    const open = openNotes(readNotes(id))
+    if (opt.json) {
+      const { timeline, fps } = await context()
+      return say(JSON.stringify({ fps, notes: open, hasTimeline: Boolean(timeline) }, null, 2))
+    }
+    if (!open.length) return say('No open notes from the user.')
+    const { timeline, fps } = await context()
+    say(`${open.length} open note${open.length === 1 ? '' : 's'} from the user`)
+    for (const note of open) {
+      say()
+      for (const line of describeNote(note, timeline, fps)) say(line)
+    }
+    say()
+    say(`Once acted on: shred notes ${id} --read <id,...> (or --read all)`)
   },
 
   async start() {

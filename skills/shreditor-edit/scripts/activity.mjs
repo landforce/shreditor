@@ -23,7 +23,16 @@ const RELEASED_NOTE =
   'Note: the user chose to edit the project themselves ("Edit anyway" in the editor); shred publish will refuse this draft. Take a new draft from their state when you are ready.'
 
 // Commands that manage the pass themselves, or never touch a project.
-const SELF_MANAGED = new Set(['draft', 'done', 'publish', 'status', 'up', 'start', 'setup'])
+const SELF_MANAGED = new Set([
+  'draft',
+  'done',
+  'publish',
+  'status',
+  'up',
+  'start',
+  'setup',
+  'notes',
+])
 
 const ownsDraft = (record, draftId) => !draftId || !record.draftId || record.draftId === draftId
 const ago = (iso, now) => `${Math.max(0, Math.round((now - Date.parse(iso)) / 60_000))}m ago`

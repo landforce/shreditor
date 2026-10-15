@@ -27,6 +27,7 @@
         "notePlaceholder": "Tell the agent what to change",
         "sendNote": "Leave note",
         "removeNote": "Remove note",
+        "goToNote": "Go to this moment",
         "noteFailed": "Couldn't save the note. Try again."
       },
       "shot": {
