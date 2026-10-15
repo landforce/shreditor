@@ -1,6 +1,7 @@
-// `shred templates`: the workspace's motion graphics template library
+// `shred motion library|show|save|clone|export|import`: the workspace's motion
+// graphics template library
 // (<workspace>/app/templates/<id>/). A template has one variant per aspect ratio
-// (9:16, 16:9, ...). list, show, save (a project's composition becomes the variant
+// (9:16, 16:9, ...). library, show, save (a project's composition becomes the variant
 // for its aspect), clone (a new aspect's variant from an existing one), export (a
 // template pack: template.json, thumbnails and the media it uses) and import
 // (brings the media in through the normal import path).
@@ -109,7 +110,7 @@ const summary = (template) => ({
 })
 
 function show(ctx, ref) {
-  if (!ref) throw new Error('Usage: shred templates show <name|id>')
+  if (!ref) throw new Error('Usage: shred motion show <name|id>')
   const { template, dir, thumbnails } = resolveTemplate(ctx.workspace, ref)
   const missing = new Set(
     missingTemplateMedia(template, workspaceHas(ctx.workspace)).map((m) => m.mediaId),
@@ -167,7 +168,7 @@ async function renderThumbnail(ctx, template, aspect) {
 async function save(ctx, projectId, ref) {
   if (!projectId || !ref)
     throw new Error(
-      'Usage: shred templates save <projectId> <compositionItemId|compositionId> --name "..." --category <c> [--role r] [--hold <frame|start-end|none>]',
+      'Usage: shred motion save <projectId> <compositionItemId|compositionId> --name "..." --category <c> [--role r] [--hold <frame|start-end|none>]',
     )
   await ctx.warnUnsaved(projectId)
   const { project } = await ctx.getProject(projectId)
@@ -222,7 +223,7 @@ function cloneCanvas(ctx, template, aspect, from) {
 async function clone(ctx, ref) {
   if (!ref || !ctx.opt.aspect)
     throw new Error(
-      'Usage: shred templates clone <name|id> --aspect <9:16|16:9|1:1|4:5|W:H> [--from <aspect>] [--size WxH]',
+      'Usage: shred motion clone <name|id> --aspect <9:16|16:9|1:1|4:5|W:H> [--from <aspect>] [--size WxH]',
     )
   const { template } = resolveTemplate(ctx.workspace, ref)
   const aspect = parseAspect(ctx.opt.aspect)
@@ -244,7 +245,7 @@ async function clone(ctx, ref) {
   ctx.say(`versions ${templateAspects(result.template).join(', ')}`)
   ctx.say(`folder   ${dir}`)
   ctx.say(
-    `next     addTemplate "${template.name}" in a ${aspect} project, adjust its composition with the usual ops, then shred templates save <projectId> <instanceId>`,
+    `next     addTemplate "${template.name}" in a ${aspect} project, adjust its composition with the usual ops, then shred motion save <projectId> <instanceId>`,
   )
 }
 
@@ -279,7 +280,7 @@ function writePack(ctx, entry, packDir) {
 
 function exportPack(ctx, ref) {
   if (!ref || !ctx.opt.out)
-    throw new Error('Usage: shred templates export <name|id> --out <dir|file.zip>')
+    throw new Error('Usage: shred motion export <name|id> --out <dir|file.zip>')
   const entry = resolveTemplate(ctx.workspace, ref)
   const out = path.resolve(ctx.opt.out)
   const slug = slugOf(entry.template.name)
@@ -396,7 +397,7 @@ function extractZip(ctx, file) {
 }
 
 async function importPack(ctx, source) {
-  if (!source) throw new Error('Usage: shred templates import <dir|file.zip>')
+  if (!source) throw new Error('Usage: shred motion import <dir|file.zip>')
   const full = path.resolve(source)
   if (!fs.existsSync(full)) throw new Error(`${full} does not exist`)
   const zipped = full.endsWith('.zip')
@@ -421,9 +422,15 @@ const SUBCOMMANDS = {
   import: (ctx, [source]) => importPack(ctx, source),
 }
 
-export async function templatesCommand([sub = 'list', ...rest], ctx) {
-  const run = Object.hasOwn(SUBCOMMANDS, sub) ? SUBCOMMANDS[sub] : null
+/** The library commands `shred motion` takes (`library` lists it). */
+export const LIBRARY_COMMANDS = ['library', 'show', 'save', 'clone', 'export', 'import']
+
+export async function templatesCommand([sub = 'library', ...rest], ctx) {
+  const name = sub === 'library' ? 'list' : sub
+  const run = Object.hasOwn(SUBCOMMANDS, name) ? SUBCOMMANDS[name] : null
   if (!run)
-    throw new Error(`Unknown templates command "${sub}" (list, show, save, clone, export, import)`)
+    throw new Error(
+      `Unknown motion library command "${sub}" (${LIBRARY_COMMANDS.join(', ')})`,
+    )
   return run(ctx, rest)
 }

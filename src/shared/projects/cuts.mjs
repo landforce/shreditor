@@ -157,7 +157,7 @@ const itemName = (item) =>
  * The timeline re-fitted for another canvas (docs/cuts.md, Creating a cut):
  * full-bleed video and images cover the new canvas; everything else keeps its
  * nearest frame edge or the centre and scales by the short side (as
- * `shred templates clone` does). `mediaSize(mediaId)` gives a media's
+ * `shred motion clone` does). `mediaSize(mediaId)` gives a media's
  * `{ width, height }` (for items with no transform). Returns the timeline,
  * the ids made to cover and what needs a look, by reason.
  */

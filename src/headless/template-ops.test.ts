@@ -197,7 +197,7 @@ describe('motion template ops', () => {
         ops: [{ op: 'addTemplate', template: 'Lower third' }] as unknown as EditOp[],
       }),
     ).rejects.toThrow(
-      '"Lower third" has no 9:16 version (it has 16:9). Make one with: shred templates clone "Lower third" --aspect 9:16',
+      '"Lower third" has no 9:16 version (it has 16:9). Make one with: shred motion clone "Lower third" --aspect 9:16',
     )
   })
 

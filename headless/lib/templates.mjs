@@ -1,7 +1,7 @@
 // The motion template library on disk: <workspace>/app/templates/<id>/template.json
 // (+ one thumbnail per aspect ratio variant). Read by the edit service
 // (addTemplate/updateTemplate ops get the templates they name in their edit
-// input) and written by `shred templates`. The file format and the build logic
+// input) and written by `shred motion`. The file format and the build logic
 // live in src/shared/motion-templates.
 import crypto from 'node:crypto'
 import fs from 'node:fs'
@@ -87,7 +87,7 @@ export function resolveTemplate(workspace, ref) {
     throw new HttpError(
       404,
       'TEMPLATE_NOT_FOUND',
-      `No template "${ref}" in ${templatesRoot(workspace)}. ${names ? `Templates: ${names}` : 'The library is empty'} (shred templates list)`,
+      `No template "${ref}" in ${templatesRoot(workspace)}. ${names ? `Templates: ${names}` : 'The library is empty'} (shred motion library)`,
     )
   }
   return entries.find((entry) => entry.template.id === found.id)
@@ -105,7 +105,7 @@ function assertTemplateMedia(template, hasMedia) {
   throw new HttpError(
     409,
     'TEMPLATE_MEDIA_MISSING',
-    `Template "${template.name}" uses media this workspace does not have: ${files}. Import its template pack (shred templates import) or import those files again.`,
+    `Template "${template.name}" uses media this workspace does not have: ${files}. Import its template pack (shred motion import) or import those files again.`,
   )
 }
 

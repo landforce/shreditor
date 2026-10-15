@@ -34,7 +34,7 @@ const REVIEW_TEXT = {
   keyframed: 'has keyframes: check the motion on the new canvas',
   reanchored: 'kept its nearest edge and scaled by the short side: check its place',
   template:
-    'a template instance: its composition is still the old aspect (shred templates clone --aspect, then updateTemplate)',
+    'a template instance: its composition is still the old aspect (shred motion clone --aspect, then updateTemplate)',
   compound: 'a compound clip: its composition keeps the old canvas inside',
 }
 

@@ -511,7 +511,7 @@ function missingVariantMessage(template, aspect) {
   const have = templateAspects(template).join(', ')
   return (
     `"${template.name}" has no ${aspect} version (it has ${have}). ` +
-    `Make one with: shred templates clone "${template.name}" --aspect ${aspect}`
+    `Make one with: shred motion clone "${template.name}" --aspect ${aspect}`
   )
 }
 

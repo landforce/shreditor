@@ -344,7 +344,7 @@ describe('template variants', () => {
     })
     expect(templateVariant(template, '16:9')).toBeNull()
     expect(() => chooseTemplateVariant(template, { width: 1920, height: 1080 })).toThrow(
-      '"Old" has no 16:9 version (it has 9:16). Make one with: shred templates clone "Old" --aspect 16:9',
+      '"Old" has no 16:9 version (it has 9:16). Make one with: shred motion clone "Old" --aspect 16:9',
     )
   })
 })

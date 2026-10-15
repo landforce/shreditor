@@ -155,19 +155,19 @@
 //   shred motion list <id>               the motion graphics on a timeline, with their folders
 //   shred motion vars <id> <clipId> [--json]   a motion clip's controls (declared variables) and the
 //                                        values its render used; a swap keeps them unless --variables changes them
-//   shred templates list [--category c] [--json]   the motion graphics template library: name,
+//   shred motion library [--category c] [--json]   the motion graphics template library: name,
 //                                        category, size, duration, controls (with defaults)
-//   shred templates show <name|id>       one template: controls, media, folder, thumbnail
-//   shred templates save <projectId> <compositionItemId|compositionId> --name "..." --category <c> [--role r]
-//                     [--hold <frame|start-end|none>]
+//   shred motion show <name|id>          one template: controls, media, folder, thumbnail
+//   shred motion save <projectId> <compositionItemId|compositionId> --name "..." --category <c> [--role r]
+//                  [--hold <frame|start-end|none>]
 //                                        save a composition as the template variant for its aspect ratio
 //                                        (a copy of a template, or the same name = new version); --hold is
 //                                        where a longer instance freezes between its in and out animation
-//   shred templates clone <name|id> --aspect 16:9 [--from 9:16] [--size WxH]
+//   shred motion clone <name|id> --aspect 16:9 [--from 9:16] [--size WxH]
 //                                        make another aspect ratio's version from an existing one (items
 //                                        keep their nearest edge, sizes follow the short side) to adjust
-//   shred templates export <name|id> --out <dir|file.zip>   a template pack (template, thumbnails, media)
-//   shred templates import <dir|file.zip>   add a pack's templates; media comes in through import
+//   shred motion export <name|id> --out <dir|file.zip>   a template pack (template, thumbnails, media)
+//   shred motion import <dir|file.zip>   add a pack's templates; media comes in through import
 //   shred export <id> [--native|--browser] [--codec h264|hevc|prores] [--quality low|medium|high|ultra] [--out name]
 //                                        final export to <workspace>/projects/<id>/exports/; default: native
 //                                        (ffmpeg from the originals) when the plan allows it, else browser
@@ -223,7 +223,7 @@ import {
   listLutNames,
   readCubeFileHeader,
 } from '../../../headless/lib/luts.mjs'
-import { templatesCommand } from './templates.mjs'
+import { LIBRARY_COMMANDS, templatesCommand } from './templates.mjs'
 import { motionCommands } from './motion.mjs'
 import { describeNote, markRead, markSeen, noteSpan, openNotes } from './notes.mjs'
 import { createActivity } from './activity.mjs'
@@ -1794,6 +1794,7 @@ const commands = {
   },
 
   async motion([sub, ...rest]) {
+    if (LIBRARY_COMMANDS.includes(sub)) return commands.templates([sub, ...rest], { quiet: true })
     const run = motionCommands({
       say,
       opt,
@@ -1803,7 +1804,7 @@ const commands = {
       baseProjectId,
       importFile: (file, projectId) => importOne(file, projectId, 'overlay', { transcribe: false }),
     })[sub]
-    if (!run) throw new Error('Usage: shred motion new|add|render|list|vars (see shred help)')
+    if (!run) throw new Error('Usage: shred motion new|add|render|list|vars, or the library: library|show|save|clone|export|import (see shred help)')
     await run(rest)
   },
 
@@ -1819,7 +1820,17 @@ const commands = {
     })
   },
 
-  async templates(rest) {
+  // The old name for `shred motion library|show|save|...`, kept so older skill
+  // copies still work.
+  async templates(rest, { quiet = false } = {}) {
+    if (!quiet) {
+      const [sub = 'list', ...more] = rest
+      const now = sub === 'list' ? 'library' : sub
+      process.stderr.write(
+        `shred templates is now shred motion ${now}${more.length ? ' ...' : ''} (edit templates are shred template)\n`,
+      )
+      rest = [now, ...more]
+    }
     await templatesCommand(rest, {
       opt,
       say,

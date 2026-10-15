@@ -2,7 +2,7 @@
  * The workspace's motion graphics template library:
  * `app/templates/<id>/template.json` plus one thumbnail per aspect ratio
  * variant, one folder per template, shared by every project in the workspace
- * and by the agent (`shred templates`). The file format lives in
+ * and by the agent (`shred motion`). The file format lives in
  * `src/shared/motion-templates/template-core.mjs`.
  *
  * Each template is its own file and a save re-reads that file's version from

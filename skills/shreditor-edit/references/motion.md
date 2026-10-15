@@ -56,7 +56,7 @@ Read the animation skills only for a bespoke piece.
 
    The swap keeps the clip's track and start, and what the user set on it: position and scale, crop, fades, effects, blend mode, keyframes. It notes what it can't keep (a trimmed head plays again; linked position/scale keyframes need setting again) and a change of length. A longer render that would run into the next clip on the track fails before anything changes. `--item` takes only clips `shred motion` placed (`--force` for another clip). A swap from the same composition keeps the values the clip rendered with, so `--variables` names only what changes; `shred motion vars <id> <clipId>` shows a clip's controls and current values. `shred motion list <id>` shows the motion clips with their folders. `shred motion render <folder> [--fps 30]` renders without touching a timeline.
 
-9. **Reuse it.** A graphic the user likes can become a library template: put the clip in a composition (`createComposition`) and `shred templates save` it (`references/engine.md`, Motion graphics templates). The template holds the rendered clip, so its HyperFrames variables aren't its controls: for another version, re-render from the original folder (`projects/<id>/motion/<slug>/`, or copy that folder into the new project's `motion/`).
+9. **Reuse it.** A graphic the user likes can become a library template: put the clip in a composition (`createComposition`) and `shred motion save` it (`references/engine.md`, Motion graphics templates). The template holds the rendered clip, so its HyperFrames variables aren't its controls: for another version, re-render from the original folder (`projects/<id>/motion/<slug>/`, or copy that folder into the new project's `motion/`).
 
 ## From the prompt library
 

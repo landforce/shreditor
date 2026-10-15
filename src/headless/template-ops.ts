@@ -61,7 +61,7 @@ function requireTemplate(ref: unknown): MotionTemplate {
   if (!name) throw new Error('template is required (a template name or id)')
   const template = findMotionTemplate(inputTemplates, name)
   if (!template)
-    throw new Error(`template: "${name}" was not passed in by the service (shred templates list)`)
+    throw new Error(`template: "${name}" was not passed in by the service (shred motion library)`)
   return template
 }
 

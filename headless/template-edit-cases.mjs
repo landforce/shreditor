@@ -99,7 +99,7 @@ export function templateCases({ item, edit, baseProject }) {
             undefined,
             [template],
           ),
-          /has no 9:16 version \(it has 16:9\)\. Make one with: shred templates clone "Lower third" --aspect 9:16/,
+          /has no 9:16 version \(it has 16:9\)\. Make one with: shred motion clone "Lower third" --aspect 9:16/,
         )
         return baseProject()
       },

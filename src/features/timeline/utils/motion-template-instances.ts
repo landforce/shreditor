@@ -242,7 +242,7 @@ export function resolveInstanceDuration(
   if (requested > composition.durationInFrames && !composition.templateHold) {
     throw new Error(
       `durationInFrames ${requested} is longer than "${composition.name}" (${composition.durationInFrames} frames) and the template has no hold. ` +
-        'Set one (shred templates save ... --hold <frame>, or Hold in Save as Template) so a longer instance animates in, holds, then animates out',
+        'Set one (shred motion save ... --hold <frame>, or Hold in Save as Template) so a longer instance animates in, holds, then animates out',
     )
   }
   return requested
