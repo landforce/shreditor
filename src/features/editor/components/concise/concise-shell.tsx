@@ -29,7 +29,6 @@ type PreviewProject = React.ComponentProps<typeof PreviewArea>['project']
 
 interface ConciseShellProps {
   project: PreviewProject
-  onSave: () => void
 }
 
 function rowPercent(rowHeight: number, shellHeight: number): number {
@@ -42,7 +41,7 @@ function rowPercent(rowHeight: number, shellHeight: number): number {
  * preview and the agent context panel sit above a full-width timeline; below
  * 1100px the media bin collapses into a strip under the timeline.
  */
-export const ConciseShell = memo(function ConciseShell({ project, onSave }: ConciseShellProps) {
+export const ConciseShell = memo(function ConciseShell({ project }: ConciseShellProps) {
   const { t } = useTranslation()
   const rootRef = useRef<HTMLDivElement>(null)
   const [size, setSize] = useState({ width: 0, height: 0 })
@@ -50,8 +49,6 @@ export const ConciseShell = memo(function ConciseShell({ project, onSave }: Conc
   const setLeftSidebarOpen = useEditorStore((s) => s.setLeftSidebarOpen)
   const activeTab = useEditorStore((s) => s.activeTab)
   const sidebarWidth = useEditorStore((s) => s.sidebarWidth)
-  const onSaveRef = useRef(onSave)
-  onSaveRef.current = onSave
 
   useLayoutEffect(() => {
     const element = rootRef.current
@@ -73,12 +70,6 @@ export const ConciseShell = memo(function ConciseShell({ project, onSave }: Conc
   useEffect(() => {
     setLeftSidebarOpen(false)
   }, [setLeftSidebarOpen])
-
-  useEffect(() => {
-    const handleSave = () => onSaveRef.current()
-    window.addEventListener('shreditor:save-project', handleSave)
-    return () => window.removeEventListener('shreditor:save-project', handleSave)
-  }, [])
 
   const narrow = size.width < NARROW_BREAKPOINT
   const previewWidth = narrow ? NARROW_PREVIEW_WIDTH : WIDE_PREVIEW_WIDTH

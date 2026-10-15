@@ -13,6 +13,13 @@ import {
   Trash2,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuTrigger,
+} from '@/components/ui/context-menu'
 import { Popover, PopoverAnchor, PopoverContent } from '@/components/ui/popover'
 import { Textarea } from '@/components/ui/textarea'
 import { noteAnchorFor, resolveNoteSpan } from '@/shared/projects/note-anchor.mjs'
@@ -27,6 +34,7 @@ import { useSelectionStore } from '@/shared/state/selection'
 import { formatTimecodeCompact } from '@/shared/utils/time-utils'
 import { cn } from '@/shared/ui/cn'
 import { useTimelineCommittedZoomContext } from '../contexts/timeline-zoom-context'
+import { AddAgentNoteMenuItem } from './timeline-agent-comments'
 import {
   MAX_CARD_PX,
   MAX_PILL_PX,
@@ -237,6 +245,8 @@ export const TimelineNotesLane = memo(function TimelineNotesLane() {
   const { frameToPixels, pixelsToFrame } = useTimelineCommittedZoomContext()
   const laneRef = useRef<HTMLDivElement>(null)
   const [activeId, setActiveId] = useState<string | null>(null)
+  // The note a context menu was opened on (null: the empty tray).
+  const [menuNoteId, setMenuNoteId] = useState<string | null>(null)
   const [dragSpan, setDragSpan] = useState<{ start: number; end: number } | null>(null)
 
   const placed = useMemo(
@@ -299,68 +309,131 @@ export const TimelineNotesLane = memo(function TimelineNotesLane() {
     useAgentNotesStore.getState().openComposer(frame, useSelectionStore.getState().selectedItemIds)
   }
 
+  const openNote = (entry: PlacedNote) => {
+    usePlaybackStore.getState().setCurrentFrame(entry.span.frame)
+    setActiveId(entry.note.id)
+  }
+  const menuEntry = placed.find((entry) => entry.note.id === menuNoteId) ?? null
+
   return (
-    <div
-      ref={laneRef}
-      className="absolute inset-0 cursor-crosshair"
-      onMouseDown={onLaneMouseDown}
-      onDoubleClick={onLaneDoubleClick}
-      onClick={(event) => event.stopPropagation()}
-    >
-      {placed.map((entry) => (
-        <NoteBlock
-          key={entry.note.id}
-          entry={entry}
-          fps={fps}
-          tray={tray}
-          onOpen={() => {
-            usePlaybackStore.getState().setCurrentFrame(entry.span.frame)
-            setActiveId(entry.note.id)
-          }}
-        />
-      ))}
-
-      {dragSpan && (
+    <ContextMenu modal={false} onOpenChange={(open) => !open && setMenuNoteId(null)}>
+      <ContextMenuTrigger asChild>
         <div
-          className="pointer-events-none absolute inset-y-0.5 rounded-sm border border-amber-500 bg-amber-500/20"
-          style={{
-            left: frameToPixels(Math.min(dragSpan.start, dragSpan.end)),
-            width: Math.max(2, frameToPixels(Math.abs(dragSpan.end - dragSpan.start))),
+          ref={laneRef}
+          className="absolute inset-0 cursor-crosshair"
+          onMouseDown={onLaneMouseDown}
+          onDoubleClick={onLaneDoubleClick}
+          onClick={(event) => event.stopPropagation()}
+          onContextMenu={(event) => {
+            event.stopPropagation()
+            if (event.target === event.currentTarget) setMenuNoteId(null)
           }}
-        />
-      )}
-
-      {active && (
-        <Popover open onOpenChange={(open) => !open && setActiveId(null)}>
-          <PopoverAnchor asChild>
-            <span className="absolute inset-y-0 w-px" style={{ left: active.left }} />
-          </PopoverAnchor>
-          <PopoverContent align="start" className="w-72 space-y-2 p-2 text-xs">
-            <NoteDetails entry={active} fps={fps} onClose={() => setActiveId(null)} />
-          </PopoverContent>
-        </Popover>
-      )}
-
-      {composer && (
-        <Popover
-          open
-          onOpenChange={(open) => !open && useAgentNotesStore.getState().closeComposer()}
         >
-          <PopoverAnchor asChild>
-            <span
-              className="absolute inset-y-0 w-px"
-              style={{ left: frameToPixels(composer.frame) }}
+          {placed.map((entry) => (
+            <NoteBlock
+              key={entry.note.id}
+              entry={entry}
+              fps={fps}
+              tray={tray}
+              onOpen={() => openNote(entry)}
+              onMenu={() => setMenuNoteId(entry.note.id)}
             />
-          </PopoverAnchor>
-          <PopoverContent align="start" className="w-80 space-y-2 p-2">
-            <NoteComposer fps={fps} />
-          </PopoverContent>
-        </Popover>
-      )}
-      <span className="sr-only">{t('timeline.notes.laneHint')}</span>
-    </div>
+          ))}
+
+          {dragSpan && (
+            <div
+              className="pointer-events-none absolute inset-y-0.5 rounded-sm border border-amber-500 bg-amber-500/20"
+              style={{
+                left: frameToPixels(Math.min(dragSpan.start, dragSpan.end)),
+                width: Math.max(2, frameToPixels(Math.abs(dragSpan.end - dragSpan.start))),
+              }}
+            />
+          )}
+
+          {active && (
+            <Popover open onOpenChange={(open) => !open && setActiveId(null)}>
+              <PopoverAnchor asChild>
+                <span className="absolute inset-y-0 w-px" style={{ left: active.left }} />
+              </PopoverAnchor>
+              <PopoverContent align="start" className="w-72 space-y-2 p-2 text-xs">
+                <NoteDetails entry={active} fps={fps} onClose={() => setActiveId(null)} />
+              </PopoverContent>
+            </Popover>
+          )}
+
+          {composer && (
+            <Popover
+              open
+              onOpenChange={(open) => !open && useAgentNotesStore.getState().closeComposer()}
+            >
+              <PopoverAnchor asChild>
+                <span
+                  className="absolute inset-y-0 w-px"
+                  style={{ left: frameToPixels(composer.frame) }}
+                />
+              </PopoverAnchor>
+              <PopoverContent
+                align="start"
+                className="w-80 space-y-2 p-2"
+                // A context menu hands focus back as it closes; that must not close
+                // the composer it just opened. Escape, a click outside or Send do.
+                onFocusOutside={(event) => event.preventDefault()}
+              >
+                <NoteComposer fps={fps} />
+              </PopoverContent>
+            </Popover>
+          )}
+          <span className="sr-only">{t('timeline.notes.laneHint')}</span>
+        </div>
+      </ContextMenuTrigger>
+      <NotesTrayMenu entry={menuEntry} onOpen={openNote} />
+    </ContextMenu>
   )
 })
+
+/** The tray's context menu: add a note, then (on a note) open, done or reopen, delete. */
+function NotesTrayMenu({
+  entry,
+  onOpen,
+}: {
+  entry: PlacedNote | null
+  onOpen: (entry: PlacedNote) => void
+}) {
+  const { t } = useTranslation()
+  const store = useAgentNotesStore.getState()
+  return (
+    <ContextMenuContent data-testid="notes-tray-menu">
+      <AddAgentNoteMenuItem />
+      {entry && (
+        <>
+          <ContextMenuItem onSelect={() => onOpen(entry)}>
+            <MessageSquare className="h-4 w-4" />
+            {t('timeline.notes.open')}
+          </ContextMenuItem>
+          {entry.done ? (
+            <ContextMenuItem onSelect={() => void store.reopen(entry.note.id)}>
+              <RotateCcw className="h-4 w-4" />
+              {t('timeline.notes.reopen')}
+            </ContextMenuItem>
+          ) : (
+            <ContextMenuItem onSelect={() => void store.markDone(entry.note.id)}>
+              <Check className="h-4 w-4" />
+              {t('timeline.notes.markDone')}
+            </ContextMenuItem>
+          )}
+          <ContextMenuSeparator />
+          <ContextMenuItem
+            className="text-destructive"
+            onSelect={() => void store.remove(entry.note.id)}
+          >
+            <Trash2 className="h-4 w-4" />
+            {t('timeline.notes.delete')}
+          </ContextMenuItem>
+        </>
+      )}
+    </ContextMenuContent>
+  )
+}
 
 /** A note block's look: open amber, done greyed; a dashed edge when its moment moved off its clip. */
 function noteBlockClass({ done, span }: PlacedNote, tray: boolean): string {
@@ -428,11 +501,13 @@ const NoteBlock = memo(function NoteBlock({
   fps,
   tray,
   onOpen,
+  onMenu,
 }: {
   entry: PlacedNote
   fps: number
   tray: boolean
   onOpen: () => void
+  onMenu: () => void
 }) {
   const { t } = useTranslation()
   const { note, span, left, width, done } = entry
@@ -449,6 +524,7 @@ const NoteBlock = memo(function NoteBlock({
         event.stopPropagation()
         onOpen()
       }}
+      onContextMenu={onMenu}
       aria-label={t(done ? 'timeline.notes.doneNote' : 'timeline.notes.openNote', {
         time: formatTimecodeCompact(span.frame, fps),
         text: note.text,
@@ -578,6 +654,12 @@ function NoteComposer({ fps }: { fps: number }) {
   const composer = useAgentNotesStore((s) => s.composer)
   const failed = useAgentNotesStore((s) => s.failed)
   const [draft, setDraft] = useState('')
+  const inputRef = useRef<HTMLTextAreaElement>(null)
+  // Opened from a context menu, the menu takes focus back as it closes: take it again.
+  useEffect(() => {
+    const timer = window.setTimeout(() => inputRef.current?.focus(), 120)
+    return () => window.clearTimeout(timer)
+  }, [])
   if (!composer) return null
 
   const send = async () => {
@@ -610,6 +692,7 @@ function NoteComposer({ fps }: { fps: number }) {
         )}
       </div>
       <Textarea
+        ref={inputRef}
         autoFocus
         value={draft}
         onChange={(event) => setDraft(event.target.value)}

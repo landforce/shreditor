@@ -172,4 +172,30 @@ describe('Notes lane', () => {
     fireEvent.click(screen.getByTestId('timeline-notes-fold'))
     expect(header.style.height).toBe('64px')
   })
+
+  it('right-click on a note: add a note first, then open, mark done and delete', async () => {
+    await loadNotes([note('n1', { frame: 30 })])
+    render(<TimelineNotesLane />)
+    fireEvent.contextMenu(screen.getByTestId('timeline-note-open'), { clientX: 120, clientY: 10 })
+    const items = await screen.findAllByRole('menuitem')
+    expect(items.map((item) => item.textContent)).toEqual([
+      'timeline.notes.addForAgent',
+      'timeline.notes.open',
+      'timeline.notes.markDone',
+      'timeline.notes.delete',
+    ])
+    fireEvent.click(items[2]!)
+    await vi.waitFor(() => expect(stored.notes[0]?.status).toBe('read'))
+  })
+
+  it('right-click on the empty tray offers only adding a note', async () => {
+    await loadNotes([note('n1', { frame: 30 })])
+    render(<TimelineNotesLane />)
+    fireEvent.contextMenu(screen.getByTestId('timeline-note-open').parentElement!, {
+      clientX: 900,
+      clientY: 10,
+    })
+    const items = await screen.findAllByRole('menuitem')
+    expect(items.map((item) => item.textContent)).toEqual(['timeline.notes.addForAgent'])
+  })
 })

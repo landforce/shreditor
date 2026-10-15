@@ -440,20 +440,12 @@ function hidesDefaultSidebarsFor(workspace: string): boolean {
 }
 
 /** The Concise workspace replaces the whole default editor body with its own shell. */
-function ConciseWorkspaceBody({
-  project,
-  onSave,
-  locked,
-}: {
-  project: EditorProject
-  onSave: () => Promise<void>
-  locked: boolean
-}) {
+function ConciseWorkspaceBody({ project, locked }: { project: EditorProject; locked: boolean }) {
   return (
     <InteractionLockRegion locked={locked} className="min-w-0 flex-1">
       <ErrorBoundary level="feature">
         <Suspense fallback={null}>
-          <LazyConciseShell project={project} onSave={onSave} />
+          <LazyConciseShell project={project} />
         </Suspense>
       </ErrorBoundary>
     </InteractionLockRegion>
@@ -943,11 +935,7 @@ export const LoadedEditor = memo(function LoadedEditor({
 
         {/* Right side: Preview/Properties + Timeline */}
         {isConciseWorkspace ? (
-          <ConciseWorkspaceBody
-            project={project}
-            onSave={handleSave}
-            locked={isMaskEditingActive}
-          />
+          <ConciseWorkspaceBody project={project} locked={isMaskEditingActive} />
         ) : isColorWorkspace ? (
           <ColorWorkspaceBody project={project} locked={isMaskEditingActive} />
         ) : (

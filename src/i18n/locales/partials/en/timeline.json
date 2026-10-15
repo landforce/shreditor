@@ -386,7 +386,9 @@
       "reopen": "Reopen",
       "markDone": "Mark done",
       "expand": "Open the Notes tray",
-      "collapse": "Fold the Notes tray"
+      "collapse": "Fold the Notes tray",
+      "addForAgent": "Add note for agent",
+      "open": "Open"
     }
   }
 }

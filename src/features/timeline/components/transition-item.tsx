@@ -36,6 +36,7 @@ import {
   type PreviewGeometry,
 } from '../utils/transition-preview-geometry'
 import { useLinkedEditPreviewStore } from '../stores/linked-edit-preview-store'
+import { AddAgentNoteMenuItem } from './timeline-agent-comments'
 
 interface TransitionItemProps {
   transition: Transition
@@ -768,6 +769,7 @@ export const TransitionItem = memo(function TransitionItem({
       </ContextMenuTrigger>
 
       <ContextMenuContent>
+        <AddAgentNoteMenuItem />
         <ContextMenuItem onClick={handleDelete} className="text-destructive">
           <Trash2 className="w-4 h-4 mr-2" />
           Remove Transition
