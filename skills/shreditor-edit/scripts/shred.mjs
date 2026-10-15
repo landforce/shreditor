@@ -108,6 +108,8 @@
 //                                        fonts.classic.stack.0 "TikTok Sans", preferences.punchIns.on false):
 //                                        checked, logged in its changelog, the project's kit:* styles follow.
 //                                        Only when the user asks. --force: a new key, a type change, or a drifted file
+//   shred kit detach <id>              stop following the kit (only when the user asks): the record goes,
+//                                        the project's kit:* styles stay
 //   shred publish <draftId> <targetId> --label "..." --summary <file.md>
 //                                        hand the finished draft to the user's project as one pass
 //                                        (the pass record carries the scorecard; refreshes the
@@ -201,8 +203,17 @@ import { createAutostart } from '../../../server/install/self-start.mjs'
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..')
 const SERVICE = process.env.SHRED_SERVICE || 'http://127.0.0.1:8787'
-const say = (line = '') => process.stdout.write(`${line}\n`)
-process.stdout.on('error', (e) => e.code === 'EPIPE' && process.exit(0))
+// When the reader goes away (`shred ... | head`), stop printing but finish the
+// command: exiting here would leave a half-applied change (styles written, the
+// kit record not).
+let stdoutClosed = false
+const say = (line = '') => {
+  if (!stdoutClosed) process.stdout.write(`${line}\n`)
+}
+process.stdout.on('error', (e) => {
+  if (e.code !== 'EPIPE') throw e
+  stdoutClosed = true
+})
 
 const { values: opt, positionals } = parseArgs({
   allowPositionals: true,
@@ -210,7 +221,11 @@ const { values: opt, positionals } = parseArgs({
   // and a kit value to its path (`kit set <id> titles.style.letterSpacing -2`).
   args: process.argv.slice(2).reduce((out, arg) => {
     if (/^-\d/.test(arg) && /^--(lufs|tp)$/.test(out.at(-1) ?? '')) out.push(`${out.pop()}=${arg}`)
-    else if (/^-\d/.test(arg) && process.argv[2] === 'kit' && /^[a-z][\w]*(\.[\w]+)+$/i.test(out.at(-1) ?? ''))
+    else if (
+      /^-\d/.test(arg) &&
+      process.argv[2] === 'kit' &&
+      /^[a-z][\w]*(\.[\w]+)+$/i.test(out.at(-1) ?? '')
+    )
       out.push(`${out.pop()}=${arg}`)
     else out.push(arg)
     return out
@@ -855,8 +870,11 @@ function printScorecard(card, project) {
   if (s.warn) say('WARNs are guidelines from videos that work, not quotas: look, then decide.')
 }
 
-/** Import one file into a project's media (waiting for a working copy); returns its media id. */
-function importOne(file, projectId, category) {
+/**
+ * Import one file into a project's media (waiting for a working copy); returns
+ * its media id. `transcribe: false` for files with no speech (rendered graphics).
+ */
+function importOne(file, projectId, category, { transcribe = true } = {}) {
   const out = execFileSync(
     process.execPath,
     [
@@ -867,6 +885,7 @@ function importOne(file, projectId, category) {
       projectId,
       '--category',
       category,
+      ...(transcribe ? [] : ['--no-transcribe']),
     ],
     {
       encoding: 'utf8',
@@ -1681,7 +1700,8 @@ const commands = {
       getProject,
       applyBatch,
       baseProjectId,
-      importFile: (file, projectId) => importOne(file, projectId, 'overlay'),
+      importFile: (file, projectId) =>
+        importOne(file, projectId, 'overlay', { transcribe: false }),
     })[sub]
     if (!run) throw new Error('Usage: shred motion new|add|render|list|vars (see shred help)')
     await run(rest)
@@ -1794,7 +1814,7 @@ const commands = {
 
   async kit([sub, ...rest]) {
     const run = kitCommands({ say, opt, workspace, getProject, applyBatch, call, key })[sub]
-    if (!run) throw new Error('Usage: shred kit apply|status|show|set|save-back (see shred help)')
+    if (!run) throw new Error('Usage: shred kit apply|status|show|set|detach|save-back (see shred help)')
     await run(rest)
   },
 

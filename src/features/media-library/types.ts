@@ -66,6 +66,8 @@ export interface MediaLibraryState {
   selectedMediaIds: string[]
   selectedCompositionIds: string[]
   searchQuery: string
+  /** Show motion renders a re-render replaced (hidden by default; see utils/motion-renders). */
+  showOlderRenders: boolean
   filterByType: 'video' | 'audio' | 'image' | 'lottie' | null
   sortBy: 'name' | 'date' | 'size'
   viewMode: 'grid' | 'list'
@@ -131,6 +133,7 @@ export interface MediaLibraryState {
 export interface MediaLibraryActions {
   // v3: Project context
   setCurrentProject: (projectId: string | null) => void
+  setShowOlderRenders: (show: boolean) => void
 
   // CRUD Operations (project-scoped in v3)
   loadMediaItems: () => Promise<void>

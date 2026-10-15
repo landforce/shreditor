@@ -167,3 +167,31 @@ test('kit set writes the kit, logs it, and restyles the project from it', async 
     /changed since it was applied/,
   )
 })
+
+test('kit detach clears the record and the applied copy', async (t) => {
+  const os = await import('node:os')
+  const path = await import('node:path')
+  const { kitCommands } = await import('../skills/shreditor-edit/scripts/kit.mjs')
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'shred-kit-detach-'))
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }))
+  const snapshot = path.join(root, 'projects', 'p1', 'agent', 'kit-applied.json')
+  fs.mkdirSync(path.dirname(snapshot), { recursive: true })
+  fs.writeFileSync(snapshot, '{}')
+  const calls = []
+  const commands = kitCommands({
+    say: () => {},
+    opt: {},
+    workspace: () => root,
+    getProject: async () => ({ project: { kit: { path: '/k/kit.json' } }, revision: 'r1' }),
+    applyBatch: async () => ({}),
+    call: async (...args) => calls.push(args),
+    key: (name) => name,
+  })
+  await commands.detach(['p1'])
+  assert.deepEqual(calls[0].slice(0, 3), [
+    'PATCH',
+    '/v1/projects/p1',
+    { updates: { kit: null }, expectedRevision: 'r1' },
+  ])
+  assert.equal(fs.existsSync(snapshot), false)
+})

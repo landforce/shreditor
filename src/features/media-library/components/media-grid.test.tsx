@@ -4,6 +4,7 @@ import type { MediaMetadata } from '@/types/storage'
 
 const storeState = vi.hoisted(() => ({
   isLoading: false,
+  mediaItems: [] as unknown[],
   selectedMediaIds: [] as string[],
   brokenMediaIds: [] as string[],
   deleteMedia: vi.fn(),
@@ -32,7 +33,12 @@ vi.mock('../stores/media-library-store', () => ({
 vi.mock('@/features/media-library/deps/timeline-stores', () => ({
   getMediaDeletionImpact: vi.fn(),
   removeProjectItems: vi.fn(),
-  useTimelineStore: { getState: () => ({}) },
+  useTimelineStore: Object.assign(
+    (selector: (state: { items: [] }) => unknown) => selector({ items: [] }),
+    { getState: () => ({}) },
+  ),
+  useCompositionsStore: (selector: (state: { mediaDependencyIds: string[] }) => unknown) =>
+    selector({ mediaDependencyIds: [] }),
 }))
 
 vi.mock('@/shared/state/editor', () => ({

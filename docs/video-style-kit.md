@@ -80,6 +80,10 @@ Positions are the kit's canvas: on a project of another aspect the position and 
 
 `shred kit set <id> <path> <value> [<path> <value>...] [--why "..."] [--force]`, only when the user asks, for kit values the editor has no control for (fonts, preferences, rules) or a quick change: `titles.style.size 104`, `fonts.classic.stack.0 "TikTok Sans"`, `preferences.punchIns.on false`. `path=value` works too, and is the form for a value starting with a dash (`titles.style.letterSpacing=-2`; the plain form also works there). A value is JSON when it parses, text otherwise; a string field always takes the text as is. The path must exist and the value keep its type (`null` may become a value and back), and the result must pass the kit schema. `schemaVersion`, `kitVersion`, `updatedAt` and `changelog` are the kit's own. Then it logs the change like save-back (patch bump, `updatedAt`, a changelog entry with `--why`, default "shred kit set"), writes atomically and brings the project's `kit:*` styles in line with the new kit. It refuses when the file changed since apply. `--force` allows a new key, a type change or a drifted file.
 
+## Detach
+
+`shred kit detach <id>`, only when the user asks: the project stops following its kit. The kit record and the applied copy (`agent/kit-applied.json`) go; the project's `kit:*` styles stay, so text using them keeps its look, and `shred check` stops checking the kit's rules.
+
 ## Limits
 
 - The kit is applied per project; the library copies are a convenience, the project copies are what renders.
