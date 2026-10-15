@@ -171,7 +171,9 @@ export function waitingAgentNotes(notes: AgentNote[]): AgentNote[] {
 
 /** What the user pastes to the agent so it reads the notes and edits. */
 function agentNotesPrompt(projectId: string): string {
-  return `Check my notes on the timeline and edit. Shreditor project ${projectId}: read them with shred notes ${projectId}.`
+  // Names the skill and its script: on many systems a bare `shred` is the
+  // coreutils secure-delete command.
+  return `Use the shreditor-edit skill to read my timeline notes on Shreditor project ${projectId} (its \`shred notes ${projectId}\`: the skill's shred.mjs, not the system shred command), then make an edit pass that addresses them.`
 }
 
 /** Copy the notes prompt to the clipboard. */

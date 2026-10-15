@@ -182,7 +182,7 @@ describe('Notes lane', () => {
     fireEvent.click(screen.getByTestId('timeline-notes-copy'))
     await vi.waitFor(() =>
       expect(writeText).toHaveBeenCalledWith(
-        'Check my notes on the timeline and edit. Shreditor project p1: read them with shred notes p1.',
+        "Use the shreditor-edit skill to read my timeline notes on Shreditor project p1 (its `shred notes p1`: the skill's shred.mjs, not the system shred command), then make an edit pass that addresses them.",
       ),
     )
     // Copying is not picking up: it keeps pulsing until `shred notes` stamps seenAt.
