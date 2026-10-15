@@ -126,7 +126,7 @@ export function easeProgress(t, easing = 'linear', easingConfig) {
 // Keys
 // ---------------------------------------------------------------------------
 
-export function clampSpeed(speed) {
+function clampSpeed(speed) {
   return Math.max(MIN_SPEED, Math.min(MAX_SPEED, speed))
 }
 
@@ -341,12 +341,6 @@ const ratioOf = (item, fps) => {
   return sourceFps / timelineFps
 }
 
-/** Speed at a clip-local frame: the ramp's, else the constant speed. */
-export function itemSpeedAt(item, localFrame) {
-  const keys = getSpeedRamp(item)
-  return keys ? speedAtFrame(keys, localFrame) : item?.speed || DEFAULT_SPEED
-}
-
 /**
  * Source frames played from the clip's sourceStart to clip-local frame
  * `localFrame` (fractional, unrounded). Forward playback; a reversed clip
@@ -370,11 +364,6 @@ export function localFrameAtSourceFrames(item, sourceFrames, fps) {
 /** Source frames the clip plays over its whole length (fractional). */
 export function sourceSpanFrames(item, fps, durationInFrames = item?.durationInFrames ?? 0) {
   return sourceFramesAtLocalFrame(item, durationInFrames, fps)
-}
-
-/** Source frames played over the clip-local range [startFrame, endFrame). */
-export function sourceFramesBetween(item, startFrame, endFrame, fps) {
-  return sourceFramesAtLocalFrame(item, endFrame, fps) - sourceFramesAtLocalFrame(item, startFrame, fps)
 }
 
 /** The ramp's lowest and highest speed inside the clip (the constant speed without one). */

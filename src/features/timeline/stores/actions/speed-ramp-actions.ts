@@ -27,7 +27,7 @@ import { useKeyframesStore } from '../keyframes-store'
 import { useTimelineSettingsStore } from '../timeline-settings-store'
 import { getSynchronizedLinkedItems } from '../../utils/linked-items'
 
-export const SPEED_LANE_PROPERTY = 'speed' as const
+const SPEED_LANE_PROPERTY = 'speed' as const
 
 type RampableItem = VideoItem | AudioItem
 
@@ -237,12 +237,12 @@ export function syncSpeedRampLanes(itemIds?: readonly string[]): void {
 }
 
 /** Speed lanes and item curves before a command, to tell which side an edit changed. */
-export interface SpeedRampStateCapture {
+interface SpeedRampStateCapture {
   lanes: Map<string, PropertyKeyframes | undefined>
   ramps: Map<string, readonly SpeedRampKey[] | undefined>
 }
 
-export function captureSpeedRampState(): SpeedRampStateCapture {
+function captureSpeedRampState(): SpeedRampStateCapture {
   const lanes = new Map<string, PropertyKeyframes | undefined>()
   for (const entry of useKeyframesStore.getState().keyframes) {
     const lane = entry.properties.find((p) => p.property === SPEED_LANE_PROPERTY)
@@ -261,7 +261,7 @@ export function captureSpeedRampState(): SpeedRampStateCapture {
  * item's curve, with the source window re-derived and the linked audio
  * following; otherwise the item's curve is written to the lane.
  */
-export function reconcileSpeedRamps(before: SpeedRampStateCapture): void {
+function reconcileSpeedRamps(before: SpeedRampStateCapture): void {
   if (reconciling) return
   const after = captureSpeedRampState()
   const ids = new Set([
@@ -308,7 +308,7 @@ let commandDepth = 0
  * drags, snapshot restores, project loads). Commands reconcile on their own
  * (`runWithSpeedRampReconcile`).
  */
-export function installSpeedRampSync(): void {
+function installSpeedRampSync(): void {
   if (installed) return
   installed = true
   let { ramps, lanes } = captureSpeedRampState()

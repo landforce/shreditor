@@ -40,7 +40,6 @@ export const DEFAULT_SPEED: number
 export const SPEED_RAMP_PRESETS: readonly SpeedRampPreset[]
 
 export function easeProgress(t: number, easing?: EasingType, easingConfig?: EasingConfig): number
-export function clampSpeed(speed: number): number
 export function getSpeedRamp(item: SpeedRampTimedItem | null | undefined): readonly SpeedRampKey[] | null
 export function hasSpeedRamp(item: SpeedRampTimedItem | null | undefined): boolean
 export function normalizeSpeedRamp(keys: readonly SpeedRampKey[] | null | undefined): SpeedRampKey[]
@@ -61,7 +60,6 @@ export function speedRampIntegral(keys: readonly SpeedRampKey[]): {
   at(frame: number): number
   inverse(value: number): number
 }
-export function itemSpeedAt(item: SpeedRampTimedItem, localFrame: number): number
 export function sourceFramesAtLocalFrame(
   item: SpeedRampTimedItem,
   localFrame: number,
@@ -76,12 +74,6 @@ export function sourceSpanFrames(
   item: SpeedRampTimedItem,
   fps: number,
   durationInFrames?: number,
-): number
-export function sourceFramesBetween(
-  item: SpeedRampTimedItem,
-  startFrame: number,
-  endFrame: number,
-  fps: number,
 ): number
 export function speedRange(item: SpeedRampTimedItem): { min: number; max: number }
 export function maxDurationForMedia(

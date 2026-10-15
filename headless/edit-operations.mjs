@@ -602,6 +602,43 @@ const cases = [
       ),
     failure: { op: 'setTransform', id: 'missing', transform: { opacity: 0.4 } },
   },
+  {
+    name: 'setSpeedRamp',
+    op: {
+      op: 'setSpeedRamp',
+      id: 'clip-left',
+      keys: [
+        { frame: 0, speed: 1 },
+        { frame: 30, speed: 1.5 },
+      ],
+    },
+    // Same length; the source window is the curve's area (37.5 frames, rounded).
+    assert: (project) =>
+      assert.deepEqual(
+        [
+          item(project, 'clip-left')?.durationInFrames,
+          item(project, 'clip-left')?.sourceEnd,
+          item(project, 'clip-left')?.speedRamp?.map((key) => key.speed),
+        ],
+        [30, 38, [1, 1.5]],
+      ),
+    // 4x for 30 frames needs 120 source frames; the media has 60.
+    failure: { op: 'setSpeedRamp', id: 'clip-left', keys: [{ frame: 0, speed: 4 }] },
+  },
+  {
+    name: 'clearSpeedRamp',
+    op: { op: 'clearSpeedRamp', id: 'clip-left' },
+    ops: [
+      { op: 'setSpeedRamp', id: 'clip-left', preset: 'ease-out', endSpeed: 0.8 },
+      { op: 'clearSpeedRamp', id: 'clip-left' },
+    ],
+    assert: (project) =>
+      assert.deepEqual(
+        [item(project, 'clip-left')?.speedRamp, item(project, 'clip-left')?.sourceEnd],
+        [undefined, 30],
+      ),
+    failure: { op: 'clearSpeedRamp', id: 'text-1' },
+  },
 ]
 
 async function edit(page, project, ops, media, luts, templates, extra = {}) {
