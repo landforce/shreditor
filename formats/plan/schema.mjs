@@ -10,6 +10,8 @@
 //   { schemaVersion: 2, fps, durationFrames, request, story: { arc, structure },
 //     sources: [...], beats: [{ id, role, edit: [start, end], source: { mediaId | asset,
 //     in, unit: 's' | 'frames' }, takeaway, why, treatment, sound, text?, track?, gapBefore? }] }
+// v3 may also carry `template: { name, hash, source }` (the edit template it was
+// scaffolded from, formats/edit-template/) and per beat `slot` and `targetSeconds`.
 // v1 (no schemaVersion): the same beats without role or why, `source.in` in frames.
 //
 // Frames are at the plan's fps, which must be the project's; `edit` is
@@ -65,11 +67,21 @@ function checkStory(raw, story, version, issues) {
     issues.error('plan', '`story.arc` is missing: say the order of the story and why')
 }
 
+/** The edit template a plan was scaffolded from (`shred plan --template`), or null. */
+function readTemplateRef(value, issues) {
+  if (value === undefined || value === null) return null
+  if (isObject(value) && isText(value.name))
+    return { name: value.name.trim(), ...(isText(value.hash) ? { hash: value.hash } : {}) }
+  issues.warn('plan', '`template` is { name, hash?, source? } (shred plan --template writes it)')
+  return null
+}
+
 function readHeader(raw, version, mode, issues, projectFps) {
   const story = isObject(raw.story) ? raw.story : {}
   checkTiming(raw, mode, projectFps, issues)
   checkStory(raw, story, version, issues)
   return {
+    template: readTemplateRef(raw.template, issues),
     version,
     mode,
     fps: typeof raw.fps === 'number' ? raw.fps : 0,
@@ -154,6 +166,9 @@ const beatWords = (raw) => ({
   sound: plain(raw.sound),
   track: trimmed(raw.track) || null,
   gapBefore: raw.gapBefore === true,
+  // From an edit template: the slot this beat fills and that slot's length on the reference.
+  slot: trimmed(raw.slot) || null,
+  targetSeconds: typeof raw.targetSeconds === 'number' ? raw.targetSeconds : null,
 })
 
 function checkBeatWords(raw, id, version, issues) {

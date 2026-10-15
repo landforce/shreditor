@@ -79,6 +79,23 @@
 //                                        Graphic Yap / Greenscreen: a draft performance plan from the
 //                                        speakers' transcripts (lines, obvious cuts marked), written to
 //                                        agent/plan.json if none (else plan.scaffold.json); review every line
+//   shred plan <projectId> --template <name> [speaker mediaId...] [--request "..."]
+//                                        a draft plan from an edit template: beats (or, for a speaker, the
+//                                        performance with the template's cutaways and texts on its lines)
+//                                        with candidate media by category; records the template on the
+//                                        project so shred check scores against it
+//   shred template from-vdb <dna.json|dna.md> [--name slug]
+//                                        an edit template from VideoDatabase Video DNA (get_video_dna
+//                                        format "json" saved to a file, or the site's .md download)
+//   shred template from-project <projectId> [--name slug]
+//                                        an edit template from a finished project: every clip a slot
+//   shred template list [--json] | show <name> [--json]   the edit template library and its slot tables
+//   shred template fill <projectId> --slot <slotId>=<mediaId>[@inSec] ...
+//                                        swap new media into a project-template's slots (replaceMedia:
+//                                        item ids and timing kept; too-short media fails)
+//   shred new --from-template <name> --name "..."   a project in the template's format and canvas;
+//                                        a project-derived template also rebuilds its tracks, text
+//                                        styles and timeline, every clip a slot
 //   shred build <draftId> [--plan file] [--replace]
 //                                        the first assembly from the plan, one atomic batch: clips (a
 //                                        performance's kept lines back to back), sync sound per the
@@ -174,6 +191,13 @@ import { templatesCommand } from './templates.mjs'
 import { describeNote, markRead, openNotes } from './notes.mjs'
 import { createActivity } from './activity.mjs'
 import { draftPlanGate, planCheck, planCommands, printPlanCheck } from './plan.mjs'
+import {
+  newFromTemplate,
+  printTemplateCheck,
+  templateCheck,
+  templateCommand,
+  templatePlan,
+} from './edit-templates.mjs'
 import { runBuild, gitHead, staleBuild } from '../../../server/install/build-state.mjs'
 import { DEFAULT_LABEL_PREFIX, jobLabel, jobStatus } from '../../../server/install/launchd.mjs'
 import { logFile, spawnEditor, spawnService } from '../../../server/install/processes.mjs'
@@ -236,6 +260,10 @@ const { values: opt, positionals } = parseArgs({
     'no-plan': { type: 'boolean' },
     read: { type: 'string' },
     watch: { type: 'boolean' },
+    template: { type: 'string' },
+    request: { type: 'string' },
+    'from-template': { type: 'string' },
+    slot: { type: 'string', multiple: true },
   },
 })
 const [command, ...args] = positionals
@@ -917,6 +945,8 @@ const planDeps = () => ({
   warnUnsaved,
 })
 
+const templateDeps = () => ({ ...planDeps(), call, key, editorUrl: EDITOR })
+
 /** Did the user change the project since the draft was taken (saved, or unsaved in the editor)? */
 async function userChangedSince(origin, targetId) {
   try {
@@ -1007,6 +1037,7 @@ const commands = {
   },
 
   async new() {
+    if (opt['from-template']) return newFromTemplate(templateDeps())
     if (!opt.name) throw new Error('--name is required')
     if (opt.variant && !opt.format) throw new Error('--variant needs --format')
     const format = opt.format ? formatOrThrow(opt.format, opt.variant) : null
@@ -1071,6 +1102,7 @@ const commands = {
       ? scoreProject(project, { ...inputs, targetOverrides: kit?.overrides })
       : null
     const plan = project.format ? planCheck({ workspace, readDrafts }, id, project) : null
+    const template = templateCheck({ workspace, readDrafts }, id, project, inputs.mediaById)
     if (opt.json)
       say(
         JSON.stringify(
@@ -1079,6 +1111,7 @@ const commands = {
             ...(card ?? {}),
             ...(kit ? { kit } : {}),
             ...(plan ? { plan } : {}),
+            ...(template ? { template } : {}),
             ...(editor ? { editor } : {}),
           },
           null,
@@ -1090,6 +1123,7 @@ const commands = {
       else say(`${id} has no format: kit rules only (shred format set ${id} <format>)`)
       printKitCheck(say, kit, project.metadata?.fps ?? 30)
       printPlanCheck(say, plan)
+      printTemplateCheck(say, template, project.metadata?.fps ?? 30)
       if (opt.frames) await printFlaggedFrames(id, card, kit?.card)
     }
     if (card?.summary.fail || kit?.card?.summary.fail) process.exitCode = 1
@@ -1674,7 +1708,12 @@ const commands = {
   },
 
   async plan(rest) {
+    if (opt.template) return templatePlan(planDeps(), rest)
     await planCommands(planDeps()).plan(rest)
+  },
+
+  async template(rest) {
+    await templateCommand(templateDeps(), rest)
   },
 
   async build(rest) {

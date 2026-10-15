@@ -46,6 +46,15 @@ Every edit starts here; nothing is planned or cut until the format is agreed. A 
 - Entries with `speechNote` had no real speech (Whisper's "Thank you." on music or typing is discarded). Flag duplicates.
 - Give the user a short catalog summary: what's there, what's strong, what's missing, and the format you propose.
 
+### Starting from a reference video
+
+When the user wants their footage cut like a proven video (a VideoDatabase link or id, "like this one", "recut last week's 10 Shot with this new footage"), make an edit template from it and plan from that. A template is the reference's structure and pacing targets as slots (shots with roles and lengths, texts with their pattern and style, graphics, captions), never timings to copy: VideoDatabase timings are AI-labeled, and the new cut follows its own footage and speech.
+
+- **VideoDatabase:** call the VideoDatabase MCP `get_video_dna` with `format: "json"` (resolve a link with `resolve_video` first), save the response as `<workspace>/projects/<id>/agent/reference/vdb-<videoId>.json`, then `shred template from-vdb <that file>`. A Video DNA `.md` the user downloaded works the same way. No edit timeline in the DNA means there is nothing to template: say so.
+- **A finished project:** `shred template from-project <projectId>`; `shred new --from-template <name> --name "..."` rebuilds its tracks, text styles and timeline with every clip a slot still playing the old media, and `shred template fill <newId> --slot s03=<mediaId>[@inSec] ...` swaps new media in (ids and timing kept; media too short for the slot is refused). Rewrite the texts, add captions again, then check.
+- Show the user the slot table (`shred template show <name>`) and the format it suggests with its reason; agree the format as in step 1 (`shred new --from-template <name>` creates the project in it).
+- `shred plan <id> --template <name> [--request "<their words>"]` writes the plan: for Vlog and 10 Shot a beat per shot slot with candidate clips by category; for Graphic Yap and Greenscreen the speaker's performance from their transcript, with the template's cutaways, graphics, title and labels placed on the kept lines at the same share of the runtime. Review it like any scaffold, replace the `[PLACEHOLDERS]` in the texts, then `shred plan` and build as usual. `shred check` adds a Template section (cuts per minute, median and first shot, shot mix, labels, title from frame 0 and its hold, captions): warnings only.
+
 ### 3. Plan
 
 - Ask what the format and style skill don't settle, if the user hasn't said: length, audience, the one thing the viewer should leave with, must-keep moments, and whether they want to see the plan first. One round of questions, only what changes the result.

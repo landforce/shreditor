@@ -160,7 +160,7 @@ function validateRead(ws, plan, { format, fps, brief }) {
  * draft's target); `project` gives the format and fps. Returns everything the
  * commands print, or `{ missing }` when there is no plan file.
  */
-function checkPlan(ws, projectId, project, file) {
+export function checkPlan(ws, projectId, project, file) {
   const files = agentFiles(ws, projectId)
   const planFile = path.resolve(file ?? readJson(files.state)?.file ?? files.plan)
   if (!fs.existsSync(planFile)) return { missing: planFile, files }
@@ -216,6 +216,10 @@ function printBeat(say, beat, fps) {
   )
   if (beat.takeaway) say(`      takeaway  ${beat.takeaway}`)
   if (beat.why) say(`      why       ${beat.why}`)
+  if (beat.slot)
+    say(
+      `      slot      ${beat.slot}${beat.targetSeconds !== null ? `, ${beat.targetSeconds} s on the reference` : ''}`,
+    )
   if (beat.text)
     say(
       `      text      ${beat.text.role} "${beat.text.text}" ${span(beat.text.start, beat.text.end, fps)}`,
@@ -243,6 +247,10 @@ function printSheet(say, result, projectFps) {
   const { plan, format } = result
   say(`Plan  ${result.planFile}  (${result.hash.slice(0, 19)}…)`)
   if (!plan) return
+  if (plan.template)
+    say(
+      `From template ${plan.template.name} (structure and targets: shred template show ${plan.template.name})`,
+    )
   if (plan.mode === 'performance') {
     printPerformanceSheet(say, result)
     return

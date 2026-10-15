@@ -27,12 +27,17 @@ export interface PlanBeat {
   sound: string
   track: string | null
   gapBefore: boolean
+  /** The edit template slot this beat fills, and its length on the reference (seconds). */
+  slot: string | null
+  targetSeconds: number | null
   text: PlanText | null
 }
 
 export type PlanMode = 'story' | 'performance'
 
 export interface Plan {
+  /** The edit template the plan was scaffolded from (`shred plan --template`). */
+  template: { name: string; hash?: string } | null
   version: 1 | 2 | 3
   /** v1 and v2 are story plans. */
   mode: PlanMode

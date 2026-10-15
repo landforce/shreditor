@@ -1,0 +1,409 @@
+{
+  "success": true,
+  "format": "json",
+  "data": {
+    "video_id": 44870,
+    "creator": "@kathrinmormann",
+    "description": "How to resist fashion hype",
+    "vdb_url": "https://videodatabase.io/video/44870-how-to-resist-fashion-hype",
+    "source_url": "https://www.instagram.com/p/Dd9KqdyIgTV",
+    "fields": {
+      "video_format": {
+        "label": "Format",
+        "value": "Talking Head Edit"
+      },
+      "hook_title_content": {
+        "label": "Hook Title",
+        "value": "DON'T BELIEVE THE HYPE ZARA X JOHN GALLIANO"
+      },
+      "hook_verbal_content": {
+        "label": "Hook Verbal",
+        "value": "Be smarter."
+      },
+      "hook_template": {
+        "label": "Hook Template",
+        "value": {
+          "template": "DON'T BELIEVE THE HYPE: [HYPED THING] [COLLAB, LAUNCH, OR TREND CONTEXT]"
+        }
+      },
+      "simple_outline": {
+        "label": "Simple Outline",
+        "value": "[\"Challenge popular trend\",\"Offer critical thinking framework\",\"Expose practical cost\",\"Deconstruct the marketing\",\"Question core authenticity\"]"
+      }
+    },
+    "timeline": {
+      "available": true,
+      "duration": 56.078,
+      "metrics": {
+        "camera_shot_count": 27,
+        "segment_count": 27,
+        "visual_change_count": 26,
+        "graphics_count": 1,
+        "background_count": 0,
+        "graphics_per_minute": 1.1,
+        "text_overlay_count": 4,
+        "cuts_per_minute": 27.82,
+        "median_shot_s": 1.6,
+        "first_cut_s": 0.833,
+        "words_per_minute": 217.7,
+        "duration_s": 56.078,
+        "continuous_take": false,
+        "db_format": "Talking Head Edit",
+        "db_format_confidence": 95
+      },
+      "shots": [
+        {
+          "id": "S01",
+          "start": 0.0,
+          "end": 0.833,
+          "boundary": "start",
+          "description": "Speaker holding shears",
+          "framing": "medium",
+          "camera": "static",
+          "shot_type": "talking_head",
+          "speech": "to_camera"
+        },
+        {
+          "id": "S02",
+          "start": 0.833,
+          "end": 1.667,
+          "boundary": "jump_cut",
+          "description": "Speaker holding shears",
+          "framing": "medium",
+          "camera": "static",
+          "shot_type": "talking_head",
+          "speech": "to_camera"
+        },
+        {
+          "id": "S03",
+          "start": 1.667,
+          "end": 2.033,
+          "boundary": "hard_cut",
+          "description": "Photo: Zara x Galliano models",
+          "framing": "medium",
+          "camera": "none",
+          "shot_type": "photo_or_still",
+          "speech": "voiceover"
+        },
+        {
+          "id": "S04",
+          "start": 2.033,
+          "end": 2.4,
+          "boundary": "hard_cut",
+          "description": "Photo: Zara campaign model",
+          "framing": "wide",
+          "camera": "none",
+          "shot_type": "photo_or_still",
+          "speech": "voiceover"
+        },
+        {
+          "id": "S05",
+          "start": 2.4,
+          "end": 2.767,
+          "boundary": "hard_cut",
+          "description": "Photo: Campaign models closeup",
+          "framing": "closeup",
+          "camera": "none",
+          "shot_type": "photo_or_still",
+          "speech": "voiceover"
+        },
+        {
+          "id": "S06",
+          "start": 2.767,
+          "end": 4.5,
+          "boundary": "hard_cut",
+          "description": "Speaker talking at desk",
+          "framing": "medium",
+          "camera": "static",
+          "shot_type": "talking_head",
+          "speech": "to_camera"
+        },
+        {
+          "id": "S07",
+          "start": 4.5,
+          "end": 7.6,
+          "boundary": "jump_cut",
+          "description": "Speaker holding up three fingers",
+          "framing": "medium",
+          "camera": "static",
+          "shot_type": "talking_head",
+          "speech": "to_camera"
+        },
+        {
+          "id": "S08",
+          "start": 7.6,
+          "end": 8.333,
+          "boundary": "jump_cut",
+          "description": "Speaker gesturing with both hands",
+          "framing": "medium",
+          "camera": "static",
+          "shot_type": "talking_head",
+          "speech": "to_camera"
+        },
+        {
+          "id": "S09",
+          "start": 8.333,
+          "end": 11.033,
+          "boundary": "hard_cut",
+          "description": "Screen recording: Zara cart total",
+          "framing": "screen",
+          "camera": "none",
+          "shot_type": "screen_recording",
+          "speech": "voiceover"
+        },
+        {
+          "id": "S10",
+          "start": 11.033,
+          "end": 12.633,
+          "boundary": "hard_cut",
+          "description": "Speaker with cart total overlay",
+          "framing": "medium",
+          "camera": "static",
+          "shot_type": "talking_head",
+          "speech": "to_camera"
+        },
+        {
+          "id": "S11",
+          "start": 12.633,
+          "end": 17.667,
+          "boundary": "jump_cut",
+          "description": "Speaker holding shears",
+          "framing": "medium",
+          "camera": "static",
+          "shot_type": "talking_head",
+          "speech": "to_camera"
+        },
+        {
+          "id": "S12",
+          "start": 17.667,
+          "end": 21.167,
+          "boundary": "jump_cut",
+          "description": "Speaker talking with hands",
+          "framing": "medium",
+          "camera": "static",
+          "shot_type": "talking_head",
+          "speech": "to_camera"
+        },
+        {
+          "id": "S13",
+          "start": 21.167,
+          "end": 23.5,
+          "boundary": "jump_cut",
+          "description": "Speaker picking up shears",
+          "framing": "medium",
+          "camera": "static",
+          "shot_type": "talking_head",
+          "speech": "to_camera"
+        },
+        {
+          "id": "S14",
+          "start": 23.5,
+          "end": 24.8,
+          "boundary": "jump_cut",
+          "description": "Speaker holding shears across face",
+          "framing": "medium",
+          "camera": "static",
+          "shot_type": "talking_head",
+          "speech": "to_camera"
+        },
+        {
+          "id": "S15",
+          "start": 24.8,
+          "end": 27.4,
+          "boundary": "jump_cut",
+          "description": "Speaker lowering shears",
+          "framing": "medium",
+          "camera": "static",
+          "shot_type": "talking_head",
+          "speech": "to_camera"
+        },
+        {
+          "id": "S16",
+          "start": 27.4,
+          "end": 30.667,
+          "boundary": "jump_cut",
+          "description": "Speaker holding shears upright",
+          "framing": "medium",
+          "camera": "static",
+          "shot_type": "talking_head",
+          "speech": "to_camera"
+        },
+        {
+          "id": "S17",
+          "start": 30.667,
+          "end": 34.733,
+          "boundary": "jump_cut",
+          "description": "Speaker gesturing point two",
+          "framing": "medium",
+          "camera": "static",
+          "shot_type": "talking_head",
+          "speech": "to_camera"
+        },
+        {
+          "id": "S18",
+          "start": 34.733,
+          "end": 35.133,
+          "boundary": "hard_cut",
+          "description": "Photo: Steven Meisel campaign group",
+          "framing": "wide",
+          "camera": "none",
+          "shot_type": "photo_or_still",
+          "speech": "voiceover"
+        },
+        {
+          "id": "S19",
+          "start": 35.133,
+          "end": 35.567,
+          "boundary": "hard_cut",
+          "description": "Photo: High contrast campaign shot",
+          "framing": "medium",
+          "camera": "none",
+          "shot_type": "photo_or_still",
+          "speech": "voiceover"
+        },
+        {
+          "id": "S20",
+          "start": 35.567,
+          "end": 36.0,
+          "boundary": "hard_cut",
+          "description": "Photo: Campaign fabric detail",
+          "framing": "closeup",
+          "camera": "none",
+          "shot_type": "photo_or_still",
+          "speech": "voiceover"
+        },
+        {
+          "id": "S21",
+          "start": 36.0,
+          "end": 37.167,
+          "boundary": "hard_cut",
+          "description": "Speaker holding shears gesturing",
+          "framing": "medium",
+          "camera": "static",
+          "shot_type": "talking_head",
+          "speech": "to_camera"
+        },
+        {
+          "id": "S22",
+          "start": 37.167,
+          "end": 43.233,
+          "boundary": "jump_cut",
+          "description": "Speaker talking at desk",
+          "framing": "medium",
+          "camera": "static",
+          "shot_type": "talking_head",
+          "speech": "to_camera"
+        },
+        {
+          "id": "S23",
+          "start": 43.233,
+          "end": 50.533,
+          "boundary": "jump_cut",
+          "description": "Speaker gesturing with both hands",
+          "framing": "medium",
+          "camera": "static",
+          "shot_type": "talking_head",
+          "speech": "to_camera"
+        },
+        {
+          "id": "S24",
+          "start": 50.533,
+          "end": 52.6,
+          "boundary": "jump_cut",
+          "description": "Speaker smiling at camera",
+          "framing": "medium",
+          "camera": "static",
+          "shot_type": "talking_head",
+          "speech": "to_camera"
+        },
+        {
+          "id": "S25",
+          "start": 52.6,
+          "end": 53.267,
+          "boundary": "jump_cut",
+          "description": "Speaker raising three fingers",
+          "framing": "closeup",
+          "camera": "static",
+          "shot_type": "talking_head",
+          "speech": "to_camera"
+        },
+        {
+          "id": "S26",
+          "start": 53.267,
+          "end": 54.133,
+          "boundary": "hard_cut",
+          "description": "Photo: John Galliano portrait",
+          "framing": "medium",
+          "camera": "none",
+          "shot_type": "photo_or_still",
+          "speech": "voiceover"
+        },
+        {
+          "id": "S27",
+          "start": 54.133,
+          "end": 56.078,
+          "boundary": "hard_cut",
+          "description": "Speaker holding beanie rim",
+          "framing": "closeup",
+          "camera": "static",
+          "shot_type": "talking_head",
+          "speech": "to_camera"
+        }
+      ],
+      "graphics": [
+        {
+          "id": "G01",
+          "start": 11.03,
+          "end": 12.63,
+          "kind": "screenshot",
+          "position": "top",
+          "description": "Overlay graphic of Zara cart total price calculation in Euros"
+        }
+      ],
+      "texts": [
+        {
+          "id": "T01",
+          "start": 0,
+          "end": 3.5,
+          "kind": "title_hook",
+          "position": "middle",
+          "description": "DON'T BELIEVE THE HYPE\nZARA X JOHN GALLIANO"
+        },
+        {
+          "id": "T02",
+          "start": 7.5,
+          "end": 9,
+          "kind": "list_item",
+          "position": "middle",
+          "description": "1. THE TOTAL"
+        },
+        {
+          "id": "T03",
+          "start": 33.5,
+          "end": 35.5,
+          "kind": "list_item",
+          "position": "middle",
+          "description": "2. THE STYLING"
+        },
+        {
+          "id": "T04",
+          "start": 52.5,
+          "end": 53.27,
+          "kind": "list_item",
+          "position": "middle",
+          "description": "3. THE DESIGNER"
+        }
+      ],
+      "captions": [
+        {
+          "id": "C01",
+          "start": 0,
+          "end": 56.078,
+          "kind": "caption_subtitle",
+          "position": "bottom",
+          "description": "captions"
+        }
+      ]
+    }
+  }
+}
