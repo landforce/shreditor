@@ -97,7 +97,7 @@ function loadBitmap(mediaId: string, key: string, index: number): Promise<ImageB
 }
 
 /** Where a clip's masks are for its media: the index entry, or null (not analysed yet). */
-export async function resolveCutoutEntry(
+async function resolveCutoutEntry(
   mediaId: string,
   cutout: CutoutSettings,
 ): Promise<CutoutIndexEntry | null> {

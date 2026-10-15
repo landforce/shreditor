@@ -25,6 +25,34 @@ export interface CutoutNeed {
   itemIds: string[]
 }
 
+/** The padded sample ranges one clip needs: all of it, or around `frames` only. */
+function clipSampleRanges(
+  item: VideoItem,
+  projectFps: number,
+  rate: number,
+  info: CutoutMediaInfo,
+  frames?: readonly number[],
+): IndexRange[] {
+  const range = itemSourceRange(item, projectFps)
+  if (!range) return []
+  const max = maxSampleIndex(info.duration, rate)
+  if (!frames) {
+    const whole = sampleRangeFor(range, rate, max)
+    return whole ? [whole] : []
+  }
+  const clipSeconds = item.durationInFrames / projectFps
+  const span = range.end - range.start
+  const out: IndexRange[] = []
+  for (const frame of frames) {
+    if (frame < item.from || frame >= item.from + item.durationInFrames) continue
+    const share = (frame - item.from) / projectFps / clipSeconds
+    const at = item.isReversed ? range.end - share * span : range.start + share * span
+    const window = sampleRangeFor({ start: at, end: at }, rate, max)
+    if (window) out.push(window)
+  }
+  return out
+}
+
 /**
  * Group the cut-out video items by what they need analysed. `frames`, when
  * given, limits each item to the samples around those timeline frames (a frame
@@ -40,30 +68,10 @@ export function planCutoutNeeds(
   for (const raw of items) {
     if (!isCutoutActive(raw)) continue
     const item = raw as VideoItem
-    if (!item.mediaId || !item.cutout) continue
-    const info = mediaInfo(item.mediaId)
-    if (!info) continue
+    const info = item.mediaId ? mediaInfo(item.mediaId) : null
+    if (!info || !item.mediaId || !item.cutout) continue
     const rate = resolveCutoutRate(item.cutout.sampleRate, info.fps)
-    const range = itemSourceRange(item, projectFps)
-    if (!range) continue
-    const max = maxSampleIndex(info.duration, rate)
-    const ranges: IndexRange[] = []
-    if (frames) {
-      for (const frame of frames) {
-        if (frame < item.from || frame >= item.from + item.durationInFrames) continue
-        const local = (frame - item.from) / projectFps
-        const span = range.end - range.start
-        const clipSeconds = item.durationInFrames / projectFps
-        const at = item.isReversed
-          ? range.end - (local / clipSeconds) * span
-          : range.start + (local / clipSeconds) * span
-        const window = sampleRangeFor({ start: at, end: at }, rate, max)
-        if (window) ranges.push(window)
-      }
-    } else {
-      const whole = sampleRangeFor(range, rate, max)
-      if (whole) ranges.push(whole)
-    }
+    const ranges = clipSampleRanges(item, projectFps, rate, info, frames)
     if (ranges.length === 0) continue
     const key = `${item.mediaId}|${item.cutout.subject}|${rate}`
     const group = groups.get(key) ?? {

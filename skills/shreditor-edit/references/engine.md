@@ -51,6 +51,7 @@ What `shred apply` accepts and how the project behaves. Verified against the Shr
 | `updateEffect` | `itemId`, `effectId`, `params?`, `enabled?` | Merges `params` into the effect; `enabled: false` bypasses it (handy for a before/after frame). |
 | `removeEffect` | `itemId`, `effectId` | |
 | `addLut` | `itemId`, `lut`, `intensity?` (0..1, default 1) | Adds a `gpu-lut` effect from `<workspace>/luts/<lut>` (a file name there, e.g. `"Warm.cube"`; `shred lut list`). The LUT is embedded in the effect as the editor's LUT panel does (resampled to 33³), so later changes to the file don't touch the clip. Returns `detail.effectId`. An unknown name fails and lists what `luts/` has. |
+| `setCutout` | `id`, `enabled`, `subject?` auto/person/object, `feather?` (0-100 source px), `invert?`, `refine?` (0..1), `sampleRate?` (1-120 or `"full"`) | Background removal on a video clip, no green screen needed (see Background removal). Fields given merge into the clip's `cutout`; a new one defaults to `subject: "auto"`. Only stores settings: the masks are analysed by `shred cutout` or before any render. Returns `detail.cutout`. Not a video clip fails. |
 | `setTransformParent` | | Parent one item's transform to another. |
 | `createComposition` | `ids`, `name` | Groups items into a layer composition (the editor's compound clip, as a Motion composition) at the project's canvas. The items keep their ids inside it. Returns `detail.id` (the composition item on the timeline), `detail.compositionId`, `detail.items`. |
 | `setCompositionControls` | `compositionId`, `controls: [{ name, targetItemId, property, defaultValue? }]` | Replaces the composition's published controls: what each instance can change. `property` is `text.text`, `text.color`, `shape.fillColor` or `shape.strokeColor` (`shape.strokeColor` needs the stroke on; text with styled spans takes none). Names are unique, case-insensitive. `defaultValue` defaults to the item's current value. Returns the controls. |
@@ -243,6 +244,15 @@ Clip `volume` is plain gain (the per-clip limiter only holds peaks), so a loudne
 
 - `shred master <voiceover or final mix stem> [--lufs -14] [--tp -1.5] [--out file.wav]` writes `<name>.mastered.wav` next to the input (original untouched) with ffmpeg's two-pass `loudnorm` (measure, then normalize with the measured values; it limits true peak itself) and prints before/after integrated LUFS and true peak measured with `ebur128`. Import the mastered file.
 - Everything playing together adds up: a -14 LUFS VO plus b-roll audio lands louder. Measure the final export (render `audioOnly` WAV, or the exported video): `ffmpeg -nostats -i out.wav -filter_complex ebur128=peak=true -f null -` and read `I:` and `Peak:` in the summary. If it misses, lower the beds, or master the exported mix and use that as the only audio.
+
+## Background removal
+
+`setCutout` (or `shred cutout`) cuts a speaker or object out of footage shot in a real room. Design, models and limits: `docs/background-removal.md` in the repo.
+
+- `shred cutout <draftId> <clipId...> [--subject auto|person|object] [--wait] [--json]` turns it on in one batch (`--off` turns it off), starts the analysis on the service and, with `--wait`, waits for it, printing progress and then each cut-out clip: subject (`auto→person`), model, samples per second, masks stored / needed, `ready` / `partial` / `none`. `shred cutout <id>` alone prints the status. The first run downloads the model once (MODNet 26 MB for people; BiRefNet lite 115 MB for objects).
+- `person` is portrait matting (soft hair edges); `object` the main salient object (a product, a pet); `auto` tries person and falls back to object when no one is found. The mask covers the clip's whole source frame, so crop, transforms, effects and keyframes work as usual, and the clip stays a separate layer: put the background (plate, b-roll, colour) on a track below it.
+- Masks are sampled 10 times a second and blended between samples; `sampleRate: "full"` analyses every source frame (slower, for a final pass when edges must not lag fast motion). `feather` softens the edge (px), `refine` hardens it (0..1), `invert` keeps the room and removes the subject; none of them re-run the model.
+- `shred frames` renders cut-out frames (it analyses the samples around each frame it needs). **Look at the edges**: hair, hands, the gap between arm and body, the chair. Exports analyse everything first; native export draws the cut-out clip as an overlay (`background removal`), the rest stays native.
 
 ## Export
 

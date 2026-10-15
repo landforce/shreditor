@@ -11,11 +11,11 @@
 //   media/<mediaId>/cache/cutout/<key>/s0000123.png      (one 8-bit mask per sample)
 // keyed by the media's content fingerprint, the model and the sample rate.
 
-export const CUTOUT_SUBJECTS = ['auto', 'person', 'object']
-export const CUTOUT_DEFAULT_RATE = 10
-export const CUTOUT_MAX_RATE = 120
-export const CUTOUT_MAX_FEATHER = 100
-export const CUTOUT_INDEX_VERSION = 1
+const CUTOUT_SUBJECTS = ['auto', 'person', 'object']
+const CUTOUT_DEFAULT_RATE = 10
+const CUTOUT_MAX_RATE = 120
+const CUTOUT_MAX_FEATHER = 100
+const CUTOUT_INDEX_VERSION = 1
 /** Long edge of a stored mask, in pixels. */
 export const CUTOUT_MASK_LONG_EDGE = 640
 /** A person mask with fewer pixels above half than this share counts as blank (auto → object). */
@@ -100,6 +100,22 @@ export function cutoutModelFileName(model, backend) {
 
 const clamp = (value, lo, hi) => Math.min(hi, Math.max(lo, value))
 
+const isNumberIn = (lo, hi) => (v) => typeof v === 'number' && v >= lo && v <= hi
+const isBoolean = (v) => typeof v === 'boolean'
+
+/** Optional fields: [field, valid?, what it must be]. */
+const CUTOUT_FIELD_RULES = [
+  ['feather', isNumberIn(0, CUTOUT_MAX_FEATHER), `a number from 0 to ${CUTOUT_MAX_FEATHER}`],
+  ['invert', isBoolean, 'true or false'],
+  ['refine', isNumberIn(0, 1), 'a number from 0 to 1'],
+  [
+    'sampleRate',
+    (v) => v === 'full' || isNumberIn(1, CUTOUT_MAX_RATE)(v),
+    `'full' or a number from 1 to ${CUTOUT_MAX_RATE}`,
+  ],
+  ['strokes', Array.isArray, 'an array'],
+]
+
 /**
  * A problem with a cutout settings object, or null. Shared by the project
  * schema and the setCutout op so both accept exactly the same values.
@@ -107,34 +123,11 @@ const clamp = (value, lo, hi) => Math.min(hi, Math.max(lo, value))
 export function cutoutSettingsProblem(value) {
   if (value === undefined) return null
   if (!value || typeof value !== 'object' || Array.isArray(value)) return 'cutout: must be an object'
-  if (typeof value.enabled !== 'boolean') return 'cutout.enabled: must be true or false'
+  if (!isBoolean(value.enabled)) return 'cutout.enabled: must be true or false'
   if (!CUTOUT_SUBJECTS.includes(value.subject))
     return `cutout.subject: must be one of ${CUTOUT_SUBJECTS.join(', ')}`
-  if (
-    value.feather !== undefined &&
-    !(typeof value.feather === 'number' && value.feather >= 0 && value.feather <= CUTOUT_MAX_FEATHER)
-  )
-    return `cutout.feather: must be a number from 0 to ${CUTOUT_MAX_FEATHER}`
-  if (value.invert !== undefined && typeof value.invert !== 'boolean')
-    return 'cutout.invert: must be true or false'
-  if (
-    value.refine !== undefined &&
-    !(typeof value.refine === 'number' && value.refine >= 0 && value.refine <= 1)
-  )
-    return 'cutout.refine: must be a number from 0 to 1'
-  if (
-    value.sampleRate !== undefined &&
-    value.sampleRate !== 'full' &&
-    !(
-      typeof value.sampleRate === 'number' &&
-      value.sampleRate >= 1 &&
-      value.sampleRate <= CUTOUT_MAX_RATE
-    )
-  )
-    return `cutout.sampleRate: must be 'full' or a number from 1 to ${CUTOUT_MAX_RATE}`
-  if (value.strokes !== undefined && !Array.isArray(value.strokes))
-    return 'cutout.strokes: must be an array'
-  return null
+  const bad = CUTOUT_FIELD_RULES.find(([field, valid]) => value[field] !== undefined && !valid(value[field]))
+  return bad ? `cutout.${bad[0]}: must be ${bad[2]}` : null
 }
 
 /** Merge a setCutout op's fields into an item's cutout (defaults for a new one). */
@@ -170,11 +163,6 @@ export function resolveCutoutRate(sampleRate, sourceFps) {
 // The sample grid
 
 const EPSILON = 1e-6
-
-/** Source time of sample `index`, in seconds. */
-export function sampleTime(index, rate) {
-  return index / rate
-}
 
 /** The source window [start, end) an item plays, in source seconds, or null. */
 export function itemSourceRange(item, projectFps) {
@@ -223,7 +211,7 @@ export function subtractIndexRanges(need, have) {
   return out
 }
 
-export function countIndexRanges(ranges) {
+function countIndexRanges(ranges) {
   return mergeIndexRanges(ranges).reduce((sum, [a, b]) => sum + b - a + 1, 0)
 }
 
@@ -270,7 +258,7 @@ export function interpolationFor(seconds, rate, has) {
 // Identity and storage layout
 
 /** 32-bit FNV-1a, hex. */
-export function fnv1a(text) {
+function fnv1a(text) {
   let hash = 0x811c9dc5
   for (let i = 0; i < text.length; i++) {
     hash ^= text.charCodeAt(i)
@@ -352,7 +340,7 @@ export function mergeCutoutIndex(disk, mine) {
 }
 
 /** The subject 'auto' resolved for a media fingerprint (person until decided). */
-export function resolveAutoSubject(index, fingerprint) {
+function resolveAutoSubject(index, fingerprint) {
   const decided = index?.auto?.[fingerprint]
   return decided === 'object' ? 'object' : decided === 'person' ? 'person' : null
 }

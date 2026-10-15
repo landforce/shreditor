@@ -59,11 +59,6 @@ export interface CutoutIndex {
   auto: Record<string, 'person' | 'object'>
 }
 
-export const CUTOUT_SUBJECTS: readonly CutoutSubject[]
-export const CUTOUT_DEFAULT_RATE: number
-export const CUTOUT_MAX_RATE: number
-export const CUTOUT_MAX_FEATHER: number
-export const CUTOUT_INDEX_VERSION: number
 export const CUTOUT_MASK_LONG_EDGE: number
 export const CUTOUT_BLANK_COVERAGE: number
 export const CUTOUT_MODELS: Record<CutoutModelId, CutoutModel>
@@ -81,7 +76,6 @@ export function mergeCutoutSettings(
 export function isCutoutActive(item: unknown): boolean
 export function resolveCutoutRate(sampleRate: CutoutSettings['sampleRate'], sourceFps: number): number
 
-export function sampleTime(index: number, rate: number): number
 export function itemSourceRange(
   item: unknown,
   projectFps: number,
@@ -91,7 +85,6 @@ export function subtractIndexRanges(
   need: readonly IndexRange[],
   have: readonly IndexRange[],
 ): IndexRange[]
-export function countIndexRanges(ranges: readonly IndexRange[]): number
 export function hasIndex(ranges: readonly IndexRange[], index: number): boolean
 export function sampleRangeFor(
   range: { start: number; end: number },
@@ -105,7 +98,6 @@ export function interpolationFor(
   has: (index: number) => boolean,
 ): { a: number; b: number; t: number } | null
 
-export function fnv1a(text: string): string
 export function mediaFingerprint(
   meta:
     | {
@@ -124,10 +116,6 @@ export function cutoutSamplePath(key: string, index: number): string
 export function emptyCutoutIndex(): CutoutIndex
 export function parseCutoutIndex(value: unknown): CutoutIndex
 export function mergeCutoutIndex(disk: unknown, mine: unknown): CutoutIndex
-export function resolveAutoSubject(
-  index: CutoutIndex | null | undefined,
-  fingerprint: string,
-): 'person' | 'object' | null
 export function findCutoutEntry(
   index: CutoutIndex | null | undefined,
   input: { fingerprint: string; subject: CutoutSubject; rate: number },

@@ -120,6 +120,7 @@ const samples = {
     },
   },
   addCaptions: { op: 'addCaptions', clipId: 'c', styleId: 'kit-captions', replace: true },
+  setCutout: { op: 'setCutout', id: 'c', enabled: true, subject: 'person', feather: 2 },
 }
 
 test('template op schemas reject what the editor could not apply', () => {

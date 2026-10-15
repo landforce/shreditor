@@ -18,6 +18,7 @@ export type LocalModelCacheId =
   | 'parakeet'
   | 'supertonic-tts'
   | 'rife'
+  | 'cutout'
 
 export interface LocalModelCacheDefinition {
   id: LocalModelCacheId
@@ -82,6 +83,14 @@ export const LOCAL_MODEL_CACHE_DEFINITIONS: LocalModelCacheDefinition[] = [
     description: 'RIFE frame interpolation model, used to render higher-frame-rate video.',
     cacheName: ONNX_MODEL_CACHE_NAME,
     matchPathFragments: ['/RIFE_fp32_timestep/'],
+  },
+  {
+    id: 'cutout',
+    label: 'Background removal',
+    description:
+      'MODNet (people) and BiRefNet lite (objects) matting models for Remove background.',
+    cacheName: ONNX_MODEL_CACHE_NAME,
+    matchPathFragments: ['/Xenova/modnet/', '/BiRefNet_lite-ONNX/'],
   },
 ]
 

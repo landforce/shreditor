@@ -32,5 +32,11 @@
         "noMedia": "Die Medien des Clips sind nicht in der Bibliothek"
       }
     }
+  },
+  "settings": {
+    "models": {
+      "cutoutModnet": "Remove background (people). Xenova/modnet ONNX, downloaded on first use, SHA-256 checked.",
+      "cutoutBirefnet": "Remove background (objects). onnx-community/BiRefNet_lite-ONNX, downloaded on first use, SHA-256 checked."
+    }
   }
 }

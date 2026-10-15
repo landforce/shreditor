@@ -28,6 +28,14 @@ import { HttpError, sendHttpError, serveFile, setHttpTimeouts } from './http-sec
 
 const STORE_PATH = /^media\/[A-Za-z0-9][A-Za-z0-9_-]{0,63}\/cache\/cutout\/[A-Za-z0-9_.-]+(\/[A-Za-z0-9_.-]+)?$/
 const MAX_BODY = 64 * 1024 * 1024
+const CORS_HEADERS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, PUT, HEAD, OPTIONS',
+  'Access-Control-Allow-Headers': 'content-type, range',
+  'Access-Control-Expose-Headers': 'content-length',
+  'Cross-Origin-Resource-Policy': 'cross-origin',
+  'Cache-Control': 'no-store',
+}
 
 /** A workspace-relative cutout path, or a 400. */
 export function cutoutStorePath(workspace, rel) {
@@ -75,6 +83,8 @@ async function sha256File(file) {
  * Download (once) and verify one model file. `fetchImpl` is injectable for tests.
  * Returns the cached file's path.
  */
+// Exercised by headless/cutout.test.mjs (fake fetch) and headless/cutout-e2e.mjs (real download)
+// fallow-ignore-next-line complexity
 export async function ensureModelFile(dir, model, backend, { fetchImpl = fetch, log = () => {} } = {}) {
   const expected = model.files[backend].sha256
   const file = path.join(dir, cutoutModelFileName(model, backend))
@@ -132,49 +142,55 @@ export async function createCutoutStore({ workspace, log = () => {}, fetchImpl }
     return downloads.get(name)
   }
 
+  // Exercised end to end by headless/cutout-e2e.mjs
+  // fallow-ignore-next-line complexity
+  const fileRoute = async (req, res, url) => {
+    const file = cutoutStorePath(workspace, url.searchParams.get('path'))
+    if (req.method === 'PUT') {
+      writeAtomic(file, await readBody(req))
+      res.writeHead(200, { 'Content-Type': 'application/json' })
+      res.end('{"ok":true}')
+      return
+    }
+    if (req.method !== 'GET' && req.method !== 'HEAD')
+      throw new HttpError(405, 'METHOD_NOT_ALLOWED', 'method not allowed')
+    await serveFile(req, res, file, {
+      contentType: file.endsWith('.json') ? 'application/json' : 'image/png',
+    })
+  }
+  const modelRoute = async (req, res, name) => {
+    await serveFile(req, res, await modelFile(name), { contentType: 'application/octet-stream' })
+  }
+  const progressRoute = async (req, res, url) => {
+    progress.set(url.searchParams.get('job') ?? 'render', JSON.parse((await readBody(req)).toString('utf8') || '{}'))
+    res.writeHead(204)
+    res.end()
+  }
+  // Service routes; exercised by headless/cutout.test.mjs and headless/cutout-e2e.mjs
+  // fallow-ignore-next-line complexity
+  const routeFor = (req, url) => {
+    if (url.pathname === '/fs/file') return fileRoute
+    const model = /^\/models\/([A-Za-z0-9_.-]+)$/.exec(url.pathname)
+    if (model && (req.method === 'GET' || req.method === 'HEAD'))
+      return (rq, rs) => modelRoute(rq, rs, model[1])
+    if (url.pathname === '/progress' && req.method === 'PUT') return progressRoute
+    return null
+  }
+
+  // Exercised end to end by headless/cutout-e2e.mjs
+  // fallow-ignore-next-line complexity
   const server = http.createServer(async (req, res) => {
-    res.setHeader('Access-Control-Allow-Origin', '*')
-    res.setHeader('Access-Control-Allow-Methods', 'GET, PUT, HEAD, OPTIONS')
-    res.setHeader('Access-Control-Allow-Headers', 'content-type, range')
-    res.setHeader('Access-Control-Expose-Headers', 'content-length')
-    res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin')
-    res.setHeader('Cache-Control', 'no-store')
+    for (const [name, value] of Object.entries(CORS_HEADERS)) res.setHeader(name, value)
     try {
-      const url = new URL(req.url ?? '/', 'http://127.0.0.1')
       if (req.method === 'OPTIONS') {
         res.writeHead(204)
         res.end()
         return
       }
-      if (url.pathname === '/fs/file') {
-        const file = cutoutStorePath(workspace, url.searchParams.get('path'))
-        if (req.method === 'PUT') {
-          writeAtomic(file, await readBody(req))
-          res.writeHead(200, { 'Content-Type': 'application/json' })
-          res.end('{"ok":true}')
-          return
-        }
-        if (req.method !== 'GET' && req.method !== 'HEAD')
-          throw new HttpError(405, 'METHOD_NOT_ALLOWED', 'method not allowed')
-        await serveFile(req, res, file, {
-          contentType: file.endsWith('.json') ? 'application/json' : 'image/png',
-        })
-        return
-      }
-      const modelMatch = /^\/models\/([A-Za-z0-9_.-]+)$/.exec(url.pathname)
-      if (modelMatch && (req.method === 'GET' || req.method === 'HEAD')) {
-        const file = await modelFile(modelMatch[1])
-        await serveFile(req, res, file, { contentType: 'application/octet-stream' })
-        return
-      }
-      if (url.pathname === '/progress' && req.method === 'PUT') {
-        const job = url.searchParams.get('job') ?? 'render'
-        progress.set(job, JSON.parse((await readBody(req)).toString('utf8') || '{}'))
-        res.writeHead(204)
-        res.end()
-        return
-      }
-      throw new HttpError(404, 'NOT_FOUND', 'not found')
+      const url = new URL(req.url ?? '/', 'http://127.0.0.1')
+      const route = routeFor(req, url)
+      if (!route) throw new HttpError(404, 'NOT_FOUND', 'not found')
+      await route(req, res, url)
     } catch (error) {
       sendHttpError(res, error)
     }

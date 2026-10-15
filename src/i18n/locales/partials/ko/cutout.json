@@ -32,5 +32,11 @@
         "noMedia": "클립의 미디어가 라이브러리에 없습니다"
       }
     }
+  },
+  "settings": {
+    "models": {
+      "cutoutModnet": "Remove background (people). Xenova/modnet ONNX, downloaded on first use, SHA-256 checked.",
+      "cutoutBirefnet": "Remove background (objects). onnx-community/BiRefNet_lite-ONNX, downloaded on first use, SHA-256 checked."
+    }
   }
 }

@@ -17,6 +17,18 @@ The editor lists the transcription entries under Settings > AI > Models and lice
 | [Transformers.js](https://github.com/huggingface/transformers.js) (`@huggingface/transformers`) | Apache-2.0 | Runs Whisper and other models in the browser. |
 | [ONNX Runtime Web](https://github.com/microsoft/onnxruntime) (`onnxruntime-web`) | MIT | In-browser inference runtime. |
 
+## Background removal
+
+Runs on the user's computer (onnxruntime-web, WebGPU or wasm). Weights are
+downloaded on first use from a URL pinned to a Hugging Face commit and checked
+against their SHA-256; nothing is bundled. Design and the models considered:
+`docs/background-removal.md`.
+
+| Component | License | How Shreditor uses it |
+|---|---|---|
+| [MODNet](https://github.com/ZHKKKe/MODNet) (Zhanghan Ke et al.) | Apache-2.0 (code and pre-trained models) | Person matting for Remove background. ONNX conversion [Xenova/modnet](https://huggingface.co/Xenova/modnet) (`license: apache-2.0`), `onnx/model.onnx` at revision `fa2fa546052fba4c08921230a26cc69a333fca12`, sha256 `07c308cf0fc7e6e8b2065a12ed7fc07e1de8febb7dc7839d7b7f15dd66584df9`. |
+| [BiRefNet](https://github.com/ZhengPeng7/BiRefNet) lite (Peng Zheng et al.) | MIT | Object segmentation for Remove background. ONNX conversion [onnx-community/BiRefNet_lite-ONNX](https://huggingface.co/onnx-community/BiRefNet_lite-ONNX) (`license: mit`) at revision `de15b22ba131738a16dff04aab8bdf8dc32e3ac1`: `onnx/model_fp16.onnx` (WebGPU, sha256 `d39b897ceb16ae654c1731f3dba0cf9b368d9cae74b5a57459b455cc8bfec402`) and `onnx/model.onnx` (wasm, sha256 `5600024376f572a557870a5eb0afb1e5961636bef4e1e22132025467d0f03333`). |
+
 ## Media
 
 | Component | License | How Shreditor uses it |

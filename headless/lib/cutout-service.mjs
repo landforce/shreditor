@@ -37,44 +37,47 @@ function readIndex(workspace, mediaId) {
   }
 }
 
+/** One cut-out clip's status against what its media has stored. */
+// Node side, covered by headless/cutout.test.mjs (node --test coverage is not measured)
+// fallow-ignore-next-line complexity
+function itemStatus(workspace, item, fps) {
+  const meta = item.mediaId ? readMediaMetadata(workspace, item.mediaId) : null
+  if (!meta) return { itemId: item.id, mediaId: item.mediaId, state: 'no-media', subject: item.cutout.subject }
+  const fingerprint = mediaFingerprint(meta)
+  const rate = resolveCutoutRate(item.cutout.sampleRate, meta.fps)
+  const range = itemSourceRange(item, fps)
+  const padded = range && sampleRangeFor(range, rate, maxSampleIndex(meta.duration, rate))
+  const found = findCutoutEntry(readIndex(workspace, item.mediaId), { fingerprint, subject: item.cutout.subject, rate })
+  const { needed, done } = cutoutCoverage(padded ? [padded] : [], found.entry)
+  const ready = needed > 0 && done >= needed
+  return {
+    itemId: item.id,
+    label: item.label,
+    mediaId: item.mediaId,
+    subject: item.cutout.subject,
+    resolvedSubject: found.subject,
+    model: found.entry?.model ?? null,
+    rate,
+    needed,
+    done,
+    state: ready ? 'ready' : done > 0 ? 'partial' : 'none',
+    feather: item.cutout.feather ?? 0,
+    invert: Boolean(item.cutout.invert),
+  }
+}
+
 /**
  * Per cut-out clip: subject (and what auto resolved to), sample rate, how many
  * of the samples it needs are stored. `state` is ready, partial, none or
  * no-media.
  */
+// Covered by headless/cutout.test.mjs
+// fallow-ignore-next-line complexity
 export function cutoutStatus(workspace, project) {
   const fps = project.metadata?.fps ?? 30
-  const out = []
-  for (const item of project.timeline?.items ?? []) {
-    if (!isCutoutActive(item)) continue
-    const meta = item.mediaId ? readMediaMetadata(workspace, item.mediaId) : null
-    if (!meta) {
-      out.push({ itemId: item.id, mediaId: item.mediaId, state: 'no-media', subject: item.cutout.subject })
-      continue
-    }
-    const fingerprint = mediaFingerprint(meta)
-    const rate = resolveCutoutRate(item.cutout.sampleRate, meta.fps)
-    const range = itemSourceRange(item, fps)
-    const need = range ? [sampleRangeFor(range, rate, maxSampleIndex(meta.duration, rate))].filter(Boolean) : []
-    const index = readIndex(workspace, item.mediaId)
-    const found = findCutoutEntry(index, { fingerprint, subject: item.cutout.subject, rate })
-    const coverage = cutoutCoverage(need, found.entry)
-    out.push({
-      itemId: item.id,
-      label: item.label,
-      mediaId: item.mediaId,
-      subject: item.cutout.subject,
-      resolvedSubject: found.subject,
-      model: found.entry?.model ?? null,
-      rate,
-      needed: coverage.needed,
-      done: coverage.done,
-      state: coverage.needed > 0 && coverage.done >= coverage.needed ? 'ready' : coverage.done > 0 ? 'partial' : 'none',
-      feather: item.cutout.feather ?? 0,
-      invert: Boolean(item.cutout.invert),
-    })
-  }
-  return out
+  return (project.timeline?.items ?? [])
+    .filter((item) => isCutoutActive(item))
+    .map((item) => itemStatus(workspace, item, fps))
 }
 
 /**
@@ -101,6 +104,8 @@ export function createCutoutRoutes({ workspace, enqueue, page, mediaUrlOf, progr
     return { job, promise }
   }
 
+  // Service route; exercised by headless/cutout.test.mjs and headless/cutout-e2e.mjs
+  // fallow-ignore-next-line complexity
   const status = (projectId, job) => {
     const { project } = loadProjectById(workspace, projectId)
     const run = job ? running.get(job) : null
@@ -124,6 +129,7 @@ export function createCutoutRoutes({ workspace, enqueue, page, mediaUrlOf, progr
 
   return {
     matches: (url) => url.pathname === '/v1/cutout',
+    // fallow-ignore-next-line complexity
     async handle(req, res, url) {
       if (req.method === 'GET') {
         const projectId = assertPortableId(url.searchParams.get('project'), 'project id')

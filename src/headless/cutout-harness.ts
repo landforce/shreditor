@@ -86,6 +86,8 @@ export async function ensureCutout(
 }
 
 /** `POST /v1/cutout`: analyse the cut-out items of a project (or the listed ones). */
+// Browser-harness driver; exercised end to end by headless/cutout-e2e.mjs
+// fallow-ignore-next-line complexity
 export async function analyzeCutout(input: {
   project: Project
   media?: Array<{ mediaId: string; url: string; metadata?: MediaMetadata }>

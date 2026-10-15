@@ -37,7 +37,7 @@ async function dropCached(url: string): Promise<void> {
 }
 
 /** Fetch a model file and refuse it unless its SHA-256 matches the pinned one. */
-export async function fetchVerifiedModel(
+async function fetchVerifiedModel(
   model: CutoutModel,
   backend: CutoutBackend,
   urlFor: CutoutModelUrlFor,
@@ -140,6 +140,9 @@ export class CutoutModelRunner {
     private readonly urlFor: CutoutModelUrlFor = cutoutModelUrl,
   ) {}
 
+  // `ready` and `run` are reached only from cutout.worker.ts, across a
+  // `new Worker(new URL(...))` edge that static analysis cannot follow.
+  // fallow-ignore-next-line unused-class-member
   ready(onProgress?: (progress: CutoutDownloadProgress) => void): Promise<void> {
     if (!this.loading) {
       this.loading = this.load(onProgress).catch((error) => {
@@ -179,6 +182,7 @@ export class CutoutModelRunner {
   }
 
   /** Alpha (row-major, 0..1, at the model's output size) of one frame given as model-sized RGBA. */
+  // fallow-ignore-next-line unused-class-member complexity
   async run(
     rgba: Uint8ClampedArray,
     width: number,
@@ -215,11 +219,5 @@ export class CutoutModelRunner {
     const outHeight = Number(dims[dims.length - 2] ?? height)
     const outWidth = Number(dims[dims.length - 1] ?? width)
     return { alpha, width: outWidth, height: outHeight }
-  }
-
-  async release(): Promise<void> {
-    await this.session?.release?.()
-    this.session = null
-    this.loading = null
   }
 }

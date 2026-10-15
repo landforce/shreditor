@@ -666,6 +666,18 @@ export async function main(argv = process.argv.slice(2)) {
     sendJson(res, 200, layout)
   }
 
+  // Background removal routes answer errors like the other routes (status, code, message).
+  // fallow-ignore-next-line complexity
+  const sendCutoutError = (res, route, e) => {
+    console.error(`${route} failed:`, e.message ?? e)
+    if (res.headersSent) return
+    const status = e instanceof HttpError || e instanceof OperationQueueError ? e.statusCode : 500
+    sendJson(res, status, {
+      ok: false,
+      apiVersion: HEADLESS_API_VERSION,
+      error: { code: e.code ?? 'INTERNAL_ERROR', message: e.message ?? String(e) },
+    })
+  }
   const cutoutRoutes = createCutoutRoutes({
     workspace,
     enqueue: (fn, options) => queue.enqueue(fn, options),
@@ -680,16 +692,7 @@ export async function main(argv = process.argv.slice(2)) {
     const url = new URL(req.url ?? '/', 'http://localhost')
     const route = `${req.method} ${url.pathname}`
     if (cutoutRoutes.matches(url)) {
-      cutoutRoutes.handle(req, res, url).catch((e) => {
-        console.error(`${route} failed:`, e.message ?? e)
-        if (res.headersSent) return
-        const status = e instanceof HttpError || e instanceof OperationQueueError ? e.statusCode : 500
-        sendJson(res, status, {
-          ok: false,
-          apiVersion: HEADLESS_API_VERSION,
-          error: { code: e.code ?? 'INTERNAL_ERROR', message: e.message ?? String(e) },
-        })
-      })
+      cutoutRoutes.handle(req, res, url).catch((e) => sendCutoutError(res, route, e))
       return
     }
     const projectMatch = /^\/v1\/projects\/([A-Za-z0-9][A-Za-z0-9_-]{0,63})$/.exec(url.pathname)

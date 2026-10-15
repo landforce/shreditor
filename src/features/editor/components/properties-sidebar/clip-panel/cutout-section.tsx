@@ -27,38 +27,32 @@ import {
 const SUBJECTS: CutoutSubject[] = ['auto', 'person', 'object']
 const BUSY = new Set(['queued', 'downloading', 'preparing', 'analyzing'])
 
+/** Translation key and values for each state's status line. */
+const STATUS_TEXT: Partial<
+  Record<CutoutUiStatus['state'], (status: CutoutUiStatus) => [string, Record<string, unknown>?]>
+> = {
+  queued: () => ['editor.cutout.status.queued'],
+  downloading: (s) => [
+    'editor.cutout.status.downloading',
+    { percent: Math.round(s.progress * 100), size: Math.round((s.job?.total ?? 0) / 1e6) },
+  ],
+  preparing: () => ['editor.cutout.status.preparing'],
+  analyzing: (s) => [
+    'editor.cutout.status.analyzing',
+    { done: s.job?.done ?? 0, count: s.job?.count ?? 0 },
+  ],
+  ready: (s) => ['editor.cutout.status.ready', { count: s.needed }],
+  partial: (s) => ['editor.cutout.status.partial', { done: s.done, count: s.needed }],
+  none: () => ['editor.cutout.status.none'],
+  error: (s) => ['editor.cutout.status.error', { error: s.error ?? '' }],
+  'no-media': () => ['editor.cutout.status.noMedia'],
+}
+
 /** The status line under the controls: model download, analysis progress, or coverage. */
 export function CutoutStatusLine({ status }: { status: CutoutUiStatus }) {
   const { t } = useTranslation()
-  const job = status.job
-  const text = (() => {
-    switch (status.state) {
-      case 'queued':
-        return t('editor.cutout.status.queued')
-      case 'downloading':
-        return t('editor.cutout.status.downloading', {
-          percent: Math.round(status.progress * 100),
-          size: Math.round((job?.total ?? 0) / 1e6),
-        })
-      case 'preparing':
-        return t('editor.cutout.status.preparing')
-      case 'analyzing':
-        return t('editor.cutout.status.analyzing', { done: job?.done ?? 0, count: job?.count ?? 0 })
-      case 'ready':
-        return t('editor.cutout.status.ready', { count: status.needed })
-      case 'partial':
-        return t('editor.cutout.status.partial', { done: status.done, count: status.needed })
-      case 'none':
-        return t('editor.cutout.status.none')
-      case 'error':
-        return t('editor.cutout.status.error', { error: status.error ?? '' })
-      case 'no-media':
-        return t('editor.cutout.status.noMedia')
-      default:
-        return ''
-    }
-  })()
-  if (!text) return null
+  const entry = STATUS_TEXT[status.state]?.(status)
+  if (!entry) return null
   const busy = BUSY.has(status.state)
   return (
     <div className="space-y-1" data-testid="cutout-status">
@@ -70,7 +64,7 @@ export function CutoutStatusLine({ status }: { status: CutoutUiStatus }) {
             : 'text-xs text-muted-foreground tabular-nums'
         }
       >
-        {text}
+        {t(entry[0], entry[1])}
       </p>
     </div>
   )
