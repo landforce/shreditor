@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { create } from 'zustand'
 import { readAgentNotes, writeAgentNotes, type AgentNote } from '@/infrastructure/storage'
 import type { NoteAnchor } from '@/shared/projects/note-anchor.mjs'
@@ -39,6 +39,11 @@ interface AgentNotesState {
   showDone: boolean
   /** The Notes tray is folded to a slim strip (remembered per browser). */
   trayCollapsed: boolean
+  /**
+   * When the user last copied the notes prompt for the agent (ISO; per project,
+   * remembered per browser). Open notes written since are not handed over yet.
+   */
+  handedOffAt: string | null
   load: (projectId: string | null) => Promise<void>
   refresh: () => Promise<void>
   add: (input: NoteInput) => Promise<boolean>
@@ -49,6 +54,8 @@ interface AgentNotesState {
   reopen: (id: string) => Promise<boolean>
   setShowDone: (showDone: boolean) => void
   setTrayCollapsed: (collapsed: boolean) => void
+  /** The open notes were handed to the agent (the prompt was copied). */
+  markHandedOff: () => void
   openComposer: (frame: number, itemIds: string[], endFrame?: number) => void
   closeComposer: () => void
 }
@@ -56,6 +63,16 @@ interface AgentNotesState {
 const sameNotes = (a: AgentNote[], b: AgentNote[]) => JSON.stringify(a) === JSON.stringify(b)
 
 const TRAY_COLLAPSED_KEY = 'shreditor.notesTray.collapsed'
+const handedOffKey = (projectId: string) => `shreditor.notes.handedOff.${projectId}`
+
+function readHandedOff(projectId: string | null): string | null {
+  if (!projectId) return null
+  try {
+    return localStorage.getItem(handedOffKey(projectId))
+  } catch {
+    return null
+  }
+}
 
 function readTrayCollapsed(): boolean {
   try {
@@ -94,9 +111,16 @@ export const useAgentNotesStore = create<AgentNotesState>()((set, get) => {
     composer: null,
     showDone: false,
     trayCollapsed: readTrayCollapsed(),
+    handedOffAt: null,
 
     load: async (projectId) => {
-      set({ projectId, notes: [], failed: false, composer: null })
+      set({
+        projectId,
+        notes: [],
+        failed: false,
+        composer: null,
+        handedOffAt: readHandedOff(projectId),
+      })
       if (projectId) await get().refresh()
     },
 
@@ -163,6 +187,18 @@ export const useAgentNotesStore = create<AgentNotesState>()((set, get) => {
       set({ trayCollapsed })
     },
 
+    markHandedOff: () => {
+      const projectId = get().projectId
+      if (!projectId) return
+      const handedOffAt = new Date().toISOString()
+      try {
+        localStorage.setItem(handedOffKey(projectId), handedOffAt)
+      } catch {
+        // Blocked storage: the reminder comes back next time the project opens.
+      }
+      set({ handedOffAt })
+    },
+
     openComposer: (frame, itemIds, endFrame) =>
       set({ composer: { frame, itemIds, ...(endFrame === undefined ? {} : { endFrame }) } }),
     closeComposer: () => set({ composer: null }),
@@ -184,6 +220,50 @@ export function doneAgentNotes(notes: AgentNote[]): AgentNote[] {
   return notes
     .filter((note) => note.status === 'read')
     .sort((a, b) => (b.readAt ?? b.createdAt).localeCompare(a.readAt ?? a.createdAt))
+}
+
+/** Open notes written since the notes prompt was last copied for the agent. */
+export function unsentAgentNotes(notes: AgentNote[], handedOffAt: string | null): AgentNote[] {
+  return openAgentNotes(notes).filter((note) => !handedOffAt || note.createdAt > handedOffAt)
+}
+
+/** What the user pastes to the agent so it reads the notes and edits. */
+function agentNotesPrompt(projectId: string): string {
+  return `Check my notes on the timeline and edit. Shreditor project ${projectId}: read them with shred notes ${projectId}.`
+}
+
+/** Copy the notes prompt to the clipboard and count the open notes as handed over. */
+async function copyNotesForAgent(): Promise<boolean> {
+  const store = useAgentNotesStore.getState()
+  if (!store.projectId) return false
+  try {
+    await navigator.clipboard.writeText(agentNotesPrompt(store.projectId))
+  } catch (error) {
+    logger.warn('Copying the notes prompt failed', error)
+    return false
+  }
+  store.markHandedOff()
+  return true
+}
+
+/**
+ * The hand-off to the agent for a button: how many notes are open and how many
+ * weren't handed over yet, and `copy` (the prompt to the clipboard), with
+ * `copied` true for a moment after.
+ */
+export function useNotesHandOff() {
+  const notes = useAgentNotesStore((s) => s.notes)
+  const handedOffAt = useAgentNotesStore((s) => s.handedOffAt)
+  const open = useMemo(() => openAgentNotes(notes).length, [notes])
+  const unsent = useMemo(() => unsentAgentNotes(notes, handedOffAt).length, [notes, handedOffAt])
+  const [copied, setCopied] = useState(false)
+  useEffect(() => {
+    if (!copied) return
+    const timer = window.setTimeout(() => setCopied(false), 1800)
+    return () => window.clearTimeout(timer)
+  }, [copied])
+  const copy = () => void copyNotesForAgent().then(setCopied)
+  return { open, unsent, copied, copy }
 }
 
 /** Pause and open the comment composer at the playhead, with the selected items. */

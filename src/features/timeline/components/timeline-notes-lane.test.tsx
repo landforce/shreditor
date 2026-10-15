@@ -173,6 +173,36 @@ describe('Notes lane', () => {
     expect(header.style.height).toBe('64px')
   })
 
+  it('pulses the copy for the agent until the prompt is copied, then again for a new note', async () => {
+    const writeText = vi.fn(async () => {})
+    Object.assign(navigator, { clipboard: { writeText } })
+    localStorage.removeItem('shreditor.notes.handedOff.p1')
+    await loadNotes([note('n1', { frame: 30 })])
+    render(<TimelineNotesLaneHeader compact={false} />)
+    const copy = screen.getByTestId('timeline-notes-copy')
+    expect(copy.dataset.unsent).toBe('1')
+    fireEvent.click(copy)
+    await vi.waitFor(() =>
+      expect(writeText).toHaveBeenCalledWith(
+        'Check my notes on the timeline and edit. Shreditor project p1: read them with shred notes p1.',
+      ),
+    )
+    await vi.waitFor(() =>
+      expect(screen.getByTestId('timeline-notes-copy').dataset.unsent).toBeUndefined(),
+    )
+    expect(localStorage.getItem('shreditor.notes.handedOff.p1')).toBeTruthy()
+    await useAgentNotesStore.getState().add({ text: 'One more', frame: 60 })
+    await vi.waitFor(() =>
+      expect(screen.getByTestId('timeline-notes-copy').dataset.unsent).toBe('1'),
+    )
+  })
+
+  it('has no copy for the agent without open notes', async () => {
+    await loadNotes([note('n1', { status: 'read' })])
+    render(<TimelineNotesLaneHeader compact={false} />)
+    expect(screen.queryByTestId('timeline-notes-copy')).toBeNull()
+  })
+
   it('right-click on a note: add a note first, then open, mark done and delete', async () => {
     await loadNotes([note('n1', { frame: 30 })])
     render(<TimelineNotesLane />)

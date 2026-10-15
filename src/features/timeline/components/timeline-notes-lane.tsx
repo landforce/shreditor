@@ -4,12 +4,12 @@ import {
   Check,
   ChevronDown,
   ChevronUp,
+  ClipboardCopy,
   Eye,
   EyeOff,
   MessageSquare,
   Plus,
   RotateCcw,
-  Send,
   Trash2,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -28,6 +28,7 @@ import {
   openAgentNotes,
   startAgentComment,
   useAgentNotesStore,
+  useNotesHandOff,
 } from '@/shared/state/agent-notes'
 import { usePlaybackStore } from '@/shared/state/playback'
 import { useSelectionStore } from '@/shared/state/selection'
@@ -84,10 +85,53 @@ function TrayButton({
   )
 }
 
+/** A small pinging dot: something here is waiting on the user. */
+function PingDot() {
+  return (
+    <span className="pointer-events-none absolute -right-0.5 -top-0.5 flex h-2 w-2" aria-hidden>
+      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-500 opacity-75" />
+      <span className="relative inline-flex h-2 w-2 rounded-full bg-amber-500" />
+    </span>
+  )
+}
+
 /**
- * The tray's cell in the track-header column: label and open count, then the
- * show-done eye, add, and fold. Open, the label sits above the buttons; folded
- * (or in Concise's narrow column) it all fits one row.
+ * Copies "check my notes and edit" for the user to paste to the agent: notes
+ * only reach it when it is asked to read them. Pulses while open notes were
+ * written since the last copy.
+ */
+function CopyForAgentButton() {
+  const { t } = useTranslation()
+  const { open, unsent, copied, copy } = useNotesHandOff()
+  if (!open) return null
+  const waiting = unsent > 0 && !copied
+  const label = copied
+    ? t('timeline.notes.copied')
+    : t(waiting ? 'timeline.notes.copyUnsent' : 'timeline.notes.copy', { count: unsent })
+  return (
+    <Button
+      variant="ghost"
+      size="icon"
+      className={cn(
+        'relative h-5 w-5 shrink-0',
+        waiting && 'bg-amber-500/20 text-amber-700 dark:text-amber-300',
+      )}
+      onClick={copy}
+      aria-label={label}
+      data-tooltip={label}
+      data-testid="timeline-notes-copy"
+      data-unsent={unsent || undefined}
+    >
+      {copied ? <Check className="h-3 w-3" /> : <ClipboardCopy className="h-3 w-3" />}
+      {waiting && <PingDot />}
+    </Button>
+  )
+}
+
+/**
+ * The tray's cell in the track-header column: label, open count and the copy
+ * for the agent, then the show-done eye, add, and fold. Open, the label sits
+ * above the buttons; folded (or in Concise's narrow column) it all fits one row.
  */
 export const TimelineNotesLaneHeader = memo(function TimelineNotesLaneHeader({
   compact,
@@ -137,6 +181,7 @@ export const TimelineNotesLaneHeader = memo(function TimelineNotesLaneHeader({
             {openCount}
           </span>
         )}
+        <CopyForAgentButton />
       </div>
       <div className={cn('flex shrink-0 items-center', !stacked && 'ml-auto')}>
         <TrayButton
@@ -376,7 +421,7 @@ export const TimelineNotesLane = memo(function TimelineNotesLane() {
                 align="start"
                 className="w-80 space-y-2 p-2"
                 // A context menu hands focus back as it closes; that must not close
-                // the composer it just opened. Escape, a click outside or Send do.
+                // the composer it just opened. Escape, a click outside or Add do.
                 onFocusOutside={(event) => event.preventDefault()}
               >
                 <NoteComposer fps={fps} />
@@ -662,7 +707,7 @@ function NoteComposer({ fps }: { fps: number }) {
   }, [])
   if (!composer) return null
 
-  const send = async () => {
+  const addNote = async () => {
     const text = draft.trim()
     const store = useAgentNotesStore.getState()
     if (!text || !store.composer) return
@@ -699,7 +744,7 @@ function NoteComposer({ fps }: { fps: number }) {
         onKeyDown={(event) => {
           if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
             event.preventDefault()
-            void send()
+            void addNote()
           }
         }}
         placeholder={t('timeline.concise.comment.placeholder')}
@@ -715,11 +760,11 @@ function NoteComposer({ fps }: { fps: number }) {
         <Button
           size="sm"
           className="h-7 gap-1.5 text-xs"
-          onClick={() => void send()}
+          onClick={() => void addNote()}
           disabled={!draft.trim()}
         >
-          <Send className="h-3.5 w-3.5" />
-          {t('timeline.concise.comment.send')}
+          <Plus className="h-3.5 w-3.5" />
+          {t('timeline.concise.comment.add')}
         </Button>
       </div>
     </>

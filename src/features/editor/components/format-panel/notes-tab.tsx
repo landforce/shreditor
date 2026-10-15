@@ -1,9 +1,10 @@
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Send, X } from 'lucide-react'
+import { Check, ClipboardCopy, Plus, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
-import { openAgentNotes, useAgentNotesStore } from '@/shared/state/agent-notes'
+import { openAgentNotes, useAgentNotesStore, useNotesHandOff } from '@/shared/state/agent-notes'
+import { cn } from '@/shared/ui/cn'
 import { usePlaybackStore } from '@/shared/state/playback'
 import { formatTimecodeCompact } from '@/shared/utils/time-utils'
 import { useProjectFps } from '../concise/card-helpers'
@@ -11,7 +12,8 @@ import { useProjectFps } from '../concise/card-helpers'
 /**
  * Notes for the agent's next pass: a general note (no timecode) written here,
  * and every open note listed, timed ones with a chip that seeks to them. Timed
- * notes are written on the timeline's Notes tray.
+ * notes are written on the timeline's Notes tray. Notes reach the agent only
+ * when it is asked to read them, so the open ones come with a prompt to copy.
  */
 export function NotesTab() {
   const { t } = useTranslation()
@@ -20,8 +22,9 @@ export function NotesTab() {
   const failed = useAgentNotesStore((s) => s.failed)
   const [draft, setDraft] = useState('')
   const open = useMemo(() => openAgentNotes(notes), [notes])
+  const { unsent, copied, copy } = useNotesHandOff()
 
-  const send = async () => {
+  const addNote = async () => {
     const text = draft.trim()
     if (!text) return
     if (await useAgentNotesStore.getState().add({ text })) setDraft('')
@@ -34,7 +37,7 @@ export function NotesTab() {
           value={draft}
           onChange={(event) => setDraft(event.target.value)}
           onKeyDown={(event) => {
-            if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) void send()
+            if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) void addNote()
           }}
           placeholder={t('editor.concise.pass.notePlaceholder')}
           aria-label={t('editor.concise.pass.note')}
@@ -43,15 +46,33 @@ export function NotesTab() {
         <Button
           size="icon"
           className="h-8 w-8 shrink-0"
-          onClick={() => void send()}
+          onClick={() => void addNote()}
           disabled={!draft.trim()}
-          aria-label={t('editor.concise.pass.sendNote')}
-          data-tooltip={t('editor.concise.pass.sendNote')}
+          aria-label={t('editor.concise.pass.addNote')}
+          data-tooltip={t('editor.concise.pass.addNote')}
         >
-          <Send className="h-3.5 w-3.5" />
+          <Plus className="h-3.5 w-3.5" />
         </Button>
       </div>
       {failed && <p className="text-xs text-destructive">{t('editor.concise.pass.noteFailed')}</p>}
+      {open.length > 0 && (
+        <Button
+          variant="outline"
+          size="sm"
+          className={cn(
+            'h-7 w-full justify-start gap-1.5 text-xs',
+            unsent > 0 && !copied && 'border-amber-500/50 bg-amber-500/10',
+          )}
+          onClick={copy}
+        >
+          {copied ? <Check className="h-3.5 w-3.5" /> : <ClipboardCopy className="h-3.5 w-3.5" />}
+          {copied
+            ? t('editor.concise.pass.promptCopied')
+            : unsent > 0
+              ? t('editor.concise.pass.copyPromptUnsent', { count: unsent })
+              : t('editor.concise.pass.copyPrompt')}
+        </Button>
+      )}
       {open.length > 0 && (
         <ul className="space-y-1">
           {open.map((note) => (

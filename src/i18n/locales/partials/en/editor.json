@@ -11,10 +11,14 @@
       "pass": {
         "note": "Note for the next pass",
         "notePlaceholder": "Tell the agent what to change",
-        "sendNote": "Leave note",
         "removeNote": "Remove note",
         "goToNote": "Go to this moment",
-        "noteFailed": "Couldn't save the note. Try again."
+        "noteFailed": "Couldn't save the note. Try again.",
+        "addNote": "Add note",
+        "copyPrompt": "Copy the prompt for Claude",
+        "copyPromptUnsent_one": "Copy the prompt for Claude ({{count}} new note)",
+        "copyPromptUnsent_other": "Copy the prompt for Claude ({{count}} new notes)",
+        "promptCopied": "Copied: paste it to Claude"
       },
       "shot": {
         "title": "Shot {{n}} of {{m}}",
