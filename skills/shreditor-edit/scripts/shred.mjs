@@ -133,6 +133,14 @@
 //   shred export <id> [--native|--browser] [--codec h264|hevc|prores] [--quality low|medium|high|ultra] [--out name]
 //                                        final export to <workspace>/projects/<id>/exports/; default: native
 //                                        (ffmpeg from the originals) when the plan allows it, else browser
+//   shred cut new <projectId> --label "Hook B" [--size 1920x1080] [--from <cutId>]
+//                                        another version of the edit as a cut: its own project (canvas,
+//                                        drafts, passes, notes, export) sharing the media; --size re-fits
+//                                        it (full-bleed clips cover, text takes its styles' look for the
+//                                        new aspect) and says what to review; prints id and editor URL
+//   shred cut list <projectId> [--json]  the cuts in the group: label, size, format, last pass, scorecard
+//   shred cut rename <cutId> "..."       relabel a cut (the editor's cut switcher shows it)
+//   shred cut remove <cutId> --yes       move a cut to the editor's Trash (restorable; media stays)
 //
 // Service: 127.0.0.1:8787 (SHRED_SERVICE to override). Workspace: SHRED_WORKSPACE,
 // else ~/.shreditor/config.json, else ~/Movies/Shreditor. Times are frames at the
@@ -173,6 +181,7 @@ import {
 import { templatesCommand } from './templates.mjs'
 import { describeNote, markRead, openNotes } from './notes.mjs'
 import { createActivity } from './activity.mjs'
+import { cutCommands, cutGroupLines, cutLine } from './cuts.mjs'
 import { draftPlanGate, planCheck, planCommands, printPlanCheck } from './plan.mjs'
 import { runBuild, gitHead, staleBuild } from '../../../server/install/build-state.mjs'
 import { DEFAULT_LABEL_PREFIX, jobLabel, jobStatus } from '../../../server/install/launchd.mjs'
@@ -928,7 +937,31 @@ async function userChangedSince(origin, targetId) {
   }
 }
 
+// `shred cut` and the cut lines in status, project and publish (cuts.mjs).
+const cutDeps = () => ({
+  say,
+  opt,
+  workspace,
+  call,
+  key,
+  getProject,
+  applyBatch,
+  readDrafts,
+  warnUnsaved,
+  editorState,
+  writeJsonAtomic,
+  editor: EDITOR,
+  scorecard: async (project) =>
+    project.format ? scoreProject(project, await scoringInputs(project)) : null,
+})
+
 const commands = {
+  async cut([sub, ...rest]) {
+    const run = cutCommands(cutDeps())[sub]
+    if (!run) throw new Error('Usage: shred cut new|list|rename|remove (see shred help)')
+    await run(rest)
+  },
+
   async up() {
     const info = await editorInfo()
     const managed = loginItem('editor', EDITOR)
@@ -1463,6 +1496,8 @@ const commands = {
     )
     const passes = await activity.statusLines()
     say(`passes     ${passes.length ? passes.join('\n           ') : 'none in progress'}`)
+    const groups = h ? await cutGroupLines(cutDeps()).catch(() => []) : []
+    if (groups.length) say(`cuts       ${groups.join('\n           ')}`)
   },
 
   async project([id]) {
@@ -1481,6 +1516,8 @@ const commands = {
         ? `format   ${formatTitle(format)} (shred format ${id})`
         : 'format   none (shred format list)',
     )
+    const cut = await cutLine(cutDeps(), id, project)
+    if (cut) say(cut)
     for (const t of [...s.tracks].sort((x, y) => x.order - y.order)) {
       const role = format ? trackRole(t, format) : null
       say(`\n${t.name} (${t.kind ?? 'track'} ${t.id}${role ? `, role ${role}` : ''})`)
@@ -1804,6 +1841,11 @@ const commands = {
     say(
       `Editor: ${EDITOR}/editor/${targetId}  (an open editor reloads it within a second; open this link if it isn't showing)`,
     )
+    const cut = await cutLine(cutDeps(), targetId, target.project)
+    if (cut)
+      say(
+        `${cut}\nTell the user which cut this pass is in; their editor stays on the cut they have open.`,
+      )
     if (scorecard) {
       say('')
       printScorecard(scorecard, published)

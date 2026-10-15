@@ -813,6 +813,18 @@ const projectKitSchema = z
   .strict()
 
 // ============================================================================
+// Project cut (docs/cuts.md): its group, label and order
+// ============================================================================
+
+const projectCutSchema = z
+  .object({
+    group: z.string().min(1),
+    label: z.string().trim().min(1).max(60),
+    order: z.number().int().min(0).max(10_000).optional(),
+  })
+  .strict()
+
+// ============================================================================
 // Project Schema
 // ============================================================================
 
@@ -831,6 +843,7 @@ const projectSchema = z
     metadata: projectResolutionSchema,
     format: projectFormatSchema.optional(),
     kit: projectKitSchema.optional(),
+    cut: projectCutSchema.optional(),
     timeline: timelineSchema.optional(),
   })
   .strict()

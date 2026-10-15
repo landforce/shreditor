@@ -404,6 +404,16 @@ const projectKit = z
   .object({ path: z.string().min(1), kitVersion: z.string().min(1), hash: z.string().min(1) })
   .passthrough()
 
+// A project's place in a cut group (docs/cuts.md): the group's main project
+// id, the cut's label and its order in the switcher.
+const projectCut = z
+  .object({
+    group: portableIdSchema,
+    label: z.string().trim().min(1).max(60),
+    order: z.number().int().min(0).max(10_000).optional(),
+  })
+  .strict()
+
 export const projectCreateRequestSchema = z
   .object({
     id: portableIdSchema.optional(),
@@ -452,6 +462,7 @@ const lifecycleProjectSchema = z
       .strict(),
     format: storedFormat.optional(),
     kit: projectKit.optional(),
+    cut: projectCut.optional(),
     timeline: lifecycleTimelineSchema.optional(),
   })
   .strict()
@@ -485,9 +496,23 @@ export const projectUpdateRequestSchema = z
         format: formatChoice.nullable().optional(),
         // The Video Style Kit record (shred kit apply); null clears it.
         kit: projectKit.nullable().optional(),
+        // The project's cut label and order (shred cut rename, the editor's Manage cuts).
+        cut: projectCut.optional(),
       })
       .strict()
       .refine((v) => Object.keys(v).length > 0, 'updates must not be empty'),
+    expectedRevision: revisionSchema.optional(),
+    force: z.boolean().optional(),
+  })
+  .strict()
+  .refine((v) => Boolean(v.expectedRevision) || v.force === true, {
+    message: 'expectedRevision is required unless force is true',
+    path: ['expectedRevision'],
+  })
+
+// Move a project to the editor's Trash (shred cut remove): restorable, no media deleted.
+export const projectTrashRequestSchema = z
+  .object({
     expectedRevision: revisionSchema.optional(),
     force: z.boolean().optional(),
   })
@@ -749,6 +774,7 @@ export function capabilities() {
       projectCreate: z.toJSONSchema(projectCreateRequestSchema, { target: 'draft-7' }),
       projectSave: z.toJSONSchema(projectSaveRequestSchema, { target: 'draft-7' }),
       projectUpdate: z.toJSONSchema(projectUpdateRequestSchema, { target: 'draft-7' }),
+      projectTrash: z.toJSONSchema(projectTrashRequestSchema, { target: 'draft-7' }),
       lifecycleEdit: z.toJSONSchema(lifecycleEditRequestSchema, { target: 'draft-7' }),
       mediaProbe: z.toJSONSchema(mediaProbeRequestSchema, { target: 'draft-7' }),
     },
@@ -761,6 +787,7 @@ export function capabilities() {
         'PUT /v1/projects/:id',
         'PATCH /v1/projects/:id',
         'POST /v1/projects/:id/edit',
+        'POST /v1/projects/:id/trash',
         'GET /v1/media',
         'GET /v1/media/:id',
         'POST /v1/media/:id/probe',
@@ -768,6 +795,7 @@ export function capabilities() {
       ],
       httpMediaUpload: false,
       deleteProject: false,
+      trashProject: true,
       writerMode: 'exclusive',
       limits: {
         projectJsonBytes: 16 * 1024 * 1024,
