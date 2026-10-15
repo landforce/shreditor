@@ -102,7 +102,8 @@ export const TimelineNotesLaneHeader = memo(function TimelineNotesLaneHeader({
     : t('timeline.notes.showDone', { count: doneCount })
   const foldLabel = collapsed ? t('timeline.notes.expand') : t('timeline.notes.collapse')
   const stacked = !collapsed
-  const showLabel = !compact || stacked
+  // Concise's narrow column has no room for the word; the icon and count say it.
+  const showLabel = !compact
   return (
     <div
       className={cn(
@@ -114,7 +115,7 @@ export const TimelineNotesLaneHeader = memo(function TimelineNotesLaneHeader({
       data-testid="timeline-notes-header"
     >
       <div className="flex min-w-0 items-center gap-1">
-        {!(compact && !stacked && openCount > 0) && (
+        {!(compact && openCount > 0) && (
           <MessageSquare
             className="h-3.5 w-3.5 shrink-0 text-amber-600 dark:text-amber-400"
             aria-hidden="true"
