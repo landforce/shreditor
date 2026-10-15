@@ -46,17 +46,16 @@ function OptionsControl({ variable, value, label, onChange }: ControlProps) {
 
 /** A control per HyperFrames variable type; anything else edits as text. */
 const CONTROLS: Record<string, (props: ControlProps) => ReactNode> = {
-  color: ({ value, label, onChange }) => (
-    <ColorPicker color={textOf(value) || '#ffffff'} onChange={onChange} label={label} />
+  color: ({ value, onChange }) => (
+    <ColorPicker color={textOf(value) || '#ffffff'} onChange={onChange} />
   ),
-  number: ({ variable, value, label, onChange }) => (
+  number: ({ variable, value, onChange }) => (
     <NumberInput
       value={Number(value ?? 0)}
       onChange={onChange}
       min={variable.min}
       max={variable.max}
       step={variable.step}
-      label={label}
     />
   ),
   boolean: ({ value, label, onChange }) => (
@@ -81,11 +80,19 @@ function VariableControl(props: Omit<ControlProps, 'label'>) {
 }
 
 /**
- * A HyperFrames motion graphic's controls (its composition's variables). Update
- * re-renders it with the new values and swaps the render into the clip: the
- * same `shred motion add --item` Claude runs, so nothing is lost.
+ * A HyperFrames motion graphic's controls (its composition's variables), for
+ * a clip `shred motion` placed. Update re-renders it with the new values and
+ * swaps the render into the clip: the same `shred motion add --item` Claude
+ * runs, so nothing is lost. `wrap` frames the body (the clip panel's section,
+ * Concise's card cell); nothing renders for other clips.
  */
-export function MotionGraphicSection({ items }: { items: TimelineItem[] }) {
+export function MotionGraphicControls({
+  items,
+  wrap,
+}: {
+  items: TimelineItem[]
+  wrap: (body: ReactNode) => ReactNode
+}) {
   const { t } = useTranslation()
   const item = items.length === 1 && isMotionGraphicClip(items[0]) ? items[0] : undefined
   const itemId = item?.id
@@ -130,8 +137,8 @@ export function MotionGraphicSection({ items }: { items: TimelineItem[] }) {
     }
   }
 
-  return (
-    <PropertySection title={t('editor.motionGraphic.title')} icon={Sparkles} defaultOpen>
+  return wrap(
+    <>
       {info.variables.length === 0 ? (
         <p className="px-1 pb-2 text-[11px] leading-snug text-muted-foreground">
           {t('editor.motionGraphic.noControls')}
@@ -186,6 +193,21 @@ export function MotionGraphicSection({ items }: { items: TimelineItem[] }) {
       <p className="mt-2 px-1 text-[11px] leading-snug text-muted-foreground">
         {t('editor.motionGraphic.hint')}
       </p>
-    </PropertySection>
+    </>,
+  )
+}
+
+/** The clip panel's Motion graphic section. */
+export function MotionGraphicSection({ items }: { items: TimelineItem[] }) {
+  const { t } = useTranslation()
+  return (
+    <MotionGraphicControls
+      items={items}
+      wrap={(body) => (
+        <PropertySection title={t('editor.motionGraphic.title')} icon={Sparkles} defaultOpen>
+          {body}
+        </PropertySection>
+      )}
+    />
   )
 }

@@ -32,9 +32,7 @@ function FieldControl({
 }) {
   switch (field.kind) {
     case 'color':
-      return (
-        <ColorPicker color={String(value)} onChange={onChange} label={label} disabled={disabled} />
-      )
+      return <ColorPicker color={String(value)} onChange={onChange} disabled={disabled} />
     case 'number':
       return (
         <NumberInput
@@ -43,7 +41,6 @@ function FieldControl({
           min={field.min}
           max={field.max}
           step={field.step}
-          label={label}
           disabled={disabled}
         />
       )
@@ -137,7 +134,11 @@ function KitGroupFields({
           ? t(`formats.style.fields.${field.labelKey}`, { defaultValue: field.label })
           : field.label
         return (
-          <PropertyRow key={field.path} label={label}>
+          <PropertyRow
+            key={field.path}
+            label={label}
+            className="[&>span:first-child]:w-28 [&>span:first-child]:shrink-0"
+          >
             <div className="min-w-0 flex-1">
               <FieldControl
                 field={field}
