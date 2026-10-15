@@ -9,26 +9,16 @@
         "description": "Every property of the current selection."
       },
       "pass": {
-        "title": "Pass",
-        "subtitle": "nothing selected",
-        "format": "Format",
-        "noFormat": "No format set",
-        "noProject": "Open a project to leave notes for the agent.",
-        "scorecard": "Scorecard",
-        "changeFormat": "Change format",
-        "fail": "fail",
-        "warn": "warn",
-        "pass": "pass",
-        "changes": "Your changes since the pass",
-        "noChanges": "Nothing changed yet",
-        "conflict": "The file changed on disk. Resolve it before saving.",
-        "save": "Save",
         "note": "Note for the next pass",
         "notePlaceholder": "Tell the agent what to change",
-        "sendNote": "Leave note",
         "removeNote": "Remove note",
         "goToNote": "Go to this moment",
-        "noteFailed": "Couldn't save the note. Try again."
+        "noteFailed": "Couldn't save the note. Try again.",
+        "addNote": "Add note",
+        "copyPrompt": "Copy the prompt for Claude",
+        "promptCopied": "Copied: paste this to your agent",
+        "copyPromptWaiting_one": "Copy the prompt for Claude ({{count}} note not picked up yet)",
+        "copyPromptWaiting_other": "Copy the prompt for Claude ({{count}} notes not picked up yet)"
       },
       "shot": {
         "title": "Shot {{n}} of {{m}}",
@@ -991,6 +981,16 @@
       "passReadyNoLabel": "Pass ready",
       "refused": "The agent is working. Wait for it, or choose Edit anyway.",
       "actionFailed": "Couldn't reach the editor's bridge. Try again."
+    },
+    "motionGraphic": {
+      "title": "Motion graphic",
+      "update": "Update graphic",
+      "saving": "Saving…",
+      "rendering": "Rendering…",
+      "revert": "Revert",
+      "unsaved": "The editor could not save its changes first. Try again.",
+      "noControls": "This graphic has no controls. Ask Claude to change it, or to add controls for its text and colours.",
+      "hint": "Rendered by HyperFrames. Updating re-renders it in a few seconds. For a different animation, add a note for the agent."
     }
   }
 }

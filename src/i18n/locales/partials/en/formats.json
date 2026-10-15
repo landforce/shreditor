@@ -97,7 +97,7 @@
     },
     "chip": {
       "none": "No format",
-      "open": "Format and scorecard",
+      "open": "Project specs: format, scorecard, canvas and notes",
       "fail": "{{count}} fail",
       "warn": "{{count}} warn",
       "pass": "✓"
@@ -110,6 +110,42 @@
     },
     "timeline": {
       "roleBadge": "Format role: {{role}}"
+    },
+    "specs": {
+      "title": "Project specs",
+      "description": "The project's format, its scorecard, the style kit, the canvas and the notes for the agent.",
+      "open": "Project specs",
+      "nothingSelected": "Nothing selected",
+      "nothingSelectedBody": "Select a clip to edit it. The format, scorecard, canvas and notes are in Project specs.",
+      "notesTab": "Notes",
+      "styleTab": "Style"
+    },
+    "style": {
+      "kit": "Video Style Kit",
+      "save": "Save to kit",
+      "saving": "Saving…",
+      "revert": "Revert",
+      "noBridge": "The style kit is edited through the local Shreditor service, which is not running.",
+      "noKit": "This project has no Video Style Kit. Ask Claude to apply one (shred kit apply) and its fonts, looks and preferences show here.",
+      "drift": "The kit file changed since this project applied it. Ask Claude to re-apply it (shred kit apply) before editing it here.",
+      "unreadable": "The kit file can't be read: {{error}}",
+      "unsaved": "The editor could not save its changes first. Try again.",
+      "hint": "Saving updates kit.json (logged in its changelog) and restyles this project's kit titles, captions and overlays. Anything else in the kit: ask Claude.",
+      "groups": {
+        "fonts": "Fonts",
+        "titles": "Titles",
+        "captions": "Captions",
+        "overlays": "Overlays",
+        "preferences": "Editing preferences"
+      },
+      "fields": {
+        "font": "Font",
+        "weight": "Weight",
+        "size": "Size",
+        "color": "Colour",
+        "boxColor": "Box colour",
+        "highlightColor": "Highlight"
+      }
     }
   }
 }

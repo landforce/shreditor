@@ -79,7 +79,7 @@ describe('ConciseShell', () => {
   })
 
   it('renders the strip only when narrow', async () => {
-    render(<ConciseShell project={project} onSave={vi.fn()} />)
+    render(<ConciseShell project={project} />)
     setWidth(740)
 
     expect(screen.getByTestId('media-bin-strip')).toBeInTheDocument()
@@ -91,7 +91,7 @@ describe('ConciseShell', () => {
   })
 
   it('renders the panel bin only when wide', () => {
-    render(<ConciseShell project={project} onSave={vi.fn()} />)
+    render(<ConciseShell project={project} />)
     setWidth(1600)
 
     expect(screen.getByTestId('media-bin-panel')).toBeInTheDocument()
@@ -99,22 +99,19 @@ describe('ConciseShell', () => {
     expect(screen.getByTestId('preview-area')).toHaveAttribute('data-compact', 'false')
   })
 
-  it('calls onSave on the save-project event and closes the sidebar on mount', () => {
-    const onSave = vi.fn()
-    render(<ConciseShell project={project} onSave={onSave} />)
+  it('closes the full media sidebar on mount (the bin replaces it)', () => {
+    render(<ConciseShell project={project} />)
 
     expect(mocks.editorState.setLeftSidebarOpen).toHaveBeenCalledWith(false)
-    window.dispatchEvent(new CustomEvent('shreditor:save-project'))
-    expect(onSave).toHaveBeenCalledTimes(1)
   })
 
   it('shows the media sidebar drawer only for a non-media tab', () => {
-    const { unmount } = render(<ConciseShell project={project} onSave={vi.fn()} />)
+    const { unmount } = render(<ConciseShell project={project} />)
     expect(screen.queryByTestId('media-sidebar')).not.toBeInTheDocument()
     unmount()
 
     mocks.editorState.activeTab = 'text'
-    render(<ConciseShell project={project} onSave={vi.fn()} />)
+    render(<ConciseShell project={project} />)
     expect(screen.getByTestId('media-sidebar')).toBeInTheDocument()
   })
 })

@@ -141,6 +141,7 @@ const newStore: MediaLibraryStoreApi =
         selectedMediaIds: [],
         selectedCompositionIds: [],
         searchQuery: '',
+        showOlderRenders: false,
         filterByType: null,
         sortBy: 'date',
         viewMode: 'grid',
@@ -482,6 +483,7 @@ const newStore: MediaLibraryStoreApi =
 
         // Filters and search
         setSearchQuery: (query) => set({ searchQuery: query }),
+        setShowOlderRenders: (show) => set({ showOlderRenders: show }),
         setFilterByType: (type) => set({ filterByType: type }),
         setSortBy: (sortBy) => set({ sortBy }),
         setViewMode: (viewMode) => set({ viewMode }),

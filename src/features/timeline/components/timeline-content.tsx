@@ -36,6 +36,8 @@ import {
 } from '../constants'
 
 // Components
+import { TimelineNotesLaneSurface } from './timeline-notes-lane'
+import { useNotesLaneHeight } from './timeline-notes-lane-layout'
 import { TimelinePlayhead } from './timeline-playhead'
 import { TimelinePreviewScrubber } from './timeline-preview-scrubber'
 import { TimelineRulerSurface } from './timeline-ruler-surface'
@@ -750,6 +752,7 @@ export const TimelineContent = memo(function TimelineContent({
 
   perfMarkRender('TimelineContent')
   const { t } = useTranslation()
+  const notesLaneHeight = useNotesLaneHeight()
 
   // Prefetch waveforms for clips approaching the viewport
   useWaveformPrefetch()
@@ -2168,7 +2171,10 @@ export const TimelineContent = memo(function TimelineContent({
         />
 
         {itemIds.length === 0 && (
-          <div className="pointer-events-none absolute inset-x-0 bottom-0 top-[64px] z-20 flex items-center justify-center px-6">
+          <div
+            className="pointer-events-none absolute inset-x-0 bottom-0 z-20 flex items-center justify-center px-6"
+            style={{ top: 64 + notesLaneHeight }}
+          >
             <div className="rounded-xl border border-dashed border-border/80 bg-background/85 px-5 py-4 text-center shadow-lg backdrop-blur-sm">
               <p className="text-sm font-semibold text-foreground">{t('timeline.emptyTitle')}</p>
               <p className="mt-1 text-xs text-muted-foreground">{t('timeline.emptyDescription')}</p>
@@ -2181,6 +2187,12 @@ export const TimelineContent = memo(function TimelineContent({
           containerWidth={containerWidth}
           initialWidth={timelineWidth}
           coordinateSurfaceRef={rulerCoordinateSurfaceRef}
+        />
+
+        <TimelineNotesLaneSurface
+          duration={actualDuration}
+          containerWidth={containerWidth}
+          initialWidth={timelineWidth}
         />
 
         <TimelineSettledContentZoomProvider>
@@ -2226,7 +2238,10 @@ export const TimelineContent = memo(function TimelineContent({
       {anyOverflow && (
         <div className="flex shrink-0 flex-col w-3 bg-background/80">
           {/* Ruler spacer */}
-          <div className="shrink-0" style={{ height: `${TIMELINE_RULER_HEIGHT}px` }} />
+          <div
+            className="shrink-0"
+            style={{ height: `${TIMELINE_RULER_HEIGHT + notesLaneHeight}px` }}
+          />
           {hasTrackSections ? (
             <>
               <TrackSectionScrollbarOverlay

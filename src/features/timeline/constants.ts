@@ -14,6 +14,8 @@ export const DEFAULT_FPS = SHARED_DEFAULT_FPS
 export const TIMELINE_HEADER_HEIGHT = EDITOR_LAYOUT.timelineHeaderHeight
 export const TIMELINE_TRACKS_HEADER_HEIGHT = EDITOR_LAYOUT.timelineTracksHeaderHeight
 export const TIMELINE_RULER_HEIGHT = EDITOR_LAYOUT.timelineRulerHeight
+/** The Notes tray under the ruler (the user's notes for the agent): cards with the text. */
+export const TIMELINE_NOTES_TRAY_HEIGHT = 64
 export const TIMELINE_SIDEBAR_WIDTH = EDITOR_LAYOUT.timelineSidebarWidth
 
 // =============================================================================

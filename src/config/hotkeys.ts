@@ -385,7 +385,7 @@ export const HOTKEY_DESCRIPTIONS: Record<HotkeyKey, string> = {
   REMOVE_MARKER: 'Remove selected marker',
   PREVIOUS_MARKER: 'Jump to previous marker',
   NEXT_MARKER: 'Jump to next marker',
-  COMMENT_FOR_AGENT: 'Comment for the agent at the playhead (Concise)',
+  COMMENT_FOR_AGENT: 'Note for the agent at the playhead',
 
   // Keyframes
   CLEAR_KEYFRAMES: 'Clear all keyframes from selected items',

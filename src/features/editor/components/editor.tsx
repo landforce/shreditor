@@ -39,6 +39,7 @@ import { useEditorHotkeys } from '@/features/editor/hooks/use-editor-hotkeys'
 import { useAutoSave } from '../hooks/use-auto-save'
 import { ProjectSyncBanner } from '../agent-sync/sync-banner'
 import { AgentActivityBanner } from '../agent-sync/agent-activity-banner'
+import { useAgentNotesSync } from '@/shared/state/agent-notes'
 import { isAgentEditLocked, refuseEditWhileAgentWorks } from '@/shared/state/agent-edit-lock'
 import { useProjectSyncStore } from '../agent-sync/sync-store'
 import { useProjectFileWatcher } from '../agent-sync/use-project-file-watcher'
@@ -86,6 +87,7 @@ import {
 import { IoDragReadout } from '@/shared/timeline/io-range'
 import type { ProjectFormat } from '@formats/registry.mjs'
 import { FormatScorecardController } from './format-panel/format-scorecard-controller'
+import { ProjectSpecsDrawer } from './format-panel/project-specs-drawer'
 const logger = createLogger('Editor')
 const LazyTimeline = lazy(() => importTimeline().then(({ Timeline }) => ({ default: Timeline })))
 const LazyColorGradingDock = lazy(() =>
@@ -236,6 +238,8 @@ const startedUpgradeBackups = new Map<string, Promise<void>>()
  * snapshotted first (best-effort safety net), then the editor loads. No prompt.
  */
 export const Editor = memo(function Editor({ projectId, project, migration }: EditorProps) {
+  // The user's notes for the agent: the Notes lane and the Pass card read them in every layout.
+  useAgentNotesSync(projectId)
   const { t } = useTranslation()
   const [upgradeApproved, setUpgradeApproved] = useState(!migration.requiresUpgrade)
   const backupName = formatProjectUpgradeBackupName(
@@ -436,20 +440,12 @@ function hidesDefaultSidebarsFor(workspace: string): boolean {
 }
 
 /** The Concise workspace replaces the whole default editor body with its own shell. */
-function ConciseWorkspaceBody({
-  project,
-  onSave,
-  locked,
-}: {
-  project: EditorProject
-  onSave: () => Promise<void>
-  locked: boolean
-}) {
+function ConciseWorkspaceBody({ project, locked }: { project: EditorProject; locked: boolean }) {
   return (
     <InteractionLockRegion locked={locked} className="min-w-0 flex-1">
       <ErrorBoundary level="feature">
         <Suspense fallback={null}>
-          <LazyConciseShell project={project} onSave={onSave} />
+          <LazyConciseShell project={project} />
         </Suspense>
       </ErrorBoundary>
     </InteractionLockRegion>
@@ -907,6 +903,7 @@ export const LoadedEditor = memo(function LoadedEditor({
     >
       <AutoSaveController onSave={handleSave} projectId={projectId} />
       <FormatScorecardController />
+      <ProjectSpecsDrawer />
       <AgentActivityBanner projectId={projectId} />
       <ProjectSyncBanner projectId={projectId} />
       <TimelineShortcutsController />
@@ -938,11 +935,7 @@ export const LoadedEditor = memo(function LoadedEditor({
 
         {/* Right side: Preview/Properties + Timeline */}
         {isConciseWorkspace ? (
-          <ConciseWorkspaceBody
-            project={project}
-            onSave={handleSave}
-            locked={isMaskEditingActive}
-          />
+          <ConciseWorkspaceBody project={project} locked={isMaskEditingActive} />
         ) : isColorWorkspace ? (
           <ColorWorkspaceBody project={project} locked={isMaskEditingActive} />
         ) : (

@@ -105,6 +105,13 @@
 //   shred kit save-back <id> [--style kit:title] [--force]
 //                                        write the project's kit:* style tweaks into kit.json (version
 //                                        bump, changelog); only when the user asks
+//   shred kit set <id> <path> <value>|<path>=<value> ... [--why "..."]
+//                                        change kit.json values by path (titles.style.size 104,
+//                                        fonts.classic.stack.0 "TikTok Sans", preferences.punchIns.on false):
+//                                        checked, logged in its changelog, the project's kit:* styles follow.
+//                                        Only when the user asks. --force: a new key, a type change, or a drifted file
+//   shred kit detach <id>              stop following the kit (only when the user asks): the record goes,
+//                                        the project's kit:* styles stay
 //   shred publish <draftId> <targetId> --label "..." --summary <file.md>
 //                                        hand the finished draft to the user's project as one pass
 //                                        (the pass record carries the scorecard; refreshes the
@@ -114,11 +121,25 @@
 //   shred notes <id> [--json]            the user's open notes: comments pinned to a timecode (with
 //                                        what sits at that frame and what they had selected) and
 //                                        general notes from the Pass card
-//   shred notes <id> --read <id,...|all> mark notes read once acted on (the editor clears them)
+//   shred notes <id> --read <id,...|all> [--reply "what you did"]
+//                                        mark notes read once acted on; the reply and the latest
+//                                        pass show on the done note in the editor's Notes lane
 //   shred notes <id> --watch             print each note as the user sends it (run it under a monitor)
 //   shred master <audio|video> [--lufs -14] [--tp -1.5] [--out file.wav]
 //                                        loudness-master to a new WAV (two-pass loudnorm)
 //   shred sync <id> [--timeout 20]       make the open editor save now, so the agent sees unsaved tweaks
+//   shred motion new <projectId> --name "..." [--duration 3]
+//                                        scaffold a HyperFrames motion graphic at the project's canvas
+//                                        (projects/<id>/motion/<slug>/, transparent starter)
+//   shred motion add <draftId> <name|folder|.html> [--at <frame|2.5s>] [--variables JSON]
+//                                        [--item <clipId> [--force]] [--keep-audio]   render it to a
+//                                        transparent WebM (reused when nothing changed) and put it on the
+//                                        first free Motion lane, or swap it into that motion clip keeping
+//                                        its place and look; its own audio is dropped unless --keep-audio
+//   shred motion render <folder|.html> [--variables JSON] [--fps 30]   render only
+//   shred motion list <id>               the motion graphics on a timeline, with their folders
+//   shred motion vars <id> <clipId> [--json]   a motion clip's controls (declared variables) and the
+//                                        values its render used; a swap keeps them unless --variables changes them
 //   shred templates list [--category c] [--json]   the motion graphics template library: name,
 //                                        category, size, duration, controls (with defaults)
 //   shred templates show <name|id>       one template: controls, media, folder, thumbnail
@@ -173,7 +194,8 @@ import {
   readCubeFileHeader,
 } from '../../../headless/lib/luts.mjs'
 import { templatesCommand } from './templates.mjs'
-import { describeNote, markRead, openNotes } from './notes.mjs'
+import { motionCommands } from './motion.mjs'
+import { describeNote, markRead, markSeen, noteSpan, openNotes } from './notes.mjs'
 import { createActivity } from './activity.mjs'
 import { draftPlanGate, planCheck, planCommands, printPlanCheck } from './plan.mjs'
 import { runBuild, gitHead, staleBuild } from '../../../server/install/build-state.mjs'
@@ -183,14 +205,30 @@ import { createAutostart } from '../../../server/install/self-start.mjs'
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..')
 const SERVICE = process.env.SHRED_SERVICE || 'http://127.0.0.1:8787'
-const say = (line = '') => process.stdout.write(`${line}\n`)
-process.stdout.on('error', (e) => e.code === 'EPIPE' && process.exit(0))
+// When the reader goes away (`shred ... | head`), stop printing but finish the
+// command: exiting here would leave a half-applied change (styles written, the
+// kit record not).
+let stdoutClosed = false
+const say = (line = '') => {
+  if (!stdoutClosed) process.stdout.write(`${line}\n`)
+}
+process.stdout.on('error', (e) => {
+  if (e.code !== 'EPIPE') throw e
+  stdoutClosed = true
+})
 
 const { values: opt, positionals } = parseArgs({
   allowPositionals: true,
-  // `--lufs -14` reads as a flag to parseArgs; glue negative numbers to their option.
+  // `--lufs -14` reads as a flag to parseArgs; glue negative numbers to their option,
+  // and a kit value to its path (`kit set <id> titles.style.letterSpacing -2`).
   args: process.argv.slice(2).reduce((out, arg) => {
     if (/^-\d/.test(arg) && /^--(lufs|tp)$/.test(out.at(-1) ?? '')) out.push(`${out.pop()}=${arg}`)
+    else if (
+      /^-\d/.test(arg) &&
+      process.argv[2] === 'kit' &&
+      /^[a-z][\w]*(\.[\w]+)+$/i.test(out.at(-1) ?? '')
+    )
+      out.push(`${out.pop()}=${arg}`)
     else out.push(arg)
     return out
   }, []),
@@ -237,7 +275,13 @@ const { values: opt, positionals } = parseArgs({
     scaffold: { type: 'boolean' },
     'no-plan': { type: 'boolean' },
     read: { type: 'string' },
+    reply: { type: 'string' },
     watch: { type: 'boolean' },
+    duration: { type: 'string' },
+    variables: { type: 'string' },
+    item: { type: 'string' },
+    'keep-audio': { type: 'boolean' },
+    why: { type: 'string' },
     allow: { type: 'string' },
     disallow: { type: 'string' },
   },
@@ -296,6 +340,9 @@ const writeDrafts = (d) => {
   fs.mkdirSync(path.dirname(DRAFTS), { recursive: true })
   fs.writeFileSync(DRAFTS, `${JSON.stringify(d, null, 2)}\n`)
 }
+
+/** The user's project behind a draft (a project id stays as it is). */
+const baseProjectId = (id) => readDrafts()[id]?.targetId ?? id
 
 const EDITOR = process.env.SHRED_EDITOR || 'http://localhost:5273'
 const editorUp = async () => {
@@ -528,6 +575,22 @@ const getProject = (id) => call('GET', `/v1/projects/${encodeURIComponent(id)}`)
 
 const notesFile = (id) => path.join(workspace(), 'projects', id, 'agent', 'notes.json')
 
+/** Replace the project's notes file (atomically). */
+function writeNotes(id, notes) {
+  const file = notesFile(id)
+  fs.writeFileSync(`${file}.tmp`, `${JSON.stringify({ version: 1, notes }, null, 2)}\n`)
+  fs.renameSync(`${file}.tmp`, file)
+}
+
+/** Record that the agent was shown these open notes (the editor stops pulsing for them). */
+function noteSeen(id, shown) {
+  const { notes, changed } = markSeen(
+    readNotes(id),
+    shown.map((note) => note.id),
+  )
+  if (changed) writeNotes(id, notes)
+}
+
 /** The project's notes (open and read); none when the file is missing or unreadable. */
 function readNotes(id) {
   try {
@@ -535,6 +598,23 @@ function readNotes(id) {
     return Array.isArray(stored?.notes) ? stored.notes : []
   } catch {
     return []
+  }
+}
+
+/** "Pass 5: <label>" for the project's latest published pass; undefined before the first. */
+function latestPassLabel(id) {
+  const dir = path.join(workspace(), 'projects', id, 'agent', 'passes')
+  try {
+    const last = fs
+      .readdirSync(dir)
+      .filter((f) => /^\d+\.json$/.test(f))
+      .sort()
+      .at(-1)
+    if (!last) return undefined
+    const pass = JSON.parse(fs.readFileSync(path.join(dir, last), 'utf8'))
+    return `Pass ${Number(pass.id ?? last.slice(0, -5))}${pass.label ? `: ${pass.label}` : ''}`
+  } catch {
+    return undefined
   }
 }
 
@@ -842,6 +922,37 @@ function printScorecard(card, project) {
   if (s.fail)
     say('A FAIL is a rule that makes this the format: fix it, or tell the user why it stays.')
   if (s.warn) say('WARNs are guidelines from videos that work, not quotas: look, then decide.')
+}
+
+/**
+ * Import one file into a project's media (waiting for a working copy); returns
+ * its media id. `transcribe: false` for files with no speech (rendered graphics).
+ */
+function importOne(file, projectId, category, { transcribe = true } = {}) {
+  const out = execFileSync(
+    process.execPath,
+    [
+      path.join(REPO, 'bin/shreditor.mjs'),
+      'import',
+      file,
+      '--project',
+      projectId,
+      '--category',
+      category,
+      ...(transcribe ? [] : ['--no-transcribe']),
+    ],
+    {
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        SHREDITOR_WORKSPACE: workspace(),
+        SHREDITOR_PORT: new URL(EDITOR).port,
+      },
+    },
+  )
+  const id = /^(?:clone|link|copy|exists)\s+([0-9a-f-]{36})\s/m.exec(out)?.[1]
+  if (!id) throw new Error(`Import of ${file} failed:\n${out.trim()}`)
+  return id
 }
 
 /**
@@ -1422,13 +1533,18 @@ const commands = {
     if (opt.read) {
       const stored = readNotes(id)
       if (!stored.length) return say('No notes from the user.')
-      const { notes, marked, unknown } = markRead(stored, opt.read)
+      const { notes, marked, unknown } = markRead(stored, opt.read, {
+        reply: opt.reply?.trim() || undefined,
+        pass: latestPassLabel(id),
+      })
       if (unknown.length)
         throw new Error(`No note ${unknown.join(', ')} (shred notes ${id} lists them)`)
-      const file = notesFile(id)
-      fs.writeFileSync(`${file}.tmp`, `${JSON.stringify({ version: 1, notes }, null, 2)}\n`)
-      fs.renameSync(`${file}.tmp`, file)
-      return say(`Marked ${marked} note${marked === 1 ? '' : 's'} read.`)
+      writeNotes(id, notes)
+      const pass = latestPassLabel(id)
+      return say(
+        `Marked ${marked} note${marked === 1 ? '' : 's'} read${pass ? ` (${pass})` : ''}.` +
+          (opt.reply ? '' : ' Add --reply "<what you did>" so the user sees it on the Notes lane.'),
+      )
     }
     // Frames are read against the saved timeline; the user's unsaved tweaks need `shred sync`.
     const context = async () => {
@@ -1446,6 +1562,7 @@ const commands = {
         const fresh = openNotes(readNotes(id)).filter((note) => !seen.has(note.id))
         if (fresh.length) {
           const { timeline, fps } = await context()
+          noteSeen(id, fresh)
           for (const note of fresh) {
             seen.add(note.id)
             say(
@@ -1461,17 +1578,21 @@ const commands = {
     const open = openNotes(readNotes(id))
     if (opt.json) {
       const { timeline, fps } = await context()
-      return say(JSON.stringify({ fps, notes: open, hasTimeline: Boolean(timeline) }, null, 2))
+      // `span` is where each note sits now (it follows the clip it was pinned to).
+      const notes = open.map((note) => ({ ...note, span: noteSpan(note, timeline, fps) }))
+      noteSeen(id, open)
+      return say(JSON.stringify({ fps, notes, hasTimeline: Boolean(timeline) }, null, 2))
     }
     if (!open.length) return say('No open notes from the user.')
     const { timeline, fps } = await context()
+    noteSeen(id, open)
     say(`${open.length} open note${open.length === 1 ? '' : 's'} from the user`)
     for (const note of open) {
       say()
       for (const line of describeNote(note, timeline, fps)) say(line)
     }
     say()
-    say(`Once acted on: shred notes ${id} --read <id,...> (or --read all)`)
+    say(`Once acted on: shred notes ${id} --read <id,...> --reply "what you did" (or --read all)`)
   },
 
   async start() {
@@ -1630,6 +1751,20 @@ const commands = {
     }
   },
 
+  async motion([sub, ...rest]) {
+    const run = motionCommands({
+      say,
+      opt,
+      workspace,
+      getProject,
+      applyBatch,
+      baseProjectId,
+      importFile: (file, projectId) => importOne(file, projectId, 'overlay', { transcribe: false }),
+    })[sub]
+    if (!run) throw new Error('Usage: shred motion new|add|render|list|vars (see shred help)')
+    await run(rest)
+  },
+
   async templates(rest) {
     await templatesCommand(rest, {
       opt,
@@ -1737,7 +1872,8 @@ const commands = {
 
   async kit([sub, ...rest]) {
     const run = kitCommands({ say, opt, workspace, getProject, applyBatch, call, key })[sub]
-    if (!run) throw new Error('Usage: shred kit apply|status|show|save-back (see shred help)')
+    if (!run)
+      throw new Error('Usage: shred kit apply|status|show|set|detach|save-back (see shred help)')
     await run(rest)
   },
 

@@ -3,6 +3,8 @@ import assert from 'node:assert/strict'
 import {
   describeNote,
   markRead,
+  markSeen,
+  noteSpan,
   openNotes,
   timecode,
 } from '../skills/shreditor-edit/scripts/notes.mjs'
@@ -71,4 +73,63 @@ test('markRead takes short ids or all, and reports unknown ones', () => {
   assert.equal(some.notes[0].status, 'read')
   assert.equal(some.notes[1].status, 'open')
   assert.equal(markRead(notes, 'all').marked, 2)
+})
+
+test("markRead keeps the reply and the pass, and drops a reopened note's old answer", () => {
+  const notes = [
+    note('aaaa1111', { reply: 'Tried a fade', pass: 'Pass 3: fade' }),
+    note('bbbb2222', { reply: 'Old', pass: 'Pass 2' }),
+  ]
+  const now = '2026-10-14T10:00:00Z'
+  const replied = markRead(notes, 'aaaa1111', {
+    reply: 'Hard cut instead',
+    pass: 'Pass 4: cut',
+    now,
+  })
+  assert.deepEqual(replied.notes[0], {
+    ...notes[0],
+    status: 'read',
+    readAt: now,
+    reply: 'Hard cut instead',
+    pass: 'Pass 4: cut',
+  })
+  const bare = markRead(notes, 'bbbb2222', { pass: 'Pass 4: cut', now }).notes[1]
+  assert.equal(bare.reply, undefined)
+  assert.equal(bare.pass, 'Pass 4: cut')
+})
+
+test('an anchored note is described where its clip is now, with the range', () => {
+  const moved = {
+    ...timeline,
+    items: timeline.items.map((i) => (i.id === 'v2' ? { ...i, from: 120 } : i)),
+  }
+  const ranged = note('ffff0000', {
+    frame: 95,
+    endFrame: 104,
+    anchor: { itemId: 'v2', offset: 5, sourceFrame: 5 },
+  })
+  assert.deepEqual(noteSpan(ranged, moved, 30), { frame: 125, endFrame: 134, state: 'anchored' })
+  const lines = describeNote(ranged, moved, 30)
+  assert.equal(lines[0], '[ffff0000] 00:04:05-00:04:14 (frames 125-134)  "note ffff0000"')
+  assert.equal(lines[1], '    in this range:')
+  assert.match(lines[2], /pier\.mov 120-180/)
+})
+
+test('a reopened note shows the agent its last answer', () => {
+  const lines = describeNote(
+    note('eeee1111', { frame: 10, reply: 'Shortened it', pass: 'Pass 2: trims' }),
+    null,
+    30,
+  )
+  assert.equal(lines[1], '    reopened; your last answer (Pass 2: trims): "Shortened it"')
+})
+
+test('notes the agent is shown are marked picked up once', () => {
+  const notes = [note('a'), note('b', { seenAt: 'earlier' }), note('c', { status: 'read' })]
+  const { notes: next, changed } = markSeen(notes, ['a', 'b', 'c'], 'now')
+  assert.equal(changed, 1)
+  assert.equal(next[0].seenAt, 'now')
+  assert.equal(next[1].seenAt, 'earlier')
+  assert.equal(next[2].seenAt, undefined)
+  assert.equal(markSeen(next, ['a'], 'later').changed, 0)
 })

@@ -98,6 +98,7 @@ import {
 import { TimelineTrackItems } from './timeline-track-items'
 import { createTimelineTrackContentLayerRef } from '../utils/timeline-live-geometry'
 import { getTimelineTrackItemRangeIndex } from '../utils/timeline-item-range-index'
+import { AddAgentNoteMenuItem } from './timeline-agent-comments'
 
 const EMPTY_TRACK_ITEMS: TimelineItemType[] = []
 
@@ -154,6 +155,7 @@ function TrackGapContextMenu({
         />
       </ContextMenuTrigger>
       <ContextMenuContent>
+        <AddAgentNoteMenuItem />
         <ContextMenuItem onClick={onCloseGap}>
           {t('timeline.contextMenu.rippleDelete')}
         </ContextMenuItem>

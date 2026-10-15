@@ -82,7 +82,7 @@ At 740 x 880 the preview is 198 x 352, the card beside it is 508 px wide and scr
 
 ### Top bar
 
-Left: back, project name, format chip with scorecard summary (click opens the Pass panel). Centre: pass status, "Pass 4 · 6 min ago · 2 edits unsaved". Right: Concise | Full segmented toggle, one gear menu (settings, shortcuts, language, docs, what's new, debug, audio meters), Save, Export with the render-queue count as a badge. Workspace tabs for Color and Motion are hidden in Concise; their shortcuts still work and switch to Full.
+Left: back, project name, format chip with scorecard summary (click opens Project specs: a right-hand drawer with the format, variant, guide, Change format, scorecard and rules, and the canvas on a second tab; `format-panel/project-specs-drawer.tsx`, in both layouts). Centre: pass status, "Pass 4 · 6 min ago · 2 edits unsaved". Right: Concise | Full segmented toggle, one gear menu (settings, shortcuts, language, docs, what's new, debug, audio meters), Save, Export with the render-queue count as a badge. Workspace tabs for Color and Motion are hidden in Concise; their shortcuts still work and switch to Full.
 
 ### Preview column
 
@@ -94,10 +94,7 @@ The panel is one scrolling column. Its header names what it is showing. Its firs
 
 **The media bin is always there.** The lower part of the context panel is the media library in every state: B-roll tiles at 9:16 with duration and a mark on the ones in the cut, then music, with search, Import, Transcript and an overflow for the other media tools. Dragging a tile onto a shot replaces it. The card above it changes with the selection.
 
-**Nothing selected: the Pass card.** One row, three cells.
-- Format: name and variant, the warn count, and links to the scorecard and the guide. The scorecard itself opens from here or from the chip in the top bar; it is not on the card.
-- Your changes since the pass: a list derived from the undo history since load, "Trimmed shot 3 by 0.4 s", "Edited title". This is what the agent will read as decisions, so it should be visible before the user saves. Save button inline.
-- Note for the next pass: one text field written to the project for the agent to read on its next pass. Not a chat. The existing AI tab chat stays reachable through the media bin's overflow.
+**Nothing selected: no card.** The media bin takes the panel (the narrow layout shows a one-line "select a clip" hint instead). What the Pass card used to hold lives in Project specs, the drawer the top-bar format chip opens: the format and scorecard, the canvas, and a Notes tab with the note for the next pass (one text field the agent reads; not a chat) and every open note. Save is in the top bar. Timed notes go on the timeline's Notes tray.
 
 **Shot selected: the Shot card.**
 - Verbs: Split, Replace, Speed, Volume, Delete, Duplicate, More.
@@ -132,7 +129,7 @@ The panel is one scrolling column. Its header names what it is showing. Its firs
 | Media sidebar: Transcript | Transcript button in the media bin header |
 | Media sidebar: Text, Shapes, Effects, Transitions, Lottie, Templates, AI | Timeline toolbar **Add** menu, and the media bin's overflow |
 | Properties: Video, Audio, Effects, Animation | **More** on any card opens the full PropertiesSidebar in a drawer |
-| Properties: Format and Canvas | Scorecard link on the Pass card; Canvas under More |
+| Properties: Format and Canvas | Project specs drawer, from the format chip |
 | Timeline: trim, razor, rate stretch, slip, slide tools | Overflow; shortcuts live |
 | Timeline: in and out, markers | Overflow |
 | Timeline: voiceover record, mic | Overflow |
@@ -165,9 +162,9 @@ Built on the branch `claude/editor-timeline-interface-design-0ad079`.
 
 - `concise` is a workspace id (`src/config/editor-workspaces.ts`) and the default for new sessions. `Alt+4` switches to it; the toolbar has a Concise | Full segmented control in both views, and the workspace switcher lists it.
 - Shell: `src/features/editor/components/concise/concise-shell.tsx`. Reflows at 1100 px: wide puts the media bin under the context card; narrow puts it in a 150 px strip under the timeline. Row split is draggable and saved per mode.
-- Context panel: `concise/context-panel.tsx` with `pass-card`, `shot-card`, `text-card`, `music-card`. "More" opens the full Properties sidebar in a drawer. Anything the cards do not cover (transitions, markers, shapes) shows the full sidebar inline.
+- Context panel: `concise/context-panel.tsx` with `shot-card`, `text-card`, `music-card` (nothing selected shows no card; Project specs holds the rest). "More" opens the full Properties sidebar in a drawer. Anything the cards do not cover (transitions, markers, shapes) shows the full sidebar inline.
 - Changes since pass: `concise/changes-since-pass.ts` reads the undo stack after the last external change. Next-pass notes are written to `projects/<id>/agent/notes.json` by `src/infrastructure/storage/workspace-fs/agent-notes.ts`, through the shared store `src/shared/state/agent-notes.ts` (re-read every 4 s and on focus, so the agent's `read` marks clear them).
-- Timeline comments: the comment button in the compact timeline header (or N) pauses and opens a composer at the playhead; the note is saved with its `frame` and the selected `itemIds`. Open timed notes show as amber pins on the ruler (`timeline-agent-comments.tsx`) and as timecode chips in the Pass card; a click seeks there. The agent reads them with `shred notes <id>` (what sits at each frame), marks them with `--read`, or gets each as it is sent with `--watch`.
+- Notes tray: a 64 px row under the ruler in Edit and Concise (folds to a 22 px strip of pills from its cell, remembered per browser), notes drawn as cards with the timecode and two lines of text (`timeline-notes-lane.tsx`, layout in `timeline-notes-lane-layout.ts`), with its cell under the Tracks bar. Drag across it to note a stretch, double-click (or N, or the cell's +) to note a moment; the composer opens there and the note is saved with `frame`, `endFrame` for a stretch, the selected `itemIds` and an `anchor` to the clip under it (`src/shared/projects/note-anchor.mjs`, shared with `shred notes`), so it follows that clip through moves and trims. Open notes are amber; done ones hide until the cell's eye shows them greyed with the agent's `reply` and `pass`. A note's details can mark it done, reopen it (the agent then sees its last answer) or delete it. The agent reads notes with `shred notes <id>`, marks them with `--read <ids> --reply "…"`, or gets each as it is sent with `--watch`.
 - Timeline: compact header with Add, Tracks and More menus (`timeline-header.tsx`), 72 px track labels (`track-header.tsx`), per-kind lane heights (`utils/track-heights.ts`: video 80, audio 40, text 28, empty 20), and the video/audio split defaults to the video lanes' height in Concise. Split and delete share one code path with the shortcuts (`utils/editing-commands.ts`).
 - Preview: `chrome="concise"` drops the title row and alignment strip; `compact` drops go-to-start/end, the shuttle indicator and the total timecode.
 - Not built yet: beat grid on the ruler, drop-a-clip-to-replace (the bin hint says it, the timeline still places a new clip), on-canvas text editing, filmstrip in the Shot card (it repeats the thumbnail).

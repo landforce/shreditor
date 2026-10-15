@@ -51,11 +51,6 @@
       "reason": "Component is exported through the timeline editor contract and consumed by the editor workspace."
     },
     {
-      "path": "src/components/ui/popover.tsx",
-      "exportName": "PopoverAnchor",
-      "reason": "unreviewed: carried over by the 2026-07-09 re-baseline; trace individually before deleting."
-    },
-    {
       "path": "src/config/hotkeys.ts",
       "exportName": "HOTKEY_DESCRIPTIONS",
       "reason": "unreviewed: carried over by the 2026-07-09 re-baseline; trace individually before deleting."
