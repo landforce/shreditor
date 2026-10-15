@@ -16,7 +16,7 @@
         "noteFailed": "Couldn't save the note. Try again.",
         "addNote": "Add note",
         "copyPrompt": "Copy the prompt for Claude",
-        "promptCopied": "Copied: paste it to Claude",
+        "promptCopied": "Copied: paste this to your agent",
         "copyPromptWaiting_one": "Copy the prompt for Claude ({{count}} note not picked up yet)",
         "copyPromptWaiting_other": "Copy the prompt for Claude ({{count}} notes not picked up yet)"
       },

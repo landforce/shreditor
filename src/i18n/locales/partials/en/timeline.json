@@ -388,7 +388,7 @@
       "addForAgent": "Add note for agent",
       "open": "Open",
       "copy": "Copy the prompt for Claude",
-      "copied": "Copied: paste it to Claude",
+      "copied": "Copied: paste this to your agent",
       "copyWaiting_one": "Copy the prompt for Claude ({{count}} note not picked up yet)",
       "copyWaiting_other": "Copy the prompt for Claude ({{count}} notes not picked up yet)"
     }

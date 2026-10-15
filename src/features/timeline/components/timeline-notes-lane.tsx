@@ -1,4 +1,5 @@
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useTranslation } from 'react-i18next'
 import {
   Check,
@@ -98,28 +99,53 @@ function WaitingPulse() {
 
 /**
  * The open-note count, which is also the copy of "check my notes and edit" for
- * the user to paste to the agent: notes only reach it when it is asked to read them.
+ * the user to paste to the agent: notes only reach it when it is asked to read
+ * them. After a copy a bubble says what to do with it (the hover tooltip hides
+ * on click).
  */
 function CopyForAgentButton() {
   const { t } = useTranslation()
   const { open, waiting, copied, copy } = useNotesHandOff()
+  const buttonRef = useRef<HTMLButtonElement>(null)
+  const [bubbleAt, setBubbleAt] = useState<{ x: number; y: number } | null>(null)
   if (!open) return null
-  const label = copied
-    ? t('timeline.notes.copied')
-    : t(waiting ? 'timeline.notes.copyWaiting' : 'timeline.notes.copy', { count: waiting })
+  const label = t(waiting ? 'timeline.notes.copyWaiting' : 'timeline.notes.copy', {
+    count: waiting,
+  })
+  const onClick = () => {
+    const rect = buttonRef.current?.getBoundingClientRect()
+    if (rect) setBubbleAt({ x: rect.right + 6, y: rect.top + rect.height / 2 })
+    copy()
+  }
   return (
-    <Button
-      size="sm"
-      className="h-5 shrink-0 gap-1 rounded bg-amber-500 px-1.5 text-[10px] font-semibold text-white tabular-nums hover:bg-amber-600"
-      onClick={copy}
-      aria-label={label}
-      data-tooltip={label}
-      data-tooltip-side="right"
-      data-testid="timeline-notes-copy"
-    >
-      {copied ? <Check className="h-3 w-3" /> : <ClipboardCopy className="h-3 w-3" />}
-      {open}
-    </Button>
+    <>
+      <Button
+        ref={buttonRef}
+        size="sm"
+        className="h-5 shrink-0 gap-1 rounded bg-amber-500 px-1.5 text-[10px] font-semibold text-white tabular-nums hover:bg-amber-600"
+        onClick={onClick}
+        aria-label={label}
+        data-tooltip={copied ? undefined : label}
+        data-tooltip-side="right"
+        data-testid="timeline-notes-copy"
+      >
+        {copied ? <Check className="h-3 w-3" /> : <ClipboardCopy className="h-3 w-3" />}
+        {open}
+      </Button>
+      {copied &&
+        bubbleAt &&
+        createPortal(
+          <div
+            role="status"
+            className="pointer-events-none fixed z-50 -translate-y-1/2 whitespace-nowrap rounded-md bg-ink px-2.5 py-1 text-xs text-ink-foreground shadow-float"
+            style={{ left: bubbleAt.x, top: bubbleAt.y }}
+            data-testid="timeline-notes-copied"
+          >
+            {t('timeline.notes.copied')}
+          </div>,
+          document.body,
+        )}
+    </>
   )
 }
 
