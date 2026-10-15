@@ -1,8 +1,9 @@
 // `shred check`'s Template section: how close a timeline lands to the
 // template it was planned from (cuts per minute, median and first shot, shot
 // mix, text slots, the title hook at frame 0 and its hold, captions). The
-// reference's timings are guidance, so this only ever passes or warns, with
-// the frame ranges to look at, like the format checks. Pure.
+// reference's timings are guidance, so this is information, never a rule:
+// each check is close to the reference or differs from it, with the frame
+// ranges to look at. Many edits never use a template. Pure.
 import { measureTimeline } from './measure.mjs'
 
 const MAX_RANGES = 20
@@ -28,7 +29,7 @@ function check(key, label, { status, value, target, detail = '', ranges = [] }) 
     value,
     target,
     detail,
-    ranges: status === 'warn' ? ranges.slice(0, MAX_RANGES) : [],
+    ranges: status === 'differs' ? ranges.slice(0, MAX_RANGES) : [],
   }
 }
 const na = (key, label, detail) =>
@@ -40,7 +41,7 @@ function bandCheck(key, label, { value, ref, share, floor, unit, ranges }) {
   const b = band(ref, share, floor)
   const ok = inBand(value, b)
   return check(key, label, {
-    status: ok ? 'pass' : 'warn',
+    status: ok ? 'close' : 'differs',
     value: round2(value),
     target: bandText(b, unit, ref),
     ranges: ok ? [] : ranges(value < b.min),
@@ -103,7 +104,7 @@ function firstCutCheck(measured, pacing) {
   const max = Math.max(pacing.firstCutSec * 1.5, pacing.firstCutSec + 0.5)
   const ok = value <= max
   return check('templateFirstCut', label, {
-    status: ok ? 'pass' : 'warn',
+    status: ok ? 'close' : 'differs',
     value: round2(value),
     target: `<= ${round2(max)} s (reference ${pacing.firstCutSec} s)`,
     ranges: [shotRange(measured.shots[0])],
@@ -134,7 +135,7 @@ function mixCheck(measured, pacing) {
   const pct = (share) => `${Math.round(share * 100)}%`
   const over = new Set(off.filter((row) => row.now > row.ref).flatMap((row) => row.roles))
   return check('templateShotMix', label, {
-    status: off.length ? 'warn' : 'pass',
+    status: off.length ? 'differs' : 'close',
     value: rows.map((row) => `${row.bucket} ${pct(row.now)}`).join(', '),
     target: `within ${pct(MIX_SLACK)} of ${rows.map((row) => `${row.bucket} ${pct(row.ref)}`).join(', ')}`,
     detail: off.map((row) => `${row.bucket} ${pct(row.now)} vs ${pct(row.ref)}`).join('; '),
@@ -150,7 +151,7 @@ function labelCheck(measured, template) {
   const ok = Math.abs(labels.length - slots.length) <= slack
   const kinds = [...new Set(slots.map((slot) => slot.textKind))].join(', ')
   return check('templateLabels', label, {
-    status: ok ? 'pass' : 'warn',
+    status: ok ? 'close' : 'differs',
     value: labels.length,
     target: `${Math.max(0, slots.length - slack)}-${slots.length + slack} (reference ${slots.length}${kinds ? `: ${kinds}` : ''})`,
     detail: slots.map((slot) => `${slot.id} "${slot.pattern}"`).join(', '),
@@ -166,7 +167,7 @@ function titleChecks(measured, template) {
   const holdFrames = Math.round(ref.targetSec * fps)
   const atZero = Boolean(title) && title.startFrame <= 0
   const hook = check('templateTitleAt0', 'Title hook from frame 0 (as the reference)', {
-    status: ref.start <= 0.1 && !atZero ? 'warn' : 'pass',
+    status: ref.start <= 0.1 && !atZero ? 'differs' : 'close',
     value: title ? title.startFrame : null,
     target: ref.start <= 0.1 ? 'frame 0' : `about ${ref.start} s`,
     detail: `${ref.id} "${ref.pattern}"`,
@@ -190,7 +191,7 @@ function captionsCheck(measured, template) {
   const has = captions.length > 0
   const wanted = mode !== 'off'
   return check('templateCaptions', 'Captions as the reference', {
-    status: has === wanted ? (mode === 'span' ? 'info' : 'pass') : 'warn',
+    status: has === wanted ? (mode === 'span' ? 'info' : 'close') : 'differs',
     value: has,
     target:
       mode === 'span' ? `a span (${template.captions.start}-${template.captions.end} s)` : mode,
@@ -218,6 +219,6 @@ export function scoreTemplate(project, template, { mediaById = {} } = {}) {
     source: template.source,
     measured: measured.pacing,
     checks,
-    summary: { pass: count('pass'), warn: count('warn'), fail: 0 },
+    summary: { close: count('close'), differs: count('differs') },
   }
 }

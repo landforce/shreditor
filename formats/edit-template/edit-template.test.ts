@@ -215,11 +215,11 @@ describe('edit templates', () => {
     assert.deepEqual(t.pacing.title, { atSec: 0, holdSec: 3.5 })
   })
 
-  test('check: the Template section passes a close cut and only warns on a far one', () => {
+  test('check: the Template section marks a close cut close and a far one as differing', () => {
     const template = templateFromProject(yapProject(), { mediaById: yapMedia, createdAt: 'fixed' })
     const same = scoreTemplate(yapProject(), template, { mediaById: yapMedia })
-    assert.equal(same.summary.warn, 0, JSON.stringify(same.checks, null, 1))
-    assert.ok(same.checks.every((c: any) => c.status !== 'fail'))
+    assert.equal(same.summary.differs, 0, JSON.stringify(same.checks, null, 1))
+    assert.ok(same.checks.every((c: any) => ['close', 'info', 'na'].includes(c.status)))
     // One long speaker clip, no image, a late short title, no captions.
     const far = yapProject()
     far.timeline.items = [
@@ -229,17 +229,17 @@ describe('edit templates', () => {
     const report = scoreTemplate(far, template, { mediaById: yapMedia })
     const status = Object.fromEntries(report.checks.map((c: any) => [c.key, c.status]))
     assert.deepEqual(status, {
-      templateLength: 'warn',
-      templateCutsPerMin: 'warn',
-      templateMedianShot: 'warn',
+      templateLength: 'differs',
+      templateCutsPerMin: 'differs',
+      templateMedianShot: 'differs',
       templateFirstCut: 'na',
-      templateShotMix: 'warn',
-      templateLabels: 'pass',
-      templateTitleAt0: 'warn',
-      templateTitleHold: 'warn',
-      templateCaptions: 'warn',
+      templateShotMix: 'differs',
+      templateLabels: 'close',
+      templateTitleAt0: 'differs',
+      templateTitleHold: 'differs',
+      templateCaptions: 'differs',
     })
-    assert.equal(report.summary.fail, 0)
+    assert.ok(!('fail' in report.summary) && !('warn' in report.summary))
     const hook = report.checks.find((c: any) => c.key === 'templateTitleAt0')
     assert.deepEqual(hook.ranges, [{ startFrame: 30, endFrame: 50 }])
     assert.deepEqual(report.checks.find((c: any) => c.key === 'templateLength').ranges, [

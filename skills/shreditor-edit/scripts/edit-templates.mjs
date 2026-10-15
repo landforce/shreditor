@@ -23,7 +23,7 @@ import { kitTightCuts, scaffoldTiming } from './performance.mjs'
 
 const LIBRARY = ['app', 'edit-templates']
 const RECORD = 'template.json'
-const TAG = { pass: 'pass', warn: 'WARN', info: 'info', na: 'n/a' }
+const TAG = { close: 'close', differs: 'differs', info: 'info', na: 'n/a' }
 
 const hashOf = (text) => `sha256:${crypto.createHash('sha256').update(text).digest('hex')}`
 const readJson = (file) => {
@@ -297,7 +297,7 @@ function printScaffoldNotes(say, result, template, request) {
       `Beats with no candidate media (fill source.mediaId): ${result.toFill.join(', ')}. Import footage of the right category (shred import --category ...), then fill them.`,
     )
   if (request === DEFAULT_REQUEST(template))
-    say(`request is a placeholder: replace it with the user's ask, in their words.`)
+    say(`request  "${request}" (the default; --request puts the user's own words in the plan)`)
 }
 
 async function planFromTemplate(deps, [id, ...speakerIds]) {
@@ -746,13 +746,13 @@ export function printTemplateCheck(say, report, fps) {
   if (!report) return
   const s = report.summary
   say(
-    `\nTemplate  ${report.template}  (${report.source.type === 'vdb' ? `VideoDatabase ${report.source.videoId}` : `project ${report.source.projectId}`})  ${s.pass} pass, ${s.warn} warn`,
+    `\nTemplate  ${report.template}  (${report.source.type === 'vdb' ? `VideoDatabase ${report.source.videoId}` : `project ${report.source.projectId}`})  ${s.close} close, ${s.differs} differ  (for reference, not rules)`,
   )
   const sec = (frame) => (frame / fps).toFixed(2)
   for (const c of report.checks) {
     const value = typeof c.value === 'boolean' ? (c.value ? 'yes' : 'no') : String(c.value ?? '-')
     say(
-      `  ${TAG[c.status].padEnd(4)}  ${c.label.padEnd(42)} ${value.padStart(6)}  target ${c.target}${c.detail ? `  (${c.detail})` : ''}`,
+      `  ${TAG[c.status].padEnd(7)}  ${c.label.padEnd(42)} ${value.padStart(6)}  reference ${c.target}${c.detail ? `  (${c.detail})` : ''}`,
     )
     if (c.ranges.length)
       say(
@@ -760,6 +760,6 @@ export function printTemplateCheck(say, report, fps) {
       )
   }
   say(
-    "  The reference's timings are guidance (AI-labeled, not frame-accurate): these only warn. The new cut follows its own speech.",
+    "  The reference's timings are guidance (AI-labeled, not frame-accurate), not rules: a difference is not a problem to fix. The new cut follows its own speech.",
   )
 }

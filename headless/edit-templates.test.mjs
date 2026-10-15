@@ -201,7 +201,7 @@ test('plan --template: a speaker format keeps the performance and takes the temp
   const again = commands(ws, { opt: { template: 'kathrinmormann-44870' }, project })
   await templatePlan(again.deps, ['p1'])
   assert.match(again.said.join('\n'), /plan\.json exists: not overwritten/)
-  assert.match(again.said.join('\n'), /request is a placeholder/)
+  assert.match(again.said.join('\n'), /request  ".*" \(the default; --request puts the user.s own words in the plan\)/)
 })
 
 test('plan --template: a story format gets one beat per shot slot, with candidates, and validates', async () => {
@@ -395,5 +395,5 @@ test('check: templateCheck reads the record a plan or new --from-template left o
   assert.equal(report.template, 'kathrinmormann-44870')
   assert.match(report.file, /projects\/p1\/agent\/template\.json$/)
   assert.ok(report.checks.length >= 8)
-  assert.ok(report.checks.every((c) => ['pass', 'warn', 'info', 'na'].includes(c.status)))
+  assert.ok(report.checks.every((c) => ['close', 'differs', 'info', 'na'].includes(c.status)))
 })

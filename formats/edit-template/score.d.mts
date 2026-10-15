@@ -4,7 +4,7 @@ import type { EditTemplate } from './template.mjs'
 export interface TemplateCheck {
   key: string
   label: string
-  status: 'pass' | 'warn' | 'info' | 'na'
+  status: 'close' | 'differs' | 'info' | 'na'
   value: unknown
   target: string
   detail: string
@@ -20,5 +20,5 @@ export function scoreTemplate(
   source: Record<string, any>
   measured: Record<string, any>
   checks: any[]
-  summary: { pass: number; warn: number; fail: 0 }
+  summary: { close: number; differs: number }
 }
