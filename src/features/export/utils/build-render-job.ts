@@ -15,6 +15,7 @@ import {
   type ExportableSequence,
 } from '@/features/export/deps/timeline-compositions'
 import { useProjectStore } from '@/features/export/deps/projects'
+import { cutExportName } from '@/shared/state/cuts'
 import { mapRequestedClientSettings, resolveClientSettings } from './render-pipeline'
 import { assessSmartCopyEligibility } from './smart-copy'
 import type { ClientExportSettings } from './client-renderer'
@@ -73,7 +74,9 @@ function captureTimeline(sequence?: ExportableSequence): TimelineCapture {
   }
 
   // Distinguish exported sequence files from the Main-timeline export.
-  const baseName = currentProject?.name ?? 'export'
+  // One of several cuts: the file carries the cut's label (docs/cuts.md).
+  const projectBaseName = currentProject?.name ?? 'export'
+  const baseName = cutExportName(projectBaseName) ?? projectBaseName
   const projectName = seq.id === null ? baseName : `${baseName} - ${seq.name}`
 
   return {

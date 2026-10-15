@@ -78,6 +78,7 @@ import {
   projectCreateRequestSchema,
   projectSaveRequestSchema,
   projectUpdateRequestSchema,
+  projectTrashRequestSchema,
   renderRequestSchema,
   validate,
 } from './lib/contract.mjs'
@@ -91,6 +92,7 @@ import {
   listMediaResources,
   listProjectResources,
   saveProjectResource,
+  trashProjectResource,
   updateMediaMetadata,
 } from './lib/lifecycle-store.mjs'
 import { withIdempotency } from './lib/idempotency.mjs'
@@ -482,6 +484,7 @@ export async function main(argv = process.argv.slice(2)) {
       ...withKit(withFormat(current.project, body.updates.format), body.updates.kit),
       ...(body.updates.name !== undefined ? { name: body.updates.name } : {}),
       ...(body.updates.description !== undefined ? { description: body.updates.description } : {}),
+      ...(body.updates.cut !== undefined ? { cut: body.updates.cut } : {}),
       metadata: {
         ...current.project.metadata,
         ...(body.updates.width !== undefined ? { width: body.updates.width } : {}),
@@ -494,6 +497,16 @@ export async function main(argv = process.argv.slice(2)) {
     })
     const resource = await saveProjectResource(workspace, id, project, body)
     sendJson(res, 200, resourceEnvelope(resource))
+  }
+
+  // A cut's removal (shred cut remove): the editor's Trash, revision-checked.
+  const handleV1ProjectTrash = async (req, res, id) => {
+    const body = validate(
+      projectTrashRequestSchema,
+      await readJsonBody(req, { maxBytes: 64 * 1024 }),
+    )
+    const result = await trashProjectResource(workspace, id, body)
+    sendJson(res, 200, { ok: true, apiVersion: HEADLESS_API_VERSION, ...result })
   }
 
   const handleV1ProjectEdit = async (req, res, id) => {
@@ -742,9 +755,9 @@ export async function main(argv = process.argv.slice(2)) {
     const url = new URL(req.url ?? '/', 'http://localhost')
     const route = `${req.method} ${url.pathname}`
     const projectMatch = /^\/v1\/projects\/([A-Za-z0-9][A-Za-z0-9_-]{0,63})$/.exec(url.pathname)
-    const projectEditMatch = /^\/v1\/projects\/([A-Za-z0-9][A-Za-z0-9_-]{0,63})\/edit$/.exec(
-      url.pathname,
-    )
+    // .../edit, and .../trash (shred cut remove) on the same branch.
+    const projectEditMatch =
+      /^\/v1\/projects\/([A-Za-z0-9][A-Za-z0-9_-]{0,63})\/(edit|trash)$/.exec(url.pathname)
     const mediaMatch = /^\/v1\/media\/([A-Za-z0-9][A-Za-z0-9_-]{0,63})$/.exec(url.pathname)
     const mediaProbeMatch = /^\/v1\/media\/([A-Za-z0-9][A-Za-z0-9_-]{0,63})\/probe$/.exec(
       url.pathname,
@@ -773,7 +786,9 @@ export async function main(argv = process.argv.slice(2)) {
                 ? () => handleV1ProjectList(url, res)
                 : projectEditMatch && req.method === 'POST'
                   ? () =>
-                      handleV1ProjectEdit(
+                      (projectEditMatch[2] === 'trash'
+                        ? handleV1ProjectTrash
+                        : handleV1ProjectEdit)(
                         req,
                         res,
                         assertPortableId(projectEditMatch[1], 'project id'),

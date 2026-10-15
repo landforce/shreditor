@@ -105,6 +105,8 @@ async function rebuildIndex(workspace) {
     .readdir(projectsRoot, { withFileTypes: true })
     .catch((e) => (e.code === 'ENOENT' ? [] : Promise.reject(e)))) {
     if (!entry.isDirectory() || !PORTABLE_ID.test(entry.name)) continue
+    // The editor's index leaves trashed projects out (workspace-fs/trash.ts).
+    if (isTrashed(workspace, entry.name)) continue
     try {
       const { value } = await readResource(
         projectFile(workspace, entry.name),
@@ -145,6 +147,8 @@ export async function listProjectResources(workspace) {
         name: resource.project.name,
         updatedAt: resource.project.updatedAt,
         revision: resource.revision,
+        ...(resource.project.cut ? { cut: resource.project.cut } : {}),
+        ...(isTrashed(workspace, entry.name) ? { trashed: true } : {}),
       })
     } catch {}
   }
@@ -211,6 +215,47 @@ export async function saveProjectResource(
       warnings.push('INDEX_REPAIR_REQUIRED')
     }
     return { id, revision: revisionOf(bytes), project: next, warnings }
+  })
+}
+
+// The editor's soft-delete marker (src/infrastructure/storage/workspace-fs/trash.ts).
+const TRASHED_MARKER = '.freecut-trashed.json'
+const isTrashed = (workspace, id) =>
+  fs.existsSync(path.join(workspace, 'projects', id, TRASHED_MARKER))
+
+/**
+ * Move a project to the editor's Trash, as its Delete does: a marker in the
+ * project folder hides it, and Restore in the project list brings it back.
+ * Nothing is deleted. The project's bin list (media-links.json) is parked as
+ * media-links.cut-removed.json, so the Trash's purge can't delete media only
+ * this project used; a restored project re-links its timeline's media on open.
+ */
+export async function trashProjectResource(
+  workspace,
+  id,
+  { expectedRevision, force = false } = {},
+) {
+  return withResourceLock(`project:${id}`, async () => {
+    const current = await getProjectResource(workspace, id)
+    checkRevision(current.revision, expectedRevision, force)
+    const dir = path.join(workspace, 'projects', id)
+    if (isTrashed(workspace, id))
+      throw new HttpError(409, 'ALREADY_TRASHED', 'Project is in the Trash')
+    const links = path.join(dir, 'media-links.json')
+    if (fs.existsSync(links))
+      await fs.promises.rename(links, path.join(dir, 'media-links.cut-removed.json'))
+    const marker = { deletedAt: Date.now(), originalName: current.project.name }
+    await atomicWriteFile(
+      path.join(dir, TRASHED_MARKER),
+      Buffer.from(`${JSON.stringify(marker, null, 2)}\n`),
+    )
+    const warnings = []
+    try {
+      await withResourceLock('projects:index', () => rebuildIndex(workspace))
+    } catch {
+      warnings.push('INDEX_REPAIR_REQUIRED')
+    }
+    return { id, revision: current.revision, trashed: true, warnings }
   })
 }
 

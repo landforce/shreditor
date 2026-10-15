@@ -48,6 +48,12 @@ export interface Project {
    * its rules join `shred check`. Absent when the project has no kit.
    */
   kit?: ProjectKit
+  /**
+   * The project's place in a group of cuts (docs/cuts.md): several versions of
+   * one edit, each its own project. Absent on a project that is no cut's
+   * sibling, and on a group's main cut until it is renamed.
+   */
+  cut?: ProjectCut
   timeline?: ProjectTimeline
   /**
    * Root folder handle for the project's media files.
@@ -60,6 +66,13 @@ export interface Project {
    * Updated when rootFolderHandle is set.
    */
   rootFolderName?: string
+}
+
+/** A project's cut: its group (the main cut's project id), label and switcher order. */
+export interface ProjectCut {
+  group: string
+  label: string
+  order?: number
 }
 
 /** A brand colour from a Video Style Kit, offered as a swatch by the text colour pickers. */
