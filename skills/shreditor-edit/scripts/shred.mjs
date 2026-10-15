@@ -119,6 +119,15 @@
 //   shred master <audio|video> [--lufs -14] [--tp -1.5] [--out file.wav]
 //                                        loudness-master to a new WAV (two-pass loudnorm)
 //   shred sync <id> [--timeout 20]       make the open editor save now, so the agent sees unsaved tweaks
+//   shred motion new <projectId> --name "..." [--duration 3]
+//                                        scaffold a HyperFrames motion graphic at the project's canvas
+//                                        (projects/<id>/motion/<slug>/, transparent starter)
+//   shred motion add <draftId> <motion folder|.html> [--at <frame|2.5s>] [--variables JSON]
+//                                        [--item <clipId>] [--keep-audio]   render it to a transparent
+//                                        WebM and put it on the Motion track (or swap the render into
+//                                        that clip); its own audio is muted unless --keep-audio
+//   shred motion render <motion folder|.html> [--variables JSON]   render only
+//   shred motion list <id>               the motion graphics on a timeline, with their folders
 //   shred templates list [--category c] [--json]   the motion graphics template library: name,
 //                                        category, size, duration, controls (with defaults)
 //   shred templates show <name|id>       one template: controls, media, folder, thumbnail
@@ -173,6 +182,7 @@ import {
   readCubeFileHeader,
 } from '../../../headless/lib/luts.mjs'
 import { templatesCommand } from './templates.mjs'
+import { motionCommands } from './motion.mjs'
 import { describeNote, markRead, noteSpan, openNotes } from './notes.mjs'
 import { createActivity } from './activity.mjs'
 import { draftPlanGate, planCheck, planCommands, printPlanCheck } from './plan.mjs'
@@ -239,6 +249,10 @@ const { values: opt, positionals } = parseArgs({
     read: { type: 'string' },
     reply: { type: 'string' },
     watch: { type: 'boolean' },
+    duration: { type: 'string' },
+    variables: { type: 'string' },
+    item: { type: 'string' },
+    'keep-audio': { type: 'boolean' },
   },
 })
 const [command, ...args] = positionals
@@ -295,6 +309,9 @@ const writeDrafts = (d) => {
   fs.mkdirSync(path.dirname(DRAFTS), { recursive: true })
   fs.writeFileSync(DRAFTS, `${JSON.stringify(d, null, 2)}\n`)
 }
+
+/** The user's project behind a draft (a project id stays as it is). */
+const baseProjectId = (id) => readDrafts()[id]?.targetId ?? id
 
 const EDITOR = process.env.SHRED_EDITOR || 'http://localhost:5273'
 const editorUp = async () => {
@@ -831,6 +848,21 @@ function printScorecard(card, project) {
  * callerIds op0, op1, ... unless they carry their own). A revision the project
  * has moved past fails the whole batch.
  */
+/** Import one file into a project's media (waiting for a working copy); returns its media id. */
+function importOne(file, projectId, category) {
+  const out = execFileSync(
+    process.execPath,
+    [path.join(REPO, 'bin/shreditor.mjs'), 'import', file, '--project', projectId, '--category', category],
+    {
+      encoding: 'utf8',
+      env: { ...process.env, SHREDITOR_WORKSPACE: workspace(), SHREDITOR_PORT: new URL(EDITOR).port },
+    },
+  )
+  const id = /^(?:clone|link|copy|exists)\s+([0-9a-f-]{36})\s/m.exec(out)?.[1]
+  if (!id) throw new Error(`Import of ${file} failed:\n${out.trim()}`)
+  return id
+}
+
 async function applyBatch(id, batch, revision) {
   const ops = batch.map((op, i) => ({ callerId: `op${i}`, ...op }))
   const logStart = serviceLogSize()
@@ -1615,6 +1647,20 @@ const commands = {
         )
       }
     }
+  },
+
+  async motion([sub, ...rest]) {
+    const run = motionCommands({
+      say,
+      opt,
+      workspace,
+      getProject,
+      applyBatch,
+      baseProjectId,
+      importFile: (file, projectId) => importOne(file, projectId, 'overlay'),
+    })[sub]
+    if (!run) throw new Error('Usage: shred motion new|add|render|list (see shred help)')
+    await run(rest)
   },
 
   async templates(rest) {
