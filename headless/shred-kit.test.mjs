@@ -116,3 +116,54 @@ test('the service stores and patches project.kit', () => {
     true,
   )
 })
+
+test('kit set writes the kit, logs it, and restyles the project from it', async (t) => {
+  const os = await import('node:os')
+  const path = await import('node:path')
+  const { kitCommands } = await import('../skills/shreditor-edit/scripts/kit.mjs')
+  const { kitHash } = await import('../formats/kit/node.mjs')
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'shred-kit-set-'))
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }))
+  const file = path.join(root, 'kit.json')
+  const original = kit()
+  fs.writeFileSync(file, JSON.stringify(original))
+  const project = {
+    metadata: { width: 1080, height: 1920, fps: 30 },
+    timeline: { textStyles: [] },
+    kit: { path: file, kitVersion: original.kitVersion, hash: kitHash(original) },
+  }
+  const batches = []
+  const lines = []
+  const commands = kitCommands({
+    say: (line) => lines.push(line),
+    opt: { why: 'bigger titles' },
+    workspace: () => root,
+    getProject: async () => ({ project, revision: 'r1' }),
+    applyBatch: async (_id, ops) => {
+      batches.push(ops)
+      return {
+        revision: 'r2',
+        results: ops.map((op) => ({
+          detail: { styleId: op.style.id, version: 1, updatedItems: [] },
+        })),
+      }
+    },
+    call: async () => ({}),
+    key: (name) => name,
+  })
+  await commands.set(['p1', 'titles.style.size', '104', 'titles.style.letterSpacing=-2'])
+  const saved = JSON.parse(fs.readFileSync(file, 'utf8'))
+  assert.equal(saved.titles.style.size, 104)
+  assert.equal(saved.titles.style.letterSpacing, -2)
+  assert.notEqual(saved.kitVersion, original.kitVersion)
+  assert.equal(saved.changelog.at(-1).why, 'bigger titles')
+  assert.match(saved.changelog.at(-1).change, /titles\.style\.size 88 -> 104/)
+  const title = batches.flat().find((op) => op.style.id === 'kit:title')
+  assert.ok(title, 'kit:title restyled from the new kit')
+
+  // This fake service keeps the old kit record, so the file reads as changed since apply.
+  await assert.rejects(
+    commands.set(['p1', 'titles.style.size', '96']),
+    /changed since it was applied/,
+  )
+})

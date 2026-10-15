@@ -76,6 +76,10 @@ Positions are the kit's canvas: on a project of another aspect the position and 
 
 `shred kit save-back <id> [--style kit:title,...] [--force]`, only when the user asks. It writes the project's kit styles (the kit canvas's aspect) into the kit's own values: size, weight as a number, line height, letter spacing, colour, box (colour, radius, padX/padY without the outline, perLine), outline, align, x, width and the anchor's y (`kit:caption` writes the default position's y, `kit:caption-low` only its own y, `kit:listicle-headline` the listicle block). Then it bumps `kitVersion` (patch), sets `updatedAt`, appends `{ date, version, change, why: "from Shreditor" }`, writes atomically, and brings the project's styles in line with the saved kit. It refuses when the file changed since apply, unless `--force`. Styles that match the kit write nothing.
 
+## Set
+
+`shred kit set <id> <path> <value> [<path> <value>...] [--why "..."] [--force]`, only when the user asks, for kit values the editor has no control for (fonts, preferences, rules) or a quick change: `titles.style.size 104`, `fonts.classic.stack.0 "TikTok Sans"`, `preferences.punchIns.on false`. `path=value` works too, and is the form for a value starting with a dash (`titles.style.letterSpacing=-2`; the plain form also works there). A value is JSON when it parses, text otherwise; a string field always takes the text as is. The path must exist and the value keep its type (`null` may become a value and back), and the result must pass the kit schema. `schemaVersion`, `kitVersion`, `updatedAt` and `changelog` are the kit's own. Then it logs the change like save-back (patch bump, `updatedAt`, a changelog entry with `--why`, default "shred kit set"), writes atomically and brings the project's `kit:*` styles in line with the new kit. It refuses when the file changed since apply. `--force` allows a new key, a type change or a drifted file.
+
 ## Limits
 
 - The kit is applied per project; the library copies are a convenience, the project copies are what renders.

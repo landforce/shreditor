@@ -103,6 +103,11 @@
 //   shred kit save-back <id> [--style kit:title] [--force]
 //                                        write the project's kit:* style tweaks into kit.json (version
 //                                        bump, changelog); only when the user asks
+//   shred kit set <id> <path> <value>|<path>=<value> ... [--why "..."]
+//                                        change kit.json values by path (titles.style.size 104,
+//                                        fonts.classic.stack.0 "TikTok Sans", preferences.punchIns.on false):
+//                                        checked, logged in its changelog, the project's kit:* styles follow.
+//                                        Only when the user asks. --force: a new key, a type change, or a drifted file
 //   shred publish <draftId> <targetId> --label "..." --summary <file.md>
 //                                        hand the finished draft to the user's project as one pass
 //                                        (the pass record carries the scorecard; refreshes the
@@ -201,9 +206,12 @@ process.stdout.on('error', (e) => e.code === 'EPIPE' && process.exit(0))
 
 const { values: opt, positionals } = parseArgs({
   allowPositionals: true,
-  // `--lufs -14` reads as a flag to parseArgs; glue negative numbers to their option.
+  // `--lufs -14` reads as a flag to parseArgs; glue negative numbers to their option,
+  // and a kit value to its path (`kit set <id> titles.style.letterSpacing -2`).
   args: process.argv.slice(2).reduce((out, arg) => {
     if (/^-\d/.test(arg) && /^--(lufs|tp)$/.test(out.at(-1) ?? '')) out.push(`${out.pop()}=${arg}`)
+    else if (/^-\d/.test(arg) && process.argv[2] === 'kit' && /^[a-z][\w]*(\.[\w]+)+$/i.test(out.at(-1) ?? ''))
+      out.push(`${out.pop()}=${arg}`)
     else out.push(arg)
     return out
   }, []),
@@ -256,6 +264,7 @@ const { values: opt, positionals } = parseArgs({
     variables: { type: 'string' },
     item: { type: 'string' },
     'keep-audio': { type: 'boolean' },
+    why: { type: 'string' },
   },
 })
 const [command, ...args] = positionals
@@ -1785,7 +1794,7 @@ const commands = {
 
   async kit([sub, ...rest]) {
     const run = kitCommands({ say, opt, workspace, getProject, applyBatch, call, key })[sub]
-    if (!run) throw new Error('Usage: shred kit apply|status|show|save-back (see shred help)')
+    if (!run) throw new Error('Usage: shred kit apply|status|show|set|save-back (see shred help)')
     await run(rest)
   },
 
