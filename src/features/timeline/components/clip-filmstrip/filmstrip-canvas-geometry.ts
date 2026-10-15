@@ -1,4 +1,5 @@
 import type { FilmstripFrame } from '../../hooks/use-filmstrip'
+import type { SourceSecondsAt } from '../../utils/speed-ramp-source-time'
 
 export interface FilmstripCanvasGeometry {
   left: number
@@ -41,6 +42,8 @@ export interface FilmstripCanvasTilesOptions {
   effectiveEnd: number
   speed: number
   isReversed: boolean
+  /** A speed-ramped clip's time map; replaces the linear `speed` mapping when set. */
+  sourceSecondsAt?: SourceSecondsAt
 }
 
 export function computeFilmstripCanvasGeometry(
@@ -138,6 +141,7 @@ export function computeFilmstripCanvasTiles({
   effectiveEnd,
   speed,
   isReversed,
+  sourceSecondsAt,
 }: FilmstripCanvasTilesOptions): FilmstripCanvasTile[] {
   if (
     frames.length === 0 ||
@@ -182,9 +186,10 @@ export function computeFilmstripCanvasTiles({
   for (let slot = startTile; slot < endTile; slot++) {
     const x = slot * safeTileWidth
     const centerX = x + safeTileWidth * 0.5
-    const targetTime = isReversed
-      ? effectiveEnd - centerX / pixelsPerSourceSecond
-      : effectiveStart + centerX / pixelsPerSourceSecond
+    const sourceOffset = sourceSecondsAt
+      ? sourceSecondsAt(centerX / pixelsPerSecond)
+      : centerX / pixelsPerSourceSecond
+    const targetTime = isReversed ? effectiveEnd - sourceOffset : effectiveStart + sourceOffset
     const frame = findClosestFrame(targetTime)
     if (frame) {
       tiles.push({ slot, frame, x, width: safeTileWidth })

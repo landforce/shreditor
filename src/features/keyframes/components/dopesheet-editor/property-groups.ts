@@ -53,6 +53,11 @@ const PROPERTY_GROUP_DEFINITIONS: Array<{
     properties: ['volume'],
   },
   {
+    id: 'time',
+    label: 'Time',
+    properties: ['speed'],
+  },
+  {
     id: 'shape',
     label: 'Shape',
     properties: [

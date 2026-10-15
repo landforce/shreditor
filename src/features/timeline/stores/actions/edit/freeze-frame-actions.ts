@@ -1,3 +1,4 @@
+import { hasSpeedRamp, sourceFramesAtLocalFrame } from '@/shared/timeline/speed-ramp.mjs'
 import type { ImageItem } from '@/types/timeline'
 import { useItemsStore } from '../../items-store'
 import { useTransitionsStore } from '../../transitions-store'
@@ -42,7 +43,11 @@ export async function insertFreezeFrame(itemId: string, playheadFrame: number): 
 
   // Calculate source frame at playhead in source-native FPS
   const timelineOffset = playheadFrame - itemStart
-  const sourceFrame = sourceStart + timelineToSourceFrames(timelineOffset, speed, fps, sourceFps)
+  // Through a speed ramp's time map when the clip has one.
+  const sourceFrame = hasSpeedRamp(item)
+    ? sourceStart +
+      Math.round(sourceFramesAtLocalFrame({ ...item, sourceFps }, timelineOffset, fps))
+    : sourceStart + timelineToSourceFrames(timelineOffset, speed, fps, sourceFps)
 
   // Get media metadata for resolution and fps info
   const media = item.mediaId ? useMediaLibraryStore.getState().mediaById[item.mediaId] : undefined

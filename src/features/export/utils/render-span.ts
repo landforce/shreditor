@@ -2,6 +2,7 @@ import type { CompositionItem, TimelineItem, VideoItem } from '@/types/timeline'
 import type { ActiveTransition } from './canvas-transitions'
 import { timelineToSourceFrames } from '@/features/export/deps/timeline-frame'
 import { resolveHeldInstanceFrame } from '@/shared/motion-templates/instance-time'
+import { hasSpeedRamp, sourceFramesAtLocalFrame } from '@/shared/timeline/speed-ramp.mjs'
 
 /**
  * Linear source-time ramp applied during a transition window.
@@ -268,6 +269,30 @@ export function isFrameInsideSourceTimeRamp(ramp: SourceTimeRamp, frame: number)
 }
 
 /**
+ * Source time (seconds, unclamped) of a speed-ramped clip at a timeline frame:
+ * the integral of its speed curve from the clip's own start
+ * (src/shared/timeline/speed-ramp.mjs). Frames outside the clip (a transition's
+ * extended span) continue at the curve's edge speed.
+ */
+function resolveSpeedRampedSourceTime(
+  item: VideoItem,
+  frame: number,
+  fps: number,
+  sourceFrameOffset: number,
+): number {
+  const sourceFps = item.sourceFps ?? fps
+  const played = sourceFramesAtLocalFrame(item, frame - item.from, fps)
+  const sourceStart = item.sourceStart ?? 0
+  if (item.isReversed) {
+    const sourceEnd =
+      (item.sourceEnd ?? sourceStart + sourceFramesAtLocalFrame(item, item.durationInFrames, fps)) -
+      sourceFrameOffset
+    return (sourceEnd - played - 1) / sourceFps
+  }
+  return (sourceStart + sourceFrameOffset + played) / sourceFps
+}
+
+/**
  * Resolve the exact source time for a video rendered through an explicit
  * timeline span. Preview DOM-video synchronization uses the same helper as
  * the canvas renderer so transition ramps cannot drift between the two paths.
@@ -291,9 +316,11 @@ export function resolveVideoRenderSourceTimeSeconds(
     renderSpan.sourceTimeRamp && !item.isReversed
       ? getSourceFrameRampOffset(renderSpan.sourceTimeRamp, frame)
       : 0
-  const unclampedSourceTime = item.isReversed
-    ? (reverseSourceEnd - localFrame * speed * (sourceFps / fps) - 1) / sourceFps
-    : adjustedSourceStart / sourceFps + localTime * speed + rampOffsetSourceFrames / sourceFps
+  const unclampedSourceTime = hasSpeedRamp(item)
+    ? resolveSpeedRampedSourceTime(item, frame, fps, sourceFrameOffset)
+    : item.isReversed
+      ? (reverseSourceEnd - localFrame * speed * (sourceFps / fps) - 1) / sourceFps
+      : adjustedSourceStart / sourceFps + localTime * speed + rampOffsetSourceFrames / sourceFps
   const clampedToStart = Math.max(0, unclampedSourceTime)
   const rawSourceTime =
     item.sourceDuration === undefined ||

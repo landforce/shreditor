@@ -35,7 +35,7 @@ function VariantSelect({ projectId, format }: { projectId: string; format: Resol
     try {
       await useProjectStore
         .getState()
-        .setProjectFormat(projectId, projectFormatRecord(format.id, variant))
+        .setProjectFormat(projectId, projectFormatRecord(format.id, variant, format.options))
     } catch (error) {
       toast.error(t('formats.panel.saveFailed'), {
         description: error instanceof Error ? error.message : undefined,
@@ -99,6 +99,40 @@ function RulesList({ format }: { format: ResolvedFormat }) {
         </div>
       ))}
     </dl>
+  )
+}
+
+/** The project's opt-in to speed ramps, which no format's spec uses. */
+function SpeedRampsOption({ projectId, format }: { projectId: string; format: ResolvedFormat }) {
+  const { t } = useTranslation()
+  const allowed = format.options.speedRamps === 'allowed'
+  const change = async (next: boolean) => {
+    try {
+      await useProjectStore.getState().setProjectFormat(
+        projectId,
+        projectFormatRecord(format.id, format.variant?.id, {
+          ...format.options,
+          speedRamps: next ? 'allowed' : 'none',
+        }),
+      )
+    } catch (error) {
+      toast.error(t('formats.panel.saveFailed'), {
+        description: error instanceof Error ? error.message : undefined,
+      })
+    }
+  }
+  return (
+    <div className="space-y-1 pt-2">
+      <label className="flex items-center justify-between gap-3 text-xs text-secondary-foreground">
+        {t('formats.panel.allowSpeedRamps')}
+        <Switch
+          checked={allowed}
+          onCheckedChange={(next) => void change(next)}
+          data-testid="format-allow-speed-ramps"
+        />
+      </label>
+      <p className="text-[11px] text-muted-foreground">{t('formats.panel.allowSpeedRampsHint')}</p>
+    </div>
   )
 }
 
@@ -213,6 +247,7 @@ export const FormatPanel = memo(function FormatPanel() {
           </PropertySection>
           <PropertySection title={t('formats.rules.title')}>
             <RulesList format={format} />
+            <SpeedRampsOption projectId={projectId} format={format} />
           </PropertySection>
           <FormatGuideDialog format={format} open={guideOpen} onOpenChange={setGuideOpen} />
         </>

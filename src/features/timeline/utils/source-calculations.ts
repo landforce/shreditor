@@ -1,4 +1,5 @@
 import type { TimelineItem } from '@/types/timeline'
+import { MAX_SPEED, MIN_SPEED } from '@/shared/timeline/speed-ramp.mjs'
 
 /**
  * Core utilities for source/timeline frame conversions.
@@ -13,9 +14,10 @@ import type { TimelineItem } from '@/types/timeline'
  * - timelineFrames = sourceFrames / speed
  */
 
-// Speed constraints
-export const MIN_SPEED = 0.1
-export const MAX_SPEED = 16
+// Speed constraints: one limit for the editor, the project schema and the
+// agent (src/shared/timeline/speed-ramp.mjs). 16x is what browser media
+// playback (playbackRate) and the export time-stretch accept.
+export { MIN_SPEED, MAX_SPEED } from '@/shared/timeline/speed-ramp.mjs'
 export const DEFAULT_SPEED = 1
 const DEFAULT_TIMELINE_FPS = 30
 

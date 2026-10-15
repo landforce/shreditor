@@ -18,6 +18,7 @@ import { observeParentElementHeight } from '../measure-parent-height'
 import { useTimelineViewportStore } from '../../stores/timeline-viewport-store'
 import { useZoomStore } from '../../stores/zoom-store'
 import { CLIP_VISIBILITY_PREFETCH_MARGIN_PX } from '../../hooks/use-clip-visibility'
+import { sourceOffsetSeconds, type SourceSecondsAt } from '../../utils/speed-ramp-source-time'
 
 const logger = createLogger('ClipWaveform')
 
@@ -43,6 +44,8 @@ interface ClipWaveformProps {
   speed: number
   /** Whether the clip plays source media in reverse */
   isReversed?: boolean
+  /** A speed-ramped clip's time map; replaces `speed` for mapping pixels to source time */
+  sourceSecondsAt?: SourceSecondsAt
   /** Frames per second */
   fps: number
   /** Whether the clip is visible (from IntersectionObserver) */
@@ -72,6 +75,7 @@ export const ClipWaveform = memo(function ClipWaveform({
   trimStart,
   speed,
   isReversed = false,
+  sourceSecondsAt,
   fps,
   isVisible,
   visibleStartRatio = 0,
@@ -131,13 +135,27 @@ export const ClipWaveform = memo(function ClipWaveform({
       sourceDuration,
       Math.max(
         effectiveStart,
-        sourceEnd ?? effectiveStart + (visibleClipWidth / Math.max(1, pixelsPerSecond)) * speed,
+        sourceEnd ??
+          effectiveStart +
+            sourceOffsetSeconds(
+              visibleClipWidth / Math.max(1, pixelsPerSecond),
+              speed,
+              sourceSecondsAt,
+            ),
       ),
     )
     const visibleStartX = visibleClipWidth * Math.max(0, Math.min(1, visibleStartRatio))
     const visibleEndX = visibleClipWidth * Math.max(0, Math.min(1, visibleEndRatio))
-    const startOffset = (visibleStartX / Math.max(1, pixelsPerSecond)) * speed
-    const endOffset = (visibleEndX / Math.max(1, pixelsPerSecond)) * speed
+    const startOffset = sourceOffsetSeconds(
+      visibleStartX / Math.max(1, pixelsPerSecond),
+      speed,
+      sourceSecondsAt,
+    )
+    const endOffset = sourceOffsetSeconds(
+      visibleEndX / Math.max(1, pixelsPerSecond),
+      speed,
+      sourceSecondsAt,
+    )
     const sourceA = isReversed ? effectiveEnd - endOffset : effectiveStart + startOffset
     const sourceB = isReversed ? effectiveEnd - startOffset : effectiveStart + endOffset
     const padSeconds = Math.max(
@@ -157,6 +175,7 @@ export const ClipWaveform = memo(function ClipWaveform({
     visibleClipWidth,
     pixelsPerSecond,
     speed,
+    sourceSecondsAt,
     visibleStartRatio,
     visibleEndRatio,
     isReversed,
@@ -276,7 +295,11 @@ export const ClipWaveform = memo(function ClipWaveform({
       )
       const effectiveEnd = Math.min(
         sourceDuration,
-        Math.max(effectiveStart, sourceEnd ?? effectiveStart + clipTimelineDuration * speed),
+        Math.max(
+          effectiveStart,
+          sourceEnd ??
+            effectiveStart + sourceOffsetSeconds(clipTimelineDuration, speed, sourceSecondsAt),
+        ),
       )
       const centerY = height / 2
       const maxWaveHeight = Math.max(1, height / 2 - WAVEFORM_VERTICAL_PADDING_PX)
@@ -292,7 +315,7 @@ export const ClipWaveform = memo(function ClipWaveform({
 
       for (let x = 0; x < amplitudeCount; x++) {
         const timelinePosition = (windowOffset + x) / currentPps
-        const sourceOffset = timelinePosition * speed
+        const sourceOffset = sourceOffsetSeconds(timelinePosition, speed, sourceSecondsAt)
         const sourceTime = isReversed ? effectiveEnd - sourceOffset : effectiveStart + sourceOffset
 
         if (sourceTime < 0 || sourceTime > sourceDuration || sampleRate <= 0) {
@@ -305,7 +328,11 @@ export const ClipWaveform = memo(function ClipWaveform({
         }
 
         // Window sampling to avoid aliasing
-        const pointWindowSeconds = Math.max(1 / sampleRate, (1 / currentPps) * speed * 0.5)
+        // Source seconds under one pixel: the ramp's local rate when ramped.
+        const pointSourceSeconds = sourceSecondsAt
+          ? Math.abs(sourceSecondsAt(timelinePosition + 1 / currentPps) - sourceOffset)
+          : (1 / currentPps) * speed
+        const pointWindowSeconds = Math.max(1 / sampleRate, pointSourceSeconds * 0.5)
         const samplesPerPoint = Math.max(1, Math.ceil(pointWindowSeconds * sampleRate))
         const halfWindow = Math.floor(samplesPerPoint / 2)
         const windowStart = Math.max(0, peakIndex - halfWindow)
@@ -359,6 +386,7 @@ export const ClipWaveform = memo(function ClipWaveform({
       sourceEnd,
       trimStart,
       speed,
+      sourceSecondsAt,
       isReversed,
       sourceDuration,
       height,

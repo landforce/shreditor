@@ -237,6 +237,33 @@ test('project format record and lookup', () => {
   assert.equal(projectFormat({ format: { id: 'gone' as never } }), null)
 })
 
+test('speed ramps: no format uses them; a project can allow them as an option', () => {
+  for (const format of FORMATS) {
+    assert.equal(format.rules.speedRamps, 'none', format.id)
+    for (const variant of format.variants) {
+      assert.equal(resolveFormat(format.id, variant.id).rules.speedRamps, 'none')
+      assert.equal(variant.overrides.rules?.speedRamps, undefined)
+    }
+  }
+  const allowed = projectFormatRecord('ten-shot', 'beat', { speedRamps: 'allowed' })
+  assert.deepEqual(allowed.options, { speedRamps: 'allowed' })
+  // The default is not stored.
+  assert.equal(projectFormatRecord('ten-shot', 'beat', { speedRamps: 'none' }).options, undefined)
+  assert.equal(
+    projectFormatRecord('ten-shot', 'beat', { speedRamps: 'maybe' as never }).options,
+    undefined,
+  )
+  const resolved = projectFormat({ format: allowed })!
+  assert.equal(resolved.rules.speedRamps, 'allowed')
+  assert.deepEqual(resolved.options, { speedRamps: 'allowed' })
+  assert.equal(resolveFormat(allowed).rules.speedRamps, 'allowed')
+  assert.deepEqual(resolveFormat('ten-shot').options, { speedRamps: 'none' })
+  // The rest of the spec is the stock one.
+  const stock = resolveFormat('ten-shot', 'beat')
+  assert.deepEqual(resolved.targets, stock.targets)
+  assert.deepEqual({ ...resolved.rules, speedRamps: 'none' }, stock.rules)
+})
+
 test('vendored guides: present, clean, and the hash the targets were reviewed against', () => {
   for (const format of FORMATS) {
     const guide = read(format.guide.path)

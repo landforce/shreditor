@@ -1,8 +1,6 @@
+import { hasSpeedRamp, sourceSpanFrames } from '@/shared/timeline/speed-ramp.mjs'
 import React from 'react'
-import {
-  AbsoluteFill,
-  useClockPlaybackRate,
-} from '@/runtime/composition-runtime/deps/player'
+import { AbsoluteFill, useClockPlaybackRate } from '@/runtime/composition-runtime/deps/player'
 import { useDebugStore, useGizmoStore } from '@/runtime/composition-runtime/deps/stores'
 import type { AudioItem, CompositionItem, TimelineItem, ShapeItem } from '@/types/timeline'
 import type { ResolvedAudioEqSettings } from '@/types/audio'
@@ -234,11 +232,17 @@ export const ItemContent = React.memo<ItemProps>(
       const sourceFps = item.sourceFps ?? mediaSourceFps ?? timelineFps
       // Get playback rate from speed property (default 1x)
       const playbackRate = item.speed ?? DEFAULT_SPEED
+      // Source checks below use a speed ramp's mean rate (its integral over the clip).
+      const isSpeedRamped = hasSpeedRamp(item)
+      const boundsRate = isSpeedRamped
+        ? sourceSpanFrames({ ...item, sourceFps }, timelineFps) /
+          Math.max(1, (item.durationInFrames * sourceFps) / timelineFps)
+        : playbackRate
 
       // Calculate source frames needed for playback using shared utility
       const sourceFramesNeeded = timelineToSourceFrames(
         item.durationInFrames,
-        playbackRate,
+        boundsRate,
         timelineFps,
         sourceFps,
       )
@@ -265,7 +269,7 @@ export const ItemContent = React.memo<ItemProps>(
         !isWithinSourceBounds(
           trimBefore,
           item.durationInFrames,
-          playbackRate,
+          boundsRate,
           sourceDuration || undefined,
           2,
           timelineFps,
@@ -306,7 +310,7 @@ export const ItemContent = React.memo<ItemProps>(
       const safeTrimBefore = getSafeTrimBefore(
         trimBefore,
         item.durationInFrames,
-        playbackRate,
+        boundsRate,
         sourceDuration || undefined,
         timelineFps,
         sourceFps,
@@ -348,14 +352,17 @@ export const ItemContent = React.memo<ItemProps>(
       )
       const shouldUseCustomDecodedVideoAudio =
         !muted && needsCustomAudioDecoder(mediaItem?.audioCodec ?? mediaItem?.codec)
-      const renderExternalVideoAudio = shouldRenderExternalVideoAudio({
-        muted,
-        hasAudioSource: !!videoAudioSrc,
-        authoredReversed: isReversed,
-        reverseShuttle: isReverseShuttle,
-        requiresPitchShift: requiresPitchShiftedVideoAudio,
-        requiresCustomDecoder: shouldUseCustomDecodedVideoAudio,
-      })
+      // A ramped clip's embedded audio follows the curve on its own element.
+      const renderExternalVideoAudio =
+        shouldRenderExternalVideoAudio({
+          muted,
+          hasAudioSource: !!videoAudioSrc,
+          authoredReversed: isReversed,
+          reverseShuttle: isReverseShuttle,
+          requiresPitchShift: requiresPitchShiftedVideoAudio,
+          requiresCustomDecoder: shouldUseCustomDecodedVideoAudio,
+        }) ||
+        (isSpeedRamped && !muted && !!videoAudioSrc)
       const videoAudioPlaybackProps = getItemAudioPlaybackProps({
         item,
         trimBefore: safeTrimBefore,
@@ -380,6 +387,7 @@ export const ItemContent = React.memo<ItemProps>(
         ) : (
           <PitchCorrectedAudio
             {...videoAudioPlaybackProps}
+            speedRamp={item.speedRamp}
             src={videoAudioSrc}
             mediaId={item.mediaId}
           />
@@ -493,7 +501,14 @@ export const ItemContent = React.memo<ItemProps>(
 
       // Use PitchCorrectedAudio for pitch-preserved playback during preview
       // and toneFrequency correction during rendering
-      return <PitchCorrectedAudio {...audioPlaybackProps} src={item.src} mediaId={item.mediaId} />
+      return (
+        <PitchCorrectedAudio
+          {...audioPlaybackProps}
+          speedRamp={item.speedRamp}
+          src={item.src}
+          mediaId={item.mediaId}
+        />
+      )
     }
 
     if (item.type === 'image') {

@@ -36,6 +36,14 @@ import {
   getCropSoftnessReferenceDimension,
   normalizeCropSettings,
 } from '@/shared/utils/media-crop'
+import {
+  applySpeedRampChoice,
+  formatRampSpeed,
+  getCombinedSpeedRampRange,
+  getSharedSpeedRampState,
+  SPEED_RAMP_CHOICE_LABEL_KEYS,
+  SPEED_RAMP_CHOICES,
+} from './speed-ramp-choices'
 
 const MIN_SPEED = 0.1
 const MAX_SPEED = 10.0
@@ -220,6 +228,9 @@ export function VideoSection({ items }: VideoSectionProps) {
   }, [cropItems, currentFrame, keyframesByItemId])
 
   const speed = getMixedValue(videoItems, (item) => item.speed, 1)
+  const speedRampState = useMemo(() => getSharedSpeedRampState(videoItems), [videoItems])
+  const speedRampRange = useMemo(() => getCombinedSpeedRampRange(videoItems), [videoItems])
+  const isSpeedRamped = speedRampRange !== null
   const fadeIn = getMixedValue(videoItems, (item) => item.fadeIn, 0)
   const fadeOut = getMixedValue(videoItems, (item) => item.fadeOut, 0)
   const cropLeft = getMixedValue(
@@ -519,6 +530,9 @@ export function VideoSection({ items }: VideoSectionProps) {
   const handleResetSpeed = useCallback(() => {
     resetSpeedWithRipple(rateStretchableIds)
   }, [rateStretchableIds, resetSpeedWithRipple])
+  const handleResetSpeedRamp = useCallback(() => {
+    applySpeedRampChoice(rateStretchableIds, 'none')
+  }, [rateStretchableIds])
 
   const handleResetFadeIn = useCallback(() => {
     const tolerance = 0.01
@@ -552,25 +566,76 @@ export function VideoSection({ items }: VideoSectionProps) {
         <PropertySection title={t('editor.videoSection.playback')} icon={Video} defaultOpen={true}>
           <PropertyRow label={t('editor.videoSection.speed')}>
             <div className="flex items-center gap-1 w-full">
-              <SliderInput
-                value={speed}
-                onChange={commitSpeedChange}
-                onLiveChange={handleSpeedLiveChange}
-                min={MIN_SPEED}
-                max={MAX_SPEED}
-                step={0.01}
-                unit="x"
+              {/* A ramp sets the speed over time; a constant change would only rate-stretch it. */}
+              <div
                 className="flex-1 min-w-0"
-              />
+                title={isSpeedRamped ? t('editor.speedRamp.constantDisabled') : undefined}
+              >
+                <SliderInput
+                  value={speed}
+                  onChange={commitSpeedChange}
+                  onLiveChange={handleSpeedLiveChange}
+                  min={MIN_SPEED}
+                  max={MAX_SPEED}
+                  step={0.01}
+                  unit="x"
+                  disabled={isSpeedRamped}
+                  className="w-full"
+                />
+              </div>
               <Button
                 variant="ghost"
                 size="icon"
                 className="h-7 w-7 flex-shrink-0"
                 onClick={handleResetSpeed}
+                disabled={isSpeedRamped}
                 title={t('editor.videoSection.resetSpeed')}
               >
                 <RotateCcw className="w-3.5 h-3.5" />
               </Button>
+            </div>
+          </PropertyRow>
+
+          <PropertyRow label={t('editor.speedRamp.label')}>
+            <div className="flex flex-col gap-1 w-full min-w-0" data-testid="speed-ramp-controls">
+              <div className="flex flex-wrap gap-1">
+                {SPEED_RAMP_CHOICES.map((choice) => (
+                  <Button
+                    key={choice}
+                    variant={speedRampState === choice ? 'secondary' : 'outline'}
+                    size="sm"
+                    className="h-6 px-1.5 text-[11px]"
+                    aria-pressed={speedRampState === choice}
+                    onClick={() => applySpeedRampChoice(rateStretchableIds, choice)}
+                  >
+                    {t(SPEED_RAMP_CHOICE_LABEL_KEYS[choice])}
+                  </Button>
+                ))}
+              </div>
+              {speedRampRange && (
+                <div className="flex items-center gap-1 min-w-0">
+                  <span
+                    className="flex-1 min-w-0 truncate text-xs text-muted-foreground tabular-nums"
+                    data-testid="speed-ramp-range"
+                  >
+                    {t('editor.speedRamp.range', {
+                      min: formatRampSpeed(speedRampRange.min),
+                      max: formatRampSpeed(speedRampRange.max),
+                    })}
+                    {speedRampState === 'custom' && ` · ${t('editor.speedRamp.custom')}`}
+                  </span>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 flex-shrink-0"
+                    onClick={handleResetSpeedRamp}
+                    title={t('editor.speedRamp.reset')}
+                    aria-label={t('editor.speedRamp.reset')}
+                  >
+                    <RotateCcw className="w-3.5 h-3.5" />
+                  </Button>
+                </div>
+              )}
             </div>
           </PropertyRow>
 

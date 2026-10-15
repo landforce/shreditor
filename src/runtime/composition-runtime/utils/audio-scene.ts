@@ -1,3 +1,9 @@
+import {
+  getSpeedRamp,
+  shiftSpeedRamp,
+  sourceFramesAtLocalFrame,
+  type SpeedRampKey,
+} from '@/shared/timeline/speed-ramp.mjs'
 import type { AudioItem, VideoItem } from '@/types/timeline'
 import type { ResolvedAudioDynamics, ResolvedAudioEqSettings } from '@/types/audio'
 import type { Transition } from '@/types/transition'
@@ -69,6 +75,12 @@ export interface AudioSegment {
   durationInFrames: number
   trimBefore: number
   playbackRate: number
+  /**
+   * A speed ramp in segment-local frames (the clip's keys moved by any
+   * transition lead-in); replaces playbackRate. Plays through the native
+   * element (pitch kept) with its rate set per frame.
+   */
+  speedRamp?: readonly SpeedRampKey[]
   isReversed?: boolean
   reverseSourceEnd?: number
   sourceFps?: number
@@ -280,6 +292,7 @@ export function buildStandaloneAudioSegments(
       durationInFrames: item.durationInFrames,
       trimBefore: resolvedTrimBeforeById.get(item.id) ?? getTrimBefore(item),
       playbackRate: item.speed ?? 1,
+      speedRamp: getSpeedRamp(item) ?? undefined,
       isReversed: item.isReversed === true ? true : undefined,
       reverseSourceEnd: getReverseSourceEnd(
         item,
@@ -335,6 +348,8 @@ export function buildStandaloneAudioSegments(
       isContinuousAudioBoundary(active.clip, segment.clip, fps) &&
       active.src === segment.src &&
       Math.abs(active.playbackRate - segment.playbackRate) <= 0.0001 &&
+      !active.speedRamp &&
+      !segment.speedRamp &&
       active.isReversed !== true &&
       segment.isReversed !== true &&
       Math.abs(active.volumeDb - segment.volumeDb) <= 0.0001 &&
@@ -370,6 +385,7 @@ export function buildStandaloneAudioSegments(
       durationInFrames: active.durationInFrames,
       trimBefore: active.trimBefore,
       playbackRate: active.playbackRate,
+      speedRamp: active.speedRamp,
       isReversed: active.isReversed,
       reverseSourceEnd: active.reverseSourceEnd,
       sourceFps: active.sourceFps,
@@ -400,6 +416,7 @@ export function buildStandaloneAudioSegments(
       durationInFrames: active.durationInFrames,
       trimBefore: active.trimBefore,
       playbackRate: active.playbackRate,
+      speedRamp: active.speedRamp,
       isReversed: active.isReversed,
       reverseSourceEnd: active.reverseSourceEnd,
       sourceFps: active.sourceFps,
@@ -504,8 +521,17 @@ export function buildTransitionVideoAudioSegments(
         : 0
     const before = Math.max(0, Math.min(extension.before, maxBeforeBySource))
     const after = Math.max(0, extension.after)
-    const beforeSource = timelineToSourceFrames(before, playbackRate, fps, itemSourceFps)
-    const afterSource = timelineToSourceFrames(after, playbackRate, fps, itemSourceFps)
+    const rampKeys = getSpeedRamp(item)
+    // A ramp holds its edge speeds through a transition's lead-in and tail.
+    const beforeSource = rampKeys
+      ? Math.round(-sourceFramesAtLocalFrame(item, -before, fps))
+      : timelineToSourceFrames(before, playbackRate, fps, itemSourceFps)
+    const afterSource = rampKeys
+      ? Math.round(
+          sourceFramesAtLocalFrame(item, item.durationInFrames + after, fps) -
+            sourceFramesAtLocalFrame(item, item.durationInFrames, fps),
+        )
+      : timelineToSourceFrames(after, playbackRate, fps, itemSourceFps)
     const trimBefore = Math.max(
       0,
       baseTrimBefore - beforeSource - (item.isReversed === true ? afterSource : 0),
@@ -533,6 +559,7 @@ export function buildTransitionVideoAudioSegments(
       durationInFrames: item.durationInFrames + before + after,
       trimBefore,
       playbackRate,
+      speedRamp: rampKeys ? shiftSpeedRamp(rampKeys, before) : undefined,
       isReversed: item.isReversed === true ? true : undefined,
       reverseSourceEnd:
         item.isReversed === true && reverseSourceEnd !== undefined
@@ -595,6 +622,8 @@ export function buildTransitionVideoAudioSegments(
       isContinuousAudioBoundary(active.clip, segment.clip, fps) &&
       active.src === segment.src &&
       Math.abs(active.playbackRate - segment.playbackRate) <= 0.0001 &&
+      !active.speedRamp &&
+      !segment.speedRamp &&
       active.isReversed !== true &&
       segment.isReversed !== true &&
       Math.abs(active.volumeDb - segment.volumeDb) <= 0.0001 &&
@@ -636,6 +665,7 @@ export function buildTransitionVideoAudioSegments(
       durationInFrames: active.durationInFrames,
       trimBefore: active.trimBefore,
       playbackRate: active.playbackRate,
+      speedRamp: active.speedRamp,
       isReversed: active.isReversed,
       reverseSourceEnd: active.reverseSourceEnd,
       sourceFps: active.sourceFps,
@@ -672,6 +702,7 @@ export function buildTransitionVideoAudioSegments(
       durationInFrames: active.durationInFrames,
       trimBefore: active.trimBefore,
       playbackRate: active.playbackRate,
+      speedRamp: active.speedRamp,
       isReversed: active.isReversed,
       reverseSourceEnd: active.reverseSourceEnd,
       sourceFps: active.sourceFps,

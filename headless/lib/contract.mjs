@@ -12,6 +12,11 @@ import {
   TEMPLATE_OP_SCHEMAS,
 } from './template-contract.mjs'
 import { ttsCapabilities, ttsRequestSchema } from './tts-contract.mjs'
+import {
+  SPEED_RAMP_OP_DESCRIPTIONS,
+  SPEED_RAMP_OP_NAMES,
+  SPEED_RAMP_OP_SCHEMAS,
+} from './speed-ramp-contract.mjs'
 
 export const HEADLESS_API_VERSION = 1
 
@@ -64,6 +69,8 @@ const ANIMATABLE_PROPERTIES = [
   'cropBottom',
   'cropSoftness',
   'volume',
+  // A clip's speed ramp lane (setSpeedRamp is the op for it).
+  'speed',
   'textStyleScale',
   'fontSize',
   'lineHeight',
@@ -318,6 +325,7 @@ const opSchemas = [
     .strict(),
   ...TEMPLATE_OP_SCHEMAS,
   ...TEXT_STYLE_OP_SCHEMAS,
+  ...SPEED_RAMP_OP_SCHEMAS,
 ]
 
 export const EDIT_OPERATION_NAMES = [
@@ -349,6 +357,7 @@ export const EDIT_OPERATION_NAMES = [
   'replaceMedia',
   ...TEMPLATE_OP_NAMES,
   ...TEXT_STYLE_OP_NAMES,
+  ...SPEED_RAMP_OP_NAMES,
 ]
 const EDIT_OPERATION_DESCRIPTIONS = Object.fromEntries(
   EDIT_OPERATION_NAMES.map((name) => [name, samplesDescription(name)]),
@@ -385,6 +394,7 @@ function samplesDescription(name) {
       'Put other media in a clip, keeping its id, place and length (fits the source window; too short fails)',
     ...TEMPLATE_OP_DESCRIPTIONS,
     ...TEXT_STYLE_OP_DESCRIPTIONS,
+    ...SPEED_RAMP_OP_DESCRIPTIONS,
   }
   return descriptions[name]
 }
@@ -401,9 +411,14 @@ export const editRequestSchema = z
     path: ['project'],
   })
 
-// A project's format (formats/registry.mjs): the id, and a variant the format has.
+// A project's format (formats/registry.mjs): the id, and a variant the format has,
+// and the project's options (speed ramps allowed or not).
 const formatChoice = z
-  .object({ id: z.enum(FORMAT_IDS), variant: z.string().min(1).optional() })
+  .object({
+    id: z.enum(FORMAT_IDS),
+    variant: z.string().min(1).optional(),
+    options: z.object({ speedRamps: z.enum(['none', 'allowed']).optional() }).strict().optional(),
+  })
   .strict()
   .refine(
     (value) => !value.variant || getFormat(value.id).variants.some((v) => v.id === value.variant),

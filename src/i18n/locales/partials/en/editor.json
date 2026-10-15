@@ -789,6 +789,18 @@
       "softness": "Softness",
       "speed": "Speed"
     },
+    "speedRamp": {
+      "label": "Ramp",
+      "none": "None",
+      "easeIn": "Ease in",
+      "easeOut": "Ease out",
+      "hero": "Hero slow-mo",
+      "whip": "Whip",
+      "custom": "Custom ramp",
+      "range": "Speed ramp: {{min}}x–{{max}}x",
+      "reset": "Reset speed ramp",
+      "constantDisabled": "Reset the ramp to change constant speed"
+    },
     "mediaSidebar": {
       "media": "Media",
       "text": "Text",

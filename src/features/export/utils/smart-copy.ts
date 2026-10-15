@@ -1,3 +1,4 @@
+import { hasSpeedRamp } from '@/shared/timeline/speed-ramp.mjs'
 import type { AudioEqSettings } from '@/types/audio'
 import type { ItemKeyframes } from '@/types/keyframe'
 import type { MediaMetadata } from '@/types/storage'
@@ -209,6 +210,7 @@ function isFullSourceAtNormalSpeed(
     (video.trimStart ?? 0) === 0,
     (video.trimEnd ?? 0) === 0,
     (video.speed ?? 1) === 1,
+    !hasSpeedRamp(video),
     video.isReversed !== true,
     Math.abs(video.durationInFrames - expectedTimelineFrames) <= 1,
   ].every(Boolean)

@@ -1,11 +1,18 @@
-import { render, screen, within } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vite-plus/test'
 import type { ReactNode } from 'react'
 import type { CompositionItem, VideoItem } from '@/types/timeline'
 import { useKeyframesStore, useTimelineStore } from '@/features/editor/deps/timeline-store'
+import { speedRampPreset } from '@/shared/timeline/speed-ramp.mjs'
 import { VideoSection } from './video-section'
 
 const keyframeToggleSpy = vi.hoisted(() => vi.fn())
+const applySpeedRampChoiceSpy = vi.hoisted(() => vi.fn())
+
+vi.mock('./speed-ramp-choices', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./speed-ramp-choices')>()
+  return { ...actual, applySpeedRampChoice: applySpeedRampChoiceSpy }
+})
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (key: string) => key }),
@@ -32,7 +39,9 @@ vi.mock('../components', () => ({
   PropertyRow: ({ label, children }: { label: string; children: ReactNode }) => (
     <div data-testid={`property-row-${label}`}>{children}</div>
   ),
-  SliderInput: ({ max }: { max: number }) => <output data-testid="slider-input" data-max={max} />,
+  SliderInput: ({ max, disabled }: { max: number; disabled?: boolean }) => (
+    <output data-testid="slider-input" data-max={max} data-disabled={disabled ? 'true' : 'false'} />
+  ),
 }))
 
 const VIDEO_ITEM: VideoItem = {
@@ -96,5 +105,48 @@ describe('VideoSection crop controls', () => {
       [video.id]: 480,
       [composition.id]: 960,
     })
+  })
+})
+
+describe('VideoSection speed ramp controls', () => {
+  beforeEach(() => {
+    applySpeedRampChoiceSpy.mockClear()
+    useKeyframesStore.setState({ keyframesByItemId: {} })
+  })
+
+  function speedSlider(): HTMLElement {
+    const row = screen.getByTestId('property-row-editor.videoSection.speed')
+    return within(row).getByTestId('slider-input')
+  }
+
+  it('offers the ramp presets on a constant-speed clip and keeps the speed slider live', () => {
+    useTimelineStore.setState({ items: [VIDEO_ITEM], fps: 30 })
+    render(<VideoSection items={[VIDEO_ITEM]} />)
+
+    expect(speedSlider().getAttribute('data-disabled')).toBe('false')
+    expect(screen.queryByTestId('speed-ramp-range')).toBeNull()
+    const none = screen.getByRole('button', { name: 'editor.speedRamp.none' })
+    expect(none.getAttribute('aria-pressed')).toBe('true')
+
+    fireEvent.click(screen.getByRole('button', { name: 'editor.speedRamp.hero' }))
+    expect(applySpeedRampChoiceSpy).toHaveBeenCalledWith([VIDEO_ITEM.id], 'hero')
+  })
+
+  it('shows the ramp, disables constant speed and resets the ramp', () => {
+    const ramped: VideoItem = {
+      ...VIDEO_ITEM,
+      speedRamp: speedRampPreset('hero', { durationInFrames: VIDEO_ITEM.durationInFrames }),
+    }
+    useTimelineStore.setState({ items: [ramped], fps: 30 })
+    render(<VideoSection items={[ramped]} />)
+
+    expect(speedSlider().getAttribute('data-disabled')).toBe('true')
+    expect(screen.getByTestId('speed-ramp-range')).toBeTruthy()
+    expect(
+      screen.getByRole('button', { name: 'editor.speedRamp.hero' }).getAttribute('aria-pressed'),
+    ).toBe('true')
+
+    fireEvent.click(screen.getByRole('button', { name: 'editor.speedRamp.reset' }))
+    expect(applySpeedRampChoiceSpy).toHaveBeenCalledWith([ramped.id], 'none')
   })
 })

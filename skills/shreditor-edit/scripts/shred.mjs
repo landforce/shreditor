@@ -17,6 +17,8 @@
 //                                        a format's (or a project's) rules, targets, checklist and guide
 //   shred format set <projectId> <formatId> [--variant v]   record the format (an empty project also
 //                                        gets its canvas and track layout)
+//        [--allow speed-ramps | --disallow speed-ramps]   project options: no format uses speed
+//                                        ramps; --allow lets this project's clips have them
 //   shred new --name "..." --format <id> [--variant v]   create a project in a format: its canvas and
 //                                        named tracks (with roles); prints id, editor URL and tracks
 //   shred new --name "..." [--size 1080x1920] [--fps 30]   create a project without a format
@@ -330,6 +332,8 @@ const { values: opt, positionals } = parseArgs({
     request: { type: 'string' },
     'from-template': { type: 'string' },
     slot: { type: 'string', multiple: true },
+    allow: { type: 'string' },
+    disallow: { type: 'string' },
   },
 })
 const [command, ...args] = positionals
@@ -735,7 +739,7 @@ function formatOrThrow(id, variant) {
 function projectFormatOrNull(project) {
   if (!project.format?.id || !getFormat(project.format.id)) return null
   try {
-    return resolveFormat(project.format.id, project.format.variant)
+    return resolveFormat(project.format.id, project.format.variant, project.format.options)
   } catch {
     return null
   }
@@ -773,6 +777,9 @@ function printFormat(format) {
   )
   for (const k of ['captions', 'speech', 'voiceover', 'music', 'sfx', 'syncSound', 'transitions'])
     say(`  ${k.padEnd(12)} ${r[k]}`)
+  say(
+    `  ${'speedRamps'.padEnd(12)} ${r.speedRamps ?? 'none'}${r.speedRamps === 'allowed' ? ' (this project allows them)' : ' (--allow speed-ramps on a project to use them)'}`,
+  )
   say('\nTargets (fail = must fix or explain; warn = starting point)')
   for (const t of format.targets) {
     const banded = t.min !== null || t.max !== null
@@ -795,16 +802,44 @@ function printTracks(project, format) {
   }
 }
 
+// Project format options from --allow / --disallow (only speed-ramps so far).
+const FORMAT_OPTION_FLAGS = { 'speed-ramps': 'speedRamps' }
+function formatOptionsFromFlags(current) {
+  const options = { ...(current ?? {}) }
+  for (const [flag, value] of [
+    [opt.allow, 'allowed'],
+    [opt.disallow, 'none'],
+  ]) {
+    if (!flag) continue
+    const key = FORMAT_OPTION_FLAGS[flag]
+    if (!key)
+      throw new Error(
+        `Unknown format option "${flag}" (options: ${Object.keys(FORMAT_OPTION_FLAGS).join(', ')})`,
+      )
+    options[key] = value
+  }
+  return Object.values(options).some((value) => value !== 'none') ? options : undefined
+}
+
 async function setFormat(id, formatId) {
   if (!id || !formatId)
-    throw new Error('Usage: shred format set <projectId> <formatId> [--variant v]')
-  const format = formatOrThrow(formatId, opt.variant)
+    throw new Error(
+      'Usage: shred format set <projectId> <formatId> [--variant v] [--allow|--disallow speed-ramps]',
+    )
   const { project, revision } = await getProject(id)
+  // Options carry over when the format stays the same; flags change them.
+  const sameFormat = getFormat(project.format?.id)?.id === getFormat(formatId)?.id
+  const options = formatOptionsFromFlags(sameFormat ? project.format?.options : undefined)
+  const format = formatOrThrow(formatId, opt.variant)
   const empty = !project.timeline?.items?.length
   const c = format.canvas
   const m = project.metadata ?? {}
   const canvasDiffers = m.width !== c.width || m.height !== c.height || m.fps !== c.fps
-  const choice = { id: format.id, ...(format.variant ? { variant: format.variant.id } : {}) }
+  const choice = {
+    id: format.id,
+    ...(format.variant ? { variant: format.variant.id } : {}),
+    ...(options ? { options } : {}),
+  }
   const updates = {
     format: choice,
     ...(empty && canvasDiffers ? { width: c.width, height: c.height, fps: c.fps } : {}),
@@ -820,6 +855,9 @@ async function setFormat(id, formatId) {
       'The service ignored the format; restart it on this build (shred start --build)',
     )
   say(`${id}: format ${formatTitle(format)}`)
+  say(
+    `speed ramps ${options?.speedRamps === 'allowed' ? 'allowed in this project' : 'not used (the format spec); --allow speed-ramps to use them'}`,
+  )
   if (empty) {
     // An empty timeline takes the format's canvas and named tracks.
     const timeline = {
@@ -1236,7 +1274,11 @@ const commands = {
       say(`${project.name} (${first}) has no format yet. Choose one with the user:`)
       return listFormats()
     }
-    const format = resolveFormat(project.format.id, opt.variant ?? project.format.variant)
+    const format = resolveFormat(
+      project.format.id,
+      opt.variant ?? project.format.variant,
+      project.format.options,
+    )
     printFormat(format)
     if (project.format.reviewedHash && project.format.reviewedHash !== format.guide.reviewedHash) {
       say(

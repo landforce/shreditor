@@ -1,3 +1,9 @@
+import {
+  getSpeedRamp,
+  sourceFramesAtLocalFrame,
+  type SpeedRampKey,
+} from '@/shared/timeline/speed-ramp.mjs'
+
 /**
  * Snap a source time to the nearest frame boundary to eliminate
  * floating-point drift.  Without this, `(sourceStart / sourceFps) +
@@ -22,8 +28,25 @@ export function snapSourceTime(time: number, sourceFps: number): number {
 }
 
 /**
+ * Source frames played after `relativeFrame` clip frames: the constant rate,
+ * or a speed ramp's integral (src/shared/timeline/speed-ramp.mjs).
+ */
+function playedSourceFrames(
+  relativeFrame: number,
+  playbackRate: number,
+  sourceFps: number,
+  timelineFps: number,
+  speedRamp: readonly SpeedRampKey[] | undefined,
+): number {
+  const keys = getSpeedRamp({ speedRamp })
+  if (!keys) return (relativeFrame * playbackRate * sourceFps) / timelineFps
+  return sourceFramesAtLocalFrame({ speedRamp: keys, sourceFps }, relativeFrame, timelineFps)
+}
+
+/**
  * Calculate source playback time (seconds) for a video clip.
  * Supports shared Sequence rendering by applying a per-item frame offset.
+ * A clip with a speed ramp passes its keys; `playbackRate` is then ignored.
  */
 export function getVideoTargetTimeSeconds(
   safeTrimBefore: number,
@@ -34,9 +57,16 @@ export function getVideoTargetTimeSeconds(
   sequenceFrameOffset: number = 0,
   isReversed: boolean = false,
   reverseSourceEnd?: number,
+  speedRamp?: readonly SpeedRampKey[],
 ): number {
   const relativeFrame = sequenceLocalFrame - sequenceFrameOffset
-  const sourceFrameOffset = (relativeFrame * playbackRate * sourceFps) / timelineFps
+  const sourceFrameOffset = playedSourceFrames(
+    relativeFrame,
+    playbackRate,
+    sourceFps,
+    timelineFps,
+    speedRamp,
+  )
   if (isReversed) {
     const sourceEnd = reverseSourceEnd ?? safeTrimBefore
     return snapSourceTime(Math.max(0, sourceEnd - sourceFrameOffset - 1) / sourceFps, sourceFps)
@@ -62,8 +92,15 @@ export function getAudioTargetTimeSeconds(
   timelineFps: number,
   isReversed: boolean = false,
   reverseSourceEnd?: number,
+  speedRamp?: readonly SpeedRampKey[],
 ): number {
-  const sourceFrameOffset = (sequenceLocalFrame * playbackRate * sourceFps) / timelineFps
+  const sourceFrameOffset = playedSourceFrames(
+    sequenceLocalFrame,
+    playbackRate,
+    sourceFps,
+    timelineFps,
+    speedRamp,
+  )
   if (isReversed) {
     const sourceEnd = reverseSourceEnd ?? trimBefore
     return snapSourceTime(Math.max(0, sourceEnd - sourceFrameOffset - 1) / sourceFps, sourceFps)

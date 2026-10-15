@@ -43,6 +43,14 @@ import {
 } from './items-store-indexes'
 import type { ItemsIndexState } from './items-store-indexes'
 import { recordTextStyleOverrides } from './items-store-text-style'
+import {
+  getSpeedRamp,
+  joinedSpeedRamp,
+  pruneSpeedRamp,
+  scaleSpeedRamp,
+  shiftSpeedRamp,
+  sourceFramesAtLocalFrame,
+} from '@/shared/timeline/speed-ramp.mjs'
 
 function getLog() {
   return createLogger('ItemsStore')
@@ -575,8 +583,32 @@ export const useItemsStore = create<ItemsState & ItemsActions>()((set, get) => (
       ;(rightItem as typeof item).cues = rightCues
     }
 
-    // Handle sourceStart/sourceEnd for media items (accounting for speed)
-    if (isMediaItem(item)) {
+    // A speed-ramped clip splits its curve: the right half's keys move with its
+    // start, so both halves keep the exact shape; the source cut is the integral.
+    const rampKeys = isMediaItem(item) ? getSpeedRamp(item) : null
+    if (rampKeys && isMediaItem(item)) {
+      const timelineFps = useTimelineSettingsStore.getState().fps
+      const { sourceStart } = getSourceProperties(item)
+      const leftSpan = Math.round(sourceFramesAtLocalFrame(item, leftDuration, timelineFps))
+      const totalSpan = Math.round(sourceFramesAtLocalFrame(item, itemDuration, timelineFps))
+      const left = leftItem as typeof item
+      const right = rightItem as typeof item
+      left.speedRamp = pruneSpeedRamp(rampKeys, leftDuration)
+      right.speedRamp = pruneSpeedRamp(shiftSpeedRamp(rampKeys, -leftDuration), rightDuration)
+      if (item.isReversed === true) {
+        const sourceEnd = item.sourceEnd ?? sourceStart + totalSpan
+        left.sourceStart = sourceEnd - leftSpan
+        left.sourceEnd = sourceEnd
+        right.sourceStart = sourceStart
+        right.sourceEnd = sourceEnd - leftSpan
+      } else {
+        left.sourceStart = sourceStart
+        left.sourceEnd = sourceStart + leftSpan
+        right.sourceStart = sourceStart + leftSpan
+        right.sourceEnd = item.sourceEnd ?? sourceStart + totalSpan
+      }
+    } else if (isMediaItem(item)) {
+      // Handle sourceStart/sourceEnd for media items (accounting for speed)
       const timelineFps = useTimelineSettingsStore.getState().fps
       const { sourceStart, speed, sourceFps } = getSourceProperties(item)
       const effectiveSourceFps = sourceFps ?? timelineFps
@@ -670,6 +702,19 @@ export const useItemsStore = create<ItemsState & ItemsActions>()((set, get) => (
       // Calculate total duration
       const totalDuration = lastItem.from + lastItem.durationInFrames - firstItem.from
 
+      // Speed ramps rejoin into the one curve they were split from.
+      let joinedRamp: ReturnType<typeof joinedSpeedRamp>
+      let joinedSoFar: TimelineItem = firstItem
+      for (const next of itemsToJoin.slice(1)) {
+        joinedRamp = joinedSpeedRamp(joinedSoFar, next)
+        if (joinedRamp === null) return state
+        joinedSoFar = {
+          ...joinedSoFar,
+          durationInFrames: joinedSoFar.durationInFrames + next.durationInFrames,
+          ...(joinedRamp ? { speedRamp: joinedRamp } : {}),
+        } as TimelineItem
+      }
+
       // Create joined item (using first item as base, but take source/trim end bounds from last item)
       // This is the inverse of split: first item provides start bounds, last item provides end bounds
       const joinedItem = {
@@ -679,6 +724,7 @@ export const useItemsStore = create<ItemsState & ItemsActions>()((set, get) => (
         // Take sourceEnd and trimEnd from the last item to maintain source continuity
         sourceEnd: lastItem.sourceEnd,
         trimEnd: lastItem.trimEnd,
+        ...(joinedRamp ? { speedRamp: joinedRamp } : {}),
       } as TimelineItem
 
       // Remove all but first (by timeline position), update first
@@ -742,6 +788,22 @@ export const useItemsStore = create<ItemsState & ItemsActions>()((set, get) => (
 
         if (!hasExplicitSourceBounds) {
           updatedItem.sourceEnd = roundFrame(clampedSourceEnd)
+        }
+
+        // A ramp stretches with the clip: keys spread in time, speeds scale the
+        // other way, so the curve plays the same source over the new length.
+        const rampKeys = getSpeedRamp(item)
+        if (rampKeys && item.durationInFrames > 0) {
+          const frameScale = finalDuration / item.durationInFrames
+          updatedItem.speedRamp = pruneSpeedRamp(
+            scaleSpeedRamp(rampKeys, frameScale, 1 / frameScale),
+            finalDuration,
+          )
+          const span = Math.round(sourceFramesAtLocalFrame(updatedItem, finalDuration, timelineFps))
+          const rampEnd = sourceStart + Math.max(1, span)
+          updatedItem.sourceEnd = item.sourceDuration
+            ? Math.min(rampEnd, item.sourceDuration)
+            : rampEnd
         }
 
         return updatedItem

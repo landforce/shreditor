@@ -17,8 +17,17 @@ import {
   timelineToSourceFrames,
 } from '@/features/editor/deps/timeline-utils'
 import type { ImageItem, VideoItem } from '@/types/timeline'
+import { hasSpeedRamp, sourceSpanFrames } from '@/shared/timeline/speed-ramp.mjs'
 import { SliderInput } from '../properties-sidebar/components'
 import { MotionGraphicControls } from '../properties-sidebar/clip-panel/motion-graphic-section'
+import {
+  applySpeedRampChoice,
+  formatRampSpeed,
+  getCombinedSpeedRampRange,
+  getSharedSpeedRampState,
+  SPEED_RAMP_CHOICE_LABEL_KEYS,
+  SPEED_RAMP_CHOICES,
+} from '../properties-sidebar/clip-panel/speed-ramp-choices'
 import { getMixedValue, updateItemsInOneStep } from '../properties-sidebar/utils'
 import {
   Cell,
@@ -178,7 +187,10 @@ function Timing({ item, fps }: { item: ShotItem; fps: number }) {
   const sourceIn = item.sourceStart ?? item.trimStart ?? 0
   const sourceOut =
     item.sourceEnd ??
-    sourceIn + timelineToSourceFrames(item.durationInFrames, speed, fps, sourceFps)
+    sourceIn +
+      (hasSpeedRamp(item)
+        ? Math.round(sourceSpanFrames(item, fps))
+        : timelineToSourceFrames(item.durationInFrames, speed, fps, sourceFps))
   const range = (a: number, b: number, rate: number) =>
     `${(a / rate).toFixed(2)}s - ${(b / rate).toFixed(2)}s`
   return (
@@ -291,11 +303,14 @@ function SpeedField({ items }: { items: ShotItem[] }) {
     [items],
   )
   const snapshotRef = useRef<ReturnType<typeof captureSnapshot> | null>(null)
-  const speed = getMixedValue(
-    items.filter((entry): entry is VideoItem => entry.type === 'video'),
-    (entry) => entry.speed,
-    1,
+  const videoItems = useMemo(
+    () => items.filter((entry): entry is VideoItem => entry.type === 'video'),
+    [items],
   )
+  const speed = getMixedValue(videoItems, (entry) => entry.speed, 1)
+  const rampState = useMemo(() => getSharedSpeedRampState(videoItems), [videoItems])
+  const rampRange = useMemo(() => getCombinedSpeedRampRange(videoItems), [videoItems])
+  const ramped = rampRange !== null
 
   const apply = useCallback(
     (next: number) => {
@@ -307,7 +322,9 @@ function SpeedField({ items }: { items: ShotItem[] }) {
         const sourceFrames =
           entry.sourceEnd !== undefined && entry.sourceStart !== undefined
             ? entry.sourceEnd - entry.sourceStart
-            : timelineToSourceFrames(entry.durationInFrames, entry.speed || 1, fps, sourceFps)
+            : hasSpeedRamp(entry)
+              ? Math.round(sourceSpanFrames(entry, fps))
+              : timelineToSourceFrames(entry.durationInFrames, entry.speed || 1, fps, sourceFps)
         const duration = Math.max(1, sourceToTimelineFrames(sourceFrames, clamped, sourceFps, fps))
         rateStretchItemWithoutHistory(entry.id, entry.from, duration, clamped)
       }
@@ -344,29 +361,60 @@ function SpeedField({ items }: { items: ShotItem[] }) {
   }
   return (
     <div className="space-y-2">
-      <SliderInput
-        value={speed}
-        onChange={commit}
-        onLiveChange={live}
-        min={MIN_SPEED}
-        max={MAX_SPEED}
-        step={0.01}
-        unit="x"
-        className="w-full"
-      />
+      {/* A ramp sets the speed over time; a constant change would only rate-stretch it. */}
+      <div title={ramped ? t('editor.speedRamp.constantDisabled') : undefined}>
+        <SliderInput
+          value={speed}
+          onChange={commit}
+          onLiveChange={live}
+          min={MIN_SPEED}
+          max={MAX_SPEED}
+          step={0.01}
+          unit="x"
+          disabled={ramped}
+          className="w-full"
+        />
+      </div>
       <div className="flex gap-1">
         {SPEED_PRESETS.map((preset) => (
           <Button
             key={preset}
-            variant={speed === preset ? 'secondary' : 'outline'}
+            variant={!ramped && speed === preset ? 'secondary' : 'outline'}
             size="sm"
             className="h-7 flex-1 px-0 text-xs"
+            disabled={ramped}
             onClick={() => commit(preset)}
           >
             {preset}x
           </Button>
         ))}
       </div>
+      <div className="flex flex-wrap gap-1" data-testid="concise-shot-speed-ramp">
+        {SPEED_RAMP_CHOICES.map((choice) => (
+          <Button
+            key={choice}
+            variant={rampState === choice ? 'secondary' : 'outline'}
+            size="sm"
+            className="h-7 px-2 text-xs"
+            aria-pressed={rampState === choice}
+            onClick={() => applySpeedRampChoice(stretchable, choice)}
+          >
+            {t(SPEED_RAMP_CHOICE_LABEL_KEYS[choice])}
+          </Button>
+        ))}
+      </div>
+      {rampRange && (
+        <p
+          className="text-xs text-muted-foreground tabular-nums"
+          data-testid="concise-shot-speed-ramp-readout"
+        >
+          {rampState === 'custom' ? `${t('editor.speedRamp.custom')} · ` : ''}
+          {t('editor.speedRamp.range', {
+            min: formatRampSpeed(rampRange.min),
+            max: formatRampSpeed(rampRange.max),
+          })}
+        </p>
+      )}
     </div>
   )
 }

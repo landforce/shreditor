@@ -1,3 +1,4 @@
+import { hasSpeedRamp } from '@/shared/timeline/speed-ramp.mjs'
 import { useCallback, useMemo } from 'react'
 import type { CompositionInputProps } from '@/types/export'
 import type { TimelineItem } from '@/types/timeline'
@@ -190,7 +191,8 @@ export function buildPreviewTransitionData({
     item.type === 'composition' ||
     hasExpensiveVisuals(item) ||
     hasCornerPin(item.cornerPin) ||
-    Math.abs((item.speed ?? 1) - 1) > 0.001
+    Math.abs((item.speed ?? 1) - 1) > 0.001 ||
+    hasSpeedRamp(item)
 
   const playbackTransitionComplexStartFrames = new Set<number>()
   const playbackTransitionOverlayWindows = playbackTransitionWindows.map((window) => {

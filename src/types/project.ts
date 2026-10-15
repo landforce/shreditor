@@ -10,6 +10,7 @@ import type { MaskVertex } from './masks'
 import type { ShapeStyleFields } from './timeline'
 import type { CompositionControlOverrides, CompositionControlSchema } from './composition-controls'
 import type { FormatRole, ProjectFormat } from '@formats/registry.mjs'
+import type { SpeedRampKey } from '@/shared/timeline/speed-ramp.mjs'
 
 /**
  * Selects the editing surface a stored composition naturally opens in.
@@ -208,6 +209,7 @@ export interface ProjectTimeline {
       maskOpacity?: number
       maskInvert?: boolean
       speed?: number // Playback speed multiplier (default 1.0)
+      speedRamp?: SpeedRampKey[] // Variable speed (src/shared/timeline/speed-ramp.mjs)
       // Composition item fields
       compositionId?: string // Reference to a sub-composition
       compositionWidth?: number

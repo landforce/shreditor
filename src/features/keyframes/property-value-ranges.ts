@@ -1,4 +1,5 @@
 import { getGpuEffect } from '@/infrastructure/gpu-effects'
+import { MAX_SPEED, MIN_SPEED } from '@/shared/timeline/speed-ramp.mjs'
 import { MAX_PACKED_RGB, MIN_PACKED_RGB } from '@/features/keyframes/utils/color-keyframes'
 import {
   isBuiltInAnimatableProperty,
@@ -32,6 +33,8 @@ const BUILT_IN_PROPERTY_VALUE_RANGES: Record<BuiltInAnimatableProperty, Property
   cropBottom: { property: 'cropBottom', min: 0, max: 4000, unit: 'px', decimals: 0 },
   cropSoftness: { property: 'cropSoftness', min: -2000, max: 2000, unit: 'px', decimals: 0 },
   volume: { property: 'volume', min: -60, max: 20, unit: 'dB', decimals: 1 },
+  // A clip's speed ramp (the item's speedRamp, mirrored into this lane).
+  speed: { property: 'speed', min: MIN_SPEED, max: MAX_SPEED, unit: 'x', decimals: 2 },
   textStyleScale: { property: 'textStyleScale', min: 0.5, max: 6, unit: 'x', decimals: 2 },
   fontSize: { property: 'fontSize', min: 8, max: 500, unit: 'px', decimals: 0 },
   lineHeight: { property: 'lineHeight', min: 0.5, max: 3, unit: 'x', decimals: 2 },
@@ -78,13 +81,10 @@ function inferUnit(label: string): string {
   return ''
 }
 
-function getPathPropertyValueRange(
-  property: AnimatableProperty,
-): PropertyValueRange | null {
+function getPathPropertyValueRange(property: AnimatableProperty): PropertyValueRange | null {
   const pathVertex = parsePathVertexAnimatableProperty(property)
   if (!pathVertex) return null
-  const isPosition =
-    pathVertex.component === 'positionX' || pathVertex.component === 'positionY'
+  const isPosition = pathVertex.component === 'positionX' || pathVertex.component === 'positionY'
   return {
     property,
     min: isPosition ? 0 : -2,
@@ -94,9 +94,7 @@ function getPathPropertyValueRange(
   }
 }
 
-function getEffectPropertyValueRange(
-  property: AnimatableProperty,
-): PropertyValueRange | null {
+function getEffectPropertyValueRange(property: AnimatableProperty): PropertyValueRange | null {
   const parsed = parseEffectAnimatableProperty(property)
   if (!parsed) return null
 

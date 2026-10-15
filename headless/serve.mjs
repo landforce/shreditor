@@ -464,7 +464,7 @@ export async function main(argv = process.argv.slice(2)) {
     const { format: _previous, ...rest } = project
     return format === null
       ? rest
-      : { ...rest, format: projectFormatRecord(format.id, format.variant) }
+      : { ...rest, format: projectFormatRecord(format.id, format.variant, format.options) }
   }
 
   // updates.kit: a record replaces the project's kit, null clears it.

@@ -81,12 +81,15 @@ describe('FormatPanel', () => {
       screen.getByText('Required from 0 s, held 3 s or more, or all video'),
     ).toBeInTheDocument()
     expect(screen.getByText('None: hard cuts only')).toBeInTheDocument()
+    expect(screen.getByText('None: constant speed')).toBeInTheDocument()
+    expect(screen.getByTestId('format-allow-speed-ramps')).not.toBeChecked()
 
     const summary = await screen.findByTestId('format-summary')
     // Pacing numbers are guidelines (warn); only format rules fail.
     expect(summary).toHaveTextContent('2 fail')
     expect(summary).toHaveTextContent('5 warn')
-    expect(summary).toHaveTextContent('2 pass')
+    // The speed ramp check (no ramped clips) is one of the passes.
+    expect(summary).toHaveTextContent('3 pass')
     const gap = screen.getByTestId('format-check-longestNoNewImageSec')
     expect(gap).toHaveAttribute('data-status', 'warn')
     expect(gap).toHaveTextContent('Longest stretch with no new image')

@@ -9,6 +9,7 @@ import { z } from 'zod'
 import { TEXT_STYLE_PRESET_IDS } from '@/shared/typography/text-style-preset-ids'
 import { storedTextStyleSchema } from '@/shared/typography/text-styles/text-style-schema'
 import { FORMAT_ROLES, getFormat, type FormatRole } from '@formats/registry.mjs'
+import { MAX_SPEED, MIN_SPEED } from '@/shared/timeline/speed-ramp.mjs'
 import { SNAPSHOT_VERSION } from '../types/snapshot'
 import {
   AUDIO_DYNAMICS_FIELD_SPECS,
@@ -87,6 +88,16 @@ const keyframeSchema = z.object({
   easing: easingTypeSchema,
   easingConfig: easingConfigSchema.optional(),
   source: animationKeyframeSourceSchema.optional(),
+})
+
+// A clip's speed curve (src/shared/timeline/speed-ramp.mjs). Frames are clip-local
+// and may sit outside the clip after a split or a start trim.
+const speedRampKeySchema = z.object({
+  frame: z.number().int(),
+  speed: z.number().min(MIN_SPEED).max(MAX_SPEED),
+  easing: easingTypeSchema.optional(),
+  easingConfig: easingConfigSchema.optional(),
+  id: z.string().min(1).optional(),
 })
 
 const propertyKeyframesSchema = z.object({
@@ -556,7 +567,8 @@ const timelineItemSchema = z
     maskOpacity: z.number().min(0).max(100).optional(),
     maskInvert: z.boolean().optional(),
     // Speed
-    speed: z.number().min(0.1).max(10).optional(),
+    speed: z.number().min(MIN_SPEED).max(MAX_SPEED).optional(),
+    speedRamp: z.array(speedRampKeySchema).optional(),
     // Source dimensions
     sourceWidth: z.number().optional(),
     sourceHeight: z.number().optional(),
@@ -774,6 +786,11 @@ const projectFormatSchema = z
     id: z.string().min(1),
     variant: z.string().min(1).optional(),
     reviewedHash: z.string().optional(),
+    // Project choices the format leaves open (formats/registry.mjs FormatOptions).
+    options: z
+      .object({ speedRamps: z.enum(['none', 'allowed']).optional() })
+      .strict()
+      .optional(),
   })
   .strict()
   .superRefine((value, ctx) => {

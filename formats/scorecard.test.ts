@@ -597,3 +597,80 @@ test('the format option overrides the project format; a project without one thro
   assert.equal(check(empty, 'lengthSec').status, 'na')
   assert.equal(check(empty, 'titleHook').status, 'fail')
 })
+
+test('speed ramps warn, naming the clips and frames, unless the project allows them', () => {
+  const items = [
+    text('track-title', 0, 3, 'how it felt waking up today', { transform: { y: 0 } }),
+    ...tenShots(14, 1),
+    clip('audio', 'track-music', 0, 14, { mediaId: 'song' }),
+  ]
+  const ramped = items.map((item, index) =>
+    index === 3
+      ? {
+          ...item,
+          label: 'Hero shot',
+          speedRamp: [
+            { frame: 0, speed: 2 },
+            { frame: 10, speed: 0.3 },
+            { frame: 20, speed: 2 },
+          ],
+        }
+      : item,
+  )
+  const media = { mediaById: { song: { category: 'music' } } }
+  const plain = scoreProject(makeProject('ten-shot', 'even', items), media)
+  assert.equal(check(plain, 'speedRamps').status, 'pass')
+
+  const project = makeProject('ten-shot', 'even', ramped)
+  const card = scoreProject(project, media)
+  const ramps = check(card, 'speedRamps')
+  assert.equal(ramps.status, 'warn')
+  assert.equal(ramps.value, 1)
+  const hero = nth(ramped, 3)
+  assert.match(
+    ramps.detail,
+    new RegExp(`Hero shot at ${hero.from}/${hero.from + 10}/${hero.from + 20}`),
+  )
+  assert.match(ramps.detail, /--allow speed-ramps/)
+  assert.deepEqual(ramps.ranges, [
+    { startFrame: hero.from, endFrame: hero.from + hero.durationInFrames },
+  ])
+  assert.deepEqual(failing(card), [])
+
+  const allowed = scoreProject(
+    { ...project, format: { ...project.format, options: { speedRamps: 'allowed' as const } } },
+    media,
+  )
+  assert.equal(check(allowed, 'speedRamps').status, 'pass')
+  assert.equal(check(allowed, 'speedRamps').target, 'allowed')
+})
+
+test('transcript words map through a speed ramp', () => {
+  // 2x for the first 30 frames, then 1x: 60 source frames, then 30, in 60 frames.
+  const item = at('video', 'v', 30, 60, {
+    sourceStart: 0,
+    sourceFps: 30,
+    speedRamp: [
+      { frame: 0, speed: 2, easing: 'hold' },
+      { frame: 30, speed: 1 },
+    ],
+  })
+  const mapped = mapClipWords(
+    item,
+    envelope([
+      { text: 'fast', start: 1, end: 1.5 },
+      { text: 'slow', start: 2.5, end: 2.9 },
+      { text: 'gone', start: 3.2, end: 3.5 },
+    ]),
+    { fps: FPS },
+  )
+  assert.deepEqual(
+    mapped.map((word) => [word.text, Number(word.start.toFixed(4)), Number(word.end.toFixed(4))]),
+    [
+      // Source 1 s at 2x is 0.5 s into the clip (clip starts at 1 s).
+      ['fast', 1.5, 1.75],
+      // Source 2.5 s: 2 s played in the first second, 0.5 s more at 1x.
+      ['slow', 2.5, 2.9],
+    ],
+  )
+})

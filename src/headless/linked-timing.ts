@@ -2,7 +2,14 @@ import type { TimelineItem } from '@/types/timeline'
 import { getSynchronizedLinkedItems } from '@/features/timeline/utils/linked-items'
 
 /** Fields that place a clip in time; linked companions keep them in step. */
-const TIMING_KEYS = ['from', 'durationInFrames', 'sourceStart', 'sourceEnd', 'speed'] as const
+const TIMING_KEYS = [
+  'from',
+  'durationInFrames',
+  'sourceStart',
+  'sourceEnd',
+  'speed',
+  'speedRamp',
+] as const
 
 /**
  * The linked companions (a video's own audio, or the video of an audio clip)

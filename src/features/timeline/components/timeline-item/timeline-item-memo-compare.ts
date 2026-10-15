@@ -43,6 +43,7 @@ export function areTimelineItemPropsEqual(
     prevItem.sourceFps === nextItem.sourceFps &&
     prevItem.trimStart === nextItem.trimStart &&
     prevItem.speed === nextItem.speed &&
+    prevItem.speedRamp === nextItem.speedRamp &&
     prevItem.isReversed === nextItem.isReversed &&
     prevItem.reverseConformStatus === nextItem.reverseConformStatus &&
     prevItem.volume === nextItem.volume &&

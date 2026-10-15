@@ -1,6 +1,7 @@
 import { memo, useCallback, useEffect, useLayoutEffect, useRef } from 'react'
 
 import type { FilmstripFrame } from '../../hooks/use-filmstrip'
+import type { SourceSecondsAt } from '../../utils/speed-ramp-source-time'
 import { useTimelineViewportStore } from '../../stores/timeline-viewport-store'
 import { useZoomStore } from '../../stores/zoom-store'
 import {
@@ -28,6 +29,8 @@ interface VisibleFilmstripCanvasProps {
   effectiveEnd: number
   speed: number
   isReversed: boolean
+  /** A speed-ramped clip's time map (see computeFilmstripCanvasTiles). */
+  sourceSecondsAt?: SourceSecondsAt
   tileWidth: number
   coverFrame: FilmstripFrame | null
   onSourceError?: (frameIndex: number) => void
@@ -283,6 +286,7 @@ export const VisibleFilmstripCanvas = memo(function VisibleFilmstripCanvas({
   effectiveEnd,
   speed,
   isReversed,
+  sourceSecondsAt,
   tileWidth,
   coverFrame,
   onSourceError,
@@ -395,6 +399,7 @@ export const VisibleFilmstripCanvas = memo(function VisibleFilmstripCanvas({
         effectiveEnd,
         speed,
         isReversed,
+        sourceSecondsAt,
       })
       syncSourceSubscriptions([
         ...(coverFrame ? [coverFrame] : []),
@@ -483,6 +488,7 @@ export const VisibleFilmstripCanvas = memo(function VisibleFilmstripCanvas({
       frames,
       height,
       isReversed,
+      sourceSecondsAt,
       speed,
       syncSourceSubscriptions,
       tileWidth,
@@ -502,15 +508,10 @@ export const VisibleFilmstripCanvas = memo(function VisibleFilmstripCanvas({
     if (liveTimelineViewport) {
       const snapshot = getLiveTimelineSnapshot()
       const timelineItem = canvas.closest<HTMLElement>('[data-timeline-item]')
-      const requiresMeasuredGeometry =
-        canvas.closest('[data-filmstrip-timeline-segment]') !== null
+      const requiresMeasuredGeometry = canvas.closest('[data-filmstrip-timeline-segment]') !== null
       const liveWindow = requiresMeasuredGeometry
         ? null
-        : computeLiveFilmstripCanvasWindowFromItem(
-            timelineItem,
-            snapshot,
-            liveViewportOverscanPx,
-          )
+        : computeLiveFilmstripCanvasWindowFromItem(timelineItem, snapshot, liveViewportOverscanPx)
       const resolvedWindow =
         liveWindow ??
         measureLiveFilmstripCanvasWindow({

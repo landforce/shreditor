@@ -921,6 +921,29 @@ describe('audio DSP through processAudio (real pipeline, mocked decode)', () => 
     expect(midway).toBeLessThan(0.125)
   })
 
+  it('a speed ramp follows its curve: 1x, then 2x, pitch-kept, into the same window', async () => {
+    const composition = dspComposition({
+      src: 'blob:audio-ramp',
+      durationInFrames: 90,
+      speedRamp: [
+        { frame: 0, speed: 1, easing: 'hold' },
+        { frame: 45, speed: 2 },
+      ],
+    })
+    // Stateful (time-stretched across the clip): never mixed in windows.
+    expect(supportsWindowedAudioProcessing(composition)).toBe(false)
+    expect(extractAudioSegments(composition, 30)[0]?.speedRamp).toHaveLength(2)
+    const result = await processAudio(composition)
+    const samples = result!.samples[0]!
+    expect(samples).toHaveLength(3 * 48_000)
+    // 1 s in, still at 1x: about 1 s of source (ramp ~0.048).
+    expect(samples[48_000]!).toBeGreaterThan(0.035)
+    expect(samples[48_000]!).toBeLessThan(0.06)
+    // 2.5 s in: 1.5 s at 1x plus 1 s at 2x = 3.5 s of source (ramp ~0.168).
+    expect(samples[120_000]!).toBeGreaterThan(0.15)
+    expect(samples[120_000]!).toBeLessThan(0.185)
+  })
+
   it('starts a clip exactly at its source start when decoded packets straddle it', async () => {
     // sourceStart 45 at 30 fps = 1.5 s = sample 72000, 320 frames into a
     // 1024-frame packet. The packet's leading frames must not shift the clip.

@@ -134,12 +134,17 @@ function projectDurationFrames(items, fps) {
   return Math.max(maxEnd, fps)
 }
 
+// The `speed` lane mirrors a clip's speed ramp (item.speedRamp), routed as 'speed ramp'.
 const keyframedIds = (keyframes) =>
   new Set(
     (keyframes ?? [])
-      .filter((k) => (k.properties ?? []).some((p) => (p.keyframes ?? []).length > 0))
+      .filter((k) =>
+        (k.properties ?? []).some((p) => p.property !== 'speed' && (p.keyframes ?? []).length > 0),
+      )
       .map((k) => k.itemId),
   )
+/** A variable-speed clip (src/shared/timeline/speed-ramp.mjs): no constant frame ratio. */
+const hasSpeedRamp = (item) => Array.isArray(item.speedRamp) && item.speedRamp.length > 0
 
 const isTranscriptSubtitle = (item) => item.type === 'subtitle' && item.source?.type === 'transcript'
 
@@ -383,6 +388,7 @@ const hasCrop = (item) => {
 
 /** Item features ffmpeg does not reproduce here (the browser draws these). */
 const VIDEO_ITEM_RULES = [
+  [hasSpeedRamp, 'speed ramp'],
   [(i) => i.effects?.some((e) => e.enabled), 'effects'],
   [isKeyframed, 'keyframes'],
   [(i) => i.motionModifiers?.length || i.motionLayers?.length, 'motion modifiers'],
@@ -479,6 +485,7 @@ const AUDIO_PROJECT_RULES = [
 const AUDIO_CLIP_RULES = [
   [(a) => a.item.audioDucking, 'ducking'],
   [(a) => (a.item.speed ?? 1) !== 1, 'speed'],
+  [(a) => hasSpeedRamp(a.item), 'speed ramp'],
   [(a) => a.item.isReversed, 'reversed'],
   [(a) => a.item.audioPitchSemitones || a.item.audioPitchCents, 'pitch'],
   [(a) => hasItemEq(a.item) || a.track.audioEq, 'EQ'],

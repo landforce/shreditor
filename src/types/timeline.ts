@@ -8,6 +8,7 @@ import type { TextMotionSpec } from './text-motion'
 import type { TextLayoutDrafts, TextSpan, TextStyleFields } from './text'
 import type { CompositionControlOverrides } from './composition-controls'
 import type { FormatRole } from '@formats/registry.mjs'
+import type { SpeedRampKey } from '@/shared/timeline/speed-ramp.mjs'
 
 export interface TimelineItemCornerPin {
   topLeft: [number, number]
@@ -84,7 +85,13 @@ type BaseTimelineItem = {
   sourceEnd?: number // Original end frame in source media (default sourceDuration)
   sourceDuration?: number // Total duration of source media in frames (for boundary checks)
   sourceFps?: number // Source media frame rate used for source* frame conversions
-  speed?: number // Playback speed multiplier (default 1.0, range 0.1-10.0)
+  speed?: number // Playback speed multiplier (default 1.0, range MIN_SPEED-MAX_SPEED, 0.1-16)
+  /**
+   * Variable speed across the clip (src/shared/timeline/speed-ramp.mjs): keys
+   * in clip-local timeline frames. When present it replaces `speed` for timing,
+   * and sourceEnd - sourceStart is the curve's integral over the clip.
+   */
+  speedRamp?: SpeedRampKey[]
   isReversed?: boolean // Play media source range from end to start
   reverseConformSrc?: string // Full-res prepared reversed media blob URL for export
   reverseConformPath?: string // OPFS/workspace cache path for the full-res reversed media

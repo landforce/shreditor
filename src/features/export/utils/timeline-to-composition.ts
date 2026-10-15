@@ -1,3 +1,8 @@
+import {
+  getSpeedRamp,
+  shiftSpeedRamp,
+  sourceFramesAtLocalFrame,
+} from '@/shared/timeline/speed-ramp.mjs'
 import type { TimelineTrack, TimelineItem } from '@/types/timeline'
 import type { Transition } from '@/types/transition'
 import type { AudioEqSettings } from '@/types/audio'
@@ -130,11 +135,24 @@ export function convertTimelineToComposition(
           const speed = item.speed || 1
           const sourceFps = item.sourceFps ?? fps
 
-          // Convert timeline frames to source-native frames
-          const sourceTrimStart = timelineToSourceFrames(additionalTrimStart, speed, fps, sourceFps)
-          const sourceTrimEnd = timelineToSourceFrames(additionalTrimEnd, speed, fps, sourceFps)
+          // Convert timeline frames to source-native frames (a speed ramp's integral
+          // over the cut-off frames; its keys move with the new start).
+          const rampKeys = getSpeedRamp(item)
+          const rampSpan = (start: number, end: number) =>
+            Math.round(
+              sourceFramesAtLocalFrame(item, end, fps) - sourceFramesAtLocalFrame(item, start, fps),
+            )
+          const sourceTrimStart = rampKeys
+            ? rampSpan(0, additionalTrimStart)
+            : timelineToSourceFrames(additionalTrimStart, speed, fps, sourceFps)
+          const sourceTrimEnd = rampKeys
+            ? rampSpan(item.durationInFrames - additionalTrimEnd, item.durationInFrames)
+            : timelineToSourceFrames(additionalTrimEnd, speed, fps, sourceFps)
 
           const mediaItem = adjustedItem as typeof item
+          if (rampKeys && additionalTrimStart > 0) {
+            mediaItem.speedRamp = shiftSpeedRamp(rampKeys, -additionalTrimStart)
+          }
           mediaItem.trimStart = currentTrimStart + sourceTrimStart
           mediaItem.trimEnd = currentTrimEnd + sourceTrimEnd
           if (item.isReversed === true) {

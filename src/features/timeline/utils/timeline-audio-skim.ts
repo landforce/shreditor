@@ -1,6 +1,7 @@
 import type { TimelineItem, TimelineTrack } from '@/types/timeline'
 import { getMixerLiveGain } from '@/shared/state/mixer-live-gain'
 import { getAudioFadeMultiplier } from '@/shared/utils/audio-fade-curve'
+import { hasSpeedRamp, sourceFramesAtLocalFrame } from '@/shared/timeline/speed-ramp.mjs'
 import { timelineToSourceFrames } from './source-calculations'
 import { resolveEffectiveTrackStates } from './group-utils'
 
@@ -18,6 +19,20 @@ interface TimelineMediaElementSkimRequest {
 function normalizeFps(fps: number | undefined, fallback: number): number {
   if (fps === undefined || !Number.isFinite(fps) || fps <= 0) return fallback
   return fps
+}
+
+/** Source frames played by a clip-local frame: through the speed ramp, else at constant speed. */
+function sourceDeltaFramesAt(
+  item: TimelineItem,
+  localFrame: number,
+  timelineFps: number,
+  sourceFps: number,
+): number {
+  if (hasSpeedRamp(item)) {
+    const timed = { speedRamp: item.speedRamp, sourceFps }
+    return Math.round(sourceFramesAtLocalFrame(timed, localFrame, timelineFps))
+  }
+  return timelineToSourceFrames(localFrame, item.speed ?? 1, timelineFps, sourceFps)
 }
 
 export interface LatestOnlyAsyncFrameRunner {
@@ -78,14 +93,13 @@ export function getTimelineAudioSkimTimeSeconds(
 
   const safeTimelineFps = normalizeFps(timelineFps, DEFAULT_TIMELINE_FPS)
   const sourceFps = normalizeFps(item.sourceFps, safeTimelineFps)
-  const speed = item.speed ?? 1
   const localTimelineFrame = Math.max(
     0,
     Math.min(item.durationInFrames - 1, timelineFrame - item.from),
   )
-  const sourceDeltaFrames = timelineToSourceFrames(
+  const sourceDeltaFrames = sourceDeltaFramesAt(
+    item,
     localTimelineFrame,
-    speed,
     safeTimelineFps,
     sourceFps,
   )
@@ -134,9 +148,8 @@ function mapToInnerCompositionFrame(
   innerFps: number,
 ): number {
   const sourceFps = normalizeFps(item.sourceFps, innerFps)
-  const speed = item.speed ?? 1
   const localFrame = Math.max(0, Math.min(item.durationInFrames - 1, frame - item.from))
-  const sourceDeltaFrames = timelineToSourceFrames(localFrame, speed, outerFps, sourceFps)
+  const sourceDeltaFrames = sourceDeltaFramesAt(item, localFrame, outerFps, sourceFps)
   const sourceStart = item.sourceStart ?? 0
   const sourceEnd = item.sourceEnd ?? sourceStart + item.durationInFrames
   return item.isReversed

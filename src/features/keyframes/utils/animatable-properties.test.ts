@@ -35,6 +35,7 @@ describe('getAnimatablePropertiesForItem', () => {
       'cropBottom',
       'cropSoftness',
       'volume',
+      'speed',
     ])
   })
 

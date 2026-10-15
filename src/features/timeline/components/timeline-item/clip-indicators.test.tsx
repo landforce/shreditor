@@ -73,4 +73,28 @@ describe('ClipIndicators', () => {
     expect(onMotionOpen).toHaveBeenCalledTimes(1)
     expect(parentClick).not.toHaveBeenCalled()
   })
+
+  it('shows a ramp badge in place of the constant speed for a speed-ramped clip', () => {
+    const props = {
+      hasKeyframes: false,
+      keyframesExpanded: false,
+      hasMotion: false,
+      currentSpeed: 1.5,
+      isReversed: false,
+      isStretching: false,
+      stretchFeedback: null,
+      isBroken: false,
+      hasMediaId: true,
+      isMask: false,
+      isShape: false,
+    }
+    const { rerender } = render(<ClipIndicators {...props} />)
+    expect(screen.getByText('1.50x')).toBeTruthy()
+    expect(screen.queryByTestId('clip-speed-ramp-badge')).toBeNull()
+
+    rerender(<ClipIndicators {...props} speedRampRange={{ min: 0.3, max: 2 }} />)
+    const badge = screen.getByTestId('clip-speed-ramp-badge')
+    expect(badge.getAttribute('title')).toBe('Speed ramp: 0.3x–2x')
+    expect(screen.queryByText('1.50x')).toBeNull()
+  })
 })

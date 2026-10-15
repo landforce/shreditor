@@ -121,7 +121,36 @@ const samples = {
     },
   },
   addCaptions: { op: 'addCaptions', clipId: 'c', styleId: 'kit-captions', replace: true },
+  setSpeedRamp: {
+    op: 'setSpeedRamp',
+    id: 'c',
+    keys: [
+      { frame: 0, speed: 1, easing: 'ease-in' },
+      { frame: 30, speed: 3 },
+    ],
+  },
+  clearSpeedRamp: { op: 'clearSpeedRamp', id: 'c' },
 }
+
+test('speed ramp op schemas take keys or a preset, in the speed limits', () => {
+  const ok = [
+    { op: 'setSpeedRamp', id: 'c', keys: [] },
+    { op: 'setSpeedRamp', id: 'c', preset: 'hero', frame: 45, speed: 0.25, baseSpeed: 2 },
+    { op: 'setSpeedRamp', id: 'c', preset: 'whip', linked: false },
+  ]
+  for (const op of ok) assert.equal(editOpSchema.safeParse(op).success, true, JSON.stringify(op))
+  const bad = [
+    { op: 'setSpeedRamp', id: 'c' },
+    { op: 'setSpeedRamp', id: 'c', keys: [], preset: 'hero' },
+    { op: 'setSpeedRamp', id: 'c', preset: 'zoom' },
+    { op: 'setSpeedRamp', id: 'c', keys: [{ frame: 0, speed: 17 }] },
+    { op: 'setSpeedRamp', id: 'c', keys: [{ frame: 0, speed: 0.05 }] },
+    { op: 'setSpeedRamp', id: 'c', keys: [{ frame: -1, speed: 1 }] },
+    { op: 'setSpeedRamp', id: 'c', keys: [{ frame: 0, speed: 1, easing: 'bounce' }] },
+    { op: 'clearSpeedRamp', id: 'c', keys: [] },
+  ]
+  for (const op of bad) assert.equal(editOpSchema.safeParse(op).success, false, JSON.stringify(op))
+})
 
 test('template op schemas reject what the editor could not apply', () => {
   const bad = [
@@ -293,8 +322,8 @@ test('validation errors and capabilities are machine-readable and bounded', () =
   assert.ok(result.schemas.render)
   assert.ok(result.schemas.frame)
   assert.ok(result.schemas.layout)
-  // Bounded so an agent can read it whole (about 33 KB with the marker and link ops).
-  assert.ok(JSON.stringify(result).length < 34_000)
+  // Bounded so an agent can read it whole (about 34 KB with the speed ramp ops).
+  assert.ok(JSON.stringify(result).length < 35_000)
 })
 
 test('CLI rejects unknown options and normalizes aliases', () => {

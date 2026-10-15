@@ -61,7 +61,7 @@ function hookValue(t: TFunction, rule: ResolvedFormat['rules']['titleHook']): st
 
 const presence = (t: TFunction, value: Presence) => t(`formats.rules.presence.${value}`)
 
-/** The format's rules in plain words: title hook, captions, voiceover, music, SFX, transitions. */
+/** The format's rules in plain words: title hook, captions, voiceover, music, SFX, transitions, speed ramps. */
 export function formatRuleLines(t: TFunction, format: ResolvedFormat): RuleLine[] {
   const { rules } = format
   return [
@@ -74,6 +74,14 @@ export function formatRuleLines(t: TFunction, format: ResolvedFormat): RuleLine[
       key: 'transitions',
       label: t('formats.rules.transitions'),
       value: t('formats.rules.transitionsNone'),
+    },
+    {
+      key: 'speedRamps',
+      label: t('formats.rules.speedRamps'),
+      value:
+        rules.speedRamps === 'allowed'
+          ? t('formats.rules.speedRampsAllowed')
+          : t('formats.rules.speedRampsNone'),
     },
   ]
 }

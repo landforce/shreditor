@@ -98,6 +98,30 @@ describe('getTimelineAudioSkimTimeSeconds', () => {
       ),
     ).toBeCloseTo(119 / 30)
   })
+
+  it('maps a speed-ramped clip through its time map', () => {
+    // 1x rising to 3x over 60 frames: 30 local frames play (1 + 2) / 2 * 30 = 45 source frames.
+    const ramped = makeAudioItem({
+      speedRamp: [
+        { frame: 0, speed: 1 },
+        { frame: 60, speed: 3 },
+      ],
+    })
+    expect(getTimelineAudioSkimTimeSeconds(ramped, 60, 30, 10)).toBeCloseTo((60 + 45) / 30)
+  })
+
+  it('reads a reversed ramped clip back from its source end', () => {
+    const ramped = makeAudioItem({
+      isReversed: true,
+      sourceStart: 30,
+      sourceEnd: 300,
+      speedRamp: [
+        { frame: 0, speed: 2 },
+        { frame: 90, speed: 2 },
+      ],
+    })
+    expect(getTimelineAudioSkimTimeSeconds(ramped, 60, 30, 20)).toBeCloseTo((300 - 1 - 60) / 30)
+  })
 })
 
 function makeTrack(id: string, overrides: Partial<TimelineTrack> = {}): TimelineTrack {

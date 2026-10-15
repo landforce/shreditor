@@ -18,6 +18,12 @@ import type { AudioEqSettings, ResolvedAudioDynamics, ResolvedAudioEqSettings } 
 import type { Keyframe as VolumeKeyframe } from '@/types/keyframe'
 import type { Transition } from '@/types/transition'
 import { createLogger } from '@/shared/logging/logger'
+import {
+  getSpeedRamp,
+  sourceFramesAtLocalFrame,
+  speedRampIntegral,
+  type SpeedRampKey,
+} from '@/shared/timeline/speed-ramp.mjs'
 import { resolveTransitionWindows } from '@/shared/timeline/transitions/transition-planner'
 import {
   timelineToSourceFrames,
@@ -109,6 +115,11 @@ interface AudioSegment {
   crossfadeFadeInFrames?: number
   crossfadeFadeOutFrames?: number
   speed: number // Playback rate
+  /**
+   * A speed ramp (clip-local frames: segment frame minus contentStartOffsetFrames).
+   * Replaces `speed`; the audio is time-stretched frame by frame, pitch kept.
+   */
+  speedRamp?: readonly SpeedRampKey[]
   isReversed: boolean
   muted: boolean
   type: 'video' | 'audio'
@@ -442,7 +453,11 @@ function buildManagedTransitionAudioSegments<TItem extends TransitionAudioItem>(
       src: item.src,
       startFrame: item.from - before,
       durationFrames: item.durationInFrames + before + after,
-      sourceStartFrame: baseTrimBefore - timelineToSourceFrames(before, speed, fps, sourceFps),
+      sourceStartFrame:
+        baseTrimBefore -
+        (getSpeedRamp(item)
+          ? Math.round(-sourceFramesAtLocalFrame(item, -before, fps))
+          : timelineToSourceFrames(before, speed, fps, sourceFps)),
       sourceFps,
       volume: (item.volume ?? 0) + entry.trackVolume,
       fadeInFrames: (item.audioFadeIn ?? 0) * fps,
@@ -471,6 +486,7 @@ function buildManagedTransitionAudioSegments<TItem extends TransitionAudioItem>(
       crossfadeFadeInFrames,
       crossfadeFadeOutFrames,
       speed,
+      speedRamp: getSpeedRamp(item) ?? undefined,
       isReversed: item.isReversed === true,
       muted: entry.muted,
       type: entry.type,
@@ -503,6 +519,7 @@ function buildManagedTransitionAudioSegments<TItem extends TransitionAudioItem>(
     if (!isContinuousAudioTransition(left.clip, right.clip, fps)) return false
     if (left.src !== right.src) return false
     if (Math.abs(left.speed - right.speed) > 0.0001) return false
+    if (left.speedRamp || right.speedRamp) return false
     if (left.isReversed !== right.isReversed) return false
     if (Math.abs(left.volume - right.volume) > 0.0001) return false
     if (left.muted !== right.muted) return false
@@ -540,6 +557,7 @@ function buildManagedTransitionAudioSegments<TItem extends TransitionAudioItem>(
     crossfadeFadeInFrames: segment.crossfadeFadeInFrames,
     crossfadeFadeOutFrames: segment.crossfadeFadeOutFrames,
     speed: segment.speed,
+    speedRamp: segment.speedRamp,
     isReversed: segment.isReversed,
     muted: segment.muted,
     type: segment.type,
@@ -1057,6 +1075,7 @@ export function extractAudioSegments(
             }),
           ],
           speed: audioItem.speed ?? 1,
+          speedRamp: getSpeedRamp(audioItem) ?? undefined,
           isReversed: audioItem.isReversed === true,
           muted: track.muted ?? false,
           type: 'audio',
@@ -2000,6 +2019,78 @@ async function applySpeedAndPitch(
   }
 }
 
+/** Source seconds a speed-ramped segment plays over its length (the curve's integral). */
+function speedRampSourceSeconds(segment: AudioSegment, fps: number): number {
+  const integral = speedRampIntegral(segment.speedRamp!)
+  const offset = segment.contentStartOffsetFrames ?? 0
+  return (integral.at(segment.durationFrames - offset) - integral.at(-offset)) / fps
+}
+
+/**
+ * Time-stretch a speed-ramped segment with the curve, pitch kept: one
+ * time-stretch stream whose tempo is set per timeline frame to the ramp's
+ * mean speed over that frame, pulling exactly that frame's output samples.
+ * The tempo changes inside one stream, so there are no seams between frames.
+ */
+async function applySpeedRampAndPitch(
+  channels: Float32Array[],
+  segment: AudioSegment,
+  fps: number,
+  sampleRate: number,
+): Promise<Float32Array[]> {
+  if (channels.length === 0 || channels[0]!.length === 0) return channels
+  const integral = speedRampIntegral(segment.speedRamp!)
+  const offset = segment.contentStartOffsetFrames ?? 0
+  const numChannels = channels.length
+  const samplesPerChannel = channels[0]!.length
+  const outputLength = Math.round((segment.durationFrames / fps) * sampleRate)
+  const timeStretch = await import('@/infrastructure/audio/time-stretch')
+  const st = new timeStretch.TimeStretchProcessor()
+  st.pitch = getAudioPitchRatioFromSemitones(segment.pitchShiftSemitones)
+  st.rate = 1.0
+  const left = channels[0]!
+  const right = numChannels >= 2 ? channels[1]! : left
+  let inputFrame = 0
+  const source = {
+    extract: (target: Float32Array, numFrames: number): number => {
+      const frames = Math.min(numFrames, samplesPerChannel - inputFrame)
+      if (frames <= 0) return 0
+      for (let i = 0; i < frames; i++) {
+        target[i * 2] = left[inputFrame + i]!
+        target[i * 2 + 1] = right[inputFrame + i]!
+      }
+      inputFrame += frames
+      return frames
+    },
+  }
+  const filter = new timeStretch.TimeStretchFilter(source, st)
+  const outLeft = new Float32Array(outputLength)
+  const outRight = new Float32Array(outputLength)
+  const chunk = new Float32Array(4096 * 2)
+  let written = 0
+  for (let frame = 0; frame < segment.durationFrames && written < outputLength; frame++) {
+    const tempo = integral.at(frame + 1 - offset) - integral.at(frame - offset)
+    st.tempo = Math.max(0.05, tempo)
+    const frameEnd = Math.min(outputLength, Math.round(((frame + 1) / fps) * sampleRate))
+    while (written < frameEnd) {
+      const extracted = filter.extract(chunk, Math.min(4096, frameEnd - written))
+      if (extracted === 0) break
+      const count = Math.min(extracted, frameEnd - written)
+      for (let i = 0; i < count; i++) {
+        outLeft[written + i] = chunk[i * 2]!
+        outRight[written + i] = chunk[i * 2 + 1]!
+      }
+      written += count
+    }
+  }
+  log.debug('Speed ramp time-stretch complete', {
+    inputLength: samplesPerChannel,
+    outputLength,
+    written,
+  })
+  return numChannels >= 2 ? [outLeft, outRight, ...channels.slice(2).map(() => outLeft)] : [outLeft]
+}
+
 /**
  * Resample audio to target sample rate using OfflineAudioContext for high-quality
  * sinc interpolation (matches browser-native resampling quality).
@@ -2238,6 +2329,7 @@ const STREAMING_AUDIO_CHUNK_SECONDS = 30
 function supportsWindowedAudioSegment(segment: AudioSegment): boolean {
   return (
     Math.abs(segment.speed - 1) <= 0.0001 &&
+    !segment.speedRamp &&
     !segment.isReversed &&
     !isAudioPitchShiftActive(segment.pitchShiftSemitones) &&
     !segment.audioEqStages?.some(isAudioEqStageActive) &&
@@ -2263,6 +2355,7 @@ function hasPacketCopyTimingChanges(segment: AudioSegment, durationInFrames: num
     segment.durationFrames !== durationInFrames ||
     segment.sourceStartFrame !== 0 ||
     Math.abs(segment.speed - 1) > 0.0001 ||
+    Boolean(segment.speedRamp) ||
     segment.isReversed
   )
 }
@@ -2818,7 +2911,10 @@ export async function processAudio(
       // sourceStartFrame is in source-native FPS frames, so divide by sourceFps (not project fps)
       const sourceStartTime = segment.sourceStartFrame / segment.sourceFps
       // Account for speed: at 2x speed, we need twice as much source audio
-      const sourceDurationNeeded = (segment.durationFrames / fps) * segment.speed
+      // (a speed ramp: its integral over the segment).
+      const sourceDurationNeeded = segment.speedRamp
+        ? speedRampSourceSeconds(segment, fps)
+        : (segment.durationFrames / fps) * segment.speed
       const sourceEndTime = sourceStartTime + sourceDurationNeeded
 
       // Decode ONLY the needed range using mediabunny (huge performance improvement!)
@@ -2839,7 +2935,14 @@ export async function processAudio(
       if (segment.isReversed) {
         processedChannels = reverseAudioChannels(processedChannels)
       }
-      if (
+      if (segment.speedRamp) {
+        processedChannels = await applySpeedRampAndPitch(
+          processedChannels,
+          segment,
+          fps,
+          decoded.sampleRate,
+        )
+      } else if (
         Math.abs(segment.speed - 1) > 0.0001 ||
         isAudioPitchShiftActive(segment.pitchShiftSemitones)
       ) {

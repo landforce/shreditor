@@ -23,6 +23,10 @@ import { hasLinkedAudioCompanion } from '@/shared/utils/linked-media'
 import { formatSignedFrameDelta } from '@/shared/utils/time-utils'
 import { isGifUrl, isWebpUrl } from '@/shared/utils/media-utils'
 import { useTimelineContentPixelsPerSecond } from '../../contexts/timeline-zoom-context'
+import {
+  getSpeedRampSourceSecondsAt,
+  type SourceSecondsAt,
+} from '../../utils/speed-ramp-source-time'
 
 const EMPTY_COMPOSITION_LOOKUP: Record<string, never> = {}
 const WAVEFORM_MIN_WIDTH_PX = 12
@@ -324,6 +328,8 @@ interface MediaSourceTiming {
   trimStart: number
   speed: number
   isReversed: boolean
+  /** The time map of a speed-ramped clip; undefined at constant speed. */
+  sourceSecondsAt: SourceSecondsAt | undefined
 }
 
 function useMediaSourceTiming(item: MediaTimelineItem, fps: number): MediaSourceTiming {
@@ -353,6 +359,11 @@ function useMediaSourceTiming(item: MediaTimelineItem, fps: number): MediaSource
       : mediaDuration > 0
         ? (sourceEndFrames / sourceDurationFrames) * mediaDuration
         : sourceEndFrames / sourceFps
+  const { speed, speedRamp, sourceFps: itemSourceFps } = item
+  const sourceSecondsAt = useMemo(
+    () => getSpeedRampSourceSecondsAt({ speed, speedRamp, sourceFps: itemSourceFps }, fps),
+    [speed, speedRamp, itemSourceFps, fps],
+  )
 
   return {
     sourceStart,
@@ -361,6 +372,7 @@ function useMediaSourceTiming(item: MediaTimelineItem, fps: number): MediaSource
     trimStart: (item.trimStart ?? 0) / fps,
     speed: item.speed ?? 1,
     isReversed: item.isReversed === true,
+    sourceSecondsAt,
   }
 }
 
@@ -400,6 +412,7 @@ const VideoClipVisualContent = memo(function VideoClipVisualContent({
           trimStart={source.trimStart}
           speed={source.speed}
           isReversed={source.isReversed}
+          sourceSecondsAt={source.sourceSecondsAt}
           fps={fps}
           isVisible={geometry.clipVisibility.isVisible}
           visibleStartRatio={geometry.clipVisibility.visibleStartRatio}
@@ -454,6 +467,7 @@ const AudioClipVisualContent = memo(function AudioClipVisualContent({
             trimStart={source.trimStart}
             speed={source.speed}
             isReversed={source.isReversed}
+            sourceSecondsAt={source.sourceSecondsAt}
             fps={fps}
             isVisible={geometry.clipVisibility.isVisible}
             visibleStartRatio={geometry.clipVisibility.visibleStartRatio}

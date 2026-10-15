@@ -54,7 +54,8 @@
       "reversedPlayback": "Reversed Playback",
       "reversedPrepFailed": "Reversed Prep Failed",
       "reversedPrepared": "Reversed Prepared",
-      "speed": "Speed: {{speed}}x"
+      "speed": "Speed: {{speed}}x",
+      "speedRamp": "Speed ramp: {{min}}x–{{max}}x"
     },
     "contextMenu": {
       "bentoLayout": "Bento Layout",

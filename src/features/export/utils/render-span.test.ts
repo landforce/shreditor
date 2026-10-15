@@ -9,6 +9,7 @@ import {
   resolveAATransitionRamps,
   resolveCompositionSourceFrame,
   resolveTransitionRenderTimelineSpan,
+  resolveVideoRenderSourceTimeSeconds,
 } from './render-span'
 
 function createVideoItem(overrides?: Partial<VideoItem>): VideoItem {
@@ -217,5 +218,38 @@ describe('render-span', () => {
       expect(getSourceFrameRampOffset(ramps.left, 70)).toBe(10)
       expect(getSourceFrameRampOffset(ramps.right, 50)).toBe(-10)
     })
+  })
+})
+
+describe('resolveVideoRenderSourceTimeSeconds with a speed ramp', () => {
+  const ramped = createVideoItem({
+    from: 60,
+    durationInFrames: 40,
+    sourceStart: 30,
+    sourceEnd: 90,
+    sourceFps: 30,
+    speedRamp: [
+      { frame: 0, speed: 1, easing: 'hold' },
+      { frame: 20, speed: 2 },
+    ],
+  })
+  const at = (frame: number, item = ramped) =>
+    Math.floor(
+      resolveVideoRenderSourceTimeSeconds(item, getItemRenderTimelineSpan(item), frame, 30) * 30,
+    )
+
+  it('integrates the curve from the clip start: 1x for 20 frames, then 2x', () => {
+    expect(at(60)).toBe(30)
+    expect(at(70)).toBe(40)
+    expect(at(80)).toBe(50)
+    expect(at(90)).toBe(70)
+    expect(at(99)).toBe(88)
+  })
+
+  it('plays a reversed ramp down from sourceEnd', () => {
+    const reversed = { ...ramped, isReversed: true }
+    expect(at(60, reversed)).toBe(89)
+    expect(at(80, reversed)).toBe(69)
+    expect(at(90, reversed)).toBe(49)
   })
 })

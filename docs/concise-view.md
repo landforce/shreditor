@@ -99,7 +99,7 @@ The panel is one scrolling column. Its header names what it is showing. Its firs
 **Shot selected: the Shot card.**
 - Verbs: Split, Replace, Speed, Volume, Delete, Duplicate, More.
 - Header: filmstrip of the clip, source filename, "shot 7 of 12", timeline in and out, source in and out.
-- Fields: speed slider with 0.5, 1, 1.5, 2 presets; volume slider and mute; fade in and out; "Hold" (trim this shot's out point to the next beat). Beat snapping is a format concept; see section 5.
+- Fields: speed slider with 0.5, 1, 1.5, 2 presets, and speed ramp presets (None, Ease in, Ease out, Hero slow-mo, Whip; a ramped shot shows its speed range and disables the constant slider until the ramp is reset); volume slider and mute; fade in and out; "Hold" (trim this shot's out point to the next beat). Beat snapping is a format concept; see section 5.
 - Replace highlights the media bin below with the selected shot as the drop target. Dropping or clicking Replace keeps the shot's timing and takes the new source from its mark-in.
 
 **Text selected: the Text card.**

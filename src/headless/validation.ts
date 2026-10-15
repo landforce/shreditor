@@ -15,6 +15,11 @@ import {
   resolveTransitionRenderPath,
 } from '@/features/export/utils/canvas-transitions'
 import { getGpuTransition } from '@/infrastructure/gpu-transitions'
+import {
+  hasSpeedRamp,
+  sourceSpanFrames,
+  type SpeedRampTimedItem,
+} from '@/shared/timeline/speed-ramp.mjs'
 
 export interface SourceRangeFinding {
   itemId: string
@@ -31,7 +36,7 @@ export interface SourceRangeFinding {
  *
  * `sourceStart`/`sourceEnd` are in source-native fps (see CLAUDE.md); when
  * `sourceEnd` is absent the needed range is derived from the timeline duration
- * and speed. Media without a known duration is skipped.
+ * and speed (a speed ramp's integral). Media without a known duration is skipped.
  */
 function findSourceOverrun(
   item: TimelineItem,
@@ -39,11 +44,15 @@ function findSourceOverrun(
   projectFps: number,
 ): SourceRangeFinding | null {
   const sourceFps = metadata.fps > 0 ? metadata.fps : projectFps
-  const speed = (item as { speed?: number }).speed ?? 1
   const sourceStart = (item as { sourceStart?: number }).sourceStart ?? 0
-  const sourceEnd =
-    (item as { sourceEnd?: number }).sourceEnd ??
-    sourceStart + (item.durationInFrames * speed * sourceFps) / projectFps
+  // The played span through the time map: the constant speed, or a ramp's integral
+  // (which the renderers follow even if sourceEnd says less).
+  const playedEnd =
+    sourceStart + sourceSpanFrames({ ...item, sourceFps } as SpeedRampTimedItem, projectFps)
+  const storedEnd = (item as { sourceEnd?: number }).sourceEnd
+  const sourceEnd = hasSpeedRamp(item)
+    ? Math.max(storedEnd ?? playedEnd, playedEnd)
+    : (storedEnd ?? playedEnd)
 
   const neededSeconds = sourceEnd / sourceFps
   // Half a frame + a small epsilon of slack: metadata durations are rounded.
@@ -189,7 +198,9 @@ function unsupportedPresentationFinding(
       `Transition "${transition.id}" uses presentation "${transition.presentation}", which has no ` +
       `${gpuAvailable ? '' : 'Canvas2D '}implementation here — it renders as a HARD CUT, not a transition` +
       (gpuAvailable ? '' : '. Presets drawable without a GPU: ') +
-      (gpuAvailable ? '' : [...CANVAS_FALLBACK_PRESENTATIONS].filter((p) => p !== 'none').join(', ')),
+      (gpuAvailable
+        ? ''
+        : [...CANVAS_FALLBACK_PRESENTATIONS].filter((p) => p !== 'none').join(', ')),
   }
 }
 

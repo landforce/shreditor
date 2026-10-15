@@ -16,6 +16,7 @@ import {
 } from '@/shared/timeline/transitions/transition-planner'
 import { hasCornerPin } from '@/features/preview/deps/composition-runtime'
 import { isTextMotionActive } from '@/shared/typography/text-motion'
+import { hasSpeedRamp } from '@/shared/timeline/speed-ramp.mjs'
 
 function hasEnabledGpuEffect(effects: ItemEffect[] | undefined): boolean {
   return effects?.some((e) => e.enabled && e.effect.type === 'gpu-effect') ?? false
@@ -46,6 +47,8 @@ function hasTextMotionSpec(item: TimelineItem): boolean {
 
 function needsRenderedOverlayPath(item: TimelineItem): boolean {
   return (
+    // A speed-ramped video is drawn by exact decode, never its constant-rate DOM element.
+    (item.type === 'video' && hasSpeedRamp(item)) ||
     hasEnabledGpuEffect(item.effects) ||
     hasRenderableBlendMode(item) ||
     hasCornerPin(item.cornerPin) ||
@@ -222,12 +225,7 @@ export function shouldForceContinuousPreviewOverlayFromIndex(
 
   return index.candidateItems.some((item) => {
     if (
-      !rangesOverlap(
-        startFrame,
-        endFrameExclusive,
-        item.from,
-        item.from + item.durationInFrames,
-      )
+      !rangesOverlap(startFrame, endFrameExclusive, item.from, item.from + item.durationInFrames)
     ) {
       return false
     }

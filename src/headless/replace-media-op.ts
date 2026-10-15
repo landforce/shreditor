@@ -9,6 +9,7 @@
  */
 import type { MediaMetadata } from '@/types/storage'
 import type { TimelineItem } from '@/types/timeline'
+import { hasSpeedRamp, sourceSpanFrames } from '@/shared/timeline/speed-ramp.mjs'
 import { useItemsStore } from '@/features/timeline/stores/items-store'
 import { useMediaLibraryStore } from '@/features/media-library/stores/media-library-store'
 import { removeItems, unlinkItems, updateItem } from '@/features/timeline/stores/timeline-actions'
@@ -90,11 +91,12 @@ function sourceWindow(
   const sourceFps = sourceFpsOf(media, projectFps)
   const sourceDuration = Math.max(1, Math.round((media.duration ?? 0) * sourceFps))
   const sourceStart = startFrame(start)
-  const speed = item.speed ?? 1
-  const need = Math.max(1, Math.round((item.durationInFrames / projectFps) * speed * sourceFps))
+  // Through the clip's speed ramp when it has one (the source window is the curve's integral).
+  const need = Math.max(1, Math.round(sourceSpanFrames({ ...item, sourceFps }, projectFps)))
+  const pace = hasSpeedRamp(item) ? 'its speed ramp' : `speed ${item.speed ?? 1}`
   if (sourceStart + need > sourceDuration + 1)
     throw new Error(
-      `replaceMedia: ${media.fileName} is ${seconds(sourceDuration, sourceFps)} s; the clip needs ${seconds(need, sourceFps)} s from ${seconds(sourceStart, sourceFps)} s (${item.durationInFrames} frames at speed ${speed}). Pick a longer media or an earlier sourceStart`,
+      `replaceMedia: ${media.fileName} is ${seconds(sourceDuration, sourceFps)} s; the clip needs ${seconds(need, sourceFps)} s from ${seconds(sourceStart, sourceFps)} s (${item.durationInFrames} frames at ${pace}). Pick a longer media or an earlier sourceStart`,
     )
   const sourceEnd = Math.min(sourceDuration, sourceStart + need)
   return { sourceFps, sourceDuration, sourceStart, sourceEnd }

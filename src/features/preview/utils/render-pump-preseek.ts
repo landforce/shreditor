@@ -121,6 +121,7 @@ export function getVideoItemSourceTimeSeconds(
     0,
     item.isReversed === true,
     reverseSourceEnd,
+    item.speedRamp,
   )
 }
 

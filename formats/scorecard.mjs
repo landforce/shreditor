@@ -11,6 +11,11 @@
 // role (track.formatRole, or a track named like the format layout), then type
 // heuristics (text at the start, long enough and high enough is the title).
 import { FORMAT_ROLES, getFormat, resolveFormat } from './registry.mjs'
+import {
+  hasSpeedRamp,
+  localFrameAtSourceFrames,
+  sourceSpanFrames,
+} from '../src/shared/timeline/speed-ramp.mjs'
 
 const PICTURE_ROLES = new Set(['speaker', 'images', 'plates', 'broll', 'shots'])
 const TEXT_ROLES = new Set(['title', 'captions', 'labels'])
@@ -246,13 +251,20 @@ export function mapClipWords(item, transcript, { fps, mediaFps } = {}) {
   const srcFps = item.sourceFps || (mediaFps > 0 ? mediaFps : fps)
   const speed = item.speed || 1
   const windowStart = (item.sourceStart ?? 0) / srcFps
-  const windowEnd =
-    item.sourceEnd !== undefined
+  // A speed-ramped clip maps through its time map (src/shared/timeline/speed-ramp.mjs).
+  const timed = { ...item, sourceFps: srcFps }
+  const ramped = hasSpeedRamp(item)
+  const windowEnd = ramped
+    ? windowStart + sourceSpanFrames(timed, fps) / srcFps
+    : item.sourceEnd !== undefined
       ? item.sourceEnd / srcFps
       : windowStart + (item.durationInFrames / fps) * speed
   const clipStart = item.from / fps
   const clipEnd = (item.from + item.durationInFrames) / fps
-  const toTimeline = (sourceSec) => clipStart + (sourceSec - windowStart) / speed
+  const toTimeline = ramped
+    ? (sourceSec) =>
+        clipStart + localFrameAtSourceFrames(timed, (sourceSec - windowStart) * srcFps, fps) / fps
+    : (sourceSec) => clipStart + (sourceSec - windowStart) / speed
   return transcriptWords(transcript)
     .filter((word) => word.end > windowStart && word.start < windowEnd)
     .map((word) => ({
@@ -738,6 +750,50 @@ function transitionCheck(context) {
   }
 }
 
+/** Clip-local frames where a ramp's speed changes, as timeline frames (first few). */
+function rampFrames(item) {
+  const keys = item.speedRamp.filter((key) => key.frame >= 0 && key.frame <= item.durationInFrames)
+  return keys.map((key) => item.from + key.frame)
+}
+
+// Speed ramps are no format's spec: 'none' unless the project allows them
+// (`shred format set <id> <format> --allow speed-ramps`, or the format panel).
+function speedRampCheck(context) {
+  const rule = context.format.rules.speedRamps ?? 'none'
+  const ramped = context.items.filter(
+    (item) => Array.isArray(item.speedRamp) && item.speedRamp.length > 0 && item.type !== 'audio',
+  )
+  const ramps = ramped.length ? ramped : context.items.filter((item) => item.speedRamp?.length > 0)
+  if (rule === 'allowed') {
+    return {
+      key: 'speedRamps',
+      label: 'Speed ramps',
+      status: 'pass',
+      value: ramps.length,
+      target: 'allowed',
+      detail: ramps.length ? `${ramps.length} ramped clip(s); allowed in this project` : 'allowed in this project',
+      ranges: [],
+    }
+  }
+  const named = ramps
+    .slice(0, 4)
+    .map((item) => `${item.label || item.id} at ${rampFrames(item).join('/')}`)
+    .join('; ')
+  return {
+    key: 'speedRamps',
+    label: 'Speed ramps',
+    status: ramps.length ? 'warn' : 'pass',
+    value: ramps.length,
+    target: 'none',
+    detail: ramps.length
+      ? `${ramps.length} ramped clip(s): ${named}${ramps.length > 4 ? '; ...' : ''}. ` +
+        `This format doesn't use speed ramps; remove them (clearSpeedRamp) or allow them for this project: ` +
+        `shred format set <projectId> ${context.format.id} --allow speed-ramps`
+      : 'constant speed only',
+    ranges: ramps.map(itemRange).slice(0, MAX_RANGES),
+  }
+}
+
 const SYNC_ROLES = new Set(['broll', 'shots', 'images', 'plates'])
 
 function ruleChecks(context) {
@@ -753,6 +809,7 @@ function ruleChecks(context) {
     presenceCheck('sfx', 'SFX', rules.sfx, heard(new Set(['sfx']))),
     presenceCheck('syncSound', 'Sync sound from b-roll', rules.syncSound, heard(SYNC_ROLES)),
     transitionCheck(context),
+    speedRampCheck(context),
   ].filter(Boolean)
 }
 
@@ -806,6 +863,9 @@ const formatIdOf = (format) => (typeof format === 'string' ? format : format?.id
 // The project's own variant applies only when scoring against its own format.
 const ownVariant = (recorded, definition) =>
   getFormat(recorded?.id)?.id === definition.id ? recorded.variant : undefined
+// ...and so do its options (speed ramps allowed).
+const ownOptions = (recorded, definition) =>
+  getFormat(recorded?.id)?.id === definition.id ? recorded.options : undefined
 
 function resolveScoringFormat(project, { format, variant }) {
   if (isResolved(format)) return format
@@ -814,5 +874,9 @@ function resolveScoringFormat(project, { format, variant }) {
   if (!definition) {
     throw new Error(id ? `Unknown format "${id}"` : 'The project has no format; choose one first')
   }
-  return resolveFormat(definition.id, variant ?? ownVariant(project?.format, definition))
+  return resolveFormat(
+    definition.id,
+    variant ?? ownVariant(project?.format, definition),
+    ownOptions(project?.format, definition),
+  )
 }

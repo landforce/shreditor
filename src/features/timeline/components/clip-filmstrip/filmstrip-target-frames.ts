@@ -1,4 +1,5 @@
 import type { FilmstripRenderWindow } from './render-window'
+import type { SourceSecondsAt } from '../../utils/speed-ramp-source-time'
 
 export interface FilmstripTargetFrameOptions {
   /** Clip-local pixel range the filmstrip draws (the padded render window). */
@@ -12,6 +13,12 @@ export interface FilmstripTargetFrameOptions {
   isReversed: boolean
   /** Frames the 1fps filmstrip has for the source (its length in whole seconds). */
   totalFrameCount: number
+  /**
+   * A speed-ramped clip's time map, with the timeline's pixels per second it
+   * reads pixels through; replaces `pixelsPerSourceSecond` when set.
+   */
+  sourceSecondsAt?: SourceSecondsAt
+  pixelsPerSecond?: number
 }
 
 /**
@@ -27,16 +34,22 @@ export function computeFilmstripTargetFrameIndices({
   effectiveEnd,
   isReversed,
   totalFrameCount,
+  sourceSecondsAt,
+  pixelsPerSecond,
 }: FilmstripTargetFrameOptions): number[] {
   if (!(sampleWidth > 0) || !(pixelsPerSourceSecond > 0) || endPx <= startPx) return []
+  const rampPixelsPerSecond =
+    sourceSecondsAt && pixelsPerSecond && pixelsPerSecond > 0 ? pixelsPerSecond : null
   const lastIndex = Math.max(0, totalFrameCount - 1)
   const indices = new Set<number>()
   const endSlot = Math.ceil(endPx / sampleWidth)
   for (let slot = Math.floor(startPx / sampleWidth); slot < endSlot; slot++) {
     const centerX = slot * sampleWidth + sampleWidth * 0.5
-    const time = isReversed
-      ? effectiveEnd - centerX / pixelsPerSourceSecond
-      : effectiveStart + centerX / pixelsPerSourceSecond
+    const sourceOffset =
+      sourceSecondsAt && rampPixelsPerSecond !== null
+        ? sourceSecondsAt(centerX / rampPixelsPerSecond)
+        : centerX / pixelsPerSourceSecond
+    const time = isReversed ? effectiveEnd - sourceOffset : effectiveStart + sourceOffset
     indices.add(Math.max(0, Math.min(lastIndex, Math.floor(time))))
   }
   return Array.from(indices).sort((a, b) => a - b)
@@ -66,6 +79,8 @@ export interface FilmstripFrameTargetsInput {
   tileWidth: number
   /** Spacing of the first pass (at least a 16:9 tile; see getFilmstripSampleWidth). */
   sampleWidth: number
+  /** A speed-ramped clip's time map; replaces the linear `speed` mapping when set. */
+  sourceSecondsAt?: SourceSecondsAt
 }
 
 export interface FilmstripFrameTargets {
@@ -92,6 +107,8 @@ export function computeFilmstripFrameTargets(
     effectiveEnd: input.effectiveEnd,
     isReversed: input.isReversed,
     totalFrameCount: Math.max(1, Math.ceil(input.sourceDuration)),
+    sourceSecondsAt: input.sourceSecondsAt,
+    pixelsPerSecond: input.pixelsPerSecond,
   }
   const coarse = computeFilmstripTargetFrameIndices({ ...options, sampleWidth })
   const perTile =
