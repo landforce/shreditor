@@ -665,6 +665,22 @@ const cases = [
       ),
     failure: { op: 'clearSpeedRamp', id: 'text-1' },
   },
+  {
+    name: 'setCutout',
+    op: { op: 'setCutout', id: 'clip-left', enabled: true, subject: 'person', feather: 2 },
+    // Settings only: the masks are analysed separately (shred cutout, or before a render).
+    assert: (project) =>
+      assert.deepEqual(
+        [
+          item(project, 'clip-left')?.cutout?.enabled,
+          item(project, 'clip-left')?.cutout?.subject,
+          item(project, 'clip-left')?.cutout?.feather,
+        ],
+        [true, 'person', 2],
+      ),
+    // Background removal is for video clips; text-1 is a title.
+    failure: { op: 'setCutout', id: 'text-1', enabled: true },
+  },
 ]
 
 async function edit(page, project, ops, media, luts, templates, extra = {}) {

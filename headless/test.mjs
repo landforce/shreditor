@@ -371,7 +371,7 @@ async function main() {
     }, SAMPLE_PROJECT)
     check(
       'removeItems rejects a batch containing missing ids',
-      /ids: item "missing" does not exist/.test(missingRemoveError ?? ''),
+      /ids: item\(s\) missing do not exist/.test(missingRemoveError ?? ''),
       missingRemoveError,
     )
 
