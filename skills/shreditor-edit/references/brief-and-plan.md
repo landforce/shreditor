@@ -203,6 +203,19 @@ Valid. sha256:67749d691ac6… recorded in <workspace>/projects/<id>/agent/plan.s
 Next: shred draft <id> --label "...", then shred build <draftId>.
 ```
 
+### From an edit template
+
+`shred plan <id> --template <name> [speaker mediaId...] [--request "..."]` scaffolds the plan from an edit template (`shred template show <name>`; references/engine.md, Edit templates) into `agent/plan.json`, or `agent/plan.scaffold.json` when a plan exists, and records the template on the project (`agent/template.json`) for `shred check`'s Template section. The plan carries where it came from:
+
+```json
+"template": { "name": "kathrinmormann-44870", "hash": "sha256:…", "source": { "type": "vdb", "videoId": 44870, "url": "…" } }
+```
+
+- **Story (Vlog, 10 Shot):** one beat per shot slot at the slot's frames, `track` from the slot's role in the format, `slot` (the slot id) and `targetSeconds` (its length on the reference), a candidate `source` from the project's media by category (speaker slots: speaker media; images and screen: graphics, overlays, then b-roll; b-roll and shots: b-roll), walking through a clip so repeats take a fresh in-point. A beat with no candidate has an empty `source` and fails validation until you fill it. Text slots become beat `text` (the pattern, e.g. the hook template; the kit style when the project has a kit).
+- **Performance (Graphic Yap, Greenscreen):** the speaker's lines from their transcript, exactly as `--scaffold` makes them (the project's speaker media by default). The template's cutaway shots and graphics become `visuals` (`toSource` its description, a candidate `asset` by category, a `note` naming the slot) on the kept line at the same share of the runtime, never overlapping on a track; the title hook goes on the hook line's `onScreen` held about as long as the reference's; list items and labels go on the lines at their share of the runtime.
+- `request` is `--request` (else a placeholder to replace) and `story.arc` the reference's outline. Everything is a starting point: review every beat or line, replace the `[PLACEHOLDERS]`, check every candidate, then `shred plan`.
+- Beats may carry `slot` and `targetSeconds` in any plan; `shred plan` prints them. The reference timings are targets: change any beat to fit the footage.
+
 ### Check
 
 `shred check` adds a **Plan** section when the project has one. Story: beats whose clip is no longer on its planned frames (with where it plays now), beats out of order on their track, length drift. Performance: kept lines no longer on the timeline (a line counts as there when a clip of its media plays most of its source), kept lines now in a different order, cut lines that are back in (a warning; info for a pause or dead air), length drift. Warnings and info only: the user's tweaks are decisions. Update the plan (and run `shred plan`) when the story itself changes.

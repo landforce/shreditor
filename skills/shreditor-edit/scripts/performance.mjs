@@ -87,7 +87,7 @@ export function printPerformancePlaced(say, placed, layout, fps) {
 }
 
 /** The kit's tight-cut preference, if the project has a kit that turns it on. */
-function kitTightCuts(ws, id, project) {
+export function kitTightCuts(ws, id, project) {
   if (!project.kit) return null
   let kit = null
   try {
