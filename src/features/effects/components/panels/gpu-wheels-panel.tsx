@@ -54,14 +54,14 @@ const DOCK_RING_THICKNESS = 5
 const DOCK_RING_GAP = 3
 const DOCK_RING_INSET = DOCK_RING_THICKNESS + DOCK_RING_GAP
 const DOCK_RING_COVER_COLOR = '#dfe5ef'
-const DOCK_RING_METAL_GRADIENT = 'linear-gradient(180deg, #1d2129 0%, #2a3d55 55%, #6b7785 100%)'
+const DOCK_RING_METAL_GRADIENT = 'linear-gradient(180deg, #0c1824 0%, #2a3d55 55%, #6b7785 100%)'
 
 // Hue 0 sits on the +x axis to match getHueAmountFromClient's atan2 mapping.
 const WHEEL_HUE_CONIC =
   'conic-gradient(from 90deg, #ff3b30, #ff9500, #ffcc00, #34c759, #00c7be, #007aff, #5856d6, #ff2d55, #ff3b30)'
 // Resolve-style disc: heavily washed-out hue field inside, saturated rim band.
 const DOCK_DISC_BACKGROUND = `radial-gradient(circle closest-side, rgba(251,252,255,0.94) 0%, rgba(251,252,255,0.9) 62%, rgba(251,252,255,0.72) 80%, rgba(251,252,255,0.25) 88%, transparent 94%), ${WHEEL_HUE_CONIC}`
-const SIDEBAR_DISC_BACKGROUND = `radial-gradient(circle at center, #ffffff 0%, #f2f3f5 26%, transparent 28%), ${WHEEL_HUE_CONIC}`
+const SIDEBAR_DISC_BACKGROUND = `radial-gradient(circle at center, #ffffff 0%, #eef1f8 26%, transparent 28%), ${WHEEL_HUE_CONIC}`
 
 function getHueAmountFromClient(clientX: number, clientY: number, element: HTMLButtonElement) {
   const rect = element.getBoundingClientRect()

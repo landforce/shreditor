@@ -6,8 +6,8 @@
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
-  "background_color": "#f2f3f5",
-  "theme_color": "#1d2129",
+  "background_color": "#eef1f8",
+  "theme_color": "#010f2a",
   "orientation": "any",
   "categories": [
     "video",
