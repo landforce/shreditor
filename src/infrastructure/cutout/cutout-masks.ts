@@ -65,7 +65,9 @@ export interface CutoutMaskSample {
 
 const MAX_BITMAPS = 160
 const bitmaps = new Map<string, Promise<ImageBitmap | null>>()
-onCutoutStoreChange(() => bitmaps.clear())
+onCutoutStoreChange((replaced) => {
+  if (replaced) bitmaps.clear()
+})
 
 function loadBitmap(mediaId: string, key: string, index: number): Promise<ImageBitmap | null> {
   const cacheKey = `${mediaId}/${key}/${index}`

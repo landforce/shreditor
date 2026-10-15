@@ -46,13 +46,14 @@ export function createHttpCutoutStore(base: string): CutoutStoreBackend {
 }
 
 let backend: CutoutStoreBackend | null = null
-const listeners = new Set<() => void>()
+/** `replaced`: stored masks may have changed in place (drop decoded copies). */
+const listeners = new Set<(replaced: boolean) => void>()
 
 /** Set (or clear) where masks are read and written. */
 export function configureCutoutStore(next: CutoutStoreBackend | null): void {
   backend = next
   indexCache.clear()
-  for (const listener of listeners) listener()
+  for (const listener of listeners) listener(true)
 }
 
 export function getCutoutStore(): CutoutStoreBackend | null {
@@ -60,13 +61,13 @@ export function getCutoutStore(): CutoutStoreBackend | null {
 }
 
 /** Called when masks change (a job wrote samples, the store moved). */
-export function onCutoutStoreChange(listener: () => void): () => void {
+export function onCutoutStoreChange(listener: (replaced: boolean) => void): () => void {
   listeners.add(listener)
   return () => listeners.delete(listener)
 }
 
-export function notifyCutoutStoreChange(): void {
-  for (const listener of listeners) listener()
+export function notifyCutoutStoreChange(replaced = false): void {
+  for (const listener of listeners) listener(replaced)
 }
 
 const INDEX_TTL_MS = 1500
@@ -99,4 +100,23 @@ export async function writeCutoutIndex(mediaId: string, mine: CutoutIndex): Prom
   await store.write(mediaId, CUTOUT_INDEX_FILE, JSON.stringify(merged, null, 2))
   indexCache.set(mediaId, { at: Date.now(), index: Promise.resolve(merged) })
   return merged
+}
+
+/**
+ * Forget one analysis (and, for 'auto', the media's decision) so it is made
+ * again. The mask files are overwritten by the next run.
+ */
+export async function forgetCutoutAnalysis(
+  mediaId: string,
+  key: string | null,
+  fingerprint: string,
+): Promise<void> {
+  const store = backend
+  if (!store) return
+  const index = await readCutoutIndex(mediaId, true)
+  if (key) delete index.entries[key]
+  delete index.auto[fingerprint]
+  await store.write(mediaId, CUTOUT_INDEX_FILE, JSON.stringify(index, null, 2))
+  indexCache.set(mediaId, { at: Date.now(), index: Promise.resolve(index) })
+  notifyCutoutStoreChange(true)
 }

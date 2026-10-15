@@ -108,7 +108,10 @@ export function getCutoutJobs(): CutoutJobStatus[] {
   return snapshot
 }
 
-function jobIdFor(request: CutoutJobRequest): string {
+/** The id of the job a request joins (one per media, subject and rate). */
+export function cutoutJobId(
+  request: Pick<CutoutJobRequest, 'mediaId' | 'subject' | 'rate'>,
+): string {
   return `${request.mediaId}|${request.subject}|${request.rate}`
 }
 
@@ -354,9 +357,10 @@ async function runJob(id: string, request: CutoutJobRequest): Promise<void> {
  * job's final status.
  */
 export function requestCutoutAnalysis(request: CutoutJobRequest): Promise<CutoutJobStatus> {
-  const id = jobIdFor(request)
+  const id = cutoutJobId(request)
   const existing = pending.get(id)
-  if (existing) return existing
+  // A cancelled job still winding down is not joined: the new request runs after it.
+  if (existing && !cancelledJobs.has(id)) return existing
   jobs.set(id, {
     id,
     mediaId: request.mediaId,
@@ -367,10 +371,12 @@ export function requestCutoutAnalysis(request: CutoutJobRequest): Promise<Cutout
     updatedAt: Date.now(),
   })
   emit()
-  const promise = (chain = chain.then(() => runJob(id, request))).then(() => {
-    pending.delete(id)
-    return jobs.get(id)!
-  })
+  const promise: Promise<CutoutJobStatus> = (chain = chain.then(() => runJob(id, request))).then(
+    () => {
+      if (pending.get(id) === promise) pending.delete(id)
+      return jobs.get(id)!
+    },
+  )
   pending.set(id, promise)
   return promise
 }

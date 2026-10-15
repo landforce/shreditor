@@ -44,6 +44,7 @@ import { useProjectSyncStore } from '../agent-sync/sync-store'
 import { useProjectFileWatcher } from '../agent-sync/use-project-file-watcher'
 import { useProjectMediaWatcher } from '../agent-sync/use-project-media-watcher'
 import { useTextStyleLibraryWatcher } from '../agent-sync/use-text-style-library-watcher'
+import { useCutoutRuntime } from '../hooks/use-cutout-runtime'
 import { useAgentSync, type SaveOptions } from '../agent-sync/use-agent-sync'
 import { ProjectRevisionConflictError } from '@/infrastructure/storage'
 import {
@@ -420,6 +421,7 @@ const AutoSaveController = memo(function AutoSaveController({
   useProjectFileWatcher(projectId)
   useProjectMediaWatcher(projectId)
   useTextStyleLibraryWatcher()
+  useCutoutRuntime(projectId)
   return null
 })
 

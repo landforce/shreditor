@@ -45,6 +45,7 @@ import { useGizmoStore } from '@/features/editor/deps/preview'
 import { LayoutSection } from './layout-section'
 import { FillSection } from './fill-section'
 import { VideoSection } from './video-section'
+import { CutoutSection } from './cutout-section'
 import { GifSection } from './gif-section'
 import { LottieSection } from './lottie-section'
 import { ShapeSection } from './shape-section'
@@ -680,6 +681,7 @@ const ClipPanelCore = memo(function ClipPanelCore({
               )}
               <CompositionControlsSection items={selectedItems} />
               {(hasVideoItems || hasCompositionItems) && <VideoSection items={selectedItems} />}
+              {hasVideoItems && <CutoutSection items={selectedItems} />}
               {paintableLayoutItems.length > 0 && (
                 <FillSection
                   items={paintableLayoutItems}

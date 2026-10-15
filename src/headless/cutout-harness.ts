@@ -15,17 +15,15 @@ import { useMediaLibraryStore } from '@/features/media-library/stores/media-libr
 import { configureCutoutStore, createHttpCutoutStore } from '@/infrastructure/cutout/cutout-store'
 import {
   cutoutMediaInfoFromMetadata,
-  getCutoutMediaInfo,
   setCutoutMediaResolver,
 } from '@/infrastructure/cutout/cutout-masks'
 import {
   getCutoutJobs,
-  requestCutoutAnalysis,
   setCutoutModelUrlResolver,
   subscribeCutoutJobs,
   type CutoutJobStatus,
 } from '@/infrastructure/cutout/cutout-analysis'
-import { planCutoutNeeds } from '@/infrastructure/cutout/cutout-plan'
+import { cutoutSourceFromUrl, ensureCutoutMasks } from '@/infrastructure/cutout/cutout-ensure'
 import { migrateProject } from '@/shared/projects/migrations'
 import { seedMediaLibrary } from './seed-media'
 
@@ -74,27 +72,17 @@ export async function ensureCutout(
   options: { frames?: number[]; job?: string } = {},
 ): Promise<CutoutJobStatus[]> {
   if (!storeBase) return []
-  const needs = planCutoutNeeds(items, fps, getCutoutMediaInfo, options.frames)
-  if (needs.length === 0) return []
   progressJob = options.job ?? 'render'
-  const results = await Promise.all(
-    needs.map((need) =>
-      requestCutoutAnalysis({
-        mediaId: need.mediaId,
-        subject: need.subject,
-        rate: need.rate,
-        info: need.info,
-        need: need.need,
-        source: async () => {
-          const url = blobUrlManager.get(need.mediaId)
-          if (!url) throw new Error(`Media ${need.mediaId} has no URL in the harness`)
-          return url.startsWith('blob:') ? { blob: await (await fetch(url)).blob() } : { url }
-        },
-      }),
-    ),
-  )
-  await postProgress(progressJob)
-  return results
+  try {
+    return await ensureCutoutMasks(
+      items,
+      fps,
+      async (mediaId) => cutoutSourceFromUrl(blobUrlManager.get(mediaId) ?? ''),
+      { frames: options.frames },
+    )
+  } finally {
+    await postProgress(progressJob)
+  }
 }
 
 /** `POST /v1/cutout`: analyse the cut-out items of a project (or the listed ones). */
