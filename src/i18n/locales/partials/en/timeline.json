@@ -387,10 +387,10 @@
       "markDone": "Mark done",
       "addForAgent": "Add note for agent",
       "open": "Open",
-      "copy": "Copy a prompt that asks Claude to read these notes and edit",
+      "copy": "Copy the prompt for Claude",
       "copied": "Copied: paste it to Claude",
-      "copyWaiting_one": "{{count}} note Claude hasn't picked up yet: copy the prompt and paste it to Claude",
-      "copyWaiting_other": "{{count}} notes Claude hasn't picked up yet: copy the prompt and paste it to Claude"
+      "copyWaiting_one": "Copy the prompt for Claude ({{count}} note not picked up yet)",
+      "copyWaiting_other": "Copy the prompt for Claude ({{count}} notes not picked up yet)"
     }
   }
 }

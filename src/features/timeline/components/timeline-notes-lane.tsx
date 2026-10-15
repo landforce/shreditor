@@ -76,6 +76,8 @@ function TrayButton({
       aria-label={label}
       aria-pressed={pressed}
       data-tooltip={label}
+      // The tray sits at the timeline's left edge: a tooltip above would run off screen.
+      data-tooltip-side="right"
       data-testid={testId}
     >
       {children}
@@ -95,8 +97,8 @@ function WaitingPulse() {
 }
 
 /**
- * Copies "check my notes and edit" for the user to paste to the agent: notes
- * only reach it when it is asked to read them.
+ * The open-note count, which is also the copy of "check my notes and edit" for
+ * the user to paste to the agent: notes only reach it when it is asked to read them.
  */
 function CopyForAgentButton() {
   const { t } = useTranslation()
@@ -107,25 +109,23 @@ function CopyForAgentButton() {
     : t(waiting ? 'timeline.notes.copyWaiting' : 'timeline.notes.copy', { count: waiting })
   return (
     <Button
-      variant="ghost"
-      size="icon"
-      className={cn(
-        'h-5 w-5 shrink-0',
-        waiting > 0 && !copied && 'bg-amber-500/20 text-amber-700 dark:text-amber-300',
-      )}
+      size="sm"
+      className="h-5 shrink-0 gap-1 rounded bg-amber-500 px-1.5 text-[10px] font-semibold text-white tabular-nums hover:bg-amber-600"
       onClick={copy}
       aria-label={label}
       data-tooltip={label}
+      data-tooltip-side="right"
       data-testid="timeline-notes-copy"
     >
       {copied ? <Check className="h-3 w-3" /> : <ClipboardCopy className="h-3 w-3" />}
+      {open}
     </Button>
   )
 }
 
 /**
- * The tray's cell in the track-header column: label, open count and the copy
- * for the agent above the show-done eye and add. It pulses, with the lane,
+ * The tray's cell in the track-header column: label and the open count (the
+ * copy for the agent) above the show-done eye and add. It pulses, with the lane,
  * while open notes wait for the agent to pick them up.
  */
 export const TimelineNotesLaneHeader = memo(function TimelineNotesLaneHeader({
@@ -168,11 +168,6 @@ export const TimelineNotesLaneHeader = memo(function TimelineNotesLaneHeader({
         )}
         {showLabel && (
           <span className="truncate text-xs font-semibold">{t('timeline.notes.label')}</span>
-        )}
-        {openCount > 0 && (
-          <span className="rounded bg-amber-500 px-1 text-[10px] leading-4 font-semibold text-white tabular-nums">
-            {openCount}
-          </span>
         )}
         <CopyForAgentButton />
       </div>
