@@ -153,9 +153,13 @@ function mediaNotReadyReason(metadata) {
   return c && Object.hasOwn(NOT_READY, c.status) ? NOT_READY[c.status](metadata, c) : null
 }
 
-/** Collect `{ mediaId, metadata }` for media referenced by addClip ops (deduped). */
+const PLACES_MEDIA = new Set(['addClip', 'replaceMedia'])
+
+/** Collect `{ mediaId, metadata }` for media referenced by addClip and replaceMedia ops (deduped). */
 export function collectAddClipMedia(workspaceDir, ops) {
-  const ids = [...new Set(ops.filter((o) => o.op === 'addClip' && o.mediaId).map((o) => o.mediaId))]
+  const ids = [
+    ...new Set(ops.filter((o) => PLACES_MEDIA.has(o.op) && o.mediaId).map((o) => o.mediaId)),
+  ]
   return ids.map((mediaId) => {
     const metadata = readMediaMetadata(workspaceDir, mediaId) ?? undefined
     const notReady = mediaNotReadyReason(metadata)

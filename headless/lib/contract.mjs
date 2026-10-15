@@ -305,6 +305,16 @@ const opSchemas = [
     })
     .strict(),
   z.object({ op: z.literal('removeMarkers'), ids: z.array(id).min(1) }).strict(),
+  // Other media in a clip, keeping its id, place and length (shred template fill).
+  z
+    .object({
+      op: z.literal('replaceMedia'),
+      id,
+      mediaId: id,
+      sourceStart: frame.optional(),
+      label: z.string().optional(),
+    })
+    .strict(),
   ...TEMPLATE_OP_SCHEMAS,
   ...TEXT_STYLE_OP_SCHEMAS,
 ]
@@ -335,6 +345,7 @@ export const EDIT_OPERATION_NAMES = [
   'unlinkItems',
   'addMarker',
   'removeMarkers',
+  'replaceMedia',
   ...TEMPLATE_OP_NAMES,
   ...TEXT_STYLE_OP_NAMES,
 ]
@@ -369,6 +380,8 @@ function samplesDescription(name) {
     unlinkItems: 'Unlink items from their linked group',
     addMarker: 'Add a timeline marker',
     removeMarkers: 'Remove markers by id',
+    replaceMedia:
+      'Put other media in a clip, keeping its id, place and length (fits the source window; too short fails)',
     ...TEMPLATE_OP_DESCRIPTIONS,
     ...TEXT_STYLE_OP_DESCRIPTIONS,
   }

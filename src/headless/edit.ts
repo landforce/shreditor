@@ -76,6 +76,7 @@ import {
 import { buildLutEffect, type HeadlessLutFile } from './lut-op'
 import { linkedTimingFollowers } from './linked-timing'
 import { removeItemsOp, runMarkerOp } from './marker-ops'
+import { runReplaceMediaOp } from './replace-media-op'
 
 const log = createLogger('HeadlessEdit')
 
@@ -105,6 +106,7 @@ export type EditOperationName =
   | 'unlinkItems'
   | 'addMarker'
   | 'removeMarkers'
+  | 'replaceMedia'
   | TemplateOperationName
   | 'applyTextStyle'
   | 'upsertTextStyle'
@@ -859,7 +861,8 @@ function applyOp(op: EditOp): unknown {
       return { id }
     }
     default: {
-      const handled = runMarkerOp(op) ?? runTextStyleOp(op, context)
+      const handled =
+        runMarkerOp(op) ?? runReplaceMediaOp(op, editCanvas.fps) ?? runTextStyleOp(op, context)
       if (handled) return handled.result
       return applyTemplateOp(op, { overlap: context, canvas: editCanvas })
     }

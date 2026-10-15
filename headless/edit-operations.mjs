@@ -420,6 +420,32 @@ const cases = [
     failure: { op: 'addClip', mediaId: 'missing-media' },
   },
   {
+    name: 'replaceMedia',
+    op: { op: 'replaceMedia', id: 'clip-right', mediaId: 'video-media', sourceStart: 3 },
+    media: [
+      {
+        mediaId: 'video-media',
+        metadata: {
+          id: 'video-media',
+          fileName: 'generated.mp4',
+          mimeType: 'video/mp4',
+          duration: 2,
+          fps: 30,
+          width: 320,
+          height: 180,
+        },
+      },
+    ],
+    assert: (project) =>
+      assert.deepEqual(
+        ['mediaId', 'from', 'durationInFrames', 'sourceStart', 'sourceEnd', 'label'].map(
+          (key) => item(project, 'clip-right')?.[key],
+        ),
+        ['video-media', 30, 30, 3, 33, 'generated.mp4'],
+      ),
+    failure: { op: 'replaceMedia', id: 'clip-right', mediaId: 'missing-media' },
+  },
+  {
     name: 'addKeyframe',
     op: {
       op: 'addKeyframe',

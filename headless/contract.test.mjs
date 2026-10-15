@@ -85,6 +85,7 @@ const samples = {
     color: '#F59E0B',
   },
   removeMarkers: { op: 'removeMarkers', ids: ['plan-b01'] },
+  replaceMedia: { op: 'replaceMedia', id: 'clip-1', mediaId: 'media-2', sourceStart: 30 },
   addTemplate: {
     op: 'addTemplate',
     template: 'Lower third',
@@ -338,6 +339,8 @@ test('marker, link and track-role ops reject what the editor could not apply', (
     { op: 'removeItems', ids: ['i'], linked: 'no' },
     { op: 'addTrack', kind: 'video', formatRole: 'hero' },
     { op: 'addTrack', kind: 'video', name: '' },
+    { op: 'replaceMedia', id: 'clip-1' },
+    { op: 'replaceMedia', id: 'clip-1', mediaId: 'm', sourceStart: -3 },
   ]
   for (const op of bad) assert.equal(editOpSchema.safeParse(op).success, false, JSON.stringify(op))
   assert.equal(editOpSchema.safeParse({ op: 'addMarker', frame: 0 }).success, true)

@@ -904,3 +904,77 @@ describe('editProject addLut', () => {
     ).rejects.toThrow(/itemId: item "missing" does not exist/)
   })
 })
+
+describe('editProject replaceMedia', () => {
+  const longMedia = (id: string, extra: Partial<MediaMetadata> = {}): MediaMetadata =>
+    ({ ...videoMedia, id, fileName: `${id}.mp4`, duration: 10, fps: 25, ...extra }) as MediaMetadata
+  const media = [
+    { mediaId: 'm-vid', metadata: videoMedia },
+    { mediaId: 'm-long', metadata: longMedia('m-long') },
+    { mediaId: 'm-short', metadata: longMedia('m-short', { duration: 1 }) },
+    { mediaId: 'm-mute', metadata: longMedia('m-mute', { audioCodec: undefined }) },
+    {
+      mediaId: 'm-png',
+      metadata: { id: 'm-png', fileName: 'p.png', mimeType: 'image/png', width: 10, height: 10 },
+    },
+  ] as Array<{ mediaId: string; metadata: MediaMetadata }>
+  const ref = { $ref: 'clip#/detail/created/0/id' }
+  const placed = (...ops: EditOp[]) =>
+    editProject({
+      project: baseProject(),
+      media,
+      ops: [
+        { op: 'addClip', mediaId: 'm-vid', from: 5, durationInFrames: 50, callerId: 'clip' },
+        { op: 'setTransform', id: ref, transform: { x: 40, width: 800 } },
+        ...ops,
+      ] as EditOp[],
+    })
+
+  it('keeps the id, place, length and transform; fits the window; the own audio follows', async () => {
+    const result = await placed({
+      op: 'replaceMedia',
+      id: ref,
+      mediaId: 'm-long',
+      sourceStart: 25,
+    } as EditOp)
+    const items = result.project.timeline!.items
+    const video = items.find((i) => i.type === 'video')!
+    const audio = items.find((i) => i.type === 'audio')!
+    // 50 frames at the 25 fps project = 2 s = 50 frames of the 25 fps source.
+    expect(video).toMatchObject({
+      from: 5,
+      durationInFrames: 50,
+      mediaId: 'm-long',
+      label: 'm-long.mp4',
+      sourceStart: 25,
+      sourceEnd: 75,
+      sourceFps: 25,
+      sourceDuration: 250,
+      transform: { x: 40, width: 800 },
+    })
+    const created = (result.results[0]!.detail as { created: Array<{ id: string }> }).created
+    expect(video.id).toBe(created[0]!.id)
+    expect(audio).toMatchObject({ mediaId: 'm-long', sourceStart: 25, sourceEnd: 75, from: 5 })
+    expect(result.results.at(-1)!.detail).toMatchObject({ linked: [audio.id] })
+  })
+
+  it('fails on media too short for the clip, or of another kind', async () => {
+    await expect(
+      placed({ op: 'replaceMedia', id: ref, mediaId: 'm-short' } as EditOp),
+    ).rejects.toThrow(/m-short\.mp4 is 1\.00 s; the clip needs 2\.00 s from 0\.00 s/)
+    await expect(
+      placed({ op: 'replaceMedia', id: ref, mediaId: 'm-png' } as EditOp),
+    ).rejects.toThrow(/is a video clip and p\.png is image/)
+    await expect(
+      placed({ op: 'replaceMedia', id: ref, mediaId: 'm-long', sourceStart: 240 } as EditOp),
+    ).rejects.toThrow(/Pick a longer media or an earlier sourceStart/)
+  })
+
+  it('media without sound takes the video and drops its old audio', async () => {
+    const result = await placed({ op: 'replaceMedia', id: ref, mediaId: 'm-mute' } as EditOp)
+    const items = result.project.timeline!.items
+    expect(items.map((i) => i.type)).toEqual(['video'])
+    expect(items[0]).toMatchObject({ mediaId: 'm-mute', durationInFrames: 50 })
+    expect(result.results.at(-1)!.detail).toHaveProperty('removedAudio')
+  })
+})
