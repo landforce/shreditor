@@ -244,14 +244,21 @@ function placeVisuals(cut, template, { format, ratio, pick }) {
       toSource: slot.description || `${slot.role} for ${slot.id}`,
       at: spot.at,
       until: spot.until,
-      note: `template ${slot.id}: ${slot.kind === 'graphic' ? `${slot.graphicKind} graphic` : `${slot.role} cutaway`}, ${slot.targetSec} s${slot.position ? `, ${slot.position}` : ''}${asset ? ' (candidate by category: check it)' : ''}`,
+      note: `template ${slot.id}: ${slot.kind === 'graphic' ? `${slot.graphicKind} graphic` : `${slot.role} cutaway`}, ${slot.targetSec} s${slot.position ? `, ${slot.position}` : ''}${asset ? '; a candidate by category, check it' : ''}`,
     })
   }
   return missed
 }
 
+/** The kept line whose end is nearest the title's reference hold (a line it barely enters is left out). */
+function titleEndLine(cut, sec) {
+  const at = lineAt(cut, sec)
+  const entry = cut[at]
+  return at > 0 && sec - entry.start < entry.length / 2 ? at - 1 : at
+}
+
 function titleOnScreen(cut, slot, styles) {
-  const end = lineAt(cut, slot.end)
+  const end = titleEndLine(cut, slot.end)
   const first = cut[0]
   const until = end === 0 ? round3(Math.min(first.length, slot.end)) : { line: cut[end].line.id }
   return { text: slot.pattern || slot.reference, role: 'title', until, ...styleFor(slot, styles) }
