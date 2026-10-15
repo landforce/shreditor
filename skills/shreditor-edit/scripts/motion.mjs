@@ -224,6 +224,9 @@ const hyperframes = (args, cwd) =>
     env: { ...process.env, HYPERFRAMES_SKIP_SKILLS: '1' },
   })
 
+/** Terminal colour and cursor codes in HyperFrames' output. */
+const ANSI = new RegExp(`${String.fromCharCode(27)}\\[[0-9;?]*[A-Za-z]`, 'g')
+
 /** What a failed HyperFrames run said: the spawn error, else its last lines. */
 function hyperframesFailure(result) {
   if (result.error)
@@ -231,7 +234,7 @@ function hyperframesFailure(result) {
       ? 'npx not found: install Node.js (https://nodejs.org)'
       : result.error.message
   return `${result.stdout ?? ''}\n${result.stderr ?? ''}`
-    .replace(/\x1b\[[0-9;?]*[A-Za-z]/g, '')
+    .replace(ANSI, '')
     .trim()
     .split('\n')
     .slice(-15)
@@ -339,6 +342,69 @@ function recordRender(dir, entry) {
   }
   list.push(entry)
   fs.writeFileSync(file, `${JSON.stringify(list, null, 2)}\n`)
+}
+
+/** Every render logged under a project's motion folder, oldest first, with its folder. */
+export function renderLog(motionRoot) {
+  const out = []
+  for (const entry of fs.existsSync(motionRoot)
+    ? fs.readdirSync(motionRoot, { withFileTypes: true })
+    : []) {
+    if (!entry.isDirectory()) continue
+    const dir = path.join(motionRoot, entry.name)
+    try {
+      for (const r of JSON.parse(fs.readFileSync(path.join(dir, PROVENANCE), 'utf8')))
+        out.push({ ...r, dir })
+    } catch {
+      // No renders logged in this folder.
+    }
+  }
+  return out.sort((a, b) => String(a.renderedAt).localeCompare(String(b.renderedAt)))
+}
+
+const decodeEntities = (text) =>
+  text
+    .replace(/&#39;/g, "'")
+    .replace(/&quot;/g, '"')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&amp;/g, '&')
+
+/** A composition's controls: its `data-composition-variables` ({id, type, label, default}...). */
+export function declaredVariables(html) {
+  const m =
+    /data-composition-variables='([^']*)'/.exec(html) ??
+    /data-composition-variables="([^"]*)"/.exec(html)
+  if (!m) return []
+  try {
+    const list = JSON.parse(decodeEntities(m[1]))
+    return Array.isArray(list) ? list.filter((v) => v && typeof v.id === 'string') : []
+  } catch {
+    return []
+  }
+}
+
+/**
+ * A placed motion clip's composition and controls: the folder it rendered from,
+ * the variables it declares, and the values its current render used (the
+ * declared defaults under the values passed). Null for a clip with no logged render.
+ */
+export function motionClip(motionRoot, clipId) {
+  const render = renderLog(motionRoot).findLast((r) => r.clipId === clipId)
+  if (!render) return null
+  const html = path.join(render.dir, render.composition ?? 'index.html')
+  const declared = fs.existsSync(html) ? declaredVariables(fs.readFileSync(html, 'utf8')) : []
+  return {
+    clipId,
+    folder: render.dir,
+    source: render.composition ? path.join(render.dir, render.composition) : render.dir,
+    variables: declared,
+    values: {
+      ...Object.fromEntries(declared.map((v) => [v.id, v.default])),
+      ...render.variables,
+    },
+    renderedAt: render.renderedAt,
+  }
 }
 
 const isMotionClip = (item) => item.type === 'video' && item.label?.startsWith(MOTION_LABEL)
@@ -558,11 +624,24 @@ export function motionCommands({
         )
       // Everything that can be wrong with the request fails before the render.
       const resolved = resolveSource(source, { motionRoot: motionRoot(id) })
-      const variables = parseVariables(opt.variables)
+      const parsed = parseVariables(opt.variables)
       const { project, revision } = await getProject(id)
       const canvas = canvasOf(project)
       const old = opt.item ? replacedClip(project, opt.item, { force: opt.force }) : null
       const from = old ? old.from : (parseAt(opt.at, canvas.fps) ?? 0)
+      // A swap from the same composition keeps the values it rendered with, so
+      // --variables names only what changes.
+      const before = old ? renderLog(motionRoot(id)).findLast((r) => r.clipId === old.id) : null
+      const declared = new Set(
+        declaredVariables(fs.readFileSync(resolved.html, 'utf8')).map((v) => v.id),
+      )
+      const kept =
+        before?.dir === resolved.dir && (before.composition ?? null) === resolved.composition
+          ? Object.fromEntries(
+              Object.entries(before.variables ?? {}).filter(([k]) => declared.has(k)),
+            )
+          : {}
+      const variables = Object.keys(kept).length ? { ...kept, ...parsed } : parsed
       if (baseProjectId(id) === id)
         say(
           `warning: ${id} is not a draft: this edits the project directly (shred draft ${id} first)`,
@@ -599,7 +678,7 @@ export function motionCommands({
         project: baseProjectId(id),
         clipId,
         ...(resolved.composition ? { composition: resolved.composition } : {}),
-        variables,
+        ...(variables && Object.keys(variables).length ? { variables } : {}),
         renderedAt: new Date().toISOString(),
       })
       say(
@@ -619,25 +698,35 @@ export function motionCommands({
       if (!clips.length) return say('No motion graphics on this timeline.')
       const root = motionRoot(id)
       // Where each clip came from, by the render log in each composition folder.
-      const sources = new Map()
-      for (const entry of fs.existsSync(root)
-        ? fs.readdirSync(root, { withFileTypes: true })
-        : []) {
-        if (!entry.isDirectory()) continue
-        const dir = path.join(root, entry.name)
-        try {
-          for (const r of JSON.parse(fs.readFileSync(path.join(dir, PROVENANCE), 'utf8')))
-            if (r.clipId) sources.set(r.clipId, r.composition ? path.join(dir, r.composition) : dir)
-        } catch {
-          // No renders logged in this folder.
-        }
-      }
+      const sources = new Map(
+        renderLog(root).map((r) => [
+          r.clipId,
+          r.composition ? path.join(r.dir, r.composition) : r.dir,
+        ]),
+      )
       for (const clip of clips) {
         const slug = clip.label.slice(MOTION_LABEL.length)
         say(
           `${clip.from}-${clip.from + clip.durationInFrames}  ${clip.label}  [${clip.id}]  ${sources.get(clip.id) ?? path.join(root, slug)}`,
         )
       }
+    },
+
+    /** A motion clip's controls and the values its render used. */
+    async vars([id, clipId]) {
+      if (!id || !clipId) throw new Error('Usage: shred motion vars <id> <clipId> [--json]')
+      const info = motionClip(motionRoot(id), clipId)
+      if (!info) throw new Error(`No render logged for clip ${clipId} (shred motion list ${id})`)
+      if (opt.json) return say(JSON.stringify(info, null, 2))
+      say(`${info.source}`)
+      if (!info.variables.length) say('  no variables declared (data-composition-variables)')
+      for (const v of info.variables)
+        say(
+          `  ${v.id.padEnd(16)} ${String(v.type ?? '').padEnd(7)} ${JSON.stringify(info.values[v.id])}  ${v.label ?? ''}`,
+        )
+      say(
+        `Change: shred motion add ${id} ${path.basename(info.folder)} --item ${clipId} --variables '{"${info.variables[0]?.id ?? 'title'}":"..."}'`,
+      )
     },
   }
 }

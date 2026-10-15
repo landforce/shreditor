@@ -14,6 +14,7 @@ import { createAgentActivityRoutes } from './agent-activity.mjs'
 import { createEditorStateRoutes } from './editor-state.mjs'
 import { createMediaRoutes } from './media-bridge.mjs'
 import { createTemplateRoutes } from './template-bridge.mjs'
+import { createMotionRoutes } from './motion-bridge.mjs'
 import { createTranscriptionRoutes } from './transcription.mjs'
 
 const PREFIX = '/__shreditor/'
@@ -171,6 +172,8 @@ export function createWorkspaceBridge({ mode = 'dev' } = {}) {
   const transcriptionRoutes = createTranscriptionRoutes({ sendJson, readBody })
   // Motion template library change stamp (see template-bridge.mjs).
   const templateRoutes = createTemplateRoutes({ sendJson })
+  // Motion graphic controls and re-renders (see motion-bridge.mjs).
+  const motionRoutes = createMotionRoutes({ sendJson, readBody })
   return async function workspaceBridge(req, res, next) {
     const url = new URL(req.url ?? '/', 'http://localhost')
     if (!url.pathname.startsWith(PREFIX)) return next?.()
@@ -184,6 +187,7 @@ export function createWorkspaceBridge({ mode = 'dev' } = {}) {
       if (await editorStateRoutes(req, res, { route, root, url })) return
       if (await agentActivityRoutes(req, res, { route, root, url })) return
       if (await templateRoutes(req, res, { route, root })) return
+      if (await motionRoutes(req, res, { route, root, query: url.searchParams })) return
       switch (route) {
         case 'GET info': {
           const config = readConfig()

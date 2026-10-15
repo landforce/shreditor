@@ -129,6 +129,8 @@
 //                                        its place and look; its own audio is dropped unless --keep-audio
 //   shred motion render <folder|.html> [--variables JSON] [--fps 30]   render only
 //   shred motion list <id>               the motion graphics on a timeline, with their folders
+//   shred motion vars <id> <clipId> [--json]   a motion clip's controls (declared variables) and the
+//                                        values its render used; a swap keeps them unless --variables changes them
 //   shred templates list [--category c] [--json]   the motion graphics template library: name,
 //                                        category, size, duration, controls (with defaults)
 //   shred templates show <name|id>       one template: controls, media, folder, thumbnail
@@ -1672,7 +1674,7 @@ const commands = {
       baseProjectId,
       importFile: (file, projectId) => importOne(file, projectId, 'overlay'),
     })[sub]
-    if (!run) throw new Error('Usage: shred motion new|add|render|list (see shred help)')
+    if (!run) throw new Error('Usage: shred motion new|add|render|list|vars (see shred help)')
     await run(rest)
   },
 

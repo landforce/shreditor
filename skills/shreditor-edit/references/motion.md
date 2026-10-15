@@ -54,7 +54,7 @@ Read the animation skills only for a bespoke piece.
    shred motion add <draftId> hole-1-title --item <clipId> --variables '{"title":"Hole 2"}'
    ```
 
-   The swap keeps the clip's track and start, and what the user set on it: position and scale, crop, fades, effects, blend mode, keyframes. It notes what it can't keep (a trimmed head plays again; linked position/scale keyframes need setting again) and a change of length. A longer render that would run into the next clip on the track fails before anything changes. `--item` takes only clips `shred motion` placed (`--force` for another clip). `shred motion list <id>` shows the motion clips with their folders. `shred motion render <folder> [--fps 30]` renders without touching a timeline.
+   The swap keeps the clip's track and start, and what the user set on it: position and scale, crop, fades, effects, blend mode, keyframes. It notes what it can't keep (a trimmed head plays again; linked position/scale keyframes need setting again) and a change of length. A longer render that would run into the next clip on the track fails before anything changes. `--item` takes only clips `shred motion` placed (`--force` for another clip). A swap from the same composition keeps the values the clip rendered with, so `--variables` names only what changes; `shred motion vars <id> <clipId>` shows a clip's controls and current values. `shred motion list <id>` shows the motion clips with their folders. `shred motion render <folder> [--fps 30]` renders without touching a timeline.
 
 9. **Reuse it.** A graphic the user likes can become a library template: put the clip in a composition (`createComposition`) and `shred templates save` it (`references/engine.md`, Motion graphics templates). The template holds the rendered clip, so its HyperFrames variables aren't its controls: for another version, re-render from the original folder (`projects/<id>/motion/<slug>/`, or copy that folder into the new project's `motion/`).
 
@@ -76,6 +76,6 @@ The rest are freeform briefs or one-liners ("an impressive slow-reveal logo"): k
 ## Limits
 
 - HyperFrames renders with headless Chrome; the first render downloads its browser. A simple title renders in a few seconds; a dense piece takes several seconds per second of motion.
-- The graphic is a rendered clip on the timeline: move, trim and layer it in the editor like any clip. Its animation changes only by editing the folder and re-rendering.
+- The graphic is a rendered clip on the timeline: move, trim and layer it in the editor like any clip. Its animation changes only by editing the folder and re-rendering. The editor's service re-renders a clip with new control values the same way (`server/motion-bridge.mjs`: `GET motion/clip`, `POST motion/rerender`).
 - WebM (VP9 with alpha) is the overlay format: Shreditor's preview, frame renderer and export all keep its transparency. HyperFrames' MOV (ProRes 4444) does not show in Shreditor's frame renderer; don't use it here.
 - Renders stay in each folder's `renders/`, one per distinct version.
