@@ -169,6 +169,7 @@ export function buildContinuousPreviewOverlayIndex(
     if (hasRenderableBlendMode(item)) return true
     if (hasCornerPin(item.cornerPin)) return true
     if (hasTextMotionSpec(item)) return true
+    if (isCutoutActive(item)) return true
     if (item.type === 'composition' && compositionById) {
       const subComp = compositionById[item.compositionId]
       return Boolean(subComp && subCompositionNeedsRenderedOverlayPath(subComp, compositionById))
@@ -365,6 +366,7 @@ export function shouldForceContinuousPreviewOverlayInWindow(
     if (hasEnabledGpuEffect(effectiveEffects)) return true
     if (hasRenderableBlendMode(item)) return true
     if (hasCornerPin(item.cornerPin)) return true
+    if (isCutoutActive(item)) return true
     // Keep the continuous GPU overlay on while a text clip's motion window is
     // active — otherwise playback falls to the DOM Player, which cannot render
     // per-glyph motion (fps is unused by isTextMotionActive).

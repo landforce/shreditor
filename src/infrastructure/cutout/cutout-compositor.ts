@@ -13,7 +13,9 @@ const VERTEX = `#version 300 es
 in vec2 aPos;
 out vec2 vUv;
 void main() {
-  vUv = aPos * 0.5 + 0.5;
+  // Textures are uploaded unflipped (row 0 = top; ImageBitmaps ignore
+  // UNPACK_FLIP_Y), so the top of the canvas samples v = 0.
+  vUv = vec2(aPos.x * 0.5 + 0.5, 0.5 - aPos.y * 0.5);
   gl_Position = vec4(aPos, 0.0, 1.0);
 }`
 
@@ -184,7 +186,7 @@ export function applyCutoutMask(
     canvas.height = height
   }
   gl.viewport(0, 0, width, height)
-  gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true)
+  gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false)
   gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false)
   const upload = (unit: number, image: TexImageSource) => {
     gl.activeTexture(gl.TEXTURE0 + unit)

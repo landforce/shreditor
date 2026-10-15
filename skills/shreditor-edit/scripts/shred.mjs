@@ -151,6 +151,9 @@
 //                                        keep their nearest edge, sizes follow the short side) to adjust
 //   shred templates export <name|id> --out <dir|file.zip>   a template pack (template, thumbnails, media)
 //   shred templates import <dir|file.zip>   add a pack's templates; media comes in through import
+//   shred cutout <id> [<itemId>...] [--subject auto|person|object] [--off] [--wait] [--json]
+//                                        remove the background of video clips (no green screen needed):
+//                                        turns it on, analyses masks on the service, prints each clip's status
 //   shred export <id> [--native|--browser] [--codec h264|hevc|prores] [--quality low|medium|high|ultra] [--out name]
 //                                        final export to <workspace>/projects/<id>/exports/; default: native
 //                                        (ffmpeg from the originals) when the plan allows it, else browser
@@ -193,6 +196,7 @@ import {
 } from '../../../headless/lib/luts.mjs'
 import { templatesCommand } from './templates.mjs'
 import { motionCommands } from './motion.mjs'
+import { cutoutCommand } from './cutout.mjs'
 import { describeNote, markRead, markSeen, noteSpan, openNotes } from './notes.mjs'
 import { createActivity } from './activity.mjs'
 import { draftPlanGate, planCheck, planCommands, printPlanCheck } from './plan.mjs'
@@ -275,6 +279,8 @@ const { values: opt, positionals } = parseArgs({
     read: { type: 'string' },
     reply: { type: 'string' },
     watch: { type: 'boolean' },
+    subject: { type: 'string' },
+    off: { type: 'boolean' },
     duration: { type: 'string' },
     variables: { type: 'string' },
     item: { type: 'string' },
@@ -1721,6 +1727,10 @@ const commands = {
     })[sub]
     if (!run) throw new Error('Usage: shred motion new|add|render|list|vars (see shred help)')
     await run(rest)
+  },
+
+  async cutout(rest) {
+    await cutoutCommand(rest, { opt, say, call, getProject, applyBatch })
   },
 
   async templates(rest) {

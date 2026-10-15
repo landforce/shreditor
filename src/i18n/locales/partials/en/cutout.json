@@ -1,0 +1,36 @@
+{
+  "editor": {
+    "cutout": {
+      "title": "Remove background",
+      "enable": "Remove background",
+      "hint": "Cut the speaker out of a real room, no green screen.",
+      "subject": "Keep",
+      "mixed": "Mixed",
+      "subjects": {
+        "auto": "Auto (person, else object)",
+        "person": "Person",
+        "object": "Main object"
+      },
+      "feather": "Feather",
+      "refine": "Edge",
+      "refineHint": "0% keeps the soft matte (hair); higher makes the edge harder.",
+      "invert": "Invert",
+      "everyFrame": "Every frame",
+      "everyFrameHint": "Analyse every source frame instead of 10 per second (slower, for final quality).",
+      "model": "{{model}} · {{license}} · {{size}} MB, downloaded once",
+      "reanalyse": "Re-analyse",
+      "cancel": "Cancel",
+      "status": {
+        "queued": "Waiting to analyse",
+        "downloading": "Downloading model {{percent}}% ({{size}} MB)",
+        "preparing": "Loading model",
+        "analyzing": "Analysing {{done}}/{{count}}",
+        "ready": "Ready ({{count}} masks)",
+        "partial": "{{done}} of {{count}} masks; the rest is analysed in the background",
+        "none": "Not analysed yet",
+        "error": "Failed: {{error}}",
+        "noMedia": "The clip's media is not in the library"
+      }
+    }
+  }
+}

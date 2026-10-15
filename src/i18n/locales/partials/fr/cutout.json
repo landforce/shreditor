@@ -1,0 +1,36 @@
+{
+  "editor": {
+    "cutout": {
+      "title": "Supprimer l'arrière-plan",
+      "enable": "Supprimer l'arrière-plan",
+      "hint": "Détourez l'intervenant d'une vraie pièce, sans fond vert.",
+      "subject": "Garder",
+      "mixed": "Mixte",
+      "subjects": {
+        "auto": "Auto (personne, sinon objet)",
+        "person": "Personne",
+        "object": "Objet principal"
+      },
+      "feather": "Adoucissement",
+      "refine": "Bord",
+      "refineHint": "0 % garde le masque doux (cheveux) ; plus haut durcit le bord.",
+      "invert": "Inverser",
+      "everyFrame": "Chaque image",
+      "everyFrameHint": "Analyser chaque image source au lieu de 10 par seconde (plus lent, pour la qualité finale).",
+      "model": "{{model}} · {{license}} · {{size}} Mo, téléchargé une fois",
+      "reanalyse": "Réanalyser",
+      "cancel": "Annuler",
+      "status": {
+        "queued": "En attente d'analyse",
+        "downloading": "Téléchargement du modèle {{percent}} % ({{size}} Mo)",
+        "preparing": "Chargement du modèle",
+        "analyzing": "Analyse {{done}}/{{count}}",
+        "ready": "Prêt ({{count}} masques)",
+        "partial": "{{done}} sur {{count}} masques ; le reste est analysé en arrière-plan",
+        "none": "Pas encore analysé",
+        "error": "Échec : {{error}}",
+        "noMedia": "Le média du clip n'est pas dans la bibliothèque"
+      }
+    }
+  }
+}

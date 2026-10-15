@@ -1,0 +1,36 @@
+{
+  "editor": {
+    "cutout": {
+      "title": "Remover fundo",
+      "enable": "Remover fundo",
+      "hint": "Recorte quem fala de uma sala real, sem tela verde.",
+      "subject": "Manter",
+      "mixed": "Misto",
+      "subjects": {
+        "auto": "Auto (pessoa, senão objeto)",
+        "person": "Pessoa",
+        "object": "Objeto principal"
+      },
+      "feather": "Suavização",
+      "refine": "Borda",
+      "refineHint": "0% mantém o fosco suave (cabelo); mais alto endurece a borda.",
+      "invert": "Inverter",
+      "everyFrame": "Todo quadro",
+      "everyFrameHint": "Analisa todo quadro de origem em vez de 10 por segundo (mais lento, para a qualidade final).",
+      "model": "{{model}} · {{license}} · {{size}} MB, baixado uma vez",
+      "reanalyse": "Analisar de novo",
+      "cancel": "Cancelar",
+      "status": {
+        "queued": "Aguardando análise",
+        "downloading": "Baixando modelo {{percent}}% ({{size}} MB)",
+        "preparing": "Carregando modelo",
+        "analyzing": "Analisando {{done}}/{{count}}",
+        "ready": "Pronto ({{count}} máscaras)",
+        "partial": "{{done}} de {{count}} máscaras; o resto é analisado em segundo plano",
+        "none": "Ainda não analisado",
+        "error": "Falhou: {{error}}",
+        "noMedia": "A mídia do clipe não está na biblioteca"
+      }
+    }
+  }
+}

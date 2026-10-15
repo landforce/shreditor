@@ -1,0 +1,36 @@
+{
+  "editor": {
+    "cutout": {
+      "title": "Hintergrund entfernen",
+      "enable": "Hintergrund entfernen",
+      "hint": "Sprecher ohne Greenscreen aus einem echten Raum freistellen.",
+      "subject": "Behalten",
+      "mixed": "Gemischt",
+      "subjects": {
+        "auto": "Auto (Person, sonst Objekt)",
+        "person": "Person",
+        "object": "Hauptobjekt"
+      },
+      "feather": "Weiche Kante",
+      "refine": "Kante",
+      "refineHint": "0 % behält die weiche Maske (Haare); höher macht die Kante härter.",
+      "invert": "Umkehren",
+      "everyFrame": "Jedes Bild",
+      "everyFrameHint": "Jedes Quellbild statt 10 pro Sekunde analysieren (langsamer, für die finale Qualität).",
+      "model": "{{model}} · {{license}} · {{size}} MB, einmal geladen",
+      "reanalyse": "Neu analysieren",
+      "cancel": "Abbrechen",
+      "status": {
+        "queued": "Wartet auf Analyse",
+        "downloading": "Modell wird geladen {{percent}} % ({{size}} MB)",
+        "preparing": "Modell wird vorbereitet",
+        "analyzing": "Analyse {{done}}/{{count}}",
+        "ready": "Bereit ({{count}} Masken)",
+        "partial": "{{done}} von {{count}} Masken; der Rest wird im Hintergrund analysiert",
+        "none": "Noch nicht analysiert",
+        "error": "Fehlgeschlagen: {{error}}",
+        "noMedia": "Die Medien des Clips sind nicht in der Bibliothek"
+      }
+    }
+  }
+}

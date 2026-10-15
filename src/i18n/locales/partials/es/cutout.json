@@ -1,0 +1,36 @@
+{
+  "editor": {
+    "cutout": {
+      "title": "Quitar fondo",
+      "enable": "Quitar fondo",
+      "hint": "Recorta a la persona de una sala real, sin pantalla verde.",
+      "subject": "Conservar",
+      "mixed": "Mixto",
+      "subjects": {
+        "auto": "Auto (persona, si no objeto)",
+        "person": "Persona",
+        "object": "Objeto principal"
+      },
+      "feather": "Difuminado",
+      "refine": "Borde",
+      "refineHint": "0 % conserva el mate suave (pelo); más alto endurece el borde.",
+      "invert": "Invertir",
+      "everyFrame": "Cada fotograma",
+      "everyFrameHint": "Analiza cada fotograma de origen en lugar de 10 por segundo (más lento, para la calidad final).",
+      "model": "{{model}} · {{license}} · {{size}} MB, se descarga una vez",
+      "reanalyse": "Volver a analizar",
+      "cancel": "Cancelar",
+      "status": {
+        "queued": "Esperando análisis",
+        "downloading": "Descargando modelo {{percent}} % ({{size}} MB)",
+        "preparing": "Cargando modelo",
+        "analyzing": "Analizando {{done}}/{{count}}",
+        "ready": "Listo ({{count}} máscaras)",
+        "partial": "{{done}} de {{count}} máscaras; el resto se analiza en segundo plano",
+        "none": "Aún sin analizar",
+        "error": "Error: {{error}}",
+        "noMedia": "El medio del clip no está en la biblioteca"
+      }
+    }
+  }
+}

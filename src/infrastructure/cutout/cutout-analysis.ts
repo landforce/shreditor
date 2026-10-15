@@ -278,6 +278,7 @@ async function decideAuto(
     rate: request.rate,
   })
   let covered = 0
+  update(id, { count: probe.length, done: 0 })
   const result = await runWorker(id, request, {
     model: person,
     key,

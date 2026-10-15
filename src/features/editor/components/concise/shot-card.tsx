@@ -33,6 +33,7 @@ import {
 import { focusWithin, formatSeconds, useProjectFps } from './card-helpers'
 import { FOCUS_MEDIA_BIN_EVENT } from './events'
 import { describeOutPoint, planCutIn, planCutOut } from './beat-cuts'
+import { CutoutCell } from './cutout-cell'
 
 const MIN_SPEED = 0.25
 const MAX_SPEED = 4
@@ -138,6 +139,7 @@ export function ShotCard({ items }: { items: ShotItem[] }) {
       <Cell title={t('editor.concise.shot.fades')} span={2} className="@3xl:col-span-1">
         <FadeFields items={videoItems} />
       </Cell>
+      <CutoutCell items={videoItems} />
       <MotionGraphicControls
         items={items}
         wrap={(body) => (
