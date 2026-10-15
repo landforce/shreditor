@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 
-export type NoSelectionTab = 'format' | 'canvas' | 'notes'
+export type NoSelectionTab = 'format' | 'style' | 'canvas' | 'notes'
 
 interface FormatPanelState {
   /** Which tab the Project specs drawer shows: the format (scorecard), the canvas or the notes. */

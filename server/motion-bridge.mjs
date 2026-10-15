@@ -11,31 +11,14 @@
 //     agent runs, so the output is identical. It edits project.json through the
 //     edit service; the editor saves first and reloads after, as for any agent
 //     edit. One re-render per project at a time (409 while one runs).
-import { spawn } from 'node:child_process'
 import path from 'node:path'
-import { fileURLToPath } from 'node:url'
 import { motionClip } from '../skills/shreditor-edit/scripts/motion.mjs'
+import { failureMessage, runShredProcess } from './shred-process.mjs'
 
-const SHRED = fileURLToPath(new URL('../skills/shreditor-edit/scripts/shred.mjs', import.meta.url))
 const ID = /^[0-9a-f-]{8,64}$/i
 
 function badRequest(message) {
   return Object.assign(new Error(message), { status: 400, name: 'TypeError' })
-}
-
-/** Runs shred with the workspace pinned; resolves its exit code and output. */
-function runShredProcess(args, { root }) {
-  return new Promise((resolve) => {
-    const child = spawn(process.execPath, [SHRED, ...args], {
-      env: { ...process.env, SHRED_WORKSPACE: root },
-      stdio: ['ignore', 'pipe', 'pipe'],
-    })
-    let output = ''
-    child.stdout.on('data', (chunk) => (output += chunk))
-    child.stderr.on('data', (chunk) => (output += chunk))
-    child.on('error', (error) => resolve({ code: 1, output: error.message }))
-    child.on('close', (code) => resolve({ code, output }))
-  })
 }
 
 export function createMotionRoutes({ sendJson, readBody, runShred = runShredProcess }) {
@@ -89,7 +72,7 @@ export function createMotionRoutes({ sendJson, readBody, runShred = runShredProc
       if (code !== 0 || !clipId) {
         sendJson(res, 422, {
           name: 'MotionRenderError',
-          message: output.trim().split('\n').slice(-12).join('\n') || 'shred motion add failed',
+          message: failureMessage(output, 'shred motion add failed'),
         })
         return true
       }

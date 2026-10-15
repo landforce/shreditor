@@ -8,9 +8,11 @@ import { useFormatPanelStore, type NoSelectionTab } from '../../stores/format-pa
 import { CanvasPanel } from '../properties-sidebar/canvas-panel'
 import { FormatPanel } from './format-panel'
 import { NotesTab } from './notes-tab'
+import { StyleTab } from './style-tab'
 
 const TABS: { id: NoSelectionTab; labelKey: string }[] = [
   { id: 'format', labelKey: 'formats.panel.tab' },
+  { id: 'style', labelKey: 'formats.specs.styleTab' },
   { id: 'canvas', labelKey: 'formats.panel.canvasTab' },
   { id: 'notes', labelKey: 'formats.specs.notesTab' },
 ]
@@ -18,10 +20,11 @@ const TABS: { id: NoSelectionTab; labelKey: string }[] = [
 function SpecsTabContent({ tab }: { tab: NoSelectionTab }) {
   if (tab === 'canvas') return <CanvasPanel />
   if (tab === 'notes') return <NotesTab />
+  if (tab === 'style') return <StyleTab />
   return <FormatPanel />
 }
 
-/** Format, Canvas and Notes, switched by a tab strip. */
+/** Format, Style, Canvas and Notes, switched by a tab strip. */
 function SpecsTabs() {
   const { t } = useTranslation()
   const tab = useFormatPanelStore((s) => s.tab)
@@ -54,7 +57,7 @@ function SpecsTabs() {
 
 /**
  * Project specs: the format (variant, guide, Change format, scorecard, rules),
- * the canvas and the notes for the agent, in a right-hand drawer the top-bar
+ * the style kit, the canvas and the notes for the agent, in a right-hand drawer the top-bar
  * format chip opens, so none of it takes room in the main view. Inside a
  * composition only its canvas applies.
  */

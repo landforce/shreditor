@@ -977,6 +977,16 @@
       "passReadyNoLabel": "Pass ready",
       "refused": "The agent is working. Wait for it, or choose Edit anyway.",
       "actionFailed": "Couldn't reach the editor's bridge. Try again."
+    },
+    "motionGraphic": {
+      "title": "Motion graphic",
+      "update": "Update graphic",
+      "saving": "Saving…",
+      "rendering": "Rendering…",
+      "revert": "Revert",
+      "unsaved": "The editor could not save its changes first. Try again.",
+      "noControls": "This graphic has no controls. Ask Claude to change it, or to add controls for its text and colours.",
+      "hint": "Rendered by HyperFrames. Updating re-renders it in a few seconds. For a different animation, add a note for the agent."
     }
   }
 }

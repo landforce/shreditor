@@ -14,6 +14,9 @@ vi.mock('../properties-sidebar/canvas-panel', () => ({
 vi.mock('./notes-tab', () => ({
   NotesTab: () => <div>Notes Tab</div>,
 }))
+vi.mock('./style-tab', () => ({
+  StyleTab: () => <div>Style Tab</div>,
+}))
 vi.mock('./project-format', () => ({
   useResolvedProjectFormat: () => ({ id: 'ten-shot', name: '10 Shot', variant: 'even' }),
 }))
@@ -35,6 +38,8 @@ describe('Project specs', () => {
     fireEvent.click(screen.getByTestId('format-chip'))
     expect(screen.getByTestId('project-specs-drawer')).toBeInTheDocument()
     expect(screen.getByText('Format Panel')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('tab', { name: 'Style' }))
+    expect(screen.getByText('Style Tab')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('tab', { name: 'Canvas' }))
     expect(screen.getByText('Canvas Panel')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('tab', { name: 'Notes' }))

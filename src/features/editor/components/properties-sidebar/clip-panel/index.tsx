@@ -50,6 +50,7 @@ import { LottieSection } from './lottie-section'
 import { ShapeSection } from './shape-section'
 import { CornerPinSection } from './corner-pin-section'
 import { CompositionControlsSection } from './composition-controls-section'
+import { MotionGraphicSection } from './motion-graphic-section'
 
 const LazyAudioSection = lazy(() =>
   import('./audio-section').then((module) => ({ default: module.AudioSection })),
@@ -679,6 +680,7 @@ const ClipPanelCore = memo(function ClipPanelCore({
                 />
               )}
               <CompositionControlsSection items={selectedItems} />
+              <MotionGraphicSection items={selectedItems} />
               {(hasVideoItems || hasCompositionItems) && <VideoSection items={selectedItems} />}
               {paintableLayoutItems.length > 0 && (
                 <FillSection
