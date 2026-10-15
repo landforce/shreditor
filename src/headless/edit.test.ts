@@ -930,6 +930,24 @@ describe('editProject replaceMedia', () => {
       ] as EditOp[],
     })
 
+  it("fits the window through the clip's speed ramp", async () => {
+    const result = await placed(
+      { op: 'replaceMedia', id: ref, mediaId: 'm-long' } as EditOp,
+      {
+        op: 'setSpeedRamp',
+        id: ref,
+        keys: [
+          { frame: 0, speed: 1 },
+          { frame: 50, speed: 3 },
+        ],
+      } as EditOp,
+      { op: 'replaceMedia', id: ref, mediaId: 'm-long', sourceStart: 25 } as EditOp,
+    )
+    const video = result.project.timeline!.items.find((i) => i.type === 'video')!
+    // A linear 1x -> 3x ramp averages 2x: 50 frames play 100 source frames.
+    expect(video).toMatchObject({ durationInFrames: 50, sourceStart: 25, sourceEnd: 125 })
+  })
+
   it('keeps the id, place, length and transform; fits the window; the own audio follows', async () => {
     const result = await placed({
       op: 'replaceMedia',
