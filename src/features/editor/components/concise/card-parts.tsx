@@ -1,4 +1,4 @@
-import { useEffect, type ComponentType, type ReactNode } from 'react'
+import type { ComponentType, ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Copy, Ellipsis, Trash2, type LucideProps } from 'lucide-react'
 import { useTimelineStore } from '@/features/editor/deps/timeline-store'
@@ -52,19 +52,23 @@ export function moreVerb(label: string, onClick: () => void): Verb {
 }
 
 /**
- * One card of the context panel: a 40px header, a 56px verb strip (icon over
+ * One card of the context panel: a 40px header (optional), a 56px verb strip (icon over
  * label, like mobile CapCut) and a scrolling body. The body is two columns at
  * the panel's usual 508px and three once the panel is wide.
  */
 export function ContextCard({
   title,
   subtitle,
+  label,
   verbs,
   children,
   testId,
 }: {
-  title: string
+  /** The header line; a card without one (the Pass card) starts at its verbs. */
+  title?: string
   subtitle?: string
+  /** What screen readers call the card when it has no visible title. */
+  label?: string
   verbs: Verb[]
   children: ReactNode
   testId: string
@@ -72,16 +76,19 @@ export function ContextCard({
   return (
     <section
       data-testid={testId}
+      aria-label={title ? undefined : label}
       className="@container flex h-full min-h-0 w-full flex-col bg-panel-bg"
     >
-      <header className="flex h-10 shrink-0 items-baseline gap-2 border-b border-border px-3 pt-2.5">
-        <h2 className="shrink-0 text-[13px] font-semibold text-foreground">{title}</h2>
-        {subtitle && (
-          <span className="min-w-0 truncate text-xs text-muted-foreground" title={subtitle}>
-            {subtitle}
-          </span>
-        )}
-      </header>
+      {title && (
+        <header className="flex h-10 shrink-0 items-baseline gap-2 border-b border-border px-3 pt-2.5">
+          <h2 className="shrink-0 text-[13px] font-semibold text-foreground">{title}</h2>
+          {subtitle && (
+            <span className="min-w-0 truncate text-xs text-muted-foreground" title={subtitle}>
+              {subtitle}
+            </span>
+          )}
+        </header>
+      )}
       <div
         role="toolbar"
         className="flex h-14 shrink-0 items-stretch gap-0.5 overflow-x-auto border-b border-border px-1.5 py-1"
@@ -156,26 +163,11 @@ export function Field({ label, children }: { label: string; children: ReactNode 
   )
 }
 
-/**
- * The full properties sidebar sizes itself to the editor's right-sidebar flag
- * and width, so while it is mounted here the sidebar is held open.
- */
-function useHoldSidebarOpen() {
-  useEffect(() => {
-    const was = useEditorStore.getState().rightSidebarOpen
-    if (!was) useEditorStore.getState().setRightSidebarOpen(true)
-    return () => {
-      if (!was) useEditorStore.getState().setRightSidebarOpen(false)
-    }
-  }, [])
-}
-
 /** The full existing properties sidebar, mounted inside the concise layout. */
 export function PropertiesHost({ className }: { className?: string }) {
-  useHoldSidebarOpen()
   return (
-    <div className={cn('flex h-full min-h-0 w-full overflow-x-auto', className)}>
-      <PropertiesSidebar />
+    <div className={cn('flex h-full min-h-0 w-full', className)}>
+      <PropertiesSidebar embedded />
     </div>
   )
 }

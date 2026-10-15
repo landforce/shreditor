@@ -5,7 +5,8 @@ import { createLogger } from '@/shared/logging/logger'
 
 const logger = createLogger('MediaGrid')
 import { GridMediaCard, ListMediaCard } from './media-card'
-import { useMediaLibraryStore, useFilteredMediaItems } from '../stores/media-library-store'
+import { useMediaLibraryStore } from '../stores/media-library-store'
+import { useVisibleMediaItems } from '../hooks/use-visible-media-items'
 import type { MediaMetadata } from '@/types/storage'
 import {
   getMediaDeletionImpact,
@@ -81,7 +82,7 @@ const MediaGridBase = memo(function MediaGridBase({
   const [mediaIdsToDelete, setMediaIdsToDelete] = useState<string[]>([])
   const lastSelectedIdRef = useRef<string | null>(null)
 
-  const allFilteredItems = useFilteredMediaItems()
+  const allFilteredItems = useVisibleMediaItems()
   const filteredItems = items ?? allFilteredItems
   const filteredItemsRef = useRef(filteredItems)
   const isLoading = useMediaLibraryStore((s) => s.isLoading)

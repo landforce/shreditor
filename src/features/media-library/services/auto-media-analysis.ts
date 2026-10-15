@@ -5,6 +5,7 @@ import {
   requestNativeTranscription,
 } from '@/infrastructure/storage/bridge-fs/bridge-transcription'
 import { getMediaType } from '../utils/validation'
+import { motionRenderGraphic } from '../utils/motion-renders'
 import { planBackgroundTranscription } from '../utils/background-transcription'
 import { useMediaLibraryStore } from '../stores/media-library-store'
 import { useSettingsStore } from '../deps/settings-contract'
@@ -52,8 +53,14 @@ async function runAutoMediaAnalysis(projectId: string): Promise<void> {
 
   const { mediaItems, brokenMediaIds } = useMediaLibraryStore.getState()
   const broken = new Set(brokenMediaIds)
+  // Motion renders are rendered graphics: no speech to transcribe, nothing to sort.
   const videoIds = mediaItems
-    .filter((media) => getMediaType(media.mimeType) === 'video' && !broken.has(media.id))
+    .filter(
+      (media) =>
+        getMediaType(media.mimeType) === 'video' &&
+        !broken.has(media.id) &&
+        !motionRenderGraphic(media.fileName),
+    )
     .map((media) => media.id)
 
   if (!(await ensureTranscripts(projectId, videoIds))) return

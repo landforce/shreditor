@@ -258,7 +258,7 @@ export function VectorSpeedGraph({
           <path
             d={speedPath}
             fill="none"
-            stroke="#00b5c9"
+            stroke="#2551a3"
             strokeWidth={2}
             vectorEffect="non-scaling-stroke"
           />
@@ -311,7 +311,7 @@ export function VectorSpeedGraph({
                 cy={yForSpeed(nearest.speed)}
                 r={selected ? 5 : 4}
                 fill={selected ? '#d97706' : '#ffffff'}
-                stroke="#1d2129"
+                stroke="#0c1824"
                 strokeWidth={2}
                 className="cursor-pointer"
                 onClick={() => onSelectKeyframe?.(keyframe)}

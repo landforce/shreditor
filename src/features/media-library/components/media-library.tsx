@@ -85,7 +85,9 @@ import { BackgroundTaskProgress } from './background-task-progress'
 import { MissingMediaDialog } from './missing-media-dialog'
 import { OrphanedClipsDialog } from './orphaned-clips-dialog'
 import { UnsupportedAudioCodecDialog } from './unsupported-audio-codec-dialog'
-import { useFilteredMediaItems, useMediaLibraryStore } from '../stores/media-library-store'
+import { useMediaLibraryStore } from '../stores/media-library-store'
+import { useVisibleMediaItems } from '../hooks/use-visible-media-items'
+import { OlderRendersToggle } from './older-renders-toggle'
 import {
   useCompositionsStore,
   useCompositionNavigationStore,
@@ -279,7 +281,7 @@ export const MediaLibrary = memo(function MediaLibrary({ onMediaSelect }: MediaL
   const projectStoreProjectId = useProjectStore((s) => s.currentProject?.id ?? null)
   const proxyStatus = useMediaLibraryStore((s) => s.proxyStatus)
   const transcriptStatus = useMediaLibraryStore((s) => s.transcriptStatus)
-  const filteredMediaItems = useFilteredMediaItems()
+  const filteredMediaItems = useVisibleMediaItems()
   const mediaGroups = useMediaGroups(filteredMediaItems)
   const compositions = useCompositionsStore((s) => s.compositions)
   const MediaTypeGroupView = viewMode === 'grid' ? GridMediaTypeGroup : ListMediaTypeGroup
@@ -1177,6 +1179,8 @@ export const MediaLibrary = memo(function MediaLibrary({ onMediaSelect }: MediaL
             />
           ))}
 
+          <OlderRendersToggle />
+
           {/* Loading / empty state when no groups to show */}
           {mediaGroups.length === 0 && (
             <EmptyMediaGrid onMediaSelect={onMediaSelect} itemSize={mediaItemSize} />
@@ -1257,7 +1261,7 @@ export const MediaLibrary = memo(function MediaLibrary({ onMediaSelect }: MediaL
       {/* Unified media readiness progress bar */}
       {preparingCount > 0 && (
         <BackgroundTaskProgress
-          icon={<Film className="w-3.5 h-3.5 text-cyan-600 flex-shrink-0" />}
+          icon={<Film className="w-3.5 h-3.5 text-primary flex-shrink-0" />}
           label={t('media.library.preparingMediaWithCount', { count: preparingCount })}
           progressAriaLabel={t('media.library.mediaPreparationProgress')}
           progressPercent={preparingAvgProgress * 100}
@@ -1289,7 +1293,7 @@ export const MediaLibrary = memo(function MediaLibrary({ onMediaSelect }: MediaL
                 : t('media.library.preparationQueued')}
             </span>
           }
-          fillClassName="bg-cyan-500"
+          fillClassName="bg-primary"
         />
       )}
 

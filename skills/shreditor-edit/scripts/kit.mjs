@@ -3,7 +3,8 @@
 // library), records the kit on the project and prints what mapped, what
 // didn't, the fonts and the kit's preferences; `status` says whether the
 // file changed since; `show` summarises a kit; `save-back` writes project
-// style tweaks into kit.json (only when the user asks). `shred check` adds
+// style tweaks into kit.json and `set` changes kit values by path (both only
+// when the user asks); `detach` stops following it. `shred check` adds
 // the kit's rules (kitCheck below). The model lives in formats/kit/.
 import fs from 'node:fs'
 import path from 'node:path'
@@ -27,6 +28,7 @@ import {
   summarizeKit,
 } from '../../../formats/kit/report.mjs'
 import { kitWithStyles, withChangelogEntry } from '../../../formats/kit/save-back.mjs'
+import { kitPairs, kitWithValues } from '../../../formats/kit/set.mjs'
 import { kitLayoutItems, scoreKit } from '../../../formats/kit/checks.mjs'
 import {
   catalogFontFamilies,
@@ -302,12 +304,7 @@ export function kitCommands({ say, opt, workspace, getProject, applyBatch, call,
   async function saveBack([id]) {
     if (!id) throw new Error('Usage: shred kit save-back <projectId> [--style kit:title] [--force]')
     const { project } = await getProject(id)
-    if (!project.kit) throw new Error(`${id} has no kit`)
-    const read = readKitFile(project.kit.path)
-    if (read.hash !== project.kit.hash && !opt.force)
-      throw new Error(
-        `${read.path} changed since it was applied (shred kit status ${id}). Re-apply it first, or --force to write over those changes.`,
-      )
+    const read = await appliedKit(id)
     const wanted = opt.style ? opt.style.split(',').map((s) => s.trim()) : null
     const styles = projectStyles(project).filter(
       (s) => s.id.startsWith('kit:') && (!wanted || wanted.includes(s.id)),
@@ -331,7 +328,54 @@ export function kitCommands({ say, opt, workspace, getProject, applyBatch, call,
     )
   }
 
-  return { apply, status, show, 'save-back': saveBack }
+  /** The project's kit, refused when the file changed since it was applied (unless --force). */
+  async function appliedKit(id) {
+    const { project } = await getProject(id)
+    if (!project.kit)
+      throw new Error(`${id} has no kit (shred kit apply <kit.json> --project ${id})`)
+    const read = readKitFile(project.kit.path)
+    if (read.hash !== project.kit.hash && !opt.force)
+      throw new Error(
+        `${read.path} changed since it was applied (shred kit status ${id}). Re-apply it first, or --force to write over those changes.`,
+      )
+    return read
+  }
+
+  async function set([id, ...rest]) {
+    const usage =
+      'Usage: shred kit set <projectId> <path> <value> | <path>=<value> ... [--why "..."] [--force]'
+    if (!id || !rest.length) throw new Error(usage)
+    let pairs
+    try {
+      pairs = kitPairs(rest)
+    } catch (error) {
+      throw new Error(`${error.message}. ${usage}`)
+    }
+    const read = await appliedKit(id)
+    const { kit, changes } = kitWithValues(read.kit, pairs, { force: opt.force })
+    if (!changes.length) return say('Nothing to set: the kit already has these values.')
+    const saved = withChangelogEntry(kit, changes, { why: opt.why ?? 'shred kit set' })
+    writeKitFile(read.path, saved)
+    say(`Saved to ${read.path}: v${read.kit.kitVersion} -> v${saved.kitVersion}`)
+    for (const line of describeKitDiff(changes, 40)) say(`  ${line}`)
+    // The project takes the new kit, so its kit:* styles follow.
+    await syncProject(id, { path: read.path, kit: saved, hash: kitHash(saved) }, { base: read.kit })
+  }
+
+  /** Stop following a kit: the record and the applied copy go; the kit:* styles stay. */
+  async function detach([id]) {
+    if (!id) throw new Error('Usage: shred kit detach <projectId>')
+    const { project, revision } = await getProject(id)
+    if (!project.kit) return say(`${id} has no kit.`)
+    await patchKit(id, null, revision)
+    fs.rmSync(snapshotPath(workspace(), id), { force: true })
+    say(`${id} no longer follows ${project.kit.path}.`)
+    say(
+      'Its kit:* styles stay in the project (text using them keeps its look); shred check stops checking the kit rules.',
+    )
+  }
+
+  return { apply, status, show, set, detach, 'save-back': saveBack }
 }
 
 // ---------------------------------------------------------------------------

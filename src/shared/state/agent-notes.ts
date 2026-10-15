@@ -1,6 +1,7 @@
-import { useEffect } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { create } from 'zustand'
 import { readAgentNotes, writeAgentNotes, type AgentNote } from '@/infrastructure/storage'
+import type { NoteAnchor } from '@/shared/projects/note-anchor.mjs'
 import { createLogger } from '@/shared/logging/logger'
 import { usePlaybackStore } from '@/shared/state/playback'
 import { useSelectionStore } from '@/shared/state/selection'
@@ -13,11 +14,16 @@ const REFRESH_MS = 4000
 interface NoteInput {
   text: string
   frame?: number
+  /** Last frame (inclusive) of a note about a stretch. */
+  endFrame?: number
+  anchor?: NoteAnchor
   itemIds?: string[]
 }
 
 interface Composer {
   frame: number
+  /** Set when the note is about a stretch (dragged across the Notes lane). */
+  endFrame?: number
   itemIds: string[]
 }
 
@@ -29,11 +35,18 @@ interface AgentNotesState {
   failed: boolean
   /** Where a timeline comment is being written; null when the composer is closed. */
   composer: Composer | null
+  /** The Notes lane also shows notes that are done (greyed). */
+  showDone: boolean
   load: (projectId: string | null) => Promise<void>
   refresh: () => Promise<void>
   add: (input: NoteInput) => Promise<boolean>
   remove: (id: string) => Promise<boolean>
-  openComposer: (frame: number, itemIds: string[]) => void
+  /** The user marks a note done without the agent. */
+  markDone: (id: string) => Promise<boolean>
+  /** Back to open, keeping the agent's last answer so it sees what it tried. */
+  reopen: (id: string) => Promise<boolean>
+  setShowDone: (showDone: boolean) => void
+  openComposer: (frame: number, itemIds: string[], endFrame?: number) => void
   closeComposer: () => void
 }
 
@@ -66,6 +79,7 @@ export const useAgentNotesStore = create<AgentNotesState>()((set, get) => {
     notes: [],
     failed: false,
     composer: null,
+    showDone: false,
 
     load: async (projectId) => {
       set({ projectId, notes: [], failed: false, composer: null })
@@ -83,22 +97,52 @@ export const useAgentNotesStore = create<AgentNotesState>()((set, get) => {
       }
     },
 
-    add: ({ text, frame, itemIds }) =>
-      change((current) => [
+    add: ({ text, frame, endFrame, anchor, itemIds }) => {
+      const start = frame === undefined ? undefined : Math.max(0, Math.round(frame))
+      const end =
+        start === undefined || endFrame === undefined
+          ? undefined
+          : Math.max(start, Math.round(endFrame))
+      return change((current) => [
         ...current,
         {
           id: crypto.randomUUID(),
           text,
           createdAt: new Date().toISOString(),
           status: 'open',
-          ...(frame === undefined ? {} : { frame: Math.max(0, Math.round(frame)) }),
+          ...(start === undefined ? {} : { frame: start }),
+          ...(end === undefined || end === start ? {} : { endFrame: end }),
+          ...(start !== undefined && anchor ? { anchor } : {}),
           ...(itemIds?.length ? { itemIds } : {}),
         },
-      ]),
+      ])
+    },
 
     remove: (id) => change((current) => current.filter((note) => note.id !== id)),
 
-    openComposer: (frame, itemIds) => set({ composer: { frame, itemIds } }),
+    markDone: (id) =>
+      change((current) =>
+        current.map((note) =>
+          note.id === id && note.status === 'open'
+            ? { ...note, status: 'read', readAt: new Date().toISOString() }
+            : note,
+        ),
+      ),
+
+    reopen: (id) =>
+      change((current) =>
+        current.map((note) => {
+          if (note.id !== id || note.status === 'open') return note
+          // Reopened, it waits for the agent to pick it up again.
+          const { readAt: _readAt, seenAt: _seenAt, ...rest } = note
+          return { ...rest, status: 'open' }
+        }),
+      ),
+
+    setShowDone: (showDone) => set({ showDone }),
+
+    openComposer: (frame, itemIds, endFrame) =>
+      set({ composer: { frame, itemIds, ...(endFrame === undefined ? {} : { endFrame }) } }),
     closeComposer: () => set({ composer: null }),
   }
 })
@@ -111,6 +155,57 @@ export function openAgentNotes(notes: AgentNote[]): AgentNote[] {
       (a, b) =>
         (a.frame ?? Infinity) - (b.frame ?? Infinity) || a.createdAt.localeCompare(b.createdAt),
     )
+}
+
+/** Notes that are done (read by the agent or marked done), newest first. */
+export function doneAgentNotes(notes: AgentNote[]): AgentNote[] {
+  return notes
+    .filter((note) => note.status === 'read')
+    .sort((a, b) => (b.readAt ?? b.createdAt).localeCompare(a.readAt ?? a.createdAt))
+}
+
+/** Open notes the agent hasn't picked up yet (no `shred notes` has shown them). */
+export function waitingAgentNotes(notes: AgentNote[]): AgentNote[] {
+  return openAgentNotes(notes).filter((note) => !note.seenAt)
+}
+
+/** What the user pastes to the agent so it reads the notes and edits. */
+function agentNotesPrompt(projectId: string): string {
+  // Names the skill and its script: on many systems a bare `shred` is the
+  // coreutils secure-delete command.
+  return `Use the shreditor-edit skill to read my timeline notes on Shreditor project ${projectId} (its \`shred notes ${projectId}\`: the skill's shred.mjs, not the system shred command), then make an edit pass that addresses them.`
+}
+
+/** Copy the notes prompt to the clipboard. */
+async function copyNotesForAgent(): Promise<boolean> {
+  const projectId = useAgentNotesStore.getState().projectId
+  if (!projectId) return false
+  try {
+    await navigator.clipboard.writeText(agentNotesPrompt(projectId))
+    return true
+  } catch (error) {
+    logger.warn('Copying the notes prompt failed', error)
+    return false
+  }
+}
+
+/**
+ * The hand-off to the agent for a button: how many notes are open and how many
+ * wait for the agent to pick them up, and `copy` (the prompt to the
+ * clipboard), with `copied` true for a moment after.
+ */
+export function useNotesHandOff() {
+  const notes = useAgentNotesStore((s) => s.notes)
+  const open = useMemo(() => openAgentNotes(notes).length, [notes])
+  const waiting = useMemo(() => waitingAgentNotes(notes).length, [notes])
+  const [copied, setCopied] = useState(false)
+  useEffect(() => {
+    if (!copied) return
+    const timer = window.setTimeout(() => setCopied(false), 1800)
+    return () => window.clearTimeout(timer)
+  }, [copied])
+  const copy = () => void copyNotesForAgent().then(setCopied)
+  return { open, waiting, copied, copy }
 }
 
 /** Pause and open the comment composer at the playhead, with the selected items. */

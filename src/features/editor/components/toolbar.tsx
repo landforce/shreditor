@@ -424,7 +424,7 @@ export const Toolbar = memo(function Toolbar({
 
   return (
     <div
-      className="bg-background flex flex-shrink-0 items-center gap-2.5 px-3"
+      className="surface-ink flex flex-shrink-0 items-center gap-2.5 px-3"
       style={{ height: EDITOR_LAYOUT_CSS_VALUES.toolbarHeight }}
       role="toolbar"
       aria-label={t('toolbar.ariaLabel')}

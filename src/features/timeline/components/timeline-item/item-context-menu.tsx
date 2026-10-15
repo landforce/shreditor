@@ -33,6 +33,7 @@ import {
 import { formatHotkeyBinding } from '@/config/hotkeys'
 import { useResolvedHotkeys } from '@/features/timeline/deps/settings'
 import { SaveAsTemplateMenuItem } from './save-as-template-menu-item'
+import { AddAgentNoteMenuItem } from '../timeline-agent-comments'
 
 type ItemContextMenuSectionProps = {
   t: ReturnType<typeof useTranslation>['t']
@@ -300,6 +301,7 @@ const ItemContextMenuFull = memo(function ItemContextMenuFull({
         </span>
       </ContextMenuTrigger>
       <ContextMenuContent>
+        <AddAgentNoteMenuItem />
         <JoinActions t={t} hotkeys={hotkeys} {...joinActions} />
         {linkActions && <LinkActions t={t} hotkeys={hotkeys} {...linkActions} />}
         <KeyframeActions

@@ -14,6 +14,7 @@ export {
   setMediaDragData,
 } from '@/features/media-library/utils/drag-data-cache'
 export { MediaLibrary } from '@/features/media-library/components/media-library'
+export { useSupersededMotionRenders } from '@/features/media-library/hooks/use-visible-media-items'
 
 export const importProxyService = () => import('@/features/media-library/services/proxy-service')
 export const importMediaLibraryService = () =>

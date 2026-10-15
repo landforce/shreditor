@@ -169,7 +169,7 @@ const ClipLabelIndicators = memo(function ClipLabelIndicators({
       )}
       {isShapeMask && (
         <span
-          className="px-1 py-0.5 text-[10px] font-bold bg-cyan-500/80 text-white rounded"
+          className="px-1 py-0.5 text-[10px] font-bold bg-primary/85 text-white rounded"
           title={t('timeline.clipIndicators.mask')}
         >
           M

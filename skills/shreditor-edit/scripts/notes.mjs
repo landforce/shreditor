@@ -1,7 +1,10 @@
 // The user's notes to the agent: `projects/<id>/agent/notes.json`. The editor
 // writes them (the Concise Pass card, and comments pinned to a timecode on the
 // timeline); `shred notes` reads them, says what sits at each one's frame and
-// marks them read. Pure helpers here; file access and --watch live in shred.mjs.
+// marks them read with what it did. Pure helpers here; file access and --watch
+// live in shred.mjs.
+
+import { resolveNoteSpan } from '../../../src/shared/projects/note-anchor.mjs'
 
 const pad = (n) => String(n).padStart(2, '0')
 
@@ -35,23 +38,49 @@ function itemLine(item, tracks) {
   return `${track?.name ?? 'track'}: ${item.type} ${what} ${item.from}-${item.from + item.durationInFrames} [${item.id}]`
 }
 
+const SPAN_NOTES = {
+  trimmed: '    (its moment was trimmed out of the clip; it sits at the clip edge)',
+  detached: '    (the clip it was pinned to is gone; frame as written)',
+}
+
 /**
- * One note in words: its time and text, the timeline items at its frame, and
- * the items the user had selected (by id, wherever they are now).
+ * Where a note sits now: it follows the clip it was pinned to (see
+ * note-anchor.mjs), so frames match what the editor's Notes lane shows.
+ */
+export function noteSpan(note, timeline, fps) {
+  return resolveNoteSpan(note, timeline?.items ?? [], fps)
+}
+
+/**
+ * One note in words: its time (or range) and text, the timeline items at its
+ * frame, the items the user had selected (by id, wherever they are now), and
+ * the agent's last answer when the user reopened it.
  */
 export function describeNote(note, timeline, fps) {
-  const at =
-    note.frame === undefined ? 'general' : `${timecode(note.frame, fps)} (frame ${note.frame})`
+  const span = noteSpan(note, timeline, fps)
+  const at = !span
+    ? 'general'
+    : span.endFrame === undefined
+      ? `${timecode(span.frame, fps)} (frame ${span.frame})`
+      : `${timecode(span.frame, fps)}-${timecode(span.endFrame, fps)} (frames ${span.frame}-${span.endFrame})`
   const lines = [`[${shortId(note)}] ${at}  ${JSON.stringify(note.text)}`]
+  if (note.reply) {
+    lines.push(
+      `    reopened; your last answer${note.pass ? ` (${note.pass})` : ''}: ${JSON.stringify(note.reply)}`,
+    )
+  }
+  if (span && SPAN_NOTES[span.state]) lines.push(SPAN_NOTES[span.state])
   if (!timeline) return lines
   const tracks = timeline.tracks ?? []
   const items = timeline.items ?? []
   const order = (item) => tracks.find((t) => t.id === item.trackId)?.order ?? 0
-  if (note.frame !== undefined) {
+  if (span) {
+    const last = span.endFrame ?? span.frame
     const under = items
-      .filter((i) => i.from <= note.frame && note.frame < i.from + i.durationInFrames)
-      .sort((a, b) => order(a) - order(b))
-    lines.push(under.length ? '    at this frame:' : '    at this frame: nothing')
+      .filter((i) => i.from <= last && span.frame < i.from + i.durationInFrames)
+      .sort((a, b) => order(a) - order(b) || a.from - b.from)
+    const where = span.endFrame === undefined ? 'at this frame' : 'in this range'
+    lines.push(under.length ? `    ${where}:` : `    ${where}: nothing`)
     for (const item of under) lines.push(`      ${itemLine(item, tracks)}`)
   }
   if (note.itemIds?.length) {
@@ -65,10 +94,27 @@ export function describeNote(note, timeline, fps) {
 }
 
 /**
- * Mark notes read. `which` is "all" or a comma list of ids or id prefixes
- * (the 8-character short ids `shred notes` prints).
+ * Stamp `seenAt` on the open notes the agent was just shown (ids), so the
+ * editor stops calling them waiting. Notes already seen keep their time.
  */
-export function markRead(notes, which) {
+export function markSeen(notes, ids, now = new Date().toISOString()) {
+  const shown = new Set(ids)
+  let changed = 0
+  const next = notes.map((note) => {
+    if (note.status !== 'open' || note.seenAt || !shown.has(note.id)) return note
+    changed += 1
+    return { ...note, seenAt: now }
+  })
+  return { notes: next, changed }
+}
+
+/**
+ * Mark notes read. `which` is "all" or a comma list of ids or id prefixes
+ * (the 8-character short ids `shred notes` prints). `reply` (what was done, in
+ * a line) and `pass` (the pass that did it) are kept on each note, so the user
+ * can see them on the Notes lane once the note is done.
+ */
+export function markRead(notes, which, { reply, pass, now = new Date().toISOString() } = {}) {
   const wanted =
     which === 'all'
       ? null
@@ -82,7 +128,15 @@ export function markRead(notes, which) {
     const hit = note.status === 'open' && (!wanted || wanted.some((w) => note.id.startsWith(w)))
     if (!hit) return note
     marked += 1
-    return { ...note, status: 'read' }
+    // A reopened note's old answer described the attempt that didn't land.
+    const { reply: _old, pass: _oldPass, ...rest } = note
+    return {
+      ...rest,
+      status: 'read',
+      readAt: now,
+      ...(reply ? { reply } : {}),
+      ...(pass ? { pass } : {}),
+    }
   })
   return { notes: next, marked, unknown }
 }

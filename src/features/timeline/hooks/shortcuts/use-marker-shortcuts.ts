@@ -12,7 +12,13 @@ import { addMarker, removeMarker } from '../../stores/actions/marker-actions'
 import { useResolvedHotkeys } from '@/features/timeline/deps/settings'
 import { startAgentComment } from '@/shared/state/agent-notes'
 import { useEditorStore } from '@/shared/state/editor'
-import { isConciseWorkspace } from '@/config/editor-workspaces'
+import { normalizeEditorWorkspaceId } from '@/config/editor-workspaces'
+
+/** The workspaces whose timeline has the Notes lane. */
+function workspaceShowsNotesLane(workspace: unknown): boolean {
+  const id = normalizeEditorWorkspaceId(workspace)
+  return id === 'edit' || id === 'concise'
+}
 
 export function useMarkerShortcuts() {
   const hotkeys = useResolvedHotkeys()
@@ -31,11 +37,12 @@ export function useMarkerShortcuts() {
     [],
   )
 
-  // N - Comment for the agent at the playhead (the composer lives in Concise)
+  // N - Note for the agent at the playhead (the composer opens on the Notes lane,
+  // which the Edit and Concise timelines show)
   useHotkeys(
     hotkeys.COMMENT_FOR_AGENT,
     (event) => {
-      if (!isConciseWorkspace(useEditorStore.getState().workspace)) return
+      if (!workspaceShowsNotesLane(useEditorStore.getState().workspace)) return
       event.preventDefault()
       startAgentComment()
     },
