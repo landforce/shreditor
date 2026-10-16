@@ -158,27 +158,40 @@ function containedSize(media, canvas) {
   return { width: media.width * scale, height: media.height * scale }
 }
 
+const hasExplicitSize = (t) => typeof t?.width === 'number' && typeof t?.height === 'number'
+const hasPartialSize = (t) => t?.width !== undefined || t?.height !== undefined
+
+/**
+ * The box an item is drawn in: its transform's when that gives a size, its
+ * media contained in the canvas when it gives none, else null (unknown).
+ */
+function drawnBox(item, canvas, media) {
+  const t = item.transform
+  if (hasExplicitSize(t)) return { x: t.x ?? 0, y: t.y ?? 0, width: t.width, height: t.height }
+  if (hasPartialSize(t)) return null
+  return containedBox(t, media, canvas)
+}
+
+/** The media contained in the canvas, at the transform's offset (if any). */
+function containedBox(t, media, canvas) {
+  const size = containedSize(media, canvas)
+  return size ? { x: t?.x ?? 0, y: t?.y ?? 0, ...size } : null
+}
+
+/** Whether a box `size` wide at `offset` (from the centre) reaches both edges of `frame`. */
+const coversAxis = (offset, size, frame) =>
+  offset - size / 2 <= -frame / 2 + COVER_TOLERANCE &&
+  offset + size / 2 >= frame / 2 - COVER_TOLERANCE
+
 /**
  * Whether a video or image covered the whole canvas, and its drawn box: by an
  * explicit transform that reaches every edge (unrotated), or with none when
  * the media has the canvas's aspect (contain = cover).
  */
 function fullBleedBox(item, canvas, media) {
-  const t = item.transform
-  const box =
-    t && typeof t.width === 'number' && typeof t.height === 'number'
-      ? { x: t.x ?? 0, y: t.y ?? 0, width: t.width, height: t.height }
-      : t && (t.width !== undefined || t.height !== undefined)
-        ? null
-        : (() => {
-            const size = containedSize(media, canvas)
-            return size ? { x: t?.x ?? 0, y: t?.y ?? 0, ...size } : null
-          })()
-  if (!box || Math.abs(t?.rotation ?? 0) > 0.01) return null
-  const covers = (offset, size, frame) =>
-    offset - size / 2 <= -frame / 2 + COVER_TOLERANCE &&
-    offset + size / 2 >= frame / 2 - COVER_TOLERANCE
-  return covers(box.x, box.width, canvas.width) && covers(box.y, box.height, canvas.height)
+  const box = drawnBox(item, canvas, media)
+  if (!box || Math.abs(item.transform?.rotation ?? 0) > 0.01) return null
+  return coversAxis(box.x, box.width, canvas.width) && coversAxis(box.y, box.height, canvas.height)
     ? box
     : null
 }
@@ -219,6 +232,38 @@ const itemName = (item) =>
     : (item.label ?? item.type)
 
 /**
+ * A video or image re-fitted (refitTimeline): a full-bleed one covers `to`,
+ * any other keeps the adapted transform and is flagged when it had one.
+ */
+function refitVisualItem(item, next, { from, to, mediaSize, keyframed, covered, flag }) {
+  const box = fullBleedBox(item, from, item.mediaId ? mediaSize(item.mediaId) : null)
+  if (!box) {
+    if (item.transform) flag(item, keyframed.has(item.id) ? 'keyframed' : 'reanchored')
+    return next
+  }
+  covered.push(item.id)
+  const cover = coverTransform(box, from, to)
+  if (keyframed.has(item.id)) flag(item, 'keyframed')
+  else if (Math.min(to.width / cover.width, to.height / cover.height) < 0.75) flag(item, 'framing')
+  return { ...next, transform: { ...item.transform, ...cover } }
+}
+
+/**
+ * Flag a non-media item that needs a look after a re-fit (refitTimeline): a
+ * composition, or a placed or keyframed item other than styled text.
+ */
+function flagRefitItem(item, { compositions, keyframed, flag }) {
+  if (item.type === 'composition') {
+    const comp = compositions.get(item.compositionId)
+    flag(item, comp?.templateId ? 'template' : 'compound')
+    return
+  }
+  if (item.type === 'text' && item.textStyleId) return
+  if (item.transform || keyframed.has(item.id))
+    flag(item, keyframed.has(item.id) ? 'keyframed' : 'reanchored')
+}
+
+/**
  * The timeline re-fitted for another canvas (docs/cuts.md, Creating a cut):
  * full-bleed video and images cover the new canvas; everything else keeps its
  * nearest frame edge or the centre and scales by the short side (as
@@ -249,29 +294,11 @@ export function refitTimeline(timeline, from, to, { mediaSize = () => null } = {
   const covered = []
   const review = []
   const flag = (item, reason) => review.push({ id: item.id, name: itemName(item), reason })
+  const context = { from, to, mediaSize, keyframed, covered, flag }
   const items = adapted.items.map((next, index) => {
     const item = timeline.items[index]
-    if (VISUAL_MEDIA.has(item.type)) {
-      const box = fullBleedBox(item, from, item.mediaId ? mediaSize(item.mediaId) : null)
-      if (box) {
-        covered.push(item.id)
-        const cover = coverTransform(box, from, to)
-        if (keyframed.has(item.id)) flag(item, 'keyframed')
-        else if (Math.min(to.width / cover.width, to.height / cover.height) < 0.75)
-          flag(item, 'framing')
-        return { ...next, transform: { ...item.transform, ...cover } }
-      }
-      if (item.transform) flag(item, keyframed.has(item.id) ? 'keyframed' : 'reanchored')
-      return next
-    }
-    if (item.type === 'composition') {
-      const comp = compositions.get(item.compositionId)
-      flag(item, comp?.templateId ? 'template' : 'compound')
-      return next
-    }
-    if (item.type === 'text' && item.textStyleId) return next
-    if (item.transform || keyframed.has(item.id))
-      flag(item, keyframed.has(item.id) ? 'keyframed' : 'reanchored')
+    if (VISUAL_MEDIA.has(item.type)) return refitVisualItem(item, next, context)
+    flagRefitItem(item, { compositions, keyframed, flag })
     return next
   })
   return {

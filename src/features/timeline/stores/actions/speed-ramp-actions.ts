@@ -65,6 +65,45 @@ function describeClip(item: RampableItem): string {
   return `${item.type} "${(item.label || item.id).slice(0, 40)}"`
 }
 
+/** The longest length `next`'s curve can play for in the media left to it. */
+function maxRampDuration(
+  item: RampableItem,
+  next: RampableItem,
+  available: number,
+  fps: number,
+): number {
+  const start = item.isReversed === true ? 0 : (item.sourceStart ?? 0)
+  const total = item.isReversed === true ? available : (item.sourceDuration ?? available)
+  return Math.max(1, maxDurationForMedia(next, start, total, fps))
+}
+
+function speedRampFitError(
+  item: RampableItem,
+  keys: SpeedRampKey[] | undefined,
+  span: number,
+  available: number,
+  maxDuration: number,
+): SpeedRampFitError {
+  const speeds = keys ? 'these speeds' : `${item.speed ?? DEFAULT_SPEED}x`
+  return new SpeedRampFitError(
+    `${describeClip(item)} would play ${Math.round(span)} source frames from ` +
+      `${item.isReversed === true ? 'its sourceEnd' : `sourceStart ${item.sourceStart ?? 0}`}, ` +
+      `but only ${available} are left in the media (sourceDuration ${item.sourceDuration ?? '?'}). ` +
+      `At ${speeds} the clip can be at most ${maxDuration} frames long: shorten it, lower the speeds, or start earlier in the source.`,
+    maxDuration,
+  )
+}
+
+/** The source window `sourceFrames` long that the clip plays from its first frame. */
+function rampSourceWindow(item: RampableItem, sourceFrames: number): Partial<TimelineItem> {
+  if (item.isReversed === true) {
+    const end = item.sourceEnd ?? (item.sourceStart ?? 0) + sourceFrames
+    return { sourceEnd: end, sourceStart: Math.max(0, end - sourceFrames) }
+  }
+  const start = item.sourceStart ?? 0
+  return { sourceStart: start, sourceEnd: start + sourceFrames }
+}
+
 /**
  * The item updates that give `item` these keys (or its constant speed when
  * none) at its current length, or at the longest length the media allows when
@@ -82,32 +121,16 @@ function planSpeedRamp(
   let duration = durationInFrames
   let span = sourceSpanFrames(next, fps, duration)
   if (available !== undefined && Math.round(span) > available) {
-    const start = item.isReversed === true ? 0 : (item.sourceStart ?? 0)
-    const total = item.isReversed === true ? available : (item.sourceDuration ?? available)
-    const maxDuration = Math.max(1, maxDurationForMedia(next, start, total, fps))
-    if (fit === 'error') {
-      const speeds = keys ? 'these speeds' : `${item.speed ?? DEFAULT_SPEED}x`
-      throw new SpeedRampFitError(
-        `${describeClip(item)} would play ${Math.round(span)} source frames from ` +
-          `${item.isReversed === true ? 'its sourceEnd' : `sourceStart ${item.sourceStart ?? 0}`}, ` +
-          `but only ${available} are left in the media (sourceDuration ${item.sourceDuration ?? '?'}). ` +
-          `At ${speeds} the clip can be at most ${maxDuration} frames long: shorten it, lower the speeds, or start earlier in the source.`,
-        maxDuration,
-      )
-    }
+    const maxDuration = maxRampDuration(item, next, available, fps)
+    if (fit === 'error') throw speedRampFitError(item, keys, span, available, maxDuration)
     duration = maxDuration
     span = sourceSpanFrames(next, fps, duration)
   }
   const sourceFrames = Math.max(1, Math.round(span))
-  const updates: Partial<TimelineItem> = { speedRamp: keys, durationInFrames: duration }
-  if (item.isReversed === true) {
-    const end = item.sourceEnd ?? (item.sourceStart ?? 0) + sourceFrames
-    updates.sourceEnd = end
-    updates.sourceStart = Math.max(0, end - sourceFrames)
-  } else {
-    const start = item.sourceStart ?? 0
-    updates.sourceStart = start
-    updates.sourceEnd = start + sourceFrames
+  const updates: Partial<TimelineItem> = {
+    speedRamp: keys,
+    durationInFrames: duration,
+    ...rampSourceWindow(item, sourceFrames),
   }
   return { updates, durationInFrames: duration }
 }
@@ -255,15 +278,11 @@ function captureSpeedRampState(): SpeedRampStateCapture {
   return { lanes, ramps }
 }
 
-/**
- * Bring curves and lanes back in step after a change. A lane edited while
- * its item's curve stayed put (the dopesheet, the value graph) becomes the
- * item's curve, with the source window re-derived and the linked audio
- * following; otherwise the item's curve is written to the lane.
- */
-function reconcileSpeedRamps(before: SpeedRampStateCapture): void {
-  if (reconciling) return
-  const after = captureSpeedRampState()
+/** Which items take their lane's edit as their curve, and which write their curve to the lane. */
+function partitionSpeedRampEdits(
+  before: SpeedRampStateCapture,
+  after: SpeedRampStateCapture,
+): { fromLanes: Array<{ id: string; keys: SpeedRampKey[] }>; toLanes: string[] } {
   const ids = new Set([
     ...before.lanes.keys(),
     ...after.lanes.keys(),
@@ -288,6 +307,18 @@ function reconcileSpeedRamps(before: SpeedRampStateCapture): void {
       toLanes.push(id)
     }
   }
+  return { fromLanes, toLanes }
+}
+
+/**
+ * Bring curves and lanes back in step after a change. A lane edited while
+ * its item's curve stayed put (the dopesheet, the value graph) becomes the
+ * item's curve, with the source window re-derived and the linked audio
+ * following; otherwise the item's curve is written to the lane.
+ */
+function reconcileSpeedRamps(before: SpeedRampStateCapture): void {
+  if (reconciling) return
+  const { fromLanes, toLanes } = partitionSpeedRampEdits(before, captureSpeedRampState())
   reconciling = true
   try {
     for (const { id, keys } of fromLanes) {

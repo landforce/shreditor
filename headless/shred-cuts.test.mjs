@@ -287,15 +287,16 @@ async function startService(t, ws) {
       req.on('data', (d) => (text += d))
       req.on('end', () => resolve(text ? JSON.parse(text) : {}))
     })
-  const server = http.createServer(async (req, res) => {
-    const url = new URL(req.url, 'http://x')
-    const [, v1, projects, id, action] = url.pathname.split('/')
-    try {
-      if (url.pathname === '/health') return send(res, 200, { ok: true, workspace: ws })
-      if (v1 !== 'v1' || projects !== 'projects') return send(res, 404, { error: 'no route' })
-      if (!id && req.method === 'GET')
-        return send(res, 200, { ok: true, projects: await listProjectResources(ws) })
-      if (!id && req.method === 'POST') {
+  // [matches(request), handle(request) => [status, body]], tried in order.
+  const routes = [
+    [(r) => r.pathname === '/health', async () => [200, { ok: true, workspace: ws }]],
+    [
+      (r) => r.project && !r.id && r.method === 'GET',
+      async () => [200, { ok: true, projects: await listProjectResources(ws) }],
+    ],
+    [
+      (r) => r.project && !r.id && r.method === 'POST',
+      async ({ req }) => {
         const input = validate(projectCreateRequestSchema, await body(req))
         const project = lifecycleProject(`p${++n}`, {
           name: input.name,
@@ -307,42 +308,67 @@ async function startService(t, ws) {
             fps: input.fps ?? 30,
           },
         })
-        return send(res, 201, { ok: true, ...(await createProjectResource(ws, project)) })
-      }
-      if (!action && req.method === 'GET')
-        return send(res, 200, { ok: true, ...(await getProjectResource(ws, id)) })
-      if (!action && req.method === 'PUT') {
+        return [201, { ok: true, ...(await createProjectResource(ws, project)) }]
+      },
+    ],
+    [
+      (r) => r.project && !r.action && r.method === 'GET',
+      async ({ id }) => [200, { ok: true, ...(await getProjectResource(ws, id)) }],
+    ],
+    [
+      (r) => r.project && !r.action && r.method === 'PUT',
+      async ({ req, id }) => {
         const input = validate(projectSaveRequestSchema, await body(req))
-        return send(res, 200, {
-          ok: true,
-          ...(await saveProjectResource(ws, id, input.project, input)),
-        })
-      }
-      if (!action && req.method === 'PATCH') {
+        return [200, { ok: true, ...(await saveProjectResource(ws, id, input.project, input)) }]
+      },
+    ],
+    [
+      (r) => r.project && !r.action && r.method === 'PATCH',
+      async ({ req, id }) => {
         const input = validate(projectUpdateRequestSchema, await body(req))
         const current = await getProjectResource(ws, id)
         const project = { ...current.project, ...input.updates }
-        return send(res, 200, { ok: true, ...(await saveProjectResource(ws, id, project, input)) })
-      }
-      if (action === 'trash')
-        return send(res, 200, {
-          ok: true,
-          ...(await trashProjectResource(ws, id, await body(req))),
-        })
-      if (action === 'edit') {
+        return [200, { ok: true, ...(await saveProjectResource(ws, id, project, input)) }]
+      },
+    ],
+    [
+      (r) => r.project && r.action === 'trash',
+      async ({ req, id }) => [
+        200,
+        { ok: true, ...(await trashProjectResource(ws, id, await body(req))) },
+      ],
+    ],
+    [
+      (r) => r.project && r.action === 'edit',
+      async ({ req, id }) => {
         // Records the ops; persists the project unchanged (no browser here).
         const input = await body(req)
         edits.push({ id, ops: input.ops })
         const current = await getProjectResource(ws, id)
         const saved = await saveProjectResource(ws, id, current.project, input)
-        return send(res, 200, { ok: true, applied: input.ops.length, ...saved })
-      }
-      return send(res, 404, { error: 'no route' })
+        return [200, { ok: true, applied: input.ops.length, ...saved }]
+      },
+    ],
+  ]
+  const requestOf = (req) => {
+    const url = new URL(req.url, 'http://x')
+    const [, v1, projects, id, action] = url.pathname.split('/')
+    const project = v1 === 'v1' && projects === 'projects'
+    return { req, method: req.method, pathname: url.pathname, project, id, action }
+  }
+  const sendError = (res, error) =>
+    send(res, error.statusCode ?? 500, {
+      ok: false,
+      error: { code: error.code ?? 'ERROR', message: error.message, fields: error.fields ?? [] },
+    })
+  const server = http.createServer(async (req, res) => {
+    const request = requestOf(req)
+    try {
+      const route = routes.find(([matches]) => matches(request))
+      if (!route) return send(res, 404, { error: 'no route' })
+      return send(res, ...(await route[1](request)))
     } catch (error) {
-      send(res, error.statusCode ?? 500, {
-        ok: false,
-        error: { code: error.code ?? 'ERROR', message: error.message, fields: error.fields ?? [] },
-      })
+      sendError(res, error)
     }
   })
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve))

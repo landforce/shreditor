@@ -104,6 +104,26 @@ const ReverseIndicator = memo(function ReverseIndicator({
   )
 })
 
+const SpeedRampBadge = memo(function SpeedRampBadge({ range }: { range: SpeedRampRange }) {
+  const { t } = useTranslation()
+  const label = t('timeline.clipIndicators.speedRamp', {
+    min: formatRampSpeed(range.min),
+    max: formatRampSpeed(range.max),
+  })
+  if (!label) return null
+
+  return (
+    <span
+      className="flex items-center px-1 py-0.5 bg-black/60 text-white rounded"
+      title={label}
+      aria-label={label}
+      data-testid="clip-speed-ramp-badge"
+    >
+      <ChartSpline className="w-3 h-3" />
+    </span>
+  )
+})
+
 interface ClipLabelIndicatorsProps {
   hasKeyframes: boolean
   keyframesExpanded: boolean
@@ -153,12 +173,6 @@ const ClipLabelIndicators = memo(function ClipLabelIndicators({
   onMotionOpen,
 }: ClipLabelIndicatorsProps) {
   const { t } = useTranslation()
-  const speedRampLabel = speedRampRange
-    ? t('timeline.clipIndicators.speedRamp', {
-        min: formatRampSpeed(speedRampRange.min),
-        max: formatRampSpeed(speedRampRange.max),
-      })
-    : null
 
   return (
     <div
@@ -200,16 +214,7 @@ const ClipLabelIndicators = memo(function ClipLabelIndicators({
           {currentSpeed.toFixed(2)}x
         </span>
       )}
-      {speedRampLabel && (
-        <span
-          className="flex items-center px-1 py-0.5 bg-black/60 text-white rounded"
-          title={speedRampLabel}
-          aria-label={speedRampLabel}
-          data-testid="clip-speed-ramp-badge"
-        >
-          <ChartSpline className="w-3 h-3" />
-        </span>
-      )}
+      {speedRampRange && <SpeedRampBadge range={speedRampRange} />}
       {isReversed && <ReverseIndicator status={reverseConformStatus} />}
       {reverseConformStatus === 'pending' && (
         <span
