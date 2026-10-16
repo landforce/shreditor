@@ -8,7 +8,15 @@
  * (the renderer reads the same painting state), and a smart stroke shows its
  * tracking progress here.
  */
-import { memo, useCallback, useMemo, useRef, useState, useSyncExternalStore } from 'react'
+import {
+  memo,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from 'react'
 import type { PointerEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { VideoItem } from '@/types/timeline'
@@ -36,6 +44,7 @@ import {
   type StrokeMapFrame,
 } from '@/shared/cutout/cutout-stroke-map'
 import { useResolvedPlaybackFrame } from '@/shared/state/playback/use-resolved-playback-frame'
+import { useSelectionStore } from '@/shared/state/selection'
 import {
   executeTimelineCommand,
   useItemsStore,
@@ -68,6 +77,13 @@ export const CutoutPaintContainer = memo(function CutoutPaintContainer(
 ) {
   const paint = useSyncExternalStore(subscribeCutoutPaint, getCutoutPaint)
   const item = useItemsStore((s) => (paint.itemId ? s.itemById[paint.itemId] : undefined))
+  const selected = useSelectionStore(
+    (s) => paint.itemId !== null && s.selectedItemIds.includes(paint.itemId),
+  )
+  // Painting stops when its clip is deselected (or deleted).
+  useEffect(() => {
+    if (paint.itemId && !selected) setCutoutPaint({ itemId: null })
+  }, [paint.itemId, selected])
   if (!props.containerRect || item?.type !== 'video') return null
   return (
     <CutoutPaintOverlay
@@ -230,6 +246,8 @@ const CutoutPaintOverlay = memo(function CutoutPaintOverlay({
       onPointerLeave={() => setCursor(null)}
       onKeyDown={(event) => event.key === 'Escape' && setCutoutPaint({ itemId: null })}
       onContextMenu={(event) => event.preventDefault()}
+      onMouseDown={(event) => event.stopPropagation()}
+      onClick={(event) => event.stopPropagation()}
     >
       <svg
         className="pointer-events-none absolute inset-0"

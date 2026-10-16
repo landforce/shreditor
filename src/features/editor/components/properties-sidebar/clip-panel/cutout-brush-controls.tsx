@@ -1,4 +1,4 @@
-import { useEffect, useSyncExternalStore } from 'react'
+import { useSyncExternalStore } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Brush, Eraser, Sparkles, Trash2, WandSparkles } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -74,14 +74,6 @@ export function CutoutBrushControls({ item }: { item: VideoItem }) {
   const tracking = useTracking(item.mediaId)
   const painting = paint.itemId === item.id
   const strokes = item.cutout?.strokes?.length ?? 0
-
-  // Leaving the clip (another selection, the section closing) stops painting it.
-  useEffect(
-    () => () => {
-      if (getCutoutPaint().itemId === item.id) setCutoutPaint({ itemId: null })
-    },
-    [item.id],
-  )
 
   return (
     <div className="space-y-2 border-t border-border pt-2" data-testid="cutout-brush">
