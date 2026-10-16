@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from 'react'
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { Search, Trash2, AlertTriangle, Plus, Upload } from 'lucide-react'
@@ -15,6 +15,8 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { ProjectCard } from './project-card'
+import { ProjectCutList } from './project-cut-list'
+import { groupProjectEntries } from '../utils/cut-groups'
 import { useFilteredProjects, useProjects } from '../hooks/use-project-selectors'
 import { useProjectFilters, useDeleteProject } from '../hooks/use-project-actions'
 import type { Project } from '@/types/project'
@@ -51,7 +53,17 @@ export function ProjectList({ onEditProject, onImportProject }: ProjectListProps
   } | null>(null)
 
   const allProjects = useProjects()
-  const filteredProjects = useFilteredProjects()
+  const shownProjects = useFilteredProjects()
+  // A group of cuts is one card (its Main), with its cuts listed on it.
+  const entries = useMemo(
+    () => groupProjectEntries(shownProjects, allProjects),
+    [shownProjects, allProjects],
+  )
+  const filteredProjects = useMemo(() => entries.map((entry) => entry.project), [entries])
+  const totalEntries = useMemo(
+    () => groupProjectEntries(allProjects, allProjects).length,
+    [allProjects],
+  )
   const { clearFilters } = useProjectFilters()
   const deleteProject = useDeleteProject()
 
@@ -358,24 +370,25 @@ export function ProjectList({ onEditProject, onImportProject }: ProjectListProps
         <div>
           <div className="flex items-center justify-between mb-4">
             <p className="text-sm text-muted-foreground">
-              {filteredProjects.length === allProjects.length
-                ? t('projects.list.projectCount', { count: allProjects.length })
+              {filteredProjects.length === totalEntries
+                ? t('projects.list.projectCount', { count: totalEntries })
                 : t('projects.list.projectCountFiltered', {
                     shown: filteredProjects.length,
-                    total: allProjects.length,
+                    total: totalEntries,
                   })}
             </p>
           </div>
 
           <div ref={containerRef} className="relative -mx-3 px-3 py-2 min-h-[200px]">
             <div className="grid items-start gap-4 [grid-template-columns:repeat(auto-fill,minmax(220px,1fr))]">
-              {filteredProjects.map((project) => (
+              {entries.map(({ project, cuts }) => (
                 <ProjectCard
                   key={project.id}
                   project={project}
                   onEdit={onEditProject}
                   isSelected={selectedIds.has(project.id)}
                   onCardClick={handleCardClick}
+                  footer={<ProjectCutList cuts={cuts} />}
                 />
               ))}
             </div>

@@ -69,11 +69,16 @@ export interface Project {
   rootFolderName?: string
 }
 
-/** A project's cut: its group (the main cut's project id), label and switcher order. */
+/**
+ * A project's cut: its group (the first main cut's project id, kept when
+ * another cut is made Main), label and switcher order.
+ */
 export interface ProjectCut {
   group: string
   label: string
   order?: number
+  /** Set by "Make main" where it differs from "the project whose id is the group id is Main". */
+  main?: boolean
 }
 
 /** A brand colour from a Video Style Kit, offered as a swatch by the text colour pickers. */

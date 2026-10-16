@@ -5,6 +5,7 @@ import { requireWorkspaceRoot } from '@/infrastructure/storage/workspace-fs/root
 import { useTimelineSettingsStore, useTimelineStore } from '@/features/editor/deps/timeline-store'
 import { useSelectionStore } from '@/shared/state/selection'
 import { isAgentEditLocked } from '@/shared/state/agent-edit-lock'
+import { receiveCutPublish, siblingCutIds } from '@/shared/state/cuts'
 import { AgentSyncController, type EditorStateReport } from './agent-sync-controller'
 import { useProjectSyncStore } from './sync-store'
 import { receiveAgentActivity } from './agent-activity-store'
@@ -24,14 +25,21 @@ async function send(report: EditorStateReport): Promise<{ saveRequest?: string |
   const res = await fetch(ENDPOINT, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(report),
+    // The open cut's siblings: the reply says when the agent published into one.
+    body: JSON.stringify({ ...report, cuts: siblingCutIds() }),
     cache: 'no-store',
     keepalive: Boolean(report.closed),
   })
   if (!res.ok) return null
-  const reply = (await res.json()) as { saveRequest?: string | null; agentActivity?: unknown }
+  const reply = (await res.json()) as {
+    saveRequest?: string | null
+    agentActivity?: unknown
+    cutPublish?: unknown
+  }
+  if (report.closed) return reply
   // Whether an agent is mid-pass on this project (the banner and watch mode).
-  if (!report.closed) receiveAgentActivity(reply.agentActivity)
+  receiveAgentActivity(reply.agentActivity)
+  receiveCutPublish(reply.cutPublish)
   return reply
 }
 

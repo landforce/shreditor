@@ -79,6 +79,8 @@ import {
   type ClientAudioContainer,
 } from '../utils/client-renderer'
 import { ExportPreviewPlayer } from './export-preview-player'
+import { AllCutsExportDialog, AllCutsMenuItem } from './all-cuts-export'
+import { useAllCutsExport } from '../hooks/use-all-cuts-export'
 import { useBrokenMediaIds, useMediaMetadataById } from '../deps/media-library'
 import { assessSmartCopyEligibility } from '../utils/smart-copy'
 import { resolveVideoBitrate } from '../utils/video-bitrate'
@@ -338,6 +340,8 @@ export function ExportDialog({ open, onClose, onOpenRenderQueue }: ExportDialogP
   const outPoint = exportable.outPoint
   const brokenMediaIds = useBrokenMediaIds()
   const enqueueJobs = useRenderQueueStore((s) => s.enqueueJobs)
+  // "All cuts": every cut of the group, exported one after another (docs/cuts.md).
+  const allCuts = useAllCutsExport()
 
   const [settings, setSettings] = useState<ExportSettings>({
     codec: getDefaultCodecForFormat('mp4'),
@@ -1552,8 +1556,10 @@ export function ExportDialog({ open, onClose, onOpenRenderQueue }: ExportDialogP
                   <DropdownMenuItem onClick={() => handleSplitChunks(60)}>
                     {t('export.renderQueue.splitChunks', { seconds: 60 })}
                   </DropdownMenuItem>
+                  <AllCutsMenuItem onSelect={() => void allCuts.start(settings)} />
                 </DropdownMenuContent>
               </DropdownMenu>
+              <AllCutsExportDialog job={allCuts.job} onClose={allCuts.close} />
               <Button onClick={handleStartExport} disabled={exportActionsDisabled}>
                 {exportMode === 'audio'
                   ? t('export.settings.exportAudio')

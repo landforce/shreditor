@@ -129,6 +129,23 @@ export function transition(record, action, input = {}, now = Date.now()) {
   }
 }
 
+const publishOf = (root, projectId) => {
+  const record = readActivity(root, projectId)
+  return record?.ended === 'published' && record.endedAt
+    ? { projectId, label: record.label ?? null, endedAt: record.endedAt }
+    : null
+}
+
+/**
+ * The newest pass published into any of `projectIds` (the sibling cuts of
+ * the project an editor has open), as {projectId, label, endedAt}, or null.
+ * The editor follows the agent to that cut (docs/cuts.md, Seeing cuts).
+ */
+export function latestPublish(root, projectIds) {
+  const publishes = projectIds.map((id) => publishOf(root, String(id))).filter(Boolean)
+  return publishes.sort((a, b) => b.endedAt.localeCompare(a.endedAt))[0] ?? null
+}
+
 /** Read, apply one action, write if it changed; returns the effective record. */
 export function applyActivity(root, projectId, action, input = {}, now = Date.now()) {
   const record = readActivity(root, projectId)

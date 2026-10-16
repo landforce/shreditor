@@ -28,14 +28,14 @@ FreeCut does have the start of this: `timeline.topLevelSequenceIds` promotes sub
 ## 2. The model
 
 ```json
-"cut": { "group": "<main project id>", "label": "Hook B", "order": 2 }
+"cut": { "group": "<first main project id>", "label": "Hook B", "order": 2, "main": true }
 ```
 
-- **Group.** A project's group is `cut.group`, else its own id. So the group id is the main cut's project id, and an existing project needs no write to become a group's Main: making a cut never touches the source project.
-- **Main** is the project whose id is the group id. Its label is `cut.label` when it has one (after a rename), else "Main". Order 0.
+- **Group.** A project's group is `cut.group`, else its own id. So the group id is the first main cut's project id, and an existing project needs no write to become a group's Main: making a cut never touches the source project. The group id never changes afterwards, not even when another cut is made Main (section 4).
+- **Main** is the project with `cut.main: true`; without the flag, the project whose id is the group id (`isMainCut`). `main` is stored only where it differs from that default (`cutRecord`), so groups that never used "Make main" keep their old records. Main's label is `cut.label` when it has one (after a rename), else "Main". Order 0.
 - **Order.** `cut.order` (Main is 0); new cuts go last. The switcher and `shred cut list` sort by it.
 - **Name.** A cut's project name is `<group name> · <label>` (the project list and export file names show it); renaming a cut renames both. Main keeps its own name.
-- Validated in the contract (`headless/lib/contract.mjs`: label 1-60 chars) and the project schema (`project-schema.ts`); `PATCH /v1/projects/:id` takes `updates.cut`.
+- Validated in the contract (`headless/lib/contract.mjs`: label 1-60 chars, optional `main` boolean) and the project schema (`project-schema.ts`); `PATCH /v1/projects/:id` takes `updates.cut`.
 
 ### Shared and per cut
 
@@ -67,10 +67,14 @@ Copying (not linking) the brief, plan, kit and format is deliberate: a variant i
 
 Aspect presets in the UI: same, 9:16, 16:9, 1:1, 4:5. A preset canvas keeps the source's short side (1080x1920 → 1920x1080).
 
-## 4. Renaming, ordering, removing
+## 4. Renaming, ordering, making Main, removing
 
 - `shred cut rename <cutId> "..."`, or the Manage dialog. Refused while the editor has unsaved edits on that cut (the rename writes its project.json).
 - Order: the Manage dialog's up/down. (CLI: not needed yet.)
+- **Make main**: `shred cut main <cutId>`, or the crown in the Manage dialog. Two ways to build it:
+  - *Re-point the group*: every cut's `cut.group` becomes the new Main's id. That writes every project in the group (each a revision change an open editor sees), is not atomic (a failure halfway splits the group), and changes the id the rest of the system knows the group by.
+  - *Keep the group id, flag the Main* (chosen): the cut gets `cut: { group, label, order: 0, main: true }` and the group's name as its project name; the old Main gets `main: false` (when its id is the group id), the cut's old place in the order and the name `<group> · <label>` (its label, "Main" when it had none). Exactly those two projects are written, through `PATCH /v1/projects/:id` with their revisions (the editor: `updateProject`, its own revision-checked save), promotion first so a failure between the writes leaves two Mains (both sorted first) rather than none. Every other cut, the group id, drafts and pass history stay untouched, and old groups (whose Main has no `cut` field) work unchanged. Refused while the editor has unsaved edits on either cut. Renames and moves keep the flag (`cutRecord`).
+  - The new Main can't be removed while the group has other cuts; the old Main now can.
 - **Remove** is a soft delete: the cut goes to the editor's Trash (the `.freecut-trashed.json` marker, restorable from the project list), never any media. `shred cut remove <cutId> --yes` (without `--yes` it says what it would do and stops); the Manage dialog asks for confirmation. Main can't be removed while the group has other cuts. The cut's bin list is parked (`media-links.json` → `media-links.cut-removed.json`) so the Trash's 30-day purge can't delete media only that cut used; a restore re-links everything on its timeline when it is opened.
 - Service: `POST /v1/projects/:id/trash` (revision-checked) does the trash; `GET /v1/projects` lists each project's `cut` and whether it is trashed.
 
@@ -78,12 +82,14 @@ Aspect presets in the UI: same, 9:16, 16:9, 1:1, 4:5. A preset canvas keeps the 
 
 - **Concise and Full toolbar: a cut switcher** beside the format chip. A project alone shows a quiet "+ Cut" ghost button. In a group it shows the current cut's label; the menu lists each cut with its size and a dot for its last pass's scorecard (fail, warn, pass; no dot without one), then **New cut…** and **Manage cuts…**.
 - **Switching** navigates to that cut's project in the same tab; unsaved edits get the editor's usual Save / Discard / Cancel dialog first.
-- **When the agent publishes to a cut**, the editor doesn't jump: the user may be mid-review on another cut. The switcher re-reads its group when the window gains focus and every 10 s checks the cuts' pass folders; a cut with a pass newer than the editor's load shows a dot on the switcher and in the menu ("new pass"). The agent tells the user which cut to look at and points its browser at that cut's editor link (`shred publish` prints it).
-- **Export**: the export dialog exports the open cut; download and queue file names carry the cut's label. Exporting every cut is one `shred export <cutId>` per cut (`shred cut list` lists them); the editor doesn't batch them.
+- **When the agent publishes to a cut**, the editor goes there. The editor's heartbeat to the workspace bridge (`POST /__shreditor/editor-state`, about once a second) lists the open cut's siblings (`cuts`); the reply's `cutPublish` is the newest pass published into one of them (`latestPublish`: the agent-activity record `shred publish` ends with `ended: "published"`). One newer than the editor's load, or than the last one it followed, switches the editor to that cut in the same tab, with a toast naming it, through the same path as picking it in the switcher: unsaved edits get the Save / Discard / Cancel dialog first, so nothing is discarded silently, and Cancel stays. The "new pass" mark stays as well: every 10 s the switcher checks the cuts' pass folders, and a cut with a pass newer than the editor's load shows a dot on the switcher and in the menu. The cut it switched to shows its "pass ready" bar.
+- **Project list**: a group is one card, its Main's (its first cut's while Main is in the Trash), with the group's cuts listed on it in cut order, each with its label (a crown on Main) and size; a cut opens that cut. Search, sort and filter work on every project: a group shows when any of its cuts matches, where the first match sorts, with all its cuts. The count is of cards. Deleting the card moves that one project to the Trash (as before); the group's other cuts stay and the card shows the next cut. Each trashed cut is listed and restored on its own in the Trash and rejoins its group on restore.
+- **Export**: the export dialog exports the open cut; download and queue file names carry the cut's label. **All cuts** (the Add to queue menu, shown for a group) exports every cut of the group one after another with the dialog's codec and quality, each at its own size, named `<project> - <cut label>` into its own `exports/`: the workspace bridge (`server/cut-export-bridge.mjs`, `POST /__shreditor/cuts/export`) runs `shred export <cutId> --out "<project> - <cut label>"` per cut, so each uses the native engine when it can, else the browser engine, and a dialog shows each cut waiting, exporting, done (with the engine and file) or failed (with why; the rest carry on). `shred export <id> --all-cuts` does the same from the CLI and prints each cut's engine and path (it refuses `--out`).
 - `shred status` lists cut groups; `shred project <id>` names the cut and its siblings.
 
 ## 6. Limits
 
 - Kit geometry checks and the format's targets were written for the kit's and format's canvas; a 16:9 cut of a 9:16 format scores against 9:16 targets. The scorecard says what it measured; read it with that in mind.
-- The project list shows cuts as separate projects (named `<group> · <label>`).
-- Deleting Main from the project list leaves its cuts grouped under its id with no Main; they still switch between each other.
+- Deleting Main from the project list leaves its cuts grouped under its id with no Main; they still switch between each other, and one can be made Main.
+- "All cuts" in the editor needs the workspace bridge and the edit service (the agent-native setup); it exports each cut's saved state, so the open cut's unsaved edits are not in it (`shred export` warns).
+- An editor follows publishes only while it is open on the bridge (agent-native mode): a plain browser workspace has no agent to follow.
