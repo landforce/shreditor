@@ -4,6 +4,8 @@ export interface ProjectCutRecord {
   group: string
   label: string
   order?: number
+  /** Set only when it differs from "the project whose id is the group id is Main". */
+  main?: boolean
 }
 
 interface CutMember {
@@ -24,9 +26,32 @@ export function cutGroupOf(project: CutMember | null | undefined): string | unde
 export function isMainCut(project: CutMember | null | undefined): boolean
 export function cutLabelOf(project: CutMember | null | undefined): string
 export function cutLabelError(label: unknown): string | null
+
+export interface CutSummaryRecord {
+  id: string
+  label: string
+  main: boolean
+  order: number
+}
+
+export function cutRecord(cut: {
+  id: string
+  group: string
+  label: string
+  order?: number
+  main: boolean
+}): ProjectCutRecord
+export function cutSummaryOf(project: CutMember): CutSummaryRecord
+export function makeMainUpdates(
+  members: readonly CutSummaryRecord[],
+  cutId: string,
+  group: string,
+  groupName: string,
+): Array<{ id: string; updates: { cut: ProjectCutRecord; name: string } }>
 export function cutsInGroup<T extends CutMember>(projects: readonly T[], groupId: string): T[]
 export function nextCutOrder(cuts: readonly CutMember[]): number
 export function cutProjectName(groupName: string, label: string): string
+export function cutExportFileName(groupName: string, label: string): string
 export function cutGroupName(
   main: { name?: string } | null | undefined,
   source: CutMember | null | undefined,

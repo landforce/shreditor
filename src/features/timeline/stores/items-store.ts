@@ -139,6 +139,68 @@ function takesTransform(item: TimelineItem): boolean {
   return 'transform' in item || item.type !== 'audio'
 }
 
+type SourcedMediaItem = TimelineItem & { sourceStart?: number; sourceEnd?: number }
+
+/**
+ * A speed-ramped clip splits its curve: the right half's keys move with its
+ * start, so both halves keep the exact shape; the source cut is the integral.
+ */
+function splitSpeedRampedSource(
+  item: SourcedMediaItem,
+  leftItem: TimelineItem,
+  rightItem: TimelineItem,
+  leftDuration: number,
+  itemDuration: number,
+) {
+  const rampKeys = getSpeedRamp(item)!
+  const rightDuration = itemDuration - leftDuration
+  const timelineFps = useTimelineSettingsStore.getState().fps
+  const { sourceStart } = getSourceProperties(item)
+  const leftSpan = Math.round(sourceFramesAtLocalFrame(item, leftDuration, timelineFps))
+  const totalSpan = Math.round(sourceFramesAtLocalFrame(item, itemDuration, timelineFps))
+  const left = leftItem as SourcedMediaItem
+  const right = rightItem as SourcedMediaItem
+  left.speedRamp = pruneSpeedRamp(rampKeys, leftDuration)
+  right.speedRamp = pruneSpeedRamp(shiftSpeedRamp(rampKeys, -leftDuration), rightDuration)
+  if (item.isReversed === true) {
+    const sourceEnd = item.sourceEnd ?? sourceStart + totalSpan
+    left.sourceStart = sourceEnd - leftSpan
+    left.sourceEnd = sourceEnd
+    right.sourceStart = sourceStart
+    right.sourceEnd = sourceEnd - leftSpan
+  } else {
+    left.sourceStart = sourceStart
+    left.sourceEnd = sourceStart + leftSpan
+    right.sourceStart = sourceStart + leftSpan
+    right.sourceEnd = item.sourceEnd ?? sourceStart + totalSpan
+  }
+}
+
+/**
+ * A ramp stretches with the clip: keys spread in time, speeds scale the other
+ * way, so the curve plays the same source over the new length.
+ */
+function stretchSpeedRamp(
+  item: TimelineItem,
+  updatedItem: TimelineItem,
+  sourceStart: number,
+  timelineFps: number,
+) {
+  const rampKeys = getSpeedRamp(item)
+  if (!rampKeys || item.durationInFrames <= 0) return
+  const finalDuration = updatedItem.durationInFrames
+  const frameScale = finalDuration / item.durationInFrames
+  updatedItem.speedRamp = pruneSpeedRamp(
+    scaleSpeedRamp(rampKeys, frameScale, 1 / frameScale),
+    finalDuration,
+  )
+  const span = Math.round(sourceFramesAtLocalFrame(updatedItem, finalDuration, timelineFps))
+  const rampEnd = sourceStart + Math.max(1, span)
+  ;(updatedItem as SourcedMediaItem).sourceEnd = item.sourceDuration
+    ? Math.min(rampEnd, item.sourceDuration)
+    : rampEnd
+}
+
 function updateVisualItemEffects(
   state: ItemsState,
   itemId: string,
@@ -583,30 +645,8 @@ export const useItemsStore = create<ItemsState & ItemsActions>()((set, get) => (
       ;(rightItem as typeof item).cues = rightCues
     }
 
-    // A speed-ramped clip splits its curve: the right half's keys move with its
-    // start, so both halves keep the exact shape; the source cut is the integral.
-    const rampKeys = isMediaItem(item) ? getSpeedRamp(item) : null
-    if (rampKeys && isMediaItem(item)) {
-      const timelineFps = useTimelineSettingsStore.getState().fps
-      const { sourceStart } = getSourceProperties(item)
-      const leftSpan = Math.round(sourceFramesAtLocalFrame(item, leftDuration, timelineFps))
-      const totalSpan = Math.round(sourceFramesAtLocalFrame(item, itemDuration, timelineFps))
-      const left = leftItem as typeof item
-      const right = rightItem as typeof item
-      left.speedRamp = pruneSpeedRamp(rampKeys, leftDuration)
-      right.speedRamp = pruneSpeedRamp(shiftSpeedRamp(rampKeys, -leftDuration), rightDuration)
-      if (item.isReversed === true) {
-        const sourceEnd = item.sourceEnd ?? sourceStart + totalSpan
-        left.sourceStart = sourceEnd - leftSpan
-        left.sourceEnd = sourceEnd
-        right.sourceStart = sourceStart
-        right.sourceEnd = sourceEnd - leftSpan
-      } else {
-        left.sourceStart = sourceStart
-        left.sourceEnd = sourceStart + leftSpan
-        right.sourceStart = sourceStart + leftSpan
-        right.sourceEnd = item.sourceEnd ?? sourceStart + totalSpan
-      }
+    if (isMediaItem(item) && getSpeedRamp(item)) {
+      splitSpeedRampedSource(item, leftItem, rightItem, leftDuration, itemDuration)
     } else if (isMediaItem(item)) {
       // Handle sourceStart/sourceEnd for media items (accounting for speed)
       const timelineFps = useTimelineSettingsStore.getState().fps
@@ -790,21 +830,7 @@ export const useItemsStore = create<ItemsState & ItemsActions>()((set, get) => (
           updatedItem.sourceEnd = roundFrame(clampedSourceEnd)
         }
 
-        // A ramp stretches with the clip: keys spread in time, speeds scale the
-        // other way, so the curve plays the same source over the new length.
-        const rampKeys = getSpeedRamp(item)
-        if (rampKeys && item.durationInFrames > 0) {
-          const frameScale = finalDuration / item.durationInFrames
-          updatedItem.speedRamp = pruneSpeedRamp(
-            scaleSpeedRamp(rampKeys, frameScale, 1 / frameScale),
-            finalDuration,
-          )
-          const span = Math.round(sourceFramesAtLocalFrame(updatedItem, finalDuration, timelineFps))
-          const rampEnd = sourceStart + Math.max(1, span)
-          updatedItem.sourceEnd = item.sourceDuration
-            ? Math.min(rampEnd, item.sourceDuration)
-            : rampEnd
-        }
+        stretchSpeedRamp(item, updatedItem, sourceStart, timelineFps)
 
         return updatedItem
       })

@@ -869,6 +869,7 @@ const projectCutSchema = z
     group: z.string().min(1),
     label: z.string().trim().min(1).max(60),
     order: z.number().int().min(0).max(10_000).optional(),
+    main: z.boolean().optional(),
   })
   .strict()
 

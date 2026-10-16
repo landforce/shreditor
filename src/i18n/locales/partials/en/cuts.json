@@ -15,7 +15,8 @@
         "pass": "Scorecard: all pass",
         "warn": "Scorecard: warnings",
         "fail": "Scorecard: fails"
-      }
+      },
+      "followed": "Switched to cut “{{label}}”: the agent published a pass there"
     },
     "new": {
       "title": "New cut",
@@ -36,7 +37,7 @@
     },
     "manage": {
       "title": "Manage cuts",
-      "description": "Rename and reorder cuts. Main stays first. Removing a cut moves it to the Trash; its media stays.",
+      "description": "Rename and reorder cuts, or make another one the main cut. Main stays first. Removing a cut moves it to the Trash; its media stays.",
       "labelFor": "Label of {{label}}",
       "moveUp": "Move up",
       "moveDown": "Move down",
@@ -46,7 +47,27 @@
       "confirmTitle": "Remove cut “{{label}}”?",
       "confirmDescription": "The cut moves to the Trash, where you can restore it from the project list. No media is deleted.",
       "confirmRemove": "Remove cut",
-      "failed": "Couldn't change the cut. Try again."
+      "failed": "Couldn't change the cut. Try again.",
+      "makeMain": "Make main",
+      "isMain": "Main cut"
+    },
+    "export": {
+      "allCuts": "All cuts",
+      "allCutsHint": "Export every cut of this edit, one after another, each at its own size, named “<project> - <cut label>”",
+      "title": "Exporting all cuts",
+      "progress_one": "{{done}} of {{count}} cut exported. Each uses the native engine when it can, else the browser.",
+      "progress_other": "{{done}} of {{count}} cuts exported. Each uses the native engine when it can, else the browser.",
+      "status": {
+        "queued": "waiting",
+        "exporting": "exporting…",
+        "done": "done ({{engine}})",
+        "failed": "failed"
+      }
+    },
+    "projects": {
+      "count_one": "{{count}} cut",
+      "count_other": "{{count}} cuts",
+      "open": "Open cut {{label}}"
     }
   }
 }

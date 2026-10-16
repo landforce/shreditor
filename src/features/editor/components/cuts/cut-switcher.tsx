@@ -1,7 +1,8 @@
-import { memo, useState } from 'react'
+import { memo, useEffect, useState } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 import { Check, ChevronDown, Layers, Plus, Settings2 } from 'lucide-react'
+import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -12,7 +13,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import type { CutSummary } from '@/infrastructure/storage'
-import { useCutsStore, useCutsSync } from '@/shared/state/cuts'
+import { useCutsStore, useCutsSync, type CutPublish } from '@/shared/state/cuts'
 import { useFormatScorecardStore } from '@/shared/state/format-scorecard'
 import { cn } from '@/shared/ui/cn'
 import { useTimelineStore } from '@/features/editor/deps/timeline-store'
@@ -45,6 +46,27 @@ function ScoreDot({ summary }: { summary: Score }) {
     />
   )
 }
+
+/**
+ * Follow the agent: when it publishes into another cut of the group, switch
+ * to that cut through `switchTo` (which asks first when there are unsaved
+ * edits; nothing is ever discarded silently).
+ */
+function useFollowPublishes(switchTo: (id: string) => void) {
+  const { t } = useTranslation()
+  const follow = useCutsStore((s) => s.follow)
+  useEffect(() => {
+    if (!follow) return
+    useCutsStore.setState({ follow: null })
+    toast.info(t('cuts.switcher.followed', { label: labelOf(follow) }))
+    switchTo(follow.projectId)
+    // switchTo is rebuilt every render; only a new publish matters here.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [follow])
+}
+
+const labelOf = (publish: CutPublish) =>
+  useCutsStore.getState().group?.cuts.find((cut) => cut.id === publish.projectId)?.label ?? ''
 
 interface CutSwitcherProps {
   projectId: string
@@ -80,6 +102,7 @@ export const CutSwitcher = memo(function CutSwitcher({
     if (useTimelineStore.getState().isDirty) setPending(id)
     else void go(id)
   }
+  useFollowPublishes(switchTo)
 
   const newCut = (
     <NewCutDialog

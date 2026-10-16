@@ -18,13 +18,71 @@ export const CUT_ASPECT_PRESETS = Object.freeze(['9:16', '16:9', '1:1', '4:5'])
 /** A project's group id: `cut.group`, else its own id (a lone project is its own Main). */
 export const cutGroupOf = (project) => project?.cut?.group ?? project?.id
 
-/** True for the group's main cut: the project whose id is the group id. */
-export const isMainCut = (project) => cutGroupOf(project) === project?.id
+/**
+ * True for the group's main cut: `cut.main` when it is set (after "Make
+ * main"), else the project whose id is the group id (docs/cuts.md).
+ */
+export const isMainCut = (project) =>
+  typeof project?.cut?.main === 'boolean' ? project.cut.main : cutGroupOf(project) === project?.id
 
 export const cutLabelOf = (project) => project?.cut?.label ?? MAIN_CUT_LABEL
 
 const cutOrderOf = (project) =>
   isMainCut(project) ? 0 : Number.isFinite(project?.cut?.order) ? project.cut.order : 1e9
+
+/**
+ * A cut record to write: `main` is stored only when it differs from the
+ * default (the project whose id is the group id is Main), so groups that
+ * never had "Make main" keep their old records.
+ */
+export function cutRecord({ id, group, label, order, main }) {
+  return {
+    group,
+    label,
+    ...(Number.isFinite(order) ? { order } : {}),
+    ...(main !== (id === group) ? { main } : {}),
+  }
+}
+
+/** A member's cut as the switcher, the Manage dialog and `shred cut` see it. */
+export const cutSummaryOf = (project) => ({
+  id: project.id,
+  label: cutLabelOf(project),
+  main: isMainCut(project),
+  order: isMainCut(project) ? 0 : (project.cut?.order ?? 0),
+})
+
+/**
+ * The writes that make `cutId` its group's Main (docs/cuts.md, Making another
+ * cut Main): the group id stays; the cut becomes Main (order 0, the group's
+ * name) and the old Main takes its place in the order and a "<group> · <label>"
+ * name. Promotion first, so a failed second write never leaves a group with
+ * no Main. Only these two projects change. `members` are the group's cut
+ * summaries (`cutSummaryOf`).
+ */
+export function makeMainUpdates(members, cutId, group, groupName) {
+  const next = members.find((member) => member.id === cutId)
+  if (!next) throw new Error(`${cutId} is not a cut of group ${group}`)
+  if (next.main) return []
+  const writes = [
+    {
+      id: next.id,
+      updates: {
+        cut: cutRecord({ id: next.id, group, label: next.label, order: 0, main: true }),
+        name: groupName,
+      },
+    },
+  ]
+  for (const old of members.filter((member) => member.main))
+    writes.push({
+      id: old.id,
+      updates: {
+        cut: cutRecord({ id: old.id, group, label: old.label, order: next.order || 1, main: false }),
+        name: cutProjectName(groupName, old.label),
+      },
+    })
+  return writes
+}
 
 /** Why a label can't be used, or null. */
 export function cutLabelError(label) {
@@ -60,6 +118,13 @@ export function cutProjectName(groupName, label) {
   return `${String(groupName).slice(0, Math.max(1, 100 - suffix.length))}${suffix}`
 }
 
+/**
+ * The file name of one cut's export among all cuts: "<project> - <cut label>"
+ * (slashes and dots, which a file name would split on, become dashes).
+ */
+export const cutExportFileName = (groupName, label) =>
+  `${groupName} - ${label}`.replace(/[/\\.]+/g, '-')
+
 /** The group's name from its main project (else a cut's name without its " · label"). */
 export function cutGroupName(main, source) {
   if (main?.name) return main.name
@@ -93,27 +158,40 @@ function containedSize(media, canvas) {
   return { width: media.width * scale, height: media.height * scale }
 }
 
+const hasExplicitSize = (t) => typeof t?.width === 'number' && typeof t?.height === 'number'
+const hasPartialSize = (t) => t?.width !== undefined || t?.height !== undefined
+
+/**
+ * The box an item is drawn in: its transform's when that gives a size, its
+ * media contained in the canvas when it gives none, else null (unknown).
+ */
+function drawnBox(item, canvas, media) {
+  const t = item.transform
+  if (hasExplicitSize(t)) return { x: t.x ?? 0, y: t.y ?? 0, width: t.width, height: t.height }
+  if (hasPartialSize(t)) return null
+  return containedBox(t, media, canvas)
+}
+
+/** The media contained in the canvas, at the transform's offset (if any). */
+function containedBox(t, media, canvas) {
+  const size = containedSize(media, canvas)
+  return size ? { x: t?.x ?? 0, y: t?.y ?? 0, ...size } : null
+}
+
+/** Whether a box `size` wide at `offset` (from the centre) reaches both edges of `frame`. */
+const coversAxis = (offset, size, frame) =>
+  offset - size / 2 <= -frame / 2 + COVER_TOLERANCE &&
+  offset + size / 2 >= frame / 2 - COVER_TOLERANCE
+
 /**
  * Whether a video or image covered the whole canvas, and its drawn box: by an
  * explicit transform that reaches every edge (unrotated), or with none when
  * the media has the canvas's aspect (contain = cover).
  */
 function fullBleedBox(item, canvas, media) {
-  const t = item.transform
-  const box =
-    t && typeof t.width === 'number' && typeof t.height === 'number'
-      ? { x: t.x ?? 0, y: t.y ?? 0, width: t.width, height: t.height }
-      : t && (t.width !== undefined || t.height !== undefined)
-        ? null
-        : (() => {
-            const size = containedSize(media, canvas)
-            return size ? { x: t?.x ?? 0, y: t?.y ?? 0, ...size } : null
-          })()
-  if (!box || Math.abs(t?.rotation ?? 0) > 0.01) return null
-  const covers = (offset, size, frame) =>
-    offset - size / 2 <= -frame / 2 + COVER_TOLERANCE &&
-    offset + size / 2 >= frame / 2 - COVER_TOLERANCE
-  return covers(box.x, box.width, canvas.width) && covers(box.y, box.height, canvas.height)
+  const box = drawnBox(item, canvas, media)
+  if (!box || Math.abs(item.transform?.rotation ?? 0) > 0.01) return null
+  return coversAxis(box.x, box.width, canvas.width) && coversAxis(box.y, box.height, canvas.height)
     ? box
     : null
 }
@@ -154,6 +232,38 @@ const itemName = (item) =>
     : (item.label ?? item.type)
 
 /**
+ * A video or image re-fitted (refitTimeline): a full-bleed one covers `to`,
+ * any other keeps the adapted transform and is flagged when it had one.
+ */
+function refitVisualItem(item, next, { from, to, mediaSize, keyframed, covered, flag }) {
+  const box = fullBleedBox(item, from, item.mediaId ? mediaSize(item.mediaId) : null)
+  if (!box) {
+    if (item.transform) flag(item, keyframed.has(item.id) ? 'keyframed' : 'reanchored')
+    return next
+  }
+  covered.push(item.id)
+  const cover = coverTransform(box, from, to)
+  if (keyframed.has(item.id)) flag(item, 'keyframed')
+  else if (Math.min(to.width / cover.width, to.height / cover.height) < 0.75) flag(item, 'framing')
+  return { ...next, transform: { ...item.transform, ...cover } }
+}
+
+/**
+ * Flag a non-media item that needs a look after a re-fit (refitTimeline): a
+ * composition, or a placed or keyframed item other than styled text.
+ */
+function flagRefitItem(item, { compositions, keyframed, flag }) {
+  if (item.type === 'composition') {
+    const comp = compositions.get(item.compositionId)
+    flag(item, comp?.templateId ? 'template' : 'compound')
+    return
+  }
+  if (item.type === 'text' && item.textStyleId) return
+  if (item.transform || keyframed.has(item.id))
+    flag(item, keyframed.has(item.id) ? 'keyframed' : 'reanchored')
+}
+
+/**
  * The timeline re-fitted for another canvas (docs/cuts.md, Creating a cut):
  * full-bleed video and images cover the new canvas; everything else keeps its
  * nearest frame edge or the centre and scales by the short side (as
@@ -184,29 +294,11 @@ export function refitTimeline(timeline, from, to, { mediaSize = () => null } = {
   const covered = []
   const review = []
   const flag = (item, reason) => review.push({ id: item.id, name: itemName(item), reason })
+  const context = { from, to, mediaSize, keyframed, covered, flag }
   const items = adapted.items.map((next, index) => {
     const item = timeline.items[index]
-    if (VISUAL_MEDIA.has(item.type)) {
-      const box = fullBleedBox(item, from, item.mediaId ? mediaSize(item.mediaId) : null)
-      if (box) {
-        covered.push(item.id)
-        const cover = coverTransform(box, from, to)
-        if (keyframed.has(item.id)) flag(item, 'keyframed')
-        else if (Math.min(to.width / cover.width, to.height / cover.height) < 0.75)
-          flag(item, 'framing')
-        return { ...next, transform: { ...item.transform, ...cover } }
-      }
-      if (item.transform) flag(item, keyframed.has(item.id) ? 'keyframed' : 'reanchored')
-      return next
-    }
-    if (item.type === 'composition') {
-      const comp = compositions.get(item.compositionId)
-      flag(item, comp?.templateId ? 'template' : 'compound')
-      return next
-    }
-    if (item.type === 'text' && item.textStyleId) return next
-    if (item.transform || keyframed.has(item.id))
-      flag(item, keyframed.has(item.id) ? 'keyframed' : 'reanchored')
+    if (VISUAL_MEDIA.has(item.type)) return refitVisualItem(item, next, context)
+    flagRefitItem(item, { compositions, keyframed, flag })
     return next
   })
   return {

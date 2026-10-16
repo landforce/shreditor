@@ -1,24 +1,31 @@
 // `shred cut`: several versions of one edit, side by side (docs/cuts.md).
 // A cut is its own project (own canvas, revision, drafts, passes, notes,
 // check and export) linked to its siblings by `project.cut = { group, label,
-// order }`; the group id is the main cut's project id. Media is shared by id.
+// order, main? }`; the group id is the first main cut's project id (it stays
+// when another cut is made Main). Media is shared by id.
 //
 //   shred cut new <projectId> --label "Hook B" [--size 1920x1080] [--from <cutId>]
 //   shred cut list <projectId> [--json]
 //   shred cut rename <cutId> "New label"
+//   shred cut main <cutId>
 //   shred cut remove <cutId> --yes
+//   shred export <id> --all-cuts       (exportAllCuts, below)
 import fs from 'node:fs'
 import path from 'node:path'
 import { readMediaMetadata } from '../../../headless/lib/workspace.mjs'
 import {
   cutCreatedPassRecord,
+  cutExportFileName,
   cutGroupName,
   cutGroupOf,
   cutLabelError,
   cutLabelOf,
   cutProjectName,
+  cutRecord,
+  cutSummaryOf,
   cutsInGroup,
   isMainCut,
+  makeMainUpdates,
   nextCutOrder,
   parseCanvasSize,
   portableTextOverrides,
@@ -39,7 +46,7 @@ const REVIEW_TEXT = {
 }
 
 const usage =
-  'Usage: shred cut new <projectId> --label "..." [--size WxH] [--from <cutId>] | list <projectId> | rename <cutId> "..." | remove <cutId> --yes'
+  'Usage: shred cut new <projectId> --label "..." [--size WxH] [--from <cutId>] | list <projectId> | rename <cutId> "..." | main <cutId> | remove <cutId> --yes'
 
 /** Every live (not trashed) project the service lists. */
 async function listLiveProjects(ctx) {
@@ -55,6 +62,12 @@ async function groupOf(ctx, id, project) {
     group,
   )
   return { group, members }
+}
+
+/** The group's main cut's project (after "Make main" not always the group id), or null. */
+async function mainProject(ctx, members) {
+  const main = members.find(isMainCut)
+  return main ? (await ctx.getProject(main.id)).project : null
 }
 
 const sameLabel = (a, b) => a.trim().toLowerCase() === b.trim().toLowerCase()
@@ -150,7 +163,7 @@ async function newCut(ctx, [projectId]) {
       )
   }
   assertLabelFree(members, label)
-  const main = members.some((m) => m.id === group) ? (await ctx.getProject(group)).project : null
+  const main = await mainProject(ctx, members)
   const meta = source.project.metadata
   const from = { width: meta.width, height: meta.height }
   const to = opt.size ? parseCanvasSize(opt.size) : from
@@ -253,6 +266,7 @@ async function listCuts(ctx, [projectId]) {
     const { project: p } = await ctx.getProject(member.id)
     rows.push({
       id: member.id,
+      name: p.name,
       label: cutLabelOf(member),
       main: isMainCut(member),
       width: p.metadata.width,
@@ -297,12 +311,10 @@ async function renameCut(ctx, [id, ...words]) {
   const main = isMainCut({ id, cut: project.cut })
   const groupName = main
     ? project.name
-    : cutGroupName(
-        members.some((m) => m.id === group) ? (await ctx.getProject(group)).project : null,
-        { id, ...project },
-      )
+    : cutGroupName(await mainProject(ctx, members), { id, ...project })
+  const order = main ? 0 : (project.cut?.order ?? nextCutOrder(members))
   const updates = {
-    cut: { group, label, order: main ? 0 : (project.cut?.order ?? nextCutOrder(members)) },
+    cut: cutRecord({ id, group, label, order, main }),
     ...(main ? {} : { name: cutProjectName(groupName, label) }),
   }
   await ctx.call(
@@ -346,12 +358,65 @@ async function removeCut(ctx, [id]) {
   )
 }
 
+async function patchProject(ctx, { id, updates }, tag) {
+  const { revision } = await ctx.getProject(id)
+  await ctx.call(
+    'PATCH',
+    `/v1/projects/${id}`,
+    { updates, expectedRevision: revision },
+    { 'Idempotency-Key': ctx.key(tag) },
+  )
+}
+
+/**
+ * `shred cut main <cutId>`: make another cut the group's Main. The group id
+ * stays (no other cut is written); the cut and the old Main swap places, and
+ * their names follow (docs/cuts.md, Making another cut Main).
+ */
+async function makeMain(ctx, [id]) {
+  if (!id) throw new Error(usage)
+  const { project } = await ctx.getProject(id)
+  const { group, members } = await groupOf(ctx, id, project)
+  const groupName = cutGroupName(await mainProject(ctx, members), { id, ...project })
+  const writes = makeMainUpdates(members.map(cutSummaryOf), id, group, groupName)
+  const label = cutLabelOf({ id, cut: project.cut })
+  if (!writes.length) return ctx.say(`"${label}" (${id}) is already the main cut of group ${group}`)
+  for (const write of writes) await refuseOpenEdits(ctx, write.id, 'making a cut Main')
+  for (const write of writes) await patchProject(ctx, write, 'cut-main')
+  ctx.say(
+    `"${label}" (${id}) is now the main cut of group ${group} ("${groupName}"); the group id is unchanged.`,
+  )
+}
+
 export function cutCommands(ctx) {
   return {
     new: (rest) => newCut(ctx, rest),
     list: (rest) => listCuts(ctx, rest),
     rename: (rest) => renameCut(ctx, rest),
+    main: (rest) => makeMain(ctx, rest),
     remove: (rest) => removeCut(ctx, rest),
+  }
+}
+
+/**
+ * `shred export <id> --all-cuts`: every cut of the project's group, one after
+ * another, each through the usual export (`exportOne(cutId, name)`: native
+ * when possible) at its own size, named "<project> - <cut label>"; each
+ * prints its engine and path.
+ */
+export async function exportAllCuts(ctx, id, exportOne) {
+  if (ctx.opt.out)
+    throw new Error(
+      '--out names one file; with --all-cuts each cut is named "<project> - <cut label>" (drop --out)',
+    )
+  const { project } = await ctx.getProject(id)
+  const { group, members } = await groupOf(ctx, id, project)
+  const groupName = cutGroupName(await mainProject(ctx, members), { id, ...project })
+  ctx.say(`Exporting ${members.length} cut(s) of group ${group}, one at a time`)
+  for (const [index, member] of members.entries()) {
+    const label = cutLabelOf(member)
+    ctx.say(`\n[${index + 1}/${members.length}] cut "${label}" (${member.id})`)
+    await exportOne(member.id, cutExportFileName(groupName, label))
   }
 }
 

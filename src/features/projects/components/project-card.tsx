@@ -1,4 +1,4 @@
-import { useState, type KeyboardEvent } from 'react'
+import { useState, type KeyboardEvent, type ReactNode } from 'react'
 import { Trans, useTranslation } from 'react-i18next'
 import { Link, useNavigate } from '@tanstack/react-router'
 import { toast } from 'sonner'
@@ -51,6 +51,8 @@ interface ProjectCardProps {
   isSelected?: boolean
   onCardMouseDown?: (e: React.MouseEvent, project: Project) => void
   onCardClick?: (e: React.MouseEvent, project: Project) => void
+  /** Below the details: a group's cuts (project-cut-list.tsx). */
+  footer?: ReactNode
 }
 
 export function ProjectCard({
@@ -59,6 +61,7 @@ export function ProjectCard({
   isSelected = false,
   onCardMouseDown,
   onCardClick,
+  footer,
 }: ProjectCardProps) {
   const navigate = useNavigate()
   const { t } = useTranslation()
@@ -345,6 +348,7 @@ export function ProjectCard({
             <span>{formatRelativeTime(project.updatedAt)}</span>
           </div>
         </div>
+        {footer}
       </div>
     </div>
   )

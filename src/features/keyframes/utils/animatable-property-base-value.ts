@@ -26,12 +26,22 @@ function isCropAnimatableProperty(
   )
 }
 
-function getItemSpecificBaseValue(
+/** Base values of the playback properties any clip has (volume, speed). */
+function getPlaybackBaseValue(
   item: TimelineItem,
   property: AnimatableProperty,
 ): number | undefined {
   if (property === 'volume') return item.volume ?? 0
   if (property === 'speed') return item.speed ?? 1
+  return undefined
+}
+
+function getItemSpecificBaseValue(
+  item: TimelineItem,
+  property: AnimatableProperty,
+): number | undefined {
+  const playbackValue = getPlaybackBaseValue(item, property)
+  if (playbackValue !== undefined) return playbackValue
   if (item.type === 'text' && isTextAnimatableProperty(property)) {
     return getTextAnimatableBaseValue(item, property)
   }
