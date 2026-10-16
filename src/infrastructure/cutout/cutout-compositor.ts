@@ -94,9 +94,7 @@ float segmentDistance(vec2 p, vec2 a, vec2 b) {
 }
 
 float coverage() {
-  // Regions come from SlimSAM's 256-pixel masks: their soft edge sits a little
-  // inside the object, so the threshold leans low to cover the rim.
-  if (uKind == 0) return smoothstep(0.2, 0.5, maskAt(vUv));
+  if (uKind == 0) return smoothstep(0.35, 0.65, maskAt(vUv));
   vec2 p = vUv * uSize;
   float d = 1e9;
   for (int i = 0; i < ${STROKE_CHUNK}; i++) {

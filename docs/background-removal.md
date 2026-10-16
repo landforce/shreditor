@@ -141,9 +141,10 @@ the auto mask (time-blended, feathered, refined, inverted), then smart-brush
 regions (`max`), then smart-eraser regions (multiply by 1 − r), then the plain
 strokes in painted order (brush `max`, eraser multiply by 1 − disc). Regions
 blend their two neighbouring samples by time like the auto mask; a region not
-stored near the frame (lost, or not tracked yet) adds nothing. Region edges use
-a slightly low threshold (smoothstep 0.2–0.5) because SlimSAM's 256-pixel masks
-put their soft edge a little inside the object. Strokes are drawn as distance
+stored near the frame (lost, or not tracked yet) adds nothing. Region edges are a
+smoothstep from 0.35 to 0.65 around SlimSAM's 0.5 boundary (a lower threshold
+covers the thin rim the 256-pixel masks leave, but lets their faint grid-shaped
+halo eat into neighbouring areas such as a face, so it is not used). Strokes are drawn as distance
 fields to their segments (64 points per draw, longer strokes in chunks). The
 frame is then multiplied by that alpha.
 
