@@ -1,7 +1,8 @@
 // `shred cut`: several versions of one edit, side by side (docs/cuts.md).
 // A cut is its own project (own canvas, revision, drafts, passes, notes,
 // check and export) linked to its siblings by `project.cut = { group, label,
-// order }`; the group id is the main cut's project id. Media is shared by id.
+// order, main? }`; the group id is the first main cut's project id (it stays
+// when another cut is made Main). Media is shared by id.
 //
 //   shred cut new <projectId> --label "Hook B" [--size 1920x1080] [--from <cutId>]
 //   shred cut list <projectId> [--json]
