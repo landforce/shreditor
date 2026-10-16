@@ -30,7 +30,8 @@ export function AllCutsMenuItem({ onSelect }: { onSelect: () => void }) {
         className="gap-2"
         onClick={onSelect}
         data-testid="export-all-cuts"
-        title={t('cuts.export.allCutsHint')}
+        data-tooltip={t('cuts.export.allCutsHint')}
+        data-tooltip-side="left"
       >
         <Layers className="h-3.5 w-3.5" aria-hidden="true" />
         {t('cuts.export.allCuts')}
