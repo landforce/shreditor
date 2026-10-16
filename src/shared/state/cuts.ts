@@ -20,6 +20,16 @@ interface CutsState {
   poll: () => Promise<void>
 }
 
+/** `seenPasses` plus each cut of the group not seen before, at its last pass. */
+function withSeenPasses(
+  seenPasses: Record<string, number>,
+  group: CutGroup | null,
+): Record<string, number> {
+  const seen = { ...seenPasses }
+  for (const cut of group?.cuts ?? []) seen[cut.id] ??= cut.lastPass?.n ?? 0
+  return seen
+}
+
 /**
  * The open project's cut group (docs/cuts.md): its cuts in order with size
  * and last pass, re-read on focus, plus which sibling got a new pass since
@@ -42,9 +52,7 @@ export const useCutsStore = create<CutsState>()((set, get) => ({
     try {
       const group = await listCutGroup(projectId)
       if (get().projectId !== projectId) return
-      const seen = { ...get().seenPasses }
-      for (const cut of group?.cuts ?? []) seen[cut.id] ??= cut.lastPass?.n ?? 0
-      set({ group, seenPasses: seen })
+      set({ group, seenPasses: withSeenPasses(get().seenPasses, group) })
     } catch (error) {
       logger.warn('Reading the cut group failed', error)
     }
