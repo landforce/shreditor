@@ -82,14 +82,31 @@ describe('setCutout', () => {
     })
   })
 
-  it('a split keeps the cutout on both halves', async () => {
+  it('a split keeps the cutout, strokes included, on both halves', async () => {
     const result = await editProject({
       project: project([{ ...video, cutout: { enabled: true, subject: 'person' } }]),
-      ops: [{ op: 'split', id: 'v1', frame: 20 } as EditOp],
+      ops: [
+        {
+          op: 'addCutoutStroke',
+          id: 'v1',
+          tool: 'eraser',
+          points: [
+            [0.4, 0.8],
+            [0.6, 0.82],
+          ],
+          at: 0.5,
+        } as EditOp,
+        { op: 'split', id: 'v1', frame: 20 } as EditOp,
+      ],
     })
     const halves = result.project.timeline!.items.filter((item) => item.type === 'video')
     expect(halves).toHaveLength(2)
-    for (const half of halves) expect((half as VideoItem).cutout?.subject).toBe('person')
+    for (const half of halves) {
+      const cutout = (half as VideoItem).cutout
+      expect(cutout?.subject).toBe('person')
+      // Strokes are in source time and source fractions, so both halves keep them as they are.
+      expect(cutout?.strokes?.map((stroke) => [stroke.tool, stroke.at])).toEqual([['eraser', 0.5]])
+    }
   })
 
   it('refuses other item types, unknown ids and bad values (nothing applied)', async () => {
