@@ -2019,6 +2019,49 @@ async function applySpeedAndPitch(
   }
 }
 
+/** A time-stretch source reading two channels as interleaved stereo. */
+function interleavedStereoSource(left: Float32Array, right: Float32Array) {
+  const samplesPerChannel = left.length
+  let inputFrame = 0
+  return {
+    extract: (target: Float32Array, numFrames: number): number => {
+      const frames = Math.min(numFrames, samplesPerChannel - inputFrame)
+      if (frames <= 0) return 0
+      for (let i = 0; i < frames; i++) {
+        target[i * 2] = left[inputFrame + i]!
+        target[i * 2 + 1] = right[inputFrame + i]!
+      }
+      inputFrame += frames
+      return frames
+    },
+  }
+}
+
+/**
+ * Pull stretched stereo samples from `filter` into `output` until `frameEnd`
+ * (or the filter runs dry). Returns the new write position.
+ */
+function pullStretchedSamples(
+  filter: { extract: (target: Float32Array, numFrames: number) => number },
+  chunk: Float32Array,
+  output: { left: Float32Array; right: Float32Array },
+  writtenSoFar: number,
+  frameEnd: number,
+): number {
+  let written = writtenSoFar
+  while (written < frameEnd) {
+    const extracted = filter.extract(chunk, Math.min(4096, frameEnd - written))
+    if (extracted === 0) break
+    const count = Math.min(extracted, frameEnd - written)
+    for (let i = 0; i < count; i++) {
+      output.left[written + i] = chunk[i * 2]!
+      output.right[written + i] = chunk[i * 2 + 1]!
+    }
+    written += count
+  }
+  return written
+}
+
 /** Source seconds a speed-ramped segment plays over its length (the curve's integral). */
 function speedRampSourceSeconds(segment: AudioSegment, fps: number): number {
   const integral = speedRampIntegral(segment.speedRamp!)
@@ -2050,39 +2093,17 @@ async function applySpeedRampAndPitch(
   st.rate = 1.0
   const left = channels[0]!
   const right = numChannels >= 2 ? channels[1]! : left
-  let inputFrame = 0
-  const source = {
-    extract: (target: Float32Array, numFrames: number): number => {
-      const frames = Math.min(numFrames, samplesPerChannel - inputFrame)
-      if (frames <= 0) return 0
-      for (let i = 0; i < frames; i++) {
-        target[i * 2] = left[inputFrame + i]!
-        target[i * 2 + 1] = right[inputFrame + i]!
-      }
-      inputFrame += frames
-      return frames
-    },
-  }
-  const filter = new timeStretch.TimeStretchFilter(source, st)
-  const outLeft = new Float32Array(outputLength)
-  const outRight = new Float32Array(outputLength)
+  const filter = new timeStretch.TimeStretchFilter(interleavedStereoSource(left, right), st)
+  const output = { left: new Float32Array(outputLength), right: new Float32Array(outputLength) }
   const chunk = new Float32Array(4096 * 2)
   let written = 0
   for (let frame = 0; frame < segment.durationFrames && written < outputLength; frame++) {
     const tempo = integral.at(frame + 1 - offset) - integral.at(frame - offset)
     st.tempo = Math.max(0.05, tempo)
     const frameEnd = Math.min(outputLength, Math.round(((frame + 1) / fps) * sampleRate))
-    while (written < frameEnd) {
-      const extracted = filter.extract(chunk, Math.min(4096, frameEnd - written))
-      if (extracted === 0) break
-      const count = Math.min(extracted, frameEnd - written)
-      for (let i = 0; i < count; i++) {
-        outLeft[written + i] = chunk[i * 2]!
-        outRight[written + i] = chunk[i * 2 + 1]!
-      }
-      written += count
-    }
+    written = pullStretchedSamples(filter, chunk, output, written, frameEnd)
   }
+  const { left: outLeft, right: outRight } = output
   log.debug('Speed ramp time-stretch complete', {
     inputLength: samplesPerChannel,
     outputLength,

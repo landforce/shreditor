@@ -164,21 +164,38 @@ export function normalizeSpeedRamp(keys) {
   return [...byFrame.values()].sort((a, b) => a.frame - b.frame)
 }
 
+function speedRampKeyFrameProblem(key, index, durationInFrames) {
+  if (!Number.isInteger(key.frame)) return `keys[${index}].frame must be a whole frame`
+  if (key.frame < 0 || key.frame > durationInFrames) {
+    return `keys[${index}].frame ${key.frame} is outside the clip (0..${durationInFrames})`
+  }
+  return null
+}
+
+function speedRampKeyValueProblem(key, index) {
+  if (!Number.isFinite(key.speed) || key.speed < MIN_SPEED || key.speed > MAX_SPEED) {
+    return `keys[${index}].speed ${key.speed} is outside ${MIN_SPEED}..${MAX_SPEED}`
+  }
+  if (key.easing !== undefined && !EASINGS.has(key.easing)) {
+    return `keys[${index}].easing "${key.easing}" is not one of ${[...EASINGS].join(', ')}`
+  }
+  return null
+}
+
+/** Why `keys[index]` can't be a ramp key on a clip this long, or null when it can. */
+function speedRampKeyProblem(key, index, durationInFrames) {
+  if (!key || typeof key !== 'object') return `keys[${index}] must be an object`
+  return (
+    speedRampKeyFrameProblem(key, index, durationInFrames) ?? speedRampKeyValueProblem(key, index)
+  )
+}
+
 /** Why these op keys can't be a ramp on a clip this long, or null when they can. */
 export function speedRampKeysProblem(keys, durationInFrames) {
   if (!Array.isArray(keys)) return 'keys must be an array'
   for (const [index, key] of keys.entries()) {
-    if (!key || typeof key !== 'object') return `keys[${index}] must be an object`
-    if (!Number.isInteger(key.frame)) return `keys[${index}].frame must be a whole frame`
-    if (key.frame < 0 || key.frame > durationInFrames) {
-      return `keys[${index}].frame ${key.frame} is outside the clip (0..${durationInFrames})`
-    }
-    if (!Number.isFinite(key.speed) || key.speed < MIN_SPEED || key.speed > MAX_SPEED) {
-      return `keys[${index}].speed ${key.speed} is outside ${MIN_SPEED}..${MAX_SPEED}`
-    }
-    if (key.easing !== undefined && !EASINGS.has(key.easing)) {
-      return `keys[${index}].easing "${key.easing}" is not one of ${[...EASINGS].join(', ')}`
-    }
+    const problem = speedRampKeyProblem(key, index, durationInFrames)
+    if (problem) return problem
   }
   const frames = keys.map((key) => key.frame)
   if (new Set(frames).size !== frames.length) return 'two keys share a frame'
@@ -273,6 +290,37 @@ function simpson(keys, a, b) {
   return (sum * h) / 3
 }
 
+/** The cell of the cumulative `table` whose span holds `target` (table[0] < target < table[cells]). */
+function bracketingCell(table, cells, target) {
+  let lo = 0
+  let hi = cells
+  while (hi - lo > 1) {
+    const mid = (lo + hi) >> 1
+    if (table[mid] <= target) lo = mid
+    else hi = mid
+  }
+  return lo
+}
+
+/**
+ * The frame in [frameStart, frameStart + 1] where `integral` reaches `target`: Newton from
+ * `guess` inside the frame, kept in the frame by bisection.
+ */
+function refineInverse(keys, integral, target, frameStart, guess) {
+  let low = frameStart
+  let high = low + 1
+  let f = guess
+  for (let i = 0; i < 24; i++) {
+    const error = integral(f) - target
+    if (Math.abs(error) < 1e-10) break
+    if (error > 0) high = f
+    else low = f
+    const step = f - error / speedAtFrame(keys, f)
+    f = step > low && step < high ? step : (low + high) / 2
+  }
+  return f
+}
+
 /**
  * The ramp's integral: `at(f)` is the area under the speed curve from local
  * frame 0 to f (speed x frames; negative for f < 0), `inverse(v)` the frame
@@ -305,26 +353,10 @@ export function speedRampIntegral(keys) {
     const target = value + zero
     if (target <= 0) return gridStart + target / headSpeed
     if (target >= table[cells]) return gridEnd + (target - table[cells]) / tailSpeed
-    let lo = 0
-    let hi = cells
-    while (hi - lo > 1) {
-      const mid = (lo + hi) >> 1
-      if (table[mid] <= target) lo = mid
-      else hi = mid
-    }
-    // Newton inside the frame, kept in the frame by bisection.
-    let low = gridStart + lo
-    let high = low + 1
-    let f = low + (target - table[lo]) / Math.max(1e-12, table[lo + 1] - table[lo])
-    for (let i = 0; i < 24; i++) {
-      const error = fromGridStart(f) - target
-      if (Math.abs(error) < 1e-10) break
-      if (error > 0) high = f
-      else low = f
-      const step = f - error / speedAtFrame(keys, f)
-      f = step > low && step < high ? step : (low + high) / 2
-    }
-    return f
+    const lo = bracketingCell(table, cells, target)
+    const low = gridStart + lo
+    const guess = low + (target - table[lo]) / Math.max(1e-12, table[lo + 1] - table[lo])
+    return refineInverse(keys, fromGridStart, target, low, guess)
   }
   const result = { at, inverse }
   integralCache.set(keys, result)
