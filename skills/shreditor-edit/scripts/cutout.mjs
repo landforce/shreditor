@@ -2,14 +2,48 @@
 //
 //   shred cutout <projectId|draftId> [<itemId>...] [--subject auto|person|object] [--off]
 //                [--wait] [--json]
+//   shred cutout <projectId|draftId> <itemId> --stroke '<tool>:x,y;x,y;...' --at <source seconds>
+//                [--size <radius>] [--clear-strokes] [--wait]
 //
 // With item ids it turns background removal on for those clips (one atomic
 // setCutout batch; --off turns it off) and starts the analysis on the agent
 // service. --wait polls until every cut-out clip's masks are stored, printing
 // progress. Without item ids it prints each cut-out clip's status (and with
-// --wait, analyses what is missing first).
+// --wait, analyses what is missing first). --stroke paints a correction on
+// source time --at (repeat it for several): tools brush, eraser, smartBrush and
+// smartEraser; points are fractions of the source frame; --size is the brush
+// radius as a fraction of its short side. --clear-strokes removes them first.
 
 const SUBJECTS = ['auto', 'person', 'object']
+const TOOLS = ['brush', 'eraser', 'smartBrush', 'smartEraser']
+
+/** `--stroke smartEraser:0.4,0.8;0.6,0.8` → an addCutoutStroke op (fields checked by the service). */
+export function parseStroke(text, { id, at, size }) {
+  const match = /^(\w+):(.+)$/.exec(text ?? '')
+  if (!match || !TOOLS.includes(match[1]))
+    throw new Error(`--stroke must be <tool>:x,y;x,y... with tool one of ${TOOLS.join(', ')}`)
+  const points = match[2].split(';').map((pair) => pair.split(',').map(Number))
+  if (points.some((p) => p.length !== 2 || p.some((v) => !Number.isFinite(v))))
+    throw new Error(`--stroke points must be x,y pairs (fractions of the source frame): ${text}`)
+  const seconds = Number(at)
+  if (at === undefined || !Number.isFinite(seconds)) throw new Error('--stroke needs --at <source seconds>')
+  return { op: 'addCutoutStroke', id, tool: match[1], points, at: seconds, ...(size ? { size: Number(size) } : {}) }
+}
+
+/** The ops for `shred cutout <id> <itemIds...>`: turn on (or off), then any stroke edits. */
+function cutoutOps(itemIds, opt) {
+  const ops = itemIds.map((itemId) => ({
+    op: 'setCutout',
+    id: itemId,
+    enabled: !opt.off,
+    ...(opt.subject ? { subject: opt.subject } : {}),
+  }))
+  for (const itemId of itemIds) {
+    if (opt['clear-strokes']) ops.push({ op: 'clearCutoutStrokes', id: itemId })
+    for (const text of opt.stroke ?? []) ops.push(parseStroke(text, { id: itemId, at: opt.at, size: opt.size }))
+  }
+  return ops
+}
 const POLL_MS = 1500
 
 function describe(item) {
@@ -18,7 +52,8 @@ function describe(item) {
   if (item.state === 'no-media') return `${item.itemId}  ${subject}  media missing`
   const model = item.model ? `  ${item.model}` : ''
   const edge = `${item.feather ? `  feather ${item.feather}px` : ''}${item.invert ? '  inverted' : ''}`
-  return `${item.itemId}  ${subject}${model}  ${item.rate}/s  ${item.done}/${item.needed} masks  ${item.state}${edge}${item.label ? `  "${item.label}"` : ''}`
+  const strokes = item.strokes ? `  ${item.strokes} strokes (${item.regionsTracked}/${item.regions} smart tracked)` : ''
+  return `${item.itemId}  ${subject}${model}  ${item.rate}/s  ${item.done}/${item.needed} masks  ${item.state}${edge}${strokes}${item.label ? `  "${item.label}"` : ''}`
 }
 
 function describeJob(job) {
@@ -27,6 +62,7 @@ function describeJob(job) {
     if (j.state === 'downloading')
       return `${j.mediaId}: downloading model ${Math.round(((j.received ?? 0) / Math.max(1, j.total ?? 1)) * 100)}%`
     if (j.state === 'analyzing') return `${j.mediaId}: analysing ${j.done}/${j.count}`
+    if (j.state === 'tracking') return `${j.mediaId}: tracking a smart stroke (${j.done} samples)`
     if (j.state === 'error') return `${j.mediaId}: failed: ${j.error}`
     return `${j.mediaId}: ${j.state}${j.backend ? ` (${j.backend})` : ''}`
   })
@@ -54,13 +90,7 @@ export async function cutoutCommand(args, deps) {
       if (!item) throw new Error(`No item ${itemId} in ${id}`)
       if (item.type !== 'video') throw new Error(`${itemId} is ${item.type}; background removal works on video clips`)
     }
-    const ops = itemIds.map((itemId) => ({
-      op: 'setCutout',
-      id: itemId,
-      enabled: !opt.off,
-      ...(opt.subject ? { subject: opt.subject } : {}),
-    }))
-    await applyBatch(id, ops, revision)
+    await applyBatch(id, cutoutOps(itemIds, opt), revision)
     if (opt.off) {
       say(`background removal off for ${itemIds.join(', ')}`)
       return

@@ -1,9 +1,17 @@
 import { describe, expect, it } from 'vite-plus/test'
 import type { TimelineItem } from '@/types/timeline'
 import { CUTOUT_MODELS } from '@/shared/cutout/cutout-core.mjs'
-import { planCutoutNeeds } from './cutout-plan'
+import { planCutoutNeeds, planCutoutRegions } from './cutout-plan'
 import { alphaCoverage, maskSize, smoothAlpha } from './cutout-temporal'
-import { refineBounds } from './cutout-compositor'
+import {
+  cutoutLayerBlend,
+  cutoutPrecision,
+  cutoutTextureFormat,
+  orderCutoutLayers,
+  refineBounds,
+  strokeChunks,
+} from './cutout-compositor'
+import type { CutoutLayer } from './cutout-masks'
 import { cutoutModelInputSize, normalizeModelAlpha, rgbaToModelInput } from './cutout-model'
 import type { CutoutMediaInfo } from './cutout-masks'
 
@@ -132,5 +140,109 @@ describe('compositing and model I/O', () => {
     expect([...normalizeModelAlpha([0.2, 0.4, 0.6], true)].map((v) => +v.toFixed(3))).toEqual([
       0, 0.5, 1,
     ])
+  })
+})
+
+describe('smart brush planning', () => {
+  const smart = { tool: 'smartEraser', at: 2, size: 0.05, points: [[0.5, 0.5]] }
+  it('tracks each smart stroke over the clips that carry it, plain strokes need nothing', () => {
+    const strokes = [smart, { ...smart, tool: 'brush' }]
+    const needs = planCutoutRegions(
+      [
+        clip('a', { cutout: { enabled: true, subject: 'auto', strokes } }),
+        clip('b', {
+          from: 60,
+          sourceStart: 120,
+          cutout: { enabled: true, subject: 'auto', strokes },
+        }),
+        clip('off', { cutout: { enabled: false, subject: 'auto', strokes } }),
+      ],
+      30,
+      () => info,
+    )
+    expect(needs).toHaveLength(1)
+    // a plays source 1..3 s (samples 9..31 padded), b 4..6 s (39..61): one range, painted at sample 20.
+    expect(needs[0]!.range).toEqual({ start: 20, first: 9, last: 61 })
+    expect(needs[0]!.stroke.tool).toBe('smartEraser')
+  })
+})
+
+describe('correction compositing', () => {
+  const bitmap = {} as ImageBitmap
+  const region = (erase: boolean): CutoutLayer => ({
+    kind: 'region',
+    erase,
+    a: bitmap,
+    b: bitmap,
+    t: 0,
+  })
+  const plain = (erase: boolean, x: number): CutoutLayer => ({
+    kind: 'stroke',
+    erase,
+    points: [[x, 0.5]],
+    size: 0.1,
+  })
+
+  it('composites smart-brush regions, then smart-eraser regions, then plain strokes as painted', () => {
+    const layers = [plain(true, 0.1), region(true), plain(false, 0.2), region(false)]
+    const order = orderCutoutLayers(layers)
+    expect(order.map((l) => `${l.kind}:${l.erase ? 'erase' : 'add'}`)).toEqual([
+      'region:add',
+      'region:erase',
+      'stroke:erase',
+      'stroke:add',
+    ])
+    expect(order[2]).toBe(layers[0])
+  })
+
+  it('adds with max and erases by multiplying by 1 - coverage', () => {
+    const gl = { MAX: 1, FUNC_ADD: 2, ONE: 3, ZERO: 4, SRC_COLOR: 5 } as unknown as Parameters<
+      typeof cutoutLayerBlend
+    >[0]
+    expect(cutoutLayerBlend(gl, false)).toEqual({ equation: 1, src: 3, dst: 3 })
+    expect(cutoutLayerBlend(gl, true)).toEqual({ equation: 2, src: 4, dst: 5 })
+  })
+
+  it('splits long strokes into overlapping chunks the shader takes', () => {
+    const points = Array.from({ length: 130 }, (_, i): [number, number] => [i / 130, 0])
+    const chunks = strokeChunks(points)
+    expect(chunks.map((c) => c.length)).toEqual([64, 64, 4])
+    expect(chunks[1]![0]).toEqual(chunks[0]![63])
+    expect(strokeChunks([[0, 0]])).toEqual([[[0, 0]]])
+  })
+})
+
+describe('HDR precision of the cutout pass', () => {
+  const gl = {
+    RGBA: 1,
+    RGBA8: 2,
+    RGBA16F: 3,
+    UNSIGNED_BYTE: 4,
+    HALF_FLOAT: 5,
+  } as unknown as Parameters<typeof cutoutTextureFormat>[0]
+  it('is half-float only for a float16 destination this WebGL2 can render', () => {
+    const can = { floatRenderable: true, floatDrawingBuffer: true }
+    expect(cutoutPrecision({ ...can, destinationColorType: 'float16' })).toBe('float16')
+    expect(cutoutPrecision({ ...can, destinationColorType: 'unorm8' })).toBe('unorm8')
+    expect(cutoutPrecision({ ...can, destinationColorType: undefined })).toBe('unorm8')
+    expect(
+      cutoutPrecision({
+        destinationColorType: 'float16',
+        floatRenderable: false,
+        floatDrawingBuffer: true,
+      }),
+    ).toBe('unorm8')
+    expect(
+      cutoutPrecision({
+        destinationColorType: 'float16',
+        floatRenderable: true,
+        floatDrawingBuffer: false,
+      }),
+    ).toBe('unorm8')
+  })
+
+  it('uploads RGBA16F half floats on the HDR path, RGBA8 bytes otherwise', () => {
+    expect(cutoutTextureFormat(gl, 'float16')).toEqual([3, 1, 5])
+    expect(cutoutTextureFormat(gl, 'unorm8')).toEqual([2, 1, 4])
   })
 })

@@ -12,11 +12,14 @@ import { planNativeExport } from './lib/native-plan.mjs'
 import { capabilities, editRequestSchema, validate } from './lib/contract.mjs'
 import { cutoutStorePath, ensureModelFile, modelForFileName } from './lib/cutout-store.mjs'
 import { cutoutStatus } from './lib/cutout-service.mjs'
-import { cutoutCommand } from '../skills/shreditor-edit/scripts/cutout.mjs'
+import { cutoutCommand, parseStroke } from '../skills/shreditor-edit/scripts/cutout.mjs'
+import { cutoutStrokeHash } from '../src/shared/cutout/cutout-strokes.mjs'
+import { CUTOUT_SAM_MODEL, samModelFileName } from '../src/shared/cutout/cutout-sam.mjs'
 import {
   CUTOUT_MODELS,
   cutoutAnalysisKey,
   cutoutModelFileName,
+  cutoutRegionKey,
   mediaFingerprint,
 } from '../src/shared/cutout/cutout-core.mjs'
 
@@ -122,7 +125,10 @@ test('the cutout store only serves cutout folders of media', () => {
   ]) {
     assert.throws(() => cutoutStorePath(ws, bad), /cutout store path/, bad)
   }
-  assert.deepEqual(modelForFileName(cutoutModelFileName(CUTOUT_MODELS.modnet, 'wasm')).model.id, 'modnet')
+  assert.equal(modelForFileName(cutoutModelFileName(CUTOUT_MODELS.modnet, 'wasm')).label, CUTOUT_MODELS.modnet.label)
+  const decoder = modelForFileName(samModelFileName('decoder', 'wasm'))
+  assert.match(decoder.url, /slimsam-77-uniform\/resolve\/5850ab45f587c112167512ffef949107115e26a0\//)
+  assert.equal(decoder.sha256, CUTOUT_SAM_MODEL.files.decoder.wasm.sha256)
   assert.equal(modelForFileName('evil.onnx'), null)
 })
 
@@ -130,23 +136,20 @@ test('models are cached once and refused when their SHA-256 does not match', asy
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cutout-models-'))
   const bytes = Buffer.from('not really a model')
   const sha256 = crypto.createHash('sha256').update(bytes).digest('hex')
-  const model = {
-    ...CUTOUT_MODELS.modnet,
-    files: { webgpu: { path: 'm.onnx', bytes: bytes.length, sha256 }, wasm: { path: 'm.onnx', bytes: bytes.length, sha256 } },
-  }
+  const download = { name: 'm-123.onnx', label: 'Test model', url: 'https://example.invalid/m.onnx', bytes: bytes.length, sha256 }
   let fetches = 0
   const fetchImpl = async () => {
     fetches++
     return new Response(bytes)
   }
-  const file = await ensureModelFile(dir, model, 'wasm', { fetchImpl })
+  const file = await ensureModelFile(dir, download, { fetchImpl })
   assert.deepEqual(fs.readFileSync(file), bytes)
-  await ensureModelFile(dir, model, 'wasm', { fetchImpl })
+  await ensureModelFile(dir, download, { fetchImpl })
   assert.equal(fetches, 1)
 
-  const tampered = { ...model, files: { ...model.files, webgpu: { path: 'x.onnx', bytes: 3, sha256: '0'.repeat(64) } } }
-  await assert.rejects(ensureModelFile(dir, tampered, 'webgpu', { fetchImpl }), /SHA-256 mismatch/)
-  assert.equal(fs.existsSync(path.join(dir, cutoutModelFileName(tampered, 'webgpu'))), false)
+  const tampered = { ...download, name: 'x.onnx', sha256: '0'.repeat(64) }
+  await assert.rejects(ensureModelFile(dir, tampered, { fetchImpl }), /SHA-256 mismatch/)
+  assert.equal(fs.existsSync(path.join(dir, 'x.onnx')), false)
   fs.rmSync(dir, { recursive: true, force: true })
 })
 
@@ -187,11 +190,57 @@ test('status says how much of each cut-out clip is analysed', () => {
       state: 'partial',
       feather: 3,
       invert: false,
+      strokes: 0,
+      regions: 0,
+      regionsTracked: 0,
     },
   )
   const full = workspaceWithAnalysis([[0, 30]])
   assert.equal(cutoutStatus(full.ws, full.project)[0].state, 'ready')
   for (const ws of [partial.ws, full.ws]) fs.rmSync(ws, { recursive: true, force: true })
+})
+
+test('a clip with smart strokes is ready once their regions are tracked over the clip', () => {
+  const { ws, project } = workspaceWithAnalysis([[0, 30]])
+  const smart = { tool: 'smartEraser', at: 1.5, size: 0.04, points: [[0.4, 0.8]] }
+  const brush = { tool: 'brush', at: 1.5, size: 0.04, points: [[0.5, 0.5]] }
+  project.timeline.items[0].cutout.strokes = [smart, brush]
+  const [pending] = cutoutStatus(ws, project)
+  assert.deepEqual([pending.state, pending.strokes, pending.regions, pending.regionsTracked], ['partial', 2, 1, 0])
+
+  const file = path.join(ws, 'media/m1/cache/cutout/index.json')
+  const index = JSON.parse(fs.readFileSync(file, 'utf8'))
+  const fingerprint = Object.keys(index.auto)[0]
+  const key = cutoutRegionKey({ fingerprint, rate: 10, hash: cutoutStrokeHash(smart) })
+  index.regions = { [key]: { key, done: [[9, 20]], covered: [[0, 30]], stats: {} } }
+  fs.writeFileSync(file, JSON.stringify(index))
+  const [tracked] = cutoutStatus(ws, project)
+  assert.deepEqual([tracked.state, tracked.regionsTracked], ['ready', 1])
+  fs.rmSync(ws, { recursive: true, force: true })
+})
+
+test('shred cutout --stroke paints corrections in the same batch', async () => {
+  const applied = []
+  await cutoutCommand(['p', 'c'], {
+    opt: { stroke: ['smartEraser:0.4,0.8;0.6,0.82'], at: '1.5', size: '0.05', 'clear-strokes': true },
+    say: () => {},
+    getProject: async () => ({ revision: 'r1', project: { timeline: { items: [{ id: 'c', type: 'video' }] } } }),
+    applyBatch: async (id, ops) => applied.push(...ops),
+    call: async () => ({ items: [] }),
+  })
+  assert.deepEqual(applied, [
+    { op: 'setCutout', id: 'c', enabled: true },
+    { op: 'clearCutoutStrokes', id: 'c' },
+    { op: 'addCutoutStroke', id: 'c', tool: 'smartEraser', points: [[0.4, 0.8], [0.6, 0.82]], at: 1.5, size: 0.05 },
+  ])
+  assert.throws(() => parseStroke('spray:0.1,0.1', { id: 'c', at: '1' }), /tool one of/)
+  assert.throws(() => parseStroke('brush:0.1', { id: 'c', at: '1' }), /x,y pairs/)
+  assert.throws(() => parseStroke('brush:0.1,0.2', { id: 'c' }), /--at/)
+  const op = parseStroke('brush:0.1,0.2', { id: 'c', at: '0' })
+  assert.equal(validate(editRequestSchema, { project: 'p', ops: [op] }).ops[0].tool, 'brush')
+  for (const bad of [{ ...op, points: [[1.5, 0.2]] }, { ...op, size: 0.9 }, { ...op, tool: 'spray' }]) {
+    assert.throws(() => validate(editRequestSchema, { project: 'p', ops: [bad] }))
+  }
 })
 
 test('shred cutout turns clips on in one batch, starts analysis and waits for it', async () => {

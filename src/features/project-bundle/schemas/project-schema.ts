@@ -467,13 +467,17 @@ const cutoutSchema = z
       .array(
         z
           .object({
-            mode: z.enum(['add', 'remove', 'smart']),
-            time: z.number().min(0),
-            radius: z.number().min(0).max(1),
-            points: z.array(z.object({ x: z.number(), y: z.number() }).strict()),
+            tool: z.enum(['brush', 'eraser', 'smartBrush', 'smartEraser']),
+            at: z.number().min(0),
+            size: z.number().gt(0).max(0.5),
+            points: z
+              .array(z.tuple([z.number().min(0).max(1), z.number().min(0).max(1)]))
+              .min(1)
+              .max(512),
           })
           .strict(),
       )
+      .max(64)
       .optional(),
   })
   .strict()

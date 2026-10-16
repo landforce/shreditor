@@ -54,11 +54,32 @@ export interface CutoutIndexEntry {
   updatedAt: number
 }
 
+/** A smart stroke's tracked region (masks under `key`, like an analysis). */
+export interface CutoutRegionEntry {
+  key: string
+  hash: string
+  tool: 'smartBrush' | 'smartEraser'
+  fingerprint: string
+  rate: number
+  /** The sample the stroke was painted on. */
+  start: number
+  maskWidth: number
+  maskHeight: number
+  /** Samples with a stored region mask. */
+  done: IndexRange[]
+  /** Samples tracking has been through (the region may be lost in some). */
+  covered: IndexRange[]
+  /** Per sample: [cx, cy, x0, y0, x1, y1, area] as frame fractions. */
+  stats: Record<string, number[]>
+  updatedAt: number
+}
+
 export interface CutoutIndex {
   version: number
   entries: Record<string, CutoutIndexEntry>
   /** Per media fingerprint: what subject 'auto' resolved to. */
   auto: Record<string, 'person' | 'object'>
+  regions: Record<string, CutoutRegionEntry>
 }
 
 export const CUTOUT_MASK_LONG_EDGE: number
@@ -113,6 +134,7 @@ export function mediaFingerprint(
     | undefined,
 ): string
 export function cutoutAnalysisKey(input: { fingerprint: string; model: string; rate: number }): string
+export function cutoutRegionKey(input: { fingerprint: string; rate: number; hash: string }): string
 export function cutoutDirSegments(mediaId: string): string[]
 export function cutoutSamplePath(key: string, index: number): string
 export function emptyCutoutIndex(): CutoutIndex

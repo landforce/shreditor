@@ -13,6 +13,7 @@ import path from 'node:path'
 import {
   CUTOUT_INDEX_FILE,
   cutoutCoverage,
+  cutoutRegionKey,
   cutoutDirSegments,
   findCutoutEntry,
   isCutoutActive,
@@ -23,6 +24,12 @@ import {
   resolveCutoutRate,
   sampleRangeFor,
 } from '../../src/shared/cutout/cutout-core.mjs'
+import {
+  cutoutStrokeHash,
+  isSmartStroke,
+  regionCovers,
+  regionTrackRange,
+} from '../../src/shared/cutout/cutout-strokes.mjs'
 import { loadProjectById, readMediaMetadata } from './workspace.mjs'
 import { HttpError, readJsonBody } from './http-security.mjs'
 import { resolveProjectMedia } from './render-core.mjs'
@@ -37,6 +44,17 @@ function readIndex(workspace, mediaId) {
   }
 }
 
+/** How many of a clip's smart strokes have their region tracked over everything the clip plays. */
+function regionStatus(index, item, { fingerprint, rate, padded, max }) {
+  const smart = (item.cutout.strokes ?? []).filter(isSmartStroke)
+  const tracked = smart.filter((stroke) => {
+    const key = cutoutRegionKey({ fingerprint, rate, hash: cutoutStrokeHash(stroke) })
+    const range = regionTrackRange(stroke, rate, padded, max)
+    return regionCovers(index.regions[key], range.first, range.last)
+  })
+  return { strokes: item.cutout.strokes?.length ?? 0, regions: smart.length, regionsTracked: tracked.length }
+}
+
 /** One cut-out clip's status against what its media has stored. */
 // Node side, covered by headless/cutout.test.mjs (node --test coverage is not measured)
 // fallow-ignore-next-line complexity
@@ -46,10 +64,13 @@ function itemStatus(workspace, item, fps) {
   const fingerprint = mediaFingerprint(meta)
   const rate = resolveCutoutRate(item.cutout.sampleRate, meta.fps)
   const range = itemSourceRange(item, fps)
-  const padded = range && sampleRangeFor(range, rate, maxSampleIndex(meta.duration, rate))
-  const found = findCutoutEntry(readIndex(workspace, item.mediaId), { fingerprint, subject: item.cutout.subject, rate })
+  const max = maxSampleIndex(meta.duration, rate)
+  const padded = range && sampleRangeFor(range, rate, max)
+  const index = readIndex(workspace, item.mediaId)
+  const found = findCutoutEntry(index, { fingerprint, subject: item.cutout.subject, rate })
   const { needed, done } = cutoutCoverage(padded ? [padded] : [], found.entry)
-  const ready = needed > 0 && done >= needed
+  const regions = regionStatus(index, item, { fingerprint, rate, padded, max })
+  const ready = needed > 0 && done >= needed && regions.regionsTracked === regions.regions
   return {
     itemId: item.id,
     label: item.label,
@@ -63,6 +84,7 @@ function itemStatus(workspace, item, fps) {
     state: ready ? 'ready' : done > 0 ? 'partial' : 'none',
     feather: item.cutout.feather ?? 0,
     invert: Boolean(item.cutout.invert),
+    ...regions,
   }
 }
 

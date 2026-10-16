@@ -24,6 +24,7 @@ import {
   cutoutModelFileName,
   cutoutModelUrl,
 } from '../../src/shared/cutout/cutout-core.mjs'
+import { CUTOUT_SAM_MODEL, samModelFile, samModelFileName, samModelUrl } from '../../src/shared/cutout/cutout-sam.mjs'
 import { HttpError, sendHttpError, serveFile, setHttpTimeouts } from './http-security.mjs'
 
 const STORE_PATH = /^media\/[A-Za-z0-9][A-Za-z0-9_-]{0,63}\/cache\/cutout\/[A-Za-z0-9_.-]+(\/[A-Za-z0-9_.-]+)?$/
@@ -45,14 +46,25 @@ export function cutoutStorePath(workspace, rel) {
   return path.join(workspace, ...rel.split('/'))
 }
 
-/** The model file a cache file name stands for: { model, backend } or null. */
-export function modelForFileName(name) {
+/** Every downloadable cutout model file: { name, label, url, bytes, sha256 }. */
+function cutoutDownloads() {
+  const out = []
   for (const model of Object.values(CUTOUT_MODELS)) {
     for (const backend of ['webgpu', 'wasm']) {
-      if (cutoutModelFileName(model, backend) === name) return { model, backend }
+      const { bytes, sha256 } = model.files[backend]
+      out.push({ name: cutoutModelFileName(model, backend), label: model.label, url: cutoutModelUrl(model, backend), bytes, sha256 })
     }
   }
-  return null
+  for (const [part, backend] of [['encoder', 'webgpu'], ['encoder', 'wasm'], ['decoder', 'wasm']]) {
+    const { bytes, sha256 } = samModelFile(part, backend)
+    out.push({ name: samModelFileName(part, backend), label: `${CUTOUT_SAM_MODEL.label} ${part}`, url: samModelUrl(part, backend), bytes, sha256 })
+  }
+  return out
+}
+
+/** The model file a cache file name stands for, or null. */
+export function modelForFileName(name) {
+  return cutoutDownloads().find((file) => file.name === name) ?? null
 }
 
 async function readBody(req) {
@@ -85,13 +97,12 @@ async function sha256File(file) {
  */
 // Exercised by headless/cutout.test.mjs (fake fetch) and headless/cutout-e2e.mjs (real download)
 // fallow-ignore-next-line complexity
-export async function ensureModelFile(dir, model, backend, { fetchImpl = fetch, log = () => {} } = {}) {
-  const expected = model.files[backend].sha256
-  const file = path.join(dir, cutoutModelFileName(model, backend))
+export async function ensureModelFile(dir, download, { fetchImpl = fetch, log = () => {} } = {}) {
+  const { name, label, url, bytes, sha256: expected } = download
+  const file = path.join(dir, name)
   if (fs.existsSync(file)) return file
   fs.mkdirSync(dir, { recursive: true })
-  const url = cutoutModelUrl(model, backend)
-  log(`cutout: downloading ${model.label} (${(model.files[backend].bytes / 1e6).toFixed(0)} MB) from ${url}`)
+  log(`cutout: downloading ${label} (${(bytes / 1e6).toFixed(0)} MB) from ${url}`)
   const res = await fetchImpl(url)
   if (!res.ok || !res.body) throw new Error(`model download failed: HTTP ${res.status} ${url}`)
   const tmp = `${file}.${process.pid}.download`
@@ -102,10 +113,10 @@ export async function ensureModelFile(dir, model, backend, { fetchImpl = fetch, 
   const actual = hash.digest('hex')
   if (actual !== expected) {
     fs.rmSync(tmp, { force: true })
-    throw new Error(`${model.label}: SHA-256 mismatch (got ${actual}, expected ${expected})`)
+    throw new Error(`${label}: SHA-256 mismatch (got ${actual}, expected ${expected})`)
   }
   fs.renameSync(tmp, file)
-  log(`cutout: ${model.label} verified (sha256 ${expected.slice(0, 12)}…)`)
+  log(`cutout: ${label} verified (sha256 ${expected.slice(0, 12)}…)`)
   return file
 }
 
@@ -124,13 +135,13 @@ export async function createCutoutStore({ workspace, log = () => {}, fetchImpl }
     if (!found) throw new HttpError(404, 'NOT_FOUND', 'unknown model')
     if (!downloads.has(name)) {
       const job = (async () => {
-        const file = await ensureModelFile(modelDir, found.model, found.backend, { fetchImpl, log })
+        const file = await ensureModelFile(modelDir, found, { fetchImpl, log })
         // A file left by an earlier run is checked once per service start.
         if (!verified.has(name)) {
           const actual = await sha256File(file)
-          if (actual !== found.model.files[found.backend].sha256) {
+          if (actual !== found.sha256) {
             fs.rmSync(file, { force: true })
-            throw new Error(`${found.model.label}: cached file failed its SHA-256 check; removed`)
+            throw new Error(`${found.label}: cached file failed its SHA-256 check; removed`)
           }
           verified.add(name)
         }

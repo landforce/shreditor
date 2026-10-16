@@ -30,13 +30,37 @@
         "none": "尚未分析",
         "error": "失败：{{error}}",
         "noMedia": "剪辑的媒体不在媒体库中"
+      },
+      "paint": {
+        "painting": "涂抹",
+        "paintingHint": "在预览上涂抹来修正遮罩。涂抹时被移除的区域会变暗显示。",
+        "tool": "画笔工具",
+        "tools": {
+          "smartBrush": "智能画笔",
+          "smartEraser": "智能橡皮擦",
+          "brush": "画笔",
+          "eraser": "橡皮擦"
+        },
+        "size": "大小",
+        "hint": "智能工具会选中你涂过的区域，并在整个片段中跟踪它。画笔和橡皮擦若画在某个智能区域内，会随它移动；否则在每一帧的同一位置生效。",
+        "tracking": "正在跟踪区域 {{done}}/{{count}}",
+        "strokes": "笔画：{{count}}",
+        "clear": "清除笔画",
+        "fixMask": "修正遮罩…",
+        "overlay": {
+          "smartBrush": "智能画笔：涂抹要保留的部分",
+          "smartEraser": "智能橡皮擦：涂抹要移除的部分",
+          "brush": "画笔：涂抹以保留",
+          "eraser": "橡皮擦：涂抹以移除"
+        }
       }
     }
   },
   "settings": {
     "models": {
       "cutoutModnet": "Remove background (people). Xenova/modnet ONNX, downloaded on first use, SHA-256 checked.",
-      "cutoutU2net": "Remove background (objects). BritishWerewolf/U-2-Net ONNX, downloaded on first use, SHA-256 checked."
+      "cutoutU2net": "Remove background (objects). BritishWerewolf/U-2-Net ONNX, downloaded on first use, SHA-256 checked.",
+      "cutoutSlimsam": "Smart brush for Remove background. Xenova/slimsam-77-uniform ONNX (encoder and decoder), downloaded on first use, SHA-256 checked."
     }
   }
 }

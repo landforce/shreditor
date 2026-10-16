@@ -30,13 +30,37 @@
         "none": "Not analysed yet",
         "error": "Failed: {{error}}",
         "noMedia": "The clip's media is not in the library"
+      },
+      "paint": {
+        "painting": "Painting",
+        "paintingHint": "Paint on the preview to fix the mask. The removed area shows dimmed while you paint.",
+        "tool": "Brush tool",
+        "tools": {
+          "smartBrush": "Smart brush",
+          "smartEraser": "Smart eraser",
+          "brush": "Brush",
+          "eraser": "Eraser"
+        },
+        "size": "Size",
+        "hint": "Smart tools keep the region you paint over and follow it through the clip. Brush and eraser move with a smart region they are painted inside; anywhere else they apply at the same spot on every frame.",
+        "tracking": "Tracking region {{done}}/{{count}}",
+        "strokes": "Strokes: {{count}}",
+        "clear": "Clear strokes",
+        "fixMask": "Fix mask…",
+        "overlay": {
+          "smartBrush": "Smart brush: paint over what to keep",
+          "smartEraser": "Smart eraser: paint over what to remove",
+          "brush": "Brush: paint to keep",
+          "eraser": "Eraser: paint to remove"
+        }
       }
     }
   },
   "settings": {
     "models": {
       "cutoutModnet": "Remove background (people). Xenova/modnet ONNX, downloaded on first use, SHA-256 checked.",
-      "cutoutU2net": "Remove background (objects). BritishWerewolf/U-2-Net ONNX, downloaded on first use, SHA-256 checked."
+      "cutoutU2net": "Remove background (objects). BritishWerewolf/U-2-Net ONNX, downloaded on first use, SHA-256 checked.",
+      "cutoutSlimsam": "Smart brush for Remove background. Xenova/slimsam-77-uniform ONNX (encoder and decoder), downloaded on first use, SHA-256 checked."
     }
   }
 }

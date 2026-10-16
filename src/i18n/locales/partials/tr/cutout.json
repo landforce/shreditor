@@ -30,13 +30,37 @@
         "none": "Henüz analiz edilmedi",
         "error": "Başarısız: {{error}}",
         "noMedia": "Klibin medyası kitaplıkta yok"
+      },
+      "paint": {
+        "painting": "Boyama",
+        "paintingHint": "Maskeyi düzeltmek için önizlemede boyayın. Boyarken kaldırılan alan karartılmış görünür.",
+        "tool": "Fırça aracı",
+        "tools": {
+          "smartBrush": "Akıllı fırça",
+          "smartEraser": "Akıllı silgi",
+          "brush": "Fırça",
+          "eraser": "Silgi"
+        },
+        "size": "Boyut",
+        "hint": "Akıllı araçlar boyadığınız bölgeyi alır ve klip boyunca izler. Fırça ve silgi, içine boyandıkları akıllı bölgeyle birlikte hareket eder; başka yerlerde her karede aynı noktaya uygulanır.",
+        "tracking": "Bölge izleniyor {{done}}/{{count}}",
+        "strokes": "Darbeler: {{count}}",
+        "clear": "Darbeleri temizle",
+        "fixMask": "Maskeyi düzelt…",
+        "overlay": {
+          "smartBrush": "Akıllı fırça: kalacak yeri boyayın",
+          "smartEraser": "Akıllı silgi: gidecek yeri boyayın",
+          "brush": "Fırça: kalacak yeri boyayın",
+          "eraser": "Silgi: gidecek yeri boyayın"
+        }
       }
     }
   },
   "settings": {
     "models": {
       "cutoutModnet": "Remove background (people). Xenova/modnet ONNX, downloaded on first use, SHA-256 checked.",
-      "cutoutU2net": "Remove background (objects). BritishWerewolf/U-2-Net ONNX, downloaded on first use, SHA-256 checked."
+      "cutoutU2net": "Remove background (objects). BritishWerewolf/U-2-Net ONNX, downloaded on first use, SHA-256 checked.",
+      "cutoutSlimsam": "Smart brush for Remove background. Xenova/slimsam-77-uniform ONNX (encoder and decoder), downloaded on first use, SHA-256 checked."
     }
   }
 }

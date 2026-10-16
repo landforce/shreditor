@@ -119,6 +119,52 @@ describe('setCutout', () => {
   })
 })
 
+describe('addCutoutStroke / clearCutoutStrokes', () => {
+  const stroke = {
+    op: 'addCutoutStroke',
+    id: 'v1',
+    tool: 'smartEraser',
+    points: [
+      [0.4, 0.8],
+      [0.6, 0.82],
+    ],
+    at: 1.5,
+  }
+
+  it('adds strokes in order (a new cutout starts on) and clears them in one op', async () => {
+    const one = await editProject({ project: project(), ops: [stroke as EditOp] })
+    expect(itemOf(one, 'v1').cutout).toEqual({
+      enabled: true,
+      subject: 'auto',
+      strokes: [{ tool: 'smartEraser', at: 1.5, size: 0.03, points: stroke.points }],
+    })
+    const two = await editProject({
+      project: one.project,
+      ops: [{ ...stroke, tool: 'brush', size: 0.1, points: [[0.5, 0.5]] } as EditOp],
+    })
+    expect(itemOf(two, 'v1').cutout?.strokes?.map((s) => s.tool)).toEqual(['smartEraser', 'brush'])
+    expect(two.results[0]?.detail).toMatchObject({ id: 'v1' })
+
+    const cleared = await editProject({
+      project: two.project,
+      ops: [{ op: 'clearCutoutStrokes', id: 'v1' } as EditOp],
+    })
+    expect(itemOf(cleared, 'v1').cutout).toEqual({ enabled: true, subject: 'auto' })
+  })
+
+  it('refuses bad strokes (nothing applied)', async () => {
+    await expect(
+      editProject({ project: project(), ops: [{ ...stroke, tool: 'spray' } as EditOp] }),
+    ).rejects.toThrow(/strokes\[0\]\.tool/)
+    await expect(
+      editProject({ project: project(), ops: [{ ...stroke, points: [[2, 0.5]] } as EditOp] }),
+    ).rejects.toThrow(/strokes\[0\]\.points/)
+    await expect(
+      editProject({ project: project(), ops: [{ ...stroke, size: 0.9 } as EditOp] }),
+    ).rejects.toThrow(/strokes\[0\]\.size/)
+  })
+})
+
 describe('cutout in the project schema', () => {
   it('validates the cutout field on items', () => {
     expect(
@@ -136,5 +182,15 @@ describe('cutout in the project schema', () => {
     expect(
       timelineItemProblem({ ...video, cutout: { enabled: true, subject: 'auto', refine: 2 } }),
     ).toMatch(/^cutout\.refine/)
+    const strokes = [{ tool: 'brush', at: 0, size: 0.05, points: [[0.5, 0.5]] }]
+    expect(
+      timelineItemProblem({ ...video, cutout: { enabled: true, subject: 'auto', strokes } }),
+    ).toBeNull()
+    expect(
+      timelineItemProblem({
+        ...video,
+        cutout: { enabled: true, subject: 'auto', strokes: [{ ...strokes[0], mode: 'add' }] },
+      }),
+    ).toMatch(/^cutout\.strokes/)
   })
 })

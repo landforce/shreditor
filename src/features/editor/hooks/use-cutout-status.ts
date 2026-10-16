@@ -12,6 +12,7 @@ import {
   isCutoutActive,
   mergeCutoutSettings,
 } from '@/shared/cutout/cutout-core.mjs'
+import { withoutCutoutStrokes } from '@/shared/cutout/cutout-strokes.mjs'
 import {
   cancelCutoutJob,
   cutoutJobId,
@@ -175,6 +176,16 @@ export function setClipCutout(
       updateItem(item.id, {
         cutout: mergeCutoutSettings(item.cutout, patch),
       } as Partial<TimelineItem>)
+    }
+  })
+}
+
+/** Remove every brush stroke from clips, in one undo step. */
+export function clearClipCutoutStrokes(items: readonly VideoItem[]): void {
+  const { updateItem } = useTimelineStore.getState()
+  executeTimelineCommand('CLEAR_CUTOUT_STROKES', () => {
+    for (const item of items) {
+      updateItem(item.id, { cutout: withoutCutoutStrokes(item.cutout) } as Partial<TimelineItem>)
     }
   })
 }

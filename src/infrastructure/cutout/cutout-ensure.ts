@@ -12,10 +12,16 @@ import {
   type CutoutJobStatus,
 } from './cutout-analysis'
 import { getCutoutMediaInfo } from './cutout-masks'
-import { planCutoutNeeds } from './cutout-plan'
+import { planCutoutNeeds, planCutoutRegions } from './cutout-plan'
 import { getCutoutStore, readCutoutIndex } from './cutout-store'
-import { cutoutCoverage, findCutoutEntry } from '@/shared/cutout/cutout-core.mjs'
-import type { CutoutNeed } from './cutout-plan'
+import { cutoutCoverage, cutoutRegionKey, findCutoutEntry } from '@/shared/cutout/cutout-core.mjs'
+import { regionCovers } from '@/shared/cutout/cutout-strokes.mjs'
+import type { CutoutNeed, CutoutRegionNeed } from './cutout-plan'
+import {
+  getCutoutRegionJobs,
+  requestCutoutRegion,
+  subscribeCutoutRegionJobs,
+} from './cutout-regions'
 
 export type CutoutSourceResolver = (mediaId: string) => Promise<{ blob?: Blob; url?: string }>
 
@@ -37,16 +43,70 @@ async function isCovered(need: CutoutNeed): Promise<boolean> {
   return cutoutCoverage(need.need, found.entry).missing.length === 0
 }
 
+type ProgressReporter = (fraction: number, message: string) => void
+
+/** Whether a smart stroke's region is tracked over everything it needs. */
+async function isRegionTracked(need: CutoutRegionNeed): Promise<boolean> {
+  const index = await readCutoutIndex(need.mediaId)
+  const key = cutoutRegionKey({
+    fingerprint: need.info.fingerprint,
+    rate: need.rate,
+    hash: need.hash,
+  })
+  return regionCovers(index.regions[key], need.range.first, need.range.last)
+}
+
+/** Track the smart strokes' regions the clips need and are missing. */
+async function ensureCutoutRegions(
+  items: readonly TimelineItem[],
+  fps: number,
+  resolveSource: CutoutSourceResolver,
+  onProgress?: ProgressReporter,
+): Promise<void> {
+  const planned = planCutoutRegions(items, fps, getCutoutMediaInfo)
+  const tracked = await Promise.all(planned.map(isRegionTracked))
+  const needs = planned.filter((_, i) => !tracked[i])
+  if (needs.length === 0) return
+  const unsubscribe = subscribeCutoutRegionJobs(() => {
+    const mine = getCutoutRegionJobs().filter((job) => needs.some((n) => job.hash === n.hash))
+    const done = mine.filter((job) => job.state === 'done').length
+    onProgress?.(done / needs.length, `Tracking brush strokes ${done}/${needs.length}`)
+  })
+  try {
+    const results = await Promise.all(
+      needs.map((need) =>
+        requestCutoutRegion({ ...need, source: () => resolveSource(need.mediaId) }),
+      ),
+    )
+    const failed = results.find((job) => job.state === 'error')
+    if (failed) throw new Error(`Smart brush tracking failed: ${failed.error ?? 'unknown error'}`)
+  } finally {
+    unsubscribe()
+  }
+}
+
+/**
+ * Analyse whatever the clips still need: the auto masks (only around `frames`
+ * when given), then the regions of their smart strokes.
+ */
 export async function ensureCutoutMasks(
   items: readonly TimelineItem[],
   fps: number,
   resolveSource: CutoutSourceResolver,
-  options: {
-    frames?: number[]
-    onProgress?: (fraction: number, message: string) => void
-  } = {},
+  options: { frames?: number[]; onProgress?: ProgressReporter } = {},
 ): Promise<CutoutJobStatus[]> {
   if (!getCutoutStore()) return []
+  const jobs = await ensureAutoMasks(items, fps, resolveSource, options)
+  await ensureCutoutRegions(items, fps, resolveSource, options.onProgress)
+  return jobs
+}
+
+async function ensureAutoMasks(
+  items: readonly TimelineItem[],
+  fps: number,
+  resolveSource: CutoutSourceResolver,
+  options: { frames?: number[]; onProgress?: ProgressReporter },
+): Promise<CutoutJobStatus[]> {
   const planned = planCutoutNeeds(items, fps, getCutoutMediaInfo, options.frames)
   const needs = (
     await Promise.all(planned.map(async (need) => ((await isCovered(need)) ? null : need)))
