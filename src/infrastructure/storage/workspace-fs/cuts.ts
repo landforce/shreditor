@@ -7,7 +7,7 @@
 
 import {
   cutGroupOf,
-  cutLabelOf,
+  cutSummaryOf,
   cutsInGroup,
   isMainCut,
   projectAspect,
@@ -124,11 +124,8 @@ export async function listCutGroup(projectId: string): Promise<CutGroup | null> 
   const cuts = await Promise.all(
     members.map(
       async (member): Promise<CutSummary> => ({
-        id: member.id,
+        ...cutSummaryOf(member),
         name: member.name,
-        label: cutLabelOf(member),
-        main: isMainCut(member),
-        order: isMainCut(member) ? 0 : (member.cut?.order ?? 0),
         width: member.metadata.width,
         height: member.metadata.height,
         aspect: projectAspect(member),

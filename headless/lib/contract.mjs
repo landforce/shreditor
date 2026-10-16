@@ -437,13 +437,15 @@ const projectKit = z
   .object({ path: z.string().min(1), kitVersion: z.string().min(1), hash: z.string().min(1) })
   .passthrough()
 
-// A project's place in a cut group (docs/cuts.md): the group's main project
-// id, the cut's label and its order in the switcher.
+// A project's place in a cut group (docs/cuts.md): the group id (the first
+// main cut's project id), the cut's label, its order in the switcher and,
+// after "Make main", whether it is Main.
 const projectCut = z
   .object({
     group: portableIdSchema,
     label: z.string().trim().min(1).max(60),
     order: z.number().int().min(0).max(10_000).optional(),
+    main: z.boolean().optional(),
   })
   .strict()
 

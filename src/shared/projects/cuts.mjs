@@ -18,13 +18,71 @@ export const CUT_ASPECT_PRESETS = Object.freeze(['9:16', '16:9', '1:1', '4:5'])
 /** A project's group id: `cut.group`, else its own id (a lone project is its own Main). */
 export const cutGroupOf = (project) => project?.cut?.group ?? project?.id
 
-/** True for the group's main cut: the project whose id is the group id. */
-export const isMainCut = (project) => cutGroupOf(project) === project?.id
+/**
+ * True for the group's main cut: `cut.main` when it is set (after "Make
+ * main"), else the project whose id is the group id (docs/cuts.md).
+ */
+export const isMainCut = (project) =>
+  typeof project?.cut?.main === 'boolean' ? project.cut.main : cutGroupOf(project) === project?.id
 
 export const cutLabelOf = (project) => project?.cut?.label ?? MAIN_CUT_LABEL
 
 const cutOrderOf = (project) =>
   isMainCut(project) ? 0 : Number.isFinite(project?.cut?.order) ? project.cut.order : 1e9
+
+/**
+ * A cut record to write: `main` is stored only when it differs from the
+ * default (the project whose id is the group id is Main), so groups that
+ * never had "Make main" keep their old records.
+ */
+export function cutRecord({ id, group, label, order, main }) {
+  return {
+    group,
+    label,
+    ...(Number.isFinite(order) ? { order } : {}),
+    ...(main !== (id === group) ? { main } : {}),
+  }
+}
+
+/** A member's cut as the switcher, the Manage dialog and `shred cut` see it. */
+export const cutSummaryOf = (project) => ({
+  id: project.id,
+  label: cutLabelOf(project),
+  main: isMainCut(project),
+  order: isMainCut(project) ? 0 : (project.cut?.order ?? 0),
+})
+
+/**
+ * The writes that make `cutId` its group's Main (docs/cuts.md, Making another
+ * cut Main): the group id stays; the cut becomes Main (order 0, the group's
+ * name) and the old Main takes its place in the order and a "<group> · <label>"
+ * name. Promotion first, so a failed second write never leaves a group with
+ * no Main. Only these two projects change. `members` are the group's cut
+ * summaries (`cutSummaryOf`).
+ */
+export function makeMainUpdates(members, cutId, group, groupName) {
+  const next = members.find((member) => member.id === cutId)
+  if (!next) throw new Error(`${cutId} is not a cut of group ${group}`)
+  if (next.main) return []
+  const writes = [
+    {
+      id: next.id,
+      updates: {
+        cut: cutRecord({ id: next.id, group, label: next.label, order: 0, main: true }),
+        name: groupName,
+      },
+    },
+  ]
+  for (const old of members.filter((member) => member.main))
+    writes.push({
+      id: old.id,
+      updates: {
+        cut: cutRecord({ id: old.id, group, label: old.label, order: next.order || 1, main: false }),
+        name: cutProjectName(groupName, old.label),
+      },
+    })
+  return writes
+}
 
 /** Why a label can't be used, or null. */
 export function cutLabelError(label) {
@@ -59,6 +117,13 @@ export function cutProjectName(groupName, label) {
   const suffix = ` · ${label.trim()}`
   return `${String(groupName).slice(0, Math.max(1, 100 - suffix.length))}${suffix}`
 }
+
+/**
+ * The file name of one cut's export among all cuts: "<project> - <cut label>"
+ * (slashes and dots, which a file name would split on, become dashes).
+ */
+export const cutExportFileName = (groupName, label) =>
+  `${groupName} - ${label}`.replace(/[/\\.]+/g, '-')
 
 /** The group's name from its main project (else a cut's name without its " · label"). */
 export function cutGroupName(main, source) {

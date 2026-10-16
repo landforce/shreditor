@@ -26,6 +26,7 @@ import {
   cutLabelOf,
   cutProjectName,
   cutsInGroup,
+  isMainCut,
   nextCutOrder,
   portableTextOverrides,
   projectAspect,
@@ -118,7 +119,7 @@ export async function createCut(
   const wanted = label.trim()
   if (members.some((m) => cutLabelOf(m).toLowerCase() === wanted.toLowerCase()))
     throw new CutLabelTakenError(wanted)
-  const main = members.find((m) => m.id === groupId) ?? null
+  const main = members.find((m) => isMainCut(m)) ?? null
 
   const from = { width: source.metadata.width, height: source.metadata.height }
   const to = aspect ? cutCanvasForAspect(aspect, from) : from

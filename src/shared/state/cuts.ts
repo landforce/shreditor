@@ -15,6 +15,10 @@ interface CutsState {
   seenPasses: Record<string, number>
   /** Cuts (other than the open one) with a pass newer than this editor has seen. */
   fresh: string[]
+  /** A sibling cut the agent just published to: the switcher goes there. */
+  follow: CutPublish | null
+  /** Publishes up to this time (ms) are old news: the load, then the last one followed. */
+  followAfter: number
   load: (projectId: string | null) => Promise<void>
   refresh: () => Promise<void>
   poll: () => Promise<void>
@@ -30,9 +34,18 @@ export const useCutsStore = create<CutsState>()((set, get) => ({
   group: null,
   seenPasses: {},
   fresh: [],
+  follow: null,
+  followAfter: 0,
 
   load: async (projectId) => {
-    set({ projectId, group: null, seenPasses: {}, fresh: [] })
+    set({
+      projectId,
+      group: null,
+      seenPasses: {},
+      fresh: [],
+      follow: null,
+      followAfter: Date.now(),
+    })
     if (projectId) await get().refresh()
   },
 
@@ -62,6 +75,36 @@ export const useCutsStore = create<CutsState>()((set, get) => ({
     }
   },
 }))
+
+/** A pass the agent published into a cut (server/agent-activity.mjs, latestPublish). */
+export interface CutPublish {
+  projectId: string
+  label: string | null
+  endedAt: string
+}
+
+const isCutPublish = (value: unknown): value is CutPublish =>
+  typeof (value as CutPublish | null)?.projectId === 'string' &&
+  typeof (value as CutPublish).endedAt === 'string'
+
+/** The open cut's siblings, for the editor-state heartbeat (`cuts`). */
+export function siblingCutIds(): string[] {
+  const { group, projectId } = useCutsStore.getState()
+  return (group?.cuts ?? []).map((cut) => cut.id).filter((id) => id !== projectId)
+}
+
+/**
+ * The heartbeat reply's `cutPublish`: a publish into a sibling cut newer than
+ * the editor's load (or the last one it followed) becomes `follow`, and the
+ * cut switcher switches to it (docs/cuts.md, Seeing cuts).
+ */
+export function receiveCutPublish(value: unknown): void {
+  if (!isCutPublish(value)) return
+  const at = Date.parse(value.endedAt)
+  if (!siblingCutIds().includes(value.projectId) || !(at > useCutsStore.getState().followAfter))
+    return
+  useCutsStore.setState({ follow: value, followAfter: at })
+}
 
 /** Load the open project's cuts; re-read them on focus and poll for new passes. */
 export function useCutsSync(projectId: string): void {

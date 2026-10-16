@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ArrowDown, ArrowUp, Trash2 } from 'lucide-react'
+import { ArrowDown, ArrowUp, Crown, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import {
   AlertDialog,
@@ -25,7 +25,7 @@ import type { CutGroup, CutSummary } from '@/infrastructure/storage'
 import { cutLabelError } from '@/shared/projects/cuts.mjs'
 import { createLogger } from '@/shared/logging/logger'
 import { useCutsStore } from '@/shared/state/cuts'
-import { moveCut, removeCut, renameCut } from './cut-actions'
+import { makeMainCut, moveCut, removeCut, renameCut } from './cut-actions'
 
 const logger = createLogger('ManageCutsDialog')
 
@@ -34,6 +34,34 @@ interface ManageCutsDialogProps {
   onOpenChange: (open: boolean) => void
   projectId: string
   group: CutGroup
+}
+
+/** Make main: the crown is filled on the main cut and makes any other cut Main. */
+function MakeMainButton({
+  cut,
+  group,
+  run,
+}: {
+  cut: CutSummary
+  group: CutGroup
+  run: (work: () => Promise<void>) => Promise<void>
+}) {
+  const { t } = useTranslation()
+  const hint = cut.main ? t('cuts.manage.isMain') : t('cuts.manage.makeMain')
+  return (
+    <Button
+      variant="ghost"
+      size="icon"
+      className="h-7 w-7 text-muted-foreground hover:text-foreground disabled:opacity-100"
+      disabled={cut.main}
+      aria-label={hint}
+      data-tooltip={hint}
+      data-testid={cut.main ? 'cut-is-main' : 'cut-make-main'}
+      onClick={() => void run(() => makeMainCut(group, cut.id))}
+    >
+      <Crown className={cut.main ? 'h-3.5 w-3.5 fill-current text-amber-500' : 'h-3.5 w-3.5'} />
+    </Button>
+  )
 }
 
 function CutRow({
@@ -90,6 +118,7 @@ function CutRow({
       <span className="w-20 shrink-0 font-mono text-[11px] text-muted-foreground">
         {cut.width}×{cut.height}
       </span>
+      <MakeMainButton cut={cut} group={group} run={run} />
       <Button
         variant="ghost"
         size="icon"
@@ -125,7 +154,7 @@ function CutRow({
   )
 }
 
-/** Manage cuts: rename, reorder (Main stays first) and remove, with a confirmation. */
+/** Manage cuts: rename, reorder (Main stays first), make Main and remove, with a confirmation. */
 export function ManageCutsDialog({ open, onOpenChange, projectId, group }: ManageCutsDialogProps) {
   const { t } = useTranslation()
   const refresh = useCutsStore((s) => s.refresh)

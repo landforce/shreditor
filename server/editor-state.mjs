@@ -10,13 +10,15 @@
 //
 // Both editor-state replies carry `agentActivity`, the project's agent-activity
 // record (see agent-activity.mjs), so an open editor learns about a pass on its
-// next heartbeat.
+// next heartbeat. A heartbeat that lists the open cut's siblings (`cuts`, ids)
+// gets `cutPublish` back: the newest pass the agent published into one of
+// them, which the editor switches to (docs/cuts.md).
 //
 // State is in memory only. A tab that has not reported for STALE_MS is gone.
 import crypto from 'node:crypto'
 import fs from 'node:fs'
 import path from 'node:path'
-import { effectiveActivity, readActivity } from './agent-activity.mjs'
+import { effectiveActivity, latestPublish, readActivity } from './agent-activity.mjs'
 
 export const STALE_MS = 5000
 const SAVE_REQUEST_TTL_MS = 60_000
@@ -104,6 +106,11 @@ function diskRevision(root, resolveInside, projectId) {
 /** The project's agent-activity record as it reads now (idle when missing or unreadable). */
 const activityOf = (root, projectId) => effectiveActivity(readActivity(root, projectId))
 
+const MAX_CUTS = 50
+/** The newest publish into the sibling cuts a heartbeat lists, or null. */
+const cutPublishOf = (root, cuts) =>
+  Array.isArray(cuts) ? latestPublish(root, cuts.slice(0, MAX_CUTS)) : null
+
 export function createEditorStateRoutes({ resolveInside, sendJson, readBody }) {
   const store = createEditorStateStore()
   return async function editorStateRoutes(req, res, { route, root, url }) {
@@ -112,7 +119,11 @@ export function createEditorStateRoutes({ resolveInside, sendJson, readBody }) {
     switch (route) {
       case 'POST editor-state': {
         const input = JSON.parse((await readBody(req)).toString() || '{}')
-        sendJson(res, 200, { ...store.report(input), agentActivity: activityOf(root, input.projectId) })
+        sendJson(res, 200, {
+          ...store.report(input),
+          agentActivity: activityOf(root, input.projectId),
+          cutPublish: cutPublishOf(root, input.cuts),
+        })
         return true
       }
       case 'GET editor-state':

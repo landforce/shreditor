@@ -176,6 +176,9 @@
 //   shred export <id> [--native|--browser] [--codec h264|hevc|prores] [--quality low|medium|high|ultra] [--out name]
 //                                        final export to <workspace>/projects/<id>/exports/; default: native
 //                                        (ffmpeg from the originals) when the plan allows it, else browser
+//   shred export <id> --all-cuts [--native|--browser] [--codec ...] [--quality ...]
+//                                        every cut of the group, one after another, each at its own size into
+//                                        its own exports/; prints each cut's engine and path (no --out)
 //   shred tts voices [--engine supertonic|moss] [--json]   the local TTS engines, preset voices and options
 //   shred tts --project <id> (--text "..." | --file script.txt) [--engine supertonic|moss] [--voice v]
 //             [--speed x] [--language code] [--name label] [--json]
@@ -190,6 +193,8 @@
 //                                        new aspect) and says what to review; prints id and editor URL
 //   shred cut list <projectId> [--json]  the cuts in the group: label, size, format, last pass, scorecard
 //   shred cut rename <cutId> "..."       relabel a cut (the editor's cut switcher shows it)
+//   shred cut main <cutId>               make this cut the group's Main (the old Main becomes a cut;
+//                                        the group id stays, no other cut is written)
 //   shred cut remove <cutId> --yes       move a cut to the editor's Trash (restorable; media stays)
 //
 // Service: 127.0.0.1:8787 (SHRED_SERVICE to override). Workspace: SHRED_WORKSPACE,
@@ -233,7 +238,7 @@ import { motionCommands } from './motion.mjs'
 import { cutoutCommand } from './cutout.mjs'
 import { describeNote, markRead, markSeen, noteSpan, openNotes } from './notes.mjs'
 import { createActivity } from './activity.mjs'
-import { cutCommands, cutGroupLines, cutLine } from './cuts.mjs'
+import { cutCommands, cutGroupLines, cutLine, exportAllCuts } from './cuts.mjs'
 import { draftPlanGate, planCheck, planCommands, printPlanCheck } from './plan.mjs'
 import { ttsCommand } from './tts.mjs'
 import {
@@ -305,6 +310,7 @@ const { values: opt, positionals } = parseArgs({
     yes: { type: 'boolean' },
     force: { type: 'boolean' },
     native: { type: 'boolean' },
+    'all-cuts': { type: 'boolean' },
     browser: { type: 'boolean' },
     codec: { type: 'string' },
     quality: { type: 'string' },
@@ -1156,7 +1162,7 @@ const cutDeps = () => ({
 const commands = {
   async cut([sub, ...rest]) {
     const run = cutCommands(cutDeps())[sub]
-    if (!run) throw new Error('Usage: shred cut new|list|rename|remove (see shred help)')
+    if (!run) throw new Error('Usage: shred cut new|list|rename|main|remove (see shred help)')
     await run(rest)
   },
 
@@ -2107,7 +2113,7 @@ const commands = {
     const cut = await cutLine(cutDeps(), targetId, target.project)
     if (cut)
       say(
-        `${cut}\nTell the user which cut this pass is in; their editor stays on the cut they have open.`,
+        `${cut}\nAn editor open on another cut of this group switches to this one (asking first when it has unsaved edits); tell the user which cut the pass is in.`,
       )
     if (scorecard) {
       say('')
@@ -2265,6 +2271,16 @@ const commands = {
     say(`${out}  (original untouched; import this file)`)
   },
 }
+
+// `shred export <id> --all-cuts`: every cut of the group, each through the
+// one-project export above (cuts.mjs, exportAllCuts).
+const exportOne = commands.export
+const exportCut = (cutId, name) => {
+  opt.out = name
+  return exportOne([cutId])
+}
+commands.export = ([id]) =>
+  opt['all-cuts'] ? exportAllCuts(cutDeps(), id, exportCut) : exportOne([id])
 
 // ── LUT library (<workspace>/luts/) ─────────────────────────────────────────
 
