@@ -29,6 +29,14 @@ describe('project.cut', () => {
 
   it('rejects a cut without a label or with unknown fields', () => {
     expect(validateProject({ ...project, cut: { group: 'main1', label: ' ' } }).success).toBe(false)
-    expect(validateProject({ ...project, cut: { ...cut, main: true } }).success).toBe(false)
+    expect(validateProject({ ...project, cut: { ...cut, primary: true } }).success).toBe(false)
+    expect(validateProject({ ...project, cut: { ...cut, main: 'yes' } }).success).toBe(false)
+  })
+
+  it('keeps the main flag "Make main" writes', () => {
+    const promoted = { ...cut, order: 0, main: true }
+    const validated = validateProject({ ...project, cut: promoted })
+    expect(validated.success).toBe(true)
+    expect((validated.data as Project).cut).toEqual(promoted)
   })
 })

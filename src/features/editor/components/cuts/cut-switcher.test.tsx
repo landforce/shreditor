@@ -5,6 +5,7 @@ import type { CutGroup } from '@/infrastructure/storage'
 const storage = vi.hoisted(() => ({
   listCutGroup: vi.fn(async (): Promise<CutGroup | null> => null),
   readCutPassCounts: vi.fn(async (): Promise<Record<string, number>> => ({})),
+  updateProject: vi.fn(async () => ({})),
 }))
 const navigate = vi.hoisted(() => vi.fn())
 
@@ -18,7 +19,7 @@ vi.mock('@tanstack/react-router', async (importOriginal) => ({
 }))
 
 const { CutSwitcher } = await import('./cut-switcher')
-const { useCutsStore } = await import('@/shared/state/cuts')
+const { useCutsStore, receiveCutPublish, siblingCutIds } = await import('@/shared/state/cuts')
 const { useTimelineStore } = await import('@/features/editor/deps/timeline-store')
 
 const cut = (id: string, label: string, extra: Partial<CutGroup['cuts'][number]> = {}) => ({
@@ -73,6 +74,7 @@ describe('CutSwitcher', () => {
     storage.listCutGroup.mockReset()
     storage.readCutPassCounts.mockReset()
     storage.readCutPassCounts.mockResolvedValue({})
+    storage.updateProject.mockReset()
     useCutsStore.setState({ projectId: null, group: null, seenPasses: {}, fresh: [] })
     useTimelineStore.setState({ isDirty: false })
   })
@@ -142,4 +144,106 @@ describe('CutSwitcher', () => {
     openMenu()
     expect(await screen.findByText('new pass')).toBeInTheDocument()
   })
+
+  it('follows a publish into another cut: switches there, the new-pass mark stays', async () => {
+    storage.listCutGroup.mockResolvedValue(group)
+    renderSwitcher('main')
+    await screen.findByTestId('cut-switcher')
+    expect(siblingCutIds()).toEqual(['wide', 'hook'])
+    // Old news (before the editor loaded) and the open cut's own publish are ignored.
+    act(() =>
+      receiveCutPublish({ projectId: 'hook', label: 'Old', endedAt: '2020-01-01T00:00:00Z' }),
+    )
+    act(() => receiveCutPublish({ projectId: 'main', label: 'Mine', endedAt: future(1) }))
+    act(() => receiveCutPublish({ projectId: 'elsewhere', label: 'X', endedAt: future(1) }))
+    expect(navigate).not.toHaveBeenCalled()
+
+    const publish = { projectId: 'hook', label: 'New opening', endedAt: future(2) }
+    act(() => receiveCutPublish(publish))
+    await waitFor(() =>
+      expect(navigate).toHaveBeenCalledWith({
+        to: '/editor/$projectId',
+        params: { projectId: 'hook' },
+      }),
+    )
+    expect(useCutsStore.getState().follow).toBeNull()
+    // The same publish heard again on the next heartbeat is not followed twice.
+    navigate.mockReset()
+    act(() => receiveCutPublish({ ...publish }))
+    expect(navigate).not.toHaveBeenCalled()
+    storage.readCutPassCounts.mockResolvedValue({ wide: 1, hook: 1 })
+    await act(() => useCutsStore.getState().poll())
+    expect(screen.getByTestId('cut-fresh')).toBeInTheDocument()
+  })
+
+  it('follows a publish only through the unsaved-changes dialog when there are edits', async () => {
+    storage.listCutGroup.mockResolvedValue(group)
+    renderSwitcher('main')
+    await screen.findByTestId('cut-switcher')
+    useTimelineStore.setState({ isDirty: true })
+    act(() => receiveCutPublish({ projectId: 'wide', label: 'Landscape', endedAt: future(3) }))
+    expect(await screen.findByRole('button', { name: /discard/i })).toBeInTheDocument()
+    expect(navigate).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: /cancel/i }))
+    await waitFor(() => expect(screen.queryByRole('button', { name: /discard/i })).toBeNull())
+    expect(navigate).not.toHaveBeenCalled()
+  })
+
+  it('makes another cut Main from Manage cuts: only it and the old Main change', async () => {
+    storage.listCutGroup.mockResolvedValue(group)
+    renderSwitcher('main')
+    await screen.findByTestId('cut-switcher')
+    openMenu()
+    fireEvent.click(await screen.findByText('Manage cuts…'))
+    expect(await screen.findByTestId('cut-is-main')).toBeDisabled()
+    const makeMain = screen.getAllByTestId('cut-make-main')
+    expect(makeMain).toHaveLength(2)
+    fireEvent.click(makeMain[1]!)
+    await waitFor(() => expect(storage.updateProject).toHaveBeenCalledTimes(2))
+    expect(storage.updateProject.mock.calls).toEqual([
+      [
+        'hook',
+        { cut: { group: 'main', label: 'Hook B', order: 0, main: true }, name: 'Warehouse' },
+      ],
+      [
+        'main',
+        { cut: { group: 'main', label: 'Main', order: 2, main: false }, name: 'Warehouse · Main' },
+      ],
+    ])
+  })
+
+  it('keeps the Main flag when a promoted Main is renamed or moved', async () => {
+    const promoted: CutGroup = {
+      ...group,
+      cuts: [
+        cut('hook', 'Hook B', { main: true, order: 0 }),
+        cut('main', 'Main', { order: 1 }),
+        cut('wide', '16:9', { order: 2 }),
+      ],
+    }
+    storage.listCutGroup.mockResolvedValue(promoted)
+    renderSwitcher('hook')
+    await screen.findByTestId('cut-switcher')
+    openMenu()
+    fireEvent.click(await screen.findByText('Manage cuts…'))
+    const label = await screen.findByLabelText('Label of Hook B')
+    fireEvent.change(label, { target: { value: 'Hook C' } })
+    fireEvent.blur(label)
+    await waitFor(() => expect(storage.updateProject).toHaveBeenCalledTimes(1))
+    expect(storage.updateProject).toHaveBeenCalledWith('hook', {
+      cut: { group: 'main', label: 'Hook C', order: 0, main: true },
+    })
+    storage.updateProject.mockClear()
+    fireEvent.click(screen.getAllByRole('button', { name: 'Move down' })[1]!)
+    await waitFor(() => expect(storage.updateProject).toHaveBeenCalledTimes(2))
+    expect(storage.updateProject.mock.calls[0]).toEqual([
+      'main',
+      { cut: { group: 'main', label: 'Main', order: 2, main: false } },
+    ])
+  })
 })
+
+/** An ISO time `seconds` after now. */
+function future(seconds: number): string {
+  return new Date(Date.now() + seconds * 1000).toISOString()
+}

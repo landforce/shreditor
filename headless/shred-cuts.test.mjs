@@ -12,12 +12,18 @@ import path from 'node:path'
 import { test } from 'node:test'
 import { fileURLToPath } from 'node:url'
 import { startBridge } from '../server/bridge-test-server.mjs'
+import { latestPublish, writeActivity } from '../server/agent-activity.mjs'
 import {
   coverTransform,
+  cutExportFileName,
   cutGroupName,
   cutLabelError,
   cutProjectName,
+  cutRecord,
+  cutSummaryOf,
   cutsInGroup,
+  isMainCut,
+  makeMainUpdates,
   nextCutOrder,
   refitTimeline,
 } from '../src/shared/projects/cuts.mjs'
@@ -277,6 +283,7 @@ test('trash: revision-checked, a marker (nothing deleted), media links parked', 
 async function startService(t, ws) {
   let n = 0
   const edits = []
+  const renders = []
   const send = (res, status, body) => {
     res.writeHead(status, { 'content-type': 'application/json' })
     res.end(JSON.stringify(body))
@@ -290,6 +297,15 @@ async function startService(t, ws) {
   // [matches(request), handle(request) => [status, body]], tried in order.
   const routes = [
     [(r) => r.pathname === '/health', async () => [200, { ok: true, workspace: ws }]],
+    [
+      (r) => r.pathname === '/v1/render',
+      async ({ req }) => {
+        // A native export that writes nothing: shred prints what it is told.
+        const input = await body(req)
+        renders.push(input)
+        return [200, nativeRender(ws, input)]
+      },
+    ],
     [
       (r) => r.project && !r.id && r.method === 'GET',
       async () => [200, { ok: true, projects: await listProjectResources(ws) }],
@@ -373,8 +389,25 @@ async function startService(t, ws) {
   })
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve))
   t.after(() => server.close())
-  return { url: `http://127.0.0.1:${server.address().port}`, edits }
+  return { url: `http://127.0.0.1:${server.address().port}`, edits, renders }
 }
+
+const nativeRender = (ws, input) => ({
+  ok: true,
+  engine: 'native',
+  codec: input.codec,
+  output: path.join(ws, 'projects', input.project, 'exports', `${input.out ?? input.project}.mp4`),
+  summary: [],
+  verification: {
+    frames: 90,
+    seconds: 3,
+    videoCodec: 'h264',
+    pixFmt: 'yuv420p',
+    color: { matrix: 'bt709', range: 'tv' },
+    audio: null,
+  },
+  timings: { totalSeconds: 1, overlaySeconds: 0, encodeSeconds: 1 },
+})
 
 async function setupCli(t) {
   const home = scratch(t, 'cuts-home-')
@@ -428,7 +461,7 @@ async function setupCli(t) {
   fs.mkdirSync(path.join(ws, 'projects', 'main1', 'agent'), { recursive: true })
   fs.writeFileSync(path.join(ws, 'projects', 'main1', 'agent', 'brief.yaml'), 'goal: test\n')
   const read = (id) => JSON.parse(fs.readFileSync(path.join(ws, 'projects', id, 'project.json')))
-  return { ws, shred, service, main, read }
+  return { ws, shred, service, editor, main, read }
 }
 
 test('shred cut: new shares media and keeps revisions apart; list, rename, remove guard', async (t) => {
@@ -547,4 +580,171 @@ test('a draft of a cut stays in that cut: publish lands there and nowhere else',
   assert.ok(!fs.existsSync(path.join(s.ws, 'projects', 'main1', 'agent', 'passes')))
   const wrong = await s.shred('publish', draftId, 'main1', '--label', 'x')
   assert.match(wrong.stderr, /is not a draft of main1/)
+})
+
+// ── Make main, follow publishes, export all cuts ────────────────────────────
+
+test('make main: the group id stays, only the cut and the old Main are written', () => {
+  const members = [
+    { id: 'main1', label: 'Main', main: true, order: 0 },
+    { id: 'wide', label: '16:9', main: false, order: 1 },
+    { id: 'hook', label: 'Hook B', main: false, order: 2 },
+  ]
+  assert.deepEqual(makeMainUpdates(members, 'hook', 'main1', 'Warehouse'), [
+    {
+      id: 'hook',
+      updates: { cut: { group: 'main1', label: 'Hook B', order: 0, main: true }, name: 'Warehouse' },
+    },
+    {
+      id: 'main1',
+      updates: {
+        cut: { group: 'main1', label: 'Main', order: 2, main: false },
+        name: 'Warehouse · Main',
+      },
+    },
+  ])
+  assert.deepEqual(makeMainUpdates(members, 'main1', 'main1', 'Warehouse'), [], 'already Main')
+  assert.throws(() => makeMainUpdates(members, 'nope', 'main1', 'W'), /not a cut of group main1/)
+  // The flag decides; without it, the project whose id is the group id is Main.
+  assert.equal(isMainCut({ id: 'main1' }), true)
+  assert.equal(isMainCut({ id: 'main1', cut: { group: 'main1', label: 'Main', main: false } }), false)
+  assert.equal(isMainCut({ id: 'hook', cut: { group: 'main1', label: 'Hook B', main: true } }), true)
+  assert.equal(isMainCut({ id: 'hook', cut: { group: 'main1', label: 'Hook B' } }), false)
+  // The flag is stored only where it differs from that rule: old groups keep their records.
+  assert.deepEqual(cutRecord({ id: 'main1', group: 'main1', label: 'V', order: 0, main: true }), {
+    group: 'main1',
+    label: 'V',
+    order: 0,
+  })
+  assert.deepEqual(cutRecord({ id: 'hook', group: 'main1', label: 'B', order: 2, main: false }), {
+    group: 'main1',
+    label: 'B',
+    order: 2,
+  })
+  const promoted = { id: 'hook', cut: { group: 'main1', label: 'Hook B', order: 0, main: true } }
+  const demoted = { id: 'main1', cut: { group: 'main1', label: 'Main', order: 2, main: false } }
+  const wide = { id: 'wide', cut: { group: 'main1', label: '16:9', order: 1 } }
+  assert.deepEqual(
+    cutsInGroup([demoted, wide, promoted], 'main1').map((c) => c.id),
+    ['hook', 'wide', 'main1'],
+  )
+  assert.deepEqual(cutSummaryOf(promoted), { id: 'hook', label: 'Hook B', main: true, order: 0 })
+  assert.equal(cutExportFileName('Warehouse', 'Hook B'), 'Warehouse - Hook B')
+  assert.equal(cutExportFileName('Ware/house', 'v1.5'), 'Ware-house - v1-5')
+})
+
+test('shred cut main: swaps Main, keeps the group, guards removal and later writes', async (t) => {
+  const s = await setupCli(t)
+  const hookId = (await s.shred('cut', 'new', 'main1', '--label', 'Hook B')).stdout.split('\n')[0]
+  const wideId = (await s.shred('cut', 'new', 'main1', '--label', '16:9')).stdout.split('\n')[0]
+  const wideRevision = (await getProjectResource(s.ws, wideId)).revision
+
+  const made = await s.shred('cut', 'main', hookId)
+  assert.equal(made.code, 0, made.stderr)
+  assert.match(made.stdout, /"Hook B" .* is now the main cut of group main1/)
+  assert.deepEqual(s.read(hookId).cut, { group: 'main1', label: 'Hook B', order: 0, main: true })
+  assert.equal(s.read(hookId).name, 'Warehouse')
+  assert.deepEqual(s.read('main1').cut, { group: 'main1', label: 'Main', order: 1, main: false })
+  assert.equal(s.read('main1').name, 'Warehouse · Main')
+  assert.equal(
+    (await getProjectResource(s.ws, wideId)).revision,
+    wideRevision,
+    'no other cut is written',
+  )
+  const list = JSON.parse((await s.shred('cut', 'list', wideId, '--json')).stdout)
+  assert.equal(list.group, 'main1', 'the group id stays')
+  assert.deepEqual(
+    list.cuts.map((c) => `${c.label}${c.main ? ' (main)' : ''}`),
+    ['Hook B (main)', 'Main', '16:9'],
+  )
+  assert.match((await s.shred('cut', 'main', hookId)).stdout, /already the main cut/)
+
+  // The new Main can't be removed while it has other cuts; the old one can.
+  assert.match(
+    (await s.shred('cut', 'remove', hookId, '--yes')).stderr,
+    /main cut; it can't be removed/,
+  )
+  // Renames keep the flag; a new cut takes the group's name from the new Main.
+  assert.equal((await s.shred('cut', 'rename', hookId, 'Hook C')).code, 0)
+  assert.deepEqual(s.read(hookId).cut, { group: 'main1', label: 'Hook C', order: 0, main: true })
+  assert.equal(s.read(hookId).name, 'Warehouse')
+  const later = await s.shred('cut', 'new', wideId, '--label', 'Short')
+  assert.equal(s.read(later.stdout.split('\n')[0]).name, 'Warehouse · Short')
+  const removed = await s.shred('cut', 'remove', 'main1', '--yes')
+  assert.equal(removed.code, 0, removed.stderr)
+  // Another switch: the Main before it goes back to its old place, with no flag.
+  const hookAgain = await s.shred('cut', 'main', wideId)
+  assert.equal(hookAgain.code, 0, hookAgain.stderr)
+  assert.equal(isMainCut(s.read(hookId)), false)
+  assert.deepEqual(s.read(hookId).cut, { group: 'main1', label: 'Hook C', order: 2 }, 'no flag left')
+  assert.equal(isMainCut(s.read(wideId)), true)
+})
+
+test('shred export --all-cuts: each cut in order, its own name, engine and path', async (t) => {
+  const s = await setupCli(t)
+  const hookId = (await s.shred('cut', 'new', 'main1', '--label', 'Hook B')).stdout.split('\n')[0]
+  const refused = await s.shred('export', 'main1', '--all-cuts', '--out', 'final')
+  assert.equal(refused.code, 1)
+  assert.match(refused.stderr, /--out names one file; with --all-cuts/)
+  assert.equal(s.service.renders.length, 0)
+
+  const all = await s.shred('export', hookId, '--all-cuts', '--codec', 'hevc')
+  assert.equal(all.code, 0, all.stderr)
+  assert.deepEqual(
+    s.service.renders.map((r) => [r.project, r.out, r.codec, r.engine]),
+    [
+      ['main1', 'Warehouse_-_Main', 'hevc', 'auto'],
+      [hookId, 'Warehouse_-_Hook_B', 'hevc', 'auto'],
+    ],
+  )
+  assert.match(all.stdout, /Exporting 2 cut\(s\) of group main1/)
+  assert.match(all.stdout, /\[1\/2\] cut "Main" \(main1\)[\s\S]*engine {3}native/)
+  assert.match(all.stdout, new RegExp(`\\[2/2\\] cut "Hook B" \\(${hookId}\\)`))
+  assert.match(all.stdout, /projects\/main1\/exports\/Warehouse_-_Main\.mp4/)
+  assert.match(all.stdout, /exports\/Warehouse_-_Hook_B\.mp4/)
+  // A plain export is unchanged.
+  await s.shred('export', 'main1')
+  assert.equal(s.service.renders.at(-1).out, undefined)
+})
+
+test('latestPublish: the newest pass published into any of the listed cuts', (t) => {
+  const ws = scratch(t, 'cuts-publish-')
+  assert.equal(latestPublish(ws, ['a', 'b', '../x']), null)
+  writeActivity(ws, 'a', { state: 'idle', ended: 'published', label: 'A', endedAt: '2026-01-01T00:00:01Z' })
+  writeActivity(ws, 'b', { state: 'idle', ended: 'published', label: 'B', endedAt: '2026-01-01T00:00:02Z' })
+  writeActivity(ws, 'c', { state: 'idle', ended: 'done', label: 'C', endedAt: '2026-01-01T00:00:03Z' })
+  assert.deepEqual(latestPublish(ws, ['a', 'b', 'c']), {
+    projectId: 'b',
+    label: 'B',
+    endedAt: '2026-01-01T00:00:02Z',
+  })
+  assert.equal(latestPublish(ws, ['c'])?.projectId, undefined, 'a pass that ended otherwise is not a publish')
+})
+
+test('publishing into a sibling cut reaches an editor open on another cut', async (t) => {
+  const s = await setupCli(t)
+  const cutId = (await s.shred('cut', 'new', 'main1', '--label', 'Hook B')).stdout.split('\n')[0]
+  const heartbeat = async (cuts) => {
+    const res = await fetch(`${s.editor}/__shreditor/editor-state`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ projectId: 'main1', tabId: 'tab-1', dirty: false, cuts }),
+    })
+    return res.json()
+  }
+  assert.equal((await heartbeat([cutId])).cutPublish, null, 'nothing published yet')
+  const draftId = (await s.shred('draft', cutId, '--label', 'New opening')).stdout
+    .trim()
+    .split('\n')
+    .at(-1)
+  const summary = path.join(s.ws, 'summary.md')
+  fs.writeFileSync(summary, 'A new opening.')
+  const published = await s.shred('publish', draftId, cutId, '--label', 'New opening', '--summary', summary)
+  assert.equal(published.code, 0, published.stderr)
+  assert.match(published.stdout, /An editor open on another cut of this group switches to this one/)
+  const reply = await heartbeat([cutId])
+  assert.equal(reply.cutPublish.projectId, cutId)
+  assert.equal(reply.cutPublish.label, 'New opening')
+  assert.ok(Date.parse(reply.cutPublish.endedAt) > 0)
+  assert.equal((await heartbeat(undefined)).cutPublish, null, 'no cuts listed, nothing to follow')
 })
