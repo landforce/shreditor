@@ -30,13 +30,37 @@
         "none": "아직 분석되지 않음",
         "error": "실패: {{error}}",
         "noMedia": "클립의 미디어가 라이브러리에 없습니다"
+      },
+      "paint": {
+        "painting": "페인트",
+        "paintingHint": "미리보기에 칠해서 마스크를 고칩니다. 칠하는 동안 제거되는 영역은 어둡게 보입니다.",
+        "tool": "브러시 도구",
+        "tools": {
+          "smartBrush": "스마트 브러시",
+          "smartEraser": "스마트 지우개",
+          "brush": "브러시",
+          "eraser": "지우개"
+        },
+        "size": "크기",
+        "hint": "스마트 도구는 칠한 영역을 잡아 클립 전체에서 따라갑니다. 브러시와 지우개는 안쪽에 칠한 스마트 영역을 따라 움직이고, 그 밖에서는 모든 프레임의 같은 자리에 적용됩니다.",
+        "tracking": "영역 추적 중 {{done}}/{{count}}",
+        "strokes": "스트로크: {{count}}",
+        "clear": "스트로크 지우기",
+        "fixMask": "마스크 수정…",
+        "overlay": {
+          "smartBrush": "스마트 브러시: 남길 부분을 칠하세요",
+          "smartEraser": "스마트 지우개: 지울 부분을 칠하세요",
+          "brush": "브러시: 남길 부분을 칠하세요",
+          "eraser": "지우개: 지울 부분을 칠하세요"
+        }
       }
     }
   },
   "settings": {
     "models": {
       "cutoutModnet": "Remove background (people). Xenova/modnet ONNX, downloaded on first use, SHA-256 checked.",
-      "cutoutU2net": "Remove background (objects). BritishWerewolf/U-2-Net ONNX, downloaded on first use, SHA-256 checked."
+      "cutoutU2net": "Remove background (objects). BritishWerewolf/U-2-Net ONNX, downloaded on first use, SHA-256 checked.",
+      "cutoutSlimsam": "Smart brush for Remove background. Xenova/slimsam-77-uniform ONNX (encoder and decoder), downloaded on first use, SHA-256 checked."
     }
   }
 }

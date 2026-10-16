@@ -23,6 +23,7 @@ import {
   useCutoutStatus,
   type CutoutUiStatus,
 } from '@/features/editor/hooks/use-cutout-status'
+import { CutoutBrushControls } from './cutout-brush-controls'
 
 const SUBJECTS: CutoutSubject[] = ['auto', 'person', 'object']
 const BUSY = new Set(['queued', 'downloading', 'preparing', 'analyzing'])
@@ -206,6 +207,7 @@ export function CutoutSection({ items }: { items: TimelineItem[] }) {
               </div>
             )}
           </div>
+          {first && videoItems.length === 1 && <CutoutBrushControls item={first} />}
         </>
       )}
     </PropertySection>

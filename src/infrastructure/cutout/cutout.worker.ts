@@ -5,14 +5,13 @@
  * owns the worker stores them (./cutout-analysis). Models stay loaded between
  * jobs. The editor and the headless harness run the same worker.
  */
-import { ensureProResDecoderRegistered } from '@/infrastructure/browser/register-prores-decoder'
-import { applyBitstreamColorSpace } from '@/infrastructure/browser/mediabunny-video-color-space'
 import {
   CUTOUT_MODELS,
   type CutoutBackend,
   type CutoutModelId,
 } from '@/shared/cutout/cutout-core.mjs'
 import { CutoutModelRunner, cutoutModelInputSize } from './cutout-model'
+import { context2d, encodeMask, openCutoutSource } from './cutout-frames'
 import { alphaCoverage, lumaOf, maskSize, smoothAlpha } from './cutout-temporal'
 
 export interface CutoutAnalyzeRequest {
@@ -77,51 +76,6 @@ function runnerFor(request: CutoutAnalyzeRequest): CutoutModelRunner {
   return runner
 }
 
-async function openSource(source: CutoutAnalyzeRequest['source']) {
-  await ensureProResDecoderRegistered().catch(() => {})
-  const mb = await import('mediabunny')
-  const input = new mb.Input({
-    source: source.blob ? new mb.BlobSource(source.blob) : new mb.UrlSource(source.url ?? ''),
-    formats: mb.ALL_FORMATS,
-  })
-  const track = await input.getPrimaryVideoTrack()
-  if (!track) {
-    input.dispose()
-    throw new Error('The media has no video track')
-  }
-  return { input, sink: new mb.VideoSampleSink(applyBitstreamColorSpace(track)) }
-}
-
-function context2d(width: number, height: number): OffscreenCanvasRenderingContext2D {
-  const ctx = new OffscreenCanvas(width, height).getContext('2d', { willReadFrequently: true })
-  if (!ctx) throw new Error('OffscreenCanvas 2D is unavailable')
-  return ctx
-}
-
-async function encodeMask(
-  alpha: Float32Array,
-  width: number,
-  height: number,
-  out: { width: number; height: number },
-): Promise<ArrayBuffer> {
-  const full = context2d(width, height)
-  const image = full.createImageData(width, height)
-  for (let i = 0; i < alpha.length; i++) {
-    const v = Math.round(alpha[i]! * 255)
-    image.data[i * 4] = v
-    image.data[i * 4 + 1] = v
-    image.data[i * 4 + 2] = v
-    image.data[i * 4 + 3] = 255
-  }
-  full.putImageData(image, 0, 0)
-  const scaled = context2d(out.width, out.height)
-  scaled.imageSmoothingEnabled = true
-  scaled.imageSmoothingQuality = 'high'
-  scaled.drawImage(full.canvas, 0, 0, out.width, out.height)
-  const blob = await (scaled.canvas as OffscreenCanvas).convertToBlob({ type: 'image/png' })
-  return blob.arrayBuffer()
-}
-
 // fallow-ignore-next-line complexity
 async function analyze(request: CutoutAnalyzeRequest): Promise<void> {
   const { jobId } = request
@@ -137,7 +91,7 @@ async function analyze(request: CutoutAnalyzeRequest): Promise<void> {
     }),
   )
   post({ type: 'progress', jobId, stage: 'prepare' })
-  const { input, sink } = await openSource(request.source)
+  const { input, sink } = await openCutoutSource(request.source)
   try {
     let previous: { index: number; alpha: Float32Array; luma: Float32Array } | null = null
     let done = 0

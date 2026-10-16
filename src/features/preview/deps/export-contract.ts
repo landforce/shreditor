@@ -8,6 +8,7 @@ export {
   type VideoFrameSource,
 } from '@/features/export/utils/shared-video-extractor'
 export {
+  getItemRenderTimelineSpan,
   isFrameInsideSourceTimeRamp,
   resolveAATransitionRamps,
   resolveTransitionRenderTimelineSpan,

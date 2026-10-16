@@ -115,6 +115,8 @@ export type EditOperationName =
   | 'addCaptions'
   | SpeedRampOperationName
   | 'setCutout'
+  | 'addCutoutStroke'
+  | 'clearCutoutStrokes'
 
 /** A wire operation. Node validates its discriminator and fields before this browser boundary. */
 export type EditOp = Record<string, unknown> & { op: EditOperationName }

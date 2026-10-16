@@ -2,13 +2,18 @@
 //
 //   SHRED_CUTOUT_E2E=1 node headless/cutout-e2e.mjs        (needs `npm run build`, ffmpeg, network)
 //
-// Skipped unless SHRED_CUTOUT_E2E=1: it downloads the MODNet weights (26 MB,
-// SHA-256 checked) and a portrait test image from the Transformers.js docs
-// dataset (pinned revision and hash). In a scratch workspace it makes a short
-// talking-head clip from the image, starts the agent service on a free port,
-// puts the clip over a solid green plate, runs `shred cutout --wait`, renders a
-// frame and checks the room around the subject is green (cut out) while the
-// face is not, then exports natively and checks the same on the exported file.
+// Skipped unless SHRED_CUTOUT_E2E=1: it downloads the MODNet weights (26 MB)
+// and SlimSAM-77 (encoder and decoder, 14-40 MB), all SHA-256 checked, and a
+// portrait test image from the Transformers.js docs dataset (pinned revision
+// and hash). In a scratch workspace it makes a short talking-head clip that
+// pans across the image, starts the agent service on a free port, puts the
+// clip over a solid green plate, runs `shred cutout --wait`, renders a frame
+// and checks the room around the subject is green (cut out) while the face is
+// not, then exports natively and checks the same on the exported file. Then
+// the smart brush: a smart-eraser stroke over the subject's cardigan on one
+// frame; its region must be tracked through the clip, the cardigan must show
+// the plate on rendered frames before and after the painted one (where the
+// pan has moved it), and the face must stay.
 import assert from 'node:assert/strict'
 import { execFileSync, spawn } from 'node:child_process'
 import crypto from 'node:crypto'
@@ -72,7 +77,8 @@ try {
   assert.equal(crypto.createHash('sha256').update(png).digest('hex'), IMAGE.sha256, 'test image hash')
   fs.writeFileSync(path.join(dir, 'person.png'), png)
   const clipFile = path.join(dir, 'person.mp4')
-  execFileSync('ffmpeg', ['-v', 'error', '-y', '-loop', '1', '-i', path.join(dir, 'person.png'), '-vf', "scale=1280:720,setsar=1,zoompan=z='1+0.0015*on':d=1:s=1280x720:fps=30,format=yuv420p", '-t', '3', '-c:v', 'libx264', '-crf', '18', '-an', clipFile])
+  // The 772x435 image scaled to 1600x900; a 1280x720 window pans right at 70 px/s.
+  execFileSync('ffmpeg', ['-v', 'error', '-y', '-loop', '1', '-framerate', '30', '-i', path.join(dir, 'person.png'), '-vf', "scale=1600:900,setsar=1,crop=1280:720:'100+70*t':90,format=yuv420p", '-t', '3', '-c:v', 'libx264', '-crf', '18', '-an', clipFile])
 
   service = spawn(process.execPath, [path.join(ROOT, 'headless/serve.mjs'), '--workspace', ws, '--port', String(port)], { stdio: ['ignore', 'pipe', 'pipe'] })
   let log = ''
@@ -138,9 +144,53 @@ try {
   const still = path.join(dir, 'export.png')
   execFileSync('ffmpeg', ['-v', 'error', '-y', '-ss', '1.5', '-i', exported.output, '-frames:v', '1', still])
   checkFrame(still, 'export 1.5 s')
+
+  // Smart brush. Image fractions → source-frame fractions at time t (the pan), → canvas fractions.
+  const toSource = ([ix, iy], t) => [(ix * 1600 - (100 + 70 * t)) / 1280, (iy * 900 - 90) / 720]
+  const toCanvas = ([fx, fy]) => [fx, 0.342 + fy * 0.316]
+  const renderFrame = async (frameNo) => {
+    const out = path.join(dir, `smart-${frameNo}.png`)
+    const r = await fetch(`${env.SHRED_SERVICE}/frame`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ project: projectId, frame: frameNo }),
+    })
+    assert.equal(r.status, 200)
+    fs.writeFileSync(out, Buffer.from(await r.arrayBuffer()))
+    return out
+  }
+  const cardigan = [0.45, 0.82]
+  const face = [0.5, 0.3]
+  const before = pixel(frame, ...toCanvas(toSource(cardigan, 1.5)))
+  assert.ok(!near(before, GREEN, 60), `before the stroke the cardigan is opaque, got ${before}`)
+  const stroke = [[0.33, 0.85], [0.42, 0.8], [0.55, 0.8], [0.64, 0.85]]
+    .map((p) => toSource(p, 1.5).map((v) => v.toFixed(4)).join(','))
+    .join(';')
+  const painted = shred('cutout', projectId, clipId, '--stroke', `smartEraser:${stroke}`, '--at', '1.5', '--size', '0.04', '--wait')
+  console.log(painted.trim())
+  assert.match(painted, /1 strokes \(1\/1 smart tracked\)/)
+  const tracked = JSON.parse(fs.readFileSync(path.join(ws, 'media', mediaId, 'cache/cutout/index.json'), 'utf8'))
+  const region = Object.values(tracked.regions ?? {})[0]
+  assert.ok(region, 'the region is listed in the index')
+  const samples = Object.keys(region.stats).map(Number).sort((a, b) => a - b)
+  console.log(`region tracked over samples ${samples[0]}..${samples.at(-1)} (${samples.length}), painted on ${region.start}`)
+  assert.ok(samples.length >= 25, `the region follows most of the clip, got ${samples.length} samples`)
+  const cx = (i) => region.stats[i][0]
+  assert.ok(cx(samples[0]) - cx(samples.at(-1)) > 0.1, 'the region moves left with the pan')
+  for (const frameNo of [9, 45, 81]) {
+    const t = frameNo / 30
+    const file = await renderFrame(frameNo)
+    const erased = pixel(file, ...toCanvas(toSource(cardigan, t)))
+    const kept = pixel(file, ...toCanvas(toSource(face, t)))
+    console.log(`smart erase frame ${frameNo}: cardigan ${erased} face ${kept}`)
+    assert.ok(near(erased, GREEN), `frame ${frameNo}: the erased cardigan shows the plate, got ${erased}`)
+    assert.ok(!near(kept, GREEN, 60), `frame ${frameNo}: the face stays, got ${kept}`)
+  }
   console.log('cutout e2e: ok')
 } finally {
   service?.kill('SIGTERM')
   await new Promise((r) => setTimeout(r, 1500))
-  fs.rmSync(dir, { recursive: true, force: true })
+  // SHRED_CUTOUT_E2E_KEEP=1 keeps the scratch folder (rendered frames, workspace) to look at.
+  if (process.env.SHRED_CUTOUT_E2E_KEEP === '1') console.log(`kept ${dir}`)
+  else fs.rmSync(dir, { recursive: true, force: true })
 }

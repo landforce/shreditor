@@ -12,6 +12,7 @@ import type { VideoItem } from '@/types/timeline'
 import { isCutoutActive } from '@/shared/cutout/cutout-core.mjs'
 import { sampleCutoutMasks } from '@/infrastructure/cutout/cutout-masks'
 import { applyCutoutMask } from '@/infrastructure/cutout/cutout-compositor'
+import { getCutoutPaint } from '@/infrastructure/cutout/cutout-paint'
 import {
   getItemRenderTimelineSpan,
   resolveVideoRenderSourceTimeSeconds,
@@ -29,18 +30,35 @@ export function hasActiveCutout(item: { type: string; cutout?: unknown }): boole
   return isCutoutActive(item)
 }
 
-type Scratch = { canvas: OffscreenCanvas; ctx: OffscreenCanvasRenderingContext2D }
+type Scratch = {
+  canvas: OffscreenCanvas
+  ctx: OffscreenCanvasRenderingContext2D
+  colorType: string
+}
 // Renders of several cut-out clips may interleave (they await frame decodes), so
 // each takes its own scratch canvas and hands it back.
 const freeScratch: Scratch[] = []
 
-function acquireScratch(width: number, height: number): Scratch | null {
-  let entry = freeScratch.pop() ?? null
+/**
+ * The colour type of a 2D canvas: 'float16' when it keeps more than 8 bits.
+ * The scratch frame matches the destination, so the cutout never narrows it.
+ */
+function canvasColorType(ctx: OffscreenCanvasRenderingContext2D): string {
+  const attributes = (
+    ctx as { getContextAttributes?: () => { colorType?: string } }
+  ).getContextAttributes?.()
+  return attributes?.colorType ?? 'unorm8'
+}
+
+function acquireScratch(width: number, height: number, colorType: string): Scratch | null {
+  const index = freeScratch.findIndex((entry) => entry.colorType === colorType)
+  let entry = index >= 0 ? freeScratch.splice(index, 1)[0]! : null
   if (!entry) {
     const canvas = new OffscreenCanvas(width, height)
-    const ctx = canvas.getContext('2d')
+    const settings = colorType === 'float16' ? { colorType } : undefined
+    const ctx = canvas.getContext('2d', settings) as OffscreenCanvasRenderingContext2D | null
     if (!ctx) return null
-    entry = { canvas, ctx }
+    entry = { canvas, ctx, colorType }
   }
   if (entry.canvas.width !== width || entry.canvas.height !== height) {
     entry.canvas.width = width
@@ -100,8 +118,10 @@ export async function renderCutoutVideoItem(
   const sourceWidth = item.sourceWidth ?? masks.entry.sourceWidth
   const sourceHeight = item.sourceHeight ?? masks.entry.sourceHeight
   if (!(sourceWidth > 0 && sourceHeight > 0)) return plain()
-  const size = scratchSize(sourceWidth, sourceHeight, rctx.renderMode === 'preview')
-  const target = acquireScratch(size.width, size.height)
+  const preview = rctx.renderMode === 'preview'
+  const size = scratchSize(sourceWidth, sourceHeight, preview)
+  const colorType = canvasColorType(ctx)
+  const target = acquireScratch(size.width, size.height, colorType)
   if (!target) return plain()
   try {
     // The whole source frame, 1:1 into the scratch canvas.
@@ -121,6 +141,9 @@ export async function renderCutoutVideoItem(
         settings: cutout,
         sourceWidth,
         sourceHeight,
+        layers: masks.layers,
+        highlight: preview && getCutoutPaint().itemId === item.id,
+        destinationColorType: colorType,
       }) ?? target.canvas // no WebGL2: the frame uncut rather than nothing
     return drawContainedMediaSource(
       ctx,

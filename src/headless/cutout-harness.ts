@@ -10,6 +10,12 @@ import type { TimelineItem } from '@/types/timeline'
 import type { Project } from '@/types/project'
 import type { MediaMetadata } from '@/types/storage'
 import { cutoutModelFileName } from '@/shared/cutout/cutout-core.mjs'
+import { samModelFileName } from '@/shared/cutout/cutout-sam.mjs'
+import {
+  getCutoutRegionJobs,
+  setSamUrlResolver,
+  subscribeCutoutRegionJobs,
+} from '@/infrastructure/cutout/cutout-regions'
 import { blobUrlManager } from '@/infrastructure/browser/blob-url-manager'
 import { useMediaLibraryStore } from '@/features/media-library/stores/media-library-store'
 import { configureCutoutStore, createHttpCutoutStore } from '@/infrastructure/cutout/cutout-store'
@@ -42,23 +48,37 @@ export function configureHeadlessCutout(): void {
   setCutoutModelUrlResolver(
     (model, backend) => `${base}/models/${cutoutModelFileName(model, backend)}`,
   )
+  const sam = (part: 'encoder' | 'decoder', backend: 'webgpu' | 'wasm') =>
+    `${base}/models/${samModelFileName(part, backend)}`
+  setSamUrlResolver(() => ({
+    encoder: { webgpu: sam('encoder', 'webgpu'), wasm: sam('encoder', 'wasm') },
+    decoder: sam('decoder', 'wasm'),
+  }))
 }
 
 let progressJob: string | null = null
 let lastProgress = 0
-subscribeCutoutJobs(() => {
+const onProgress = () => {
   if (!storeBase || !progressJob) return
   const now = Date.now()
   if (now - lastProgress < 400) return
   lastProgress = now
   void postProgress(progressJob)
-})
+}
+subscribeCutoutJobs(onProgress)
+subscribeCutoutRegionJobs(onProgress)
+
+/** Analysis jobs, then smart-stroke tracking jobs (`kind: 'region'`). */
+function progressJobs() {
+  const regions = getCutoutRegionJobs().map((job) => ({ ...job, kind: 'region' as const }))
+  return [...getCutoutJobs(), ...regions]
+}
 
 async function postProgress(job: string): Promise<void> {
   if (!storeBase) return
   await fetch(`${storeBase}/progress?job=${encodeURIComponent(job)}`, {
     method: 'PUT',
-    body: JSON.stringify({ jobs: getCutoutJobs(), at: Date.now() }),
+    body: JSON.stringify({ jobs: progressJobs(), at: Date.now() }),
   }).catch(() => {})
 }
 

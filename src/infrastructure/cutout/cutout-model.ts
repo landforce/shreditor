@@ -36,15 +36,13 @@ async function dropCached(url: string): Promise<void> {
   }
 }
 
-/** Fetch a model file and refuse it unless its SHA-256 matches the pinned one. */
-async function fetchVerifiedModel(
-  model: CutoutModel,
-  backend: CutoutBackend,
-  urlFor: CutoutModelUrlFor,
+/** Fetch a model file (through the ONNX model cache) and refuse it unless its SHA-256 matches. */
+export async function fetchVerifiedBytes(
+  url: string,
+  expected: string,
+  label: string,
   onProgress?: (progress: CutoutDownloadProgress) => void,
 ): Promise<ArrayBuffer> {
-  const url = urlFor(model, backend)
-  const expected = model.files[backend].sha256
   const bytes = await fetchOnnxModelBytes(url, (received, total, fromCache) =>
     onProgress?.({ received, total, fromCache }),
   )
@@ -52,7 +50,7 @@ async function fetchVerifiedModel(
   if (actual !== expected) {
     await dropCached(url)
     throw new Error(
-      `${model.label}: downloaded file failed its SHA-256 check (got ${actual.slice(0, 12)}…, expected ${expected.slice(0, 12)}…)`,
+      `${label}: downloaded file failed its SHA-256 check (got ${actual.slice(0, 12)}…, expected ${expected.slice(0, 12)}…)`,
     )
   }
   return bytes
@@ -200,7 +198,12 @@ export class CutoutModelRunner {
     onProgress?: (progress: CutoutDownloadProgress) => void,
   ): Promise<void> {
     const ort = this.ort!
-    const bytes = await fetchVerifiedModel(this.model, backend, this.urlFor, onProgress)
+    const bytes = await fetchVerifiedBytes(
+      this.urlFor(this.model, backend),
+      this.model.files[backend].sha256,
+      this.model.label,
+      onProgress,
+    )
     const session = await ort.InferenceSession.create(new Uint8Array(bytes), {
       executionProviders: [backend],
       graphOptimizationLevel: 'all',

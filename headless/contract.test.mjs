@@ -131,6 +131,8 @@ const samples = {
   },
   clearSpeedRamp: { op: 'clearSpeedRamp', id: 'c' },
   setCutout: { op: 'setCutout', id: 'c', enabled: true, subject: 'person', feather: 2 },
+  addCutoutStroke: { op: 'addCutoutStroke', id: 'c', tool: 'smartEraser', points: [[0.4, 0.8], [0.6, 0.8]], size: 0.04, at: 1.5 },
+  clearCutoutStrokes: { op: 'clearCutoutStrokes', id: 'c' },
 }
 
 test('speed ramp op schemas take keys or a preset, in the speed limits', () => {

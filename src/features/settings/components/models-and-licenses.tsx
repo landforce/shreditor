@@ -23,6 +23,7 @@ const COMPONENTS = [
     noteKey: 'settings.models.cutoutModnet',
   },
   { name: 'U-2-Net', license: 'Apache-2.0', noteKey: 'settings.models.cutoutU2net' },
+  { name: 'SlimSAM-77', license: 'Apache-2.0', noteKey: 'settings.models.cutoutSlimsam' },
   {
     name: 'Mediabunny, @mediabunny/prores',
     license: 'MPL-2.0',

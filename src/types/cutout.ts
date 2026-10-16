@@ -5,17 +5,20 @@
  */
 export type CutoutSubject = 'auto' | 'person' | 'object'
 
+/** Brush tools: plain discs (brush adds, eraser removes) or SlimSAM regions tracked through the clip. */
+export type CutoutStrokeTool = 'brush' | 'eraser' | 'smartBrush' | 'smartEraser'
+
 /**
- * A brush correction painted on one source frame (reserved for the smart brush;
- * stored and validated, not yet drawn). Points are fractions of the source frame.
+ * A brush correction painted on one source frame (docs/background-removal.md,
+ * Smart brush). Points are fractions of the source frame.
  */
 export interface CutoutStroke {
-  mode: 'add' | 'remove' | 'smart'
+  tool: CutoutStrokeTool
   /** Source time the stroke was painted at, in seconds. */
-  time: number
+  at: number
   /** Brush radius as a fraction of the source frame's short side. */
-  radius: number
-  points: Array<{ x: number; y: number }>
+  size: number
+  points: Array<[number, number]>
 }
 
 export interface CutoutSettings {

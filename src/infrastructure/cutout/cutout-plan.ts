@@ -3,7 +3,7 @@
  * padded sample ranges the cut-out clips play. Pure; shared by the editor's
  * background scheduler, export and the headless harness.
  */
-import type { CutoutSubject } from '@/types/cutout'
+import type { CutoutStroke, CutoutSubject } from '@/types/cutout'
 import type { TimelineItem, VideoItem } from '@/types/timeline'
 import {
   isCutoutActive,
@@ -14,6 +14,11 @@ import {
   sampleRangeFor,
   type IndexRange,
 } from '@/shared/cutout/cutout-core.mjs'
+import {
+  cutoutStrokeHash,
+  isSmartStroke,
+  regionTrackRange,
+} from '@/shared/cutout/cutout-strokes.mjs'
 import type { CutoutMediaInfo } from './cutout-masks'
 
 export interface CutoutNeed {
@@ -87,4 +92,56 @@ export function planCutoutNeeds(
     groups.set(key, group)
   }
   return [...groups.values()]
+}
+
+export interface CutoutRegionNeed {
+  mediaId: string
+  info: CutoutMediaInfo
+  rate: number
+  stroke: CutoutStroke
+  hash: string
+  /** Painted on sample `start`; tracked over [first, last]. */
+  range: { start: number; first: number; last: number }
+}
+
+/** The smart strokes of one cut-out clip, each with the samples to track it over. */
+function clipRegionNeeds(item: VideoItem, projectFps: number, info: CutoutMediaInfo) {
+  const rate = resolveCutoutRate(item.cutout!.sampleRate, info.fps)
+  const [whole] = clipSampleRanges(item, projectFps, rate, info)
+  const max = maxSampleIndex(info.duration, rate)
+  return (item.cutout!.strokes ?? []).filter(isSmartStroke).map((stroke) => ({
+    mediaId: item.mediaId!,
+    info,
+    rate,
+    stroke,
+    hash: cutoutStrokeHash(stroke),
+    range: regionTrackRange(stroke, rate, whole, max),
+  }))
+}
+
+/**
+ * The smart strokes the cut-out clips carry, one per media, rate and stroke,
+ * tracked over every sample the clips that carry it play (plus its own frame).
+ */
+export function planCutoutRegions(
+  items: readonly TimelineItem[],
+  projectFps: number,
+  mediaInfo: (mediaId: string) => CutoutMediaInfo | null,
+): CutoutRegionNeed[] {
+  const byKey = new Map<string, CutoutRegionNeed>()
+  for (const raw of items) {
+    if (!isCutoutActive(raw)) continue
+    const item = raw as VideoItem
+    const info = item.mediaId ? mediaInfo(item.mediaId) : null
+    if (!info) continue
+    for (const need of clipRegionNeeds(item, projectFps, info)) {
+      const key = `${need.mediaId}|${need.hash}|${need.rate}`
+      const prior = byKey.get(key)
+      if (prior) {
+        prior.range.first = Math.min(prior.range.first, need.range.first)
+        prior.range.last = Math.max(prior.range.last, need.range.last)
+      } else byKey.set(key, need)
+    }
+  }
+  return [...byKey.values()]
 }

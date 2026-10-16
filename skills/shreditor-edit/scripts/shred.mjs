@@ -173,6 +173,9 @@
 //   shred cutout <id> [<itemId>...] [--subject auto|person|object] [--off] [--wait] [--json]
 //                                        remove the background of video clips (no green screen needed):
 //                                        turns it on, analyses masks on the service, prints each clip's status
+//   shred cutout <id> <itemId> --stroke '<tool>:x,y;x,y...' --at <source s> [--size r] [--clear-strokes]
+//                                        fix the mask: brush, eraser, smartBrush or smartEraser along source-
+//                                        frame fractions (smart tools track the region through the clip)
 //   shred export <id> [--native|--browser] [--codec h264|hevc|prores] [--quality low|medium|high|ultra] [--out name]
 //                                        final export to <workspace>/projects/<id>/exports/; default: native
 //                                        (ffmpeg from the originals) when the plan allows it, else browser
@@ -330,6 +333,8 @@ const { values: opt, positionals } = parseArgs({
     watch: { type: 'boolean' },
     subject: { type: 'string' },
     off: { type: 'boolean' },
+    stroke: { type: 'string', multiple: true },
+    'clear-strokes': { type: 'boolean' },
     duration: { type: 'string' },
     variables: { type: 'string' },
     item: { type: 'string' },

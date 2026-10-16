@@ -30,13 +30,37 @@
         "none": "Aún sin analizar",
         "error": "Error: {{error}}",
         "noMedia": "El medio del clip no está en la biblioteca"
+      },
+      "paint": {
+        "painting": "Pintar",
+        "paintingHint": "Pinta en la vista previa para corregir la máscara. La zona eliminada se ve atenuada mientras pintas.",
+        "tool": "Herramienta de pincel",
+        "tools": {
+          "smartBrush": "Pincel inteligente",
+          "smartEraser": "Borrador inteligente",
+          "brush": "Pincel",
+          "eraser": "Borrador"
+        },
+        "size": "Tamaño",
+        "hint": "Las herramientas inteligentes toman la región que pintas y la siguen por el clip. El pincel y el borrador se mueven con una región inteligente si los pintas dentro; si no, se aplican en el mismo sitio en cada fotograma.",
+        "tracking": "Siguiendo la región {{done}}/{{count}}",
+        "strokes": "Trazos: {{count}}",
+        "clear": "Borrar trazos",
+        "fixMask": "Corregir máscara…",
+        "overlay": {
+          "smartBrush": "Pincel inteligente: pinta lo que quieres conservar",
+          "smartEraser": "Borrador inteligente: pinta lo que quieres quitar",
+          "brush": "Pincel: pinta para conservar",
+          "eraser": "Borrador: pinta para quitar"
+        }
       }
     }
   },
   "settings": {
     "models": {
       "cutoutModnet": "Remove background (people). Xenova/modnet ONNX, downloaded on first use, SHA-256 checked.",
-      "cutoutU2net": "Remove background (objects). BritishWerewolf/U-2-Net ONNX, downloaded on first use, SHA-256 checked."
+      "cutoutU2net": "Remove background (objects). BritishWerewolf/U-2-Net ONNX, downloaded on first use, SHA-256 checked.",
+      "cutoutSlimsam": "Smart brush for Remove background. Xenova/slimsam-77-uniform ONNX (encoder and decoder), downloaded on first use, SHA-256 checked."
     }
   }
 }

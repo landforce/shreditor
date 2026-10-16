@@ -11,6 +11,8 @@
 //   media/<mediaId>/cache/cutout/<key>/s0000123.png      (one 8-bit mask per sample)
 // keyed by the media's content fingerprint, the model and the sample rate.
 
+import { cutoutStrokesProblem, fnv1a } from './cutout-strokes.mjs'
+
 const CUTOUT_SUBJECTS = ['auto', 'person', 'object']
 const CUTOUT_DEFAULT_RATE = 10
 const CUTOUT_MAX_RATE = 120
@@ -118,7 +120,6 @@ const CUTOUT_FIELD_RULES = [
     (v) => v === 'full' || isNumberIn(1, CUTOUT_MAX_RATE)(v),
     `'full' or a number from 1 to ${CUTOUT_MAX_RATE}`,
   ],
-  ['strokes', Array.isArray, 'an array'],
 ]
 
 /**
@@ -132,7 +133,8 @@ export function cutoutSettingsProblem(value) {
   if (!CUTOUT_SUBJECTS.includes(value.subject))
     return `cutout.subject: must be one of ${CUTOUT_SUBJECTS.join(', ')}`
   const bad = CUTOUT_FIELD_RULES.find(([field, valid]) => value[field] !== undefined && !valid(value[field]))
-  return bad ? `cutout.${bad[0]}: must be ${bad[2]}` : null
+  if (bad) return `cutout.${bad[0]}: must be ${bad[2]}`
+  return value.strokes === undefined ? null : cutoutStrokesProblem(value.strokes)
 }
 
 /** Merge a setCutout op's fields into an item's cutout (defaults for a new one). */
@@ -262,16 +264,6 @@ export function interpolationFor(seconds, rate, has) {
 // ---------------------------------------------------------------------------
 // Identity and storage layout
 
-/** 32-bit FNV-1a, hex. */
-function fnv1a(text) {
-  let hash = 0x811c9dc5
-  for (let i = 0; i < text.length; i++) {
-    hash ^= text.charCodeAt(i)
-    hash = Math.imul(hash, 0x01000193) >>> 0
-  }
-  return hash.toString(16).padStart(8, '0')
-}
-
 /**
  * A media's content fingerprint: the file's size and modification time (the
  * identity the workspace already uses to dedupe imports), plus its frame size
@@ -297,6 +289,11 @@ export function cutoutAnalysisKey({ fingerprint, model, rate }) {
   return `${fingerprint}-${model}-r${rateLabel(rate)}`
 }
 
+/** The folder of a smart stroke's tracked region: fingerprint, sample rate and stroke hash. */
+export function cutoutRegionKey({ fingerprint, rate, hash }) {
+  return `${fingerprint}-slimsam-r${rateLabel(rate)}-${hash}`
+}
+
 /** Path segments of a media's cutout folder, relative to the workspace. */
 export function cutoutDirSegments(mediaId) {
   return ['media', mediaId, 'cache', 'cutout']
@@ -310,8 +307,10 @@ export function cutoutSamplePath(key, index) {
 }
 
 export function emptyCutoutIndex() {
-  return { version: CUTOUT_INDEX_VERSION, entries: {}, auto: {} }
+  return { version: CUTOUT_INDEX_VERSION, entries: {}, auto: {}, regions: {} }
 }
+
+const objectOr = (value) => (value && typeof value === 'object' ? value : {})
 
 /** Parse an index.json (tolerating a missing or broken one). */
 export function parseCutoutIndex(value) {
@@ -319,8 +318,9 @@ export function parseCutoutIndex(value) {
     return emptyCutoutIndex()
   return {
     version: CUTOUT_INDEX_VERSION,
-    entries: value.entries && typeof value.entries === 'object' ? value.entries : {},
-    auto: value.auto && typeof value.auto === 'object' ? value.auto : {},
+    entries: objectOr(value.entries),
+    auto: objectOr(value.auto),
+    regions: objectOr(value.regions),
   }
 }
 
@@ -341,7 +341,16 @@ export function mergeCutoutIndex(disk, mine) {
     }
   }
   out.auto = { ...out.auto, ...add.auto }
+  for (const [key, entry] of Object.entries(add.regions)) {
+    out.regions[key] = mergeRegionEntry(out.regions[key], entry)
+  }
   return out
+}
+
+/** Fold a writer's smart-stroke region entry into the one on disk (ranges union, stats merge). */
+function mergeRegionEntry(prior = {}, entry) {
+  const union = (field) => mergeIndexRanges([...(prior[field] ?? []), ...(entry[field] ?? [])])
+  return { ...prior, ...entry, done: union('done'), covered: union('covered'), stats: { ...prior.stats, ...entry.stats } }
 }
 
 /** The subject 'auto' resolved for a media fingerprint (person until decided). */

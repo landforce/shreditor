@@ -681,6 +681,22 @@ const cases = [
     // Background removal is for video clips; text-1 is a title.
     failure: { op: 'setCutout', id: 'text-1', enabled: true },
   },
+  {
+    name: 'addCutoutStroke',
+    op: { op: 'addCutoutStroke', id: 'clip-left', tool: 'smartEraser', points: [[0.4, 0.8], [0.6, 0.8]], at: 0.5 },
+    // Stored only: the smart region is tracked before a render or by shred cutout.
+    assert: (project) =>
+      assert.deepEqual(item(project, 'clip-left')?.cutout?.strokes, [
+        { tool: 'smartEraser', at: 0.5, size: 0.03, points: [[0.4, 0.8], [0.6, 0.8]] },
+      ]),
+    failure: { op: 'addCutoutStroke', id: 'text-1', tool: 'brush', points: [[0.5, 0.5]], at: 0 },
+  },
+  {
+    name: 'clearCutoutStrokes',
+    op: { op: 'clearCutoutStrokes', id: 'clip-left' },
+    assert: (project) => assert.equal(item(project, 'clip-left')?.cutout?.strokes, undefined),
+    failure: { op: 'clearCutoutStrokes', id: 'text-1' },
+  },
 ]
 
 async function edit(page, project, ops, media, luts, templates, extra = {}) {

@@ -8,6 +8,7 @@ import { GizmoOverlay } from './gizmo-overlay'
 import { MaskEditorContainer } from './mask-editor-container'
 import { CornerPinContainer } from './corner-pin-container'
 import { PowerWindowOverlayContainer } from './power-window-overlay'
+import { CutoutPaintContainer } from './cutout-paint-overlay'
 import { SpatialEffectPointOverlayContainer } from './spatial-effect-point-overlay'
 import { PreviewPerfPanel } from './preview-perf-panel'
 import { PreviewStage } from './preview-stage'
@@ -856,6 +857,12 @@ const VideoPreviewBase = memo(function VideoPreviewBase({
           zoom={zoom}
         />
       )}
+      <CutoutPaintContainer
+        containerRect={playerContainerRect}
+        playerSize={playerSize}
+        projectSize={{ width: project.width, height: project.height }}
+        zoom={zoom}
+      />
     </>
   ) : null
   const shouldShowAfterDuringSplitPlayback = isPlayingForSplitComparison
