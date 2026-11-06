@@ -199,6 +199,22 @@ test('model, dependencies and build are fixed in order; a linked node_modules is
   )
 })
 
+test('a model already elsewhere on the Mac is reused, not downloaded', () => {
+  const missing = { path: '/m/ggml-large-v3-turbo.bin', size: 0, isDefault: true }
+  const fresh = checkPrereqs(machine({ model: missing, existingModel: null })).find(
+    (c) => c.id === 'model',
+  )
+  assert.match(fresh.fix.command, /^download /)
+  const reuse = checkPrereqs(
+    machine({
+      model: missing,
+      existingModel: '/Users/me/whisper.cpp/models/ggml-large-v3-turbo.bin',
+    }),
+  ).find((c) => c.id === 'model')
+  assert.equal(reuse.fix.kind, 'model')
+  assert.match(reuse.fix.command, /use the copy at \/Users\/me\/whisper\.cpp.*no download/)
+})
+
 test('node_modules is compared with package-lock.json', () => {
   const lock = {
     packages: {

@@ -1,9 +1,12 @@
 // `shreditor setup whisper` / `shred setup`: check the tools native
 // transcription needs and, with consent, download the Whisper model.
 // Never installs packages: it prints the Homebrew command instead.
+import { execFileSync } from 'node:child_process'
 import crypto from 'node:crypto'
 import fs from 'node:fs'
+import os from 'node:os'
 import path from 'node:path'
+import { cloneFile } from './media-bridge.mjs'
 import { DEFAULT_MODEL_PATH, engineInfo, findExecutable, transcriptionConfig } from './transcription.mjs'
 
 /**
@@ -56,6 +59,60 @@ export async function downloadModel(target, { fetchImpl = fetch, onProgress = ()
   }
 }
 
+/** Folders other whisper.cpp setups commonly keep the model in. */
+const MODEL_DIRS = [
+  path.join(os.homedir(), 'whisper.cpp', 'models'),
+  path.join(os.homedir(), 'Dev', 'whisper.cpp', 'models'),
+  path.join(os.homedir(), '.cache', 'whisper.cpp'),
+  path.join(os.homedir(), '.cache', 'whisper'),
+  path.join(os.homedir(), 'Library', 'Application Support', 'MacWhisper', 'models'),
+  path.join(os.homedir(), 'Downloads'),
+  '/opt/homebrew/share/whisper-cpp',
+  '/usr/local/share/whisper-cpp',
+]
+
+/** Spotlight's matches for the model's file name; [] when mdfind is missing or slow. */
+function spotlight(name) {
+  try {
+    return execFileSync('mdfind', ['-name', name], { encoding: 'utf8', timeout: 5000, stdio: ['ignore', 'pipe', 'ignore'] })
+      .split('\n')
+      .filter((file) => path.basename(file) === name)
+  } catch {
+    return []
+  }
+}
+
+/**
+ * A copy of the default model already on this Mac, somewhere other than
+ * `target`, with the published size: its path, or null.
+ */
+export function findExistingModel(target, { dirs = MODEL_DIRS, search = spotlight, model = DEFAULT_MODEL } = {}) {
+  const candidates = [...dirs.map((dir) => path.join(dir, model.file)), ...search(model.file)]
+  for (const file of new Set(candidates)) {
+    if (path.resolve(file) === path.resolve(target)) continue
+    if (fs.statSync(file, { throwIfNoEntry: false })?.size === model.size) return file
+  }
+  return null
+}
+
+/**
+ * Put an existing copy of the model at `target` after checking its sha256:
+ * an APFS clone (no extra disk space) on the same volume, a symlink otherwise.
+ * Returns 'clone' or 'link'; throws when the copy doesn't match.
+ */
+export async function adoptModel(source, target, { model = DEFAULT_MODEL } = {}) {
+  if ((await sha256File(source)) !== model.sha256) throw new Error(`${source} does not match the published sha256`)
+  fs.mkdirSync(path.dirname(target), { recursive: true })
+  try {
+    await cloneFile(source, target)
+    return 'clone'
+  } catch {
+    fs.rmSync(target, { force: true })
+    fs.symlinkSync(source, target)
+    return 'link'
+  }
+}
+
 /**
  * Check and report; download the default model only when `yes` is true.
  * `say` prints one line. Returns true when native transcription is ready.
@@ -71,8 +128,19 @@ export async function setupWhisper({ yes = false, verify = false, say = (line) =
   const brew = [!tools.ffmpeg || !tools.ffprobe ? 'ffmpeg' : null, !tools['whisper-cli'] ? 'whisper-cpp' : null].filter(Boolean)
   if (brew.length) say(`         install with: brew install ${brew.join(' ')}`)
 
-  const size = fs.statSync(config.model, { throwIfNoEntry: false })?.size ?? 0
+  let size = fs.statSync(config.model, { throwIfNoEntry: false })?.size ?? 0
   const isDefault = path.basename(config.model) === DEFAULT_MODEL.file
+  const existing = size === 0 && isDefault ? findExistingModel(config.model) : null
+  if (existing) {
+    say(`found    model  ${existing}; checking sha256…`)
+    try {
+      const how = await adoptModel(existing, config.model)
+      size = DEFAULT_MODEL.size
+      say(`         ${how === 'clone' ? 'cloned it' : 'linked it'} to ${config.model} instead of downloading${how === 'link' ? ` (keep ${existing} in place)` : ''}`)
+    } catch (error) {
+      say(`         not used: ${error.message}`)
+    }
+  }
   if (size > 0) {
     let note = isDefault ? (size === DEFAULT_MODEL.size ? 'size matches the published file' : `size differs from the published ${DEFAULT_MODEL.size} bytes`) : 'custom model'
     if (verify && isDefault) {

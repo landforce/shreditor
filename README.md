@@ -69,7 +69,8 @@ yours. Nothing is merged silently.
 
 `npx shreditor install` checks everything Shreditor needs and says what is
 missing and how to fix it. It offers to install ffmpeg and whisper.cpp with
-Homebrew, download the transcription model (1.6 GB), and build the editor;
+Homebrew, download the transcription model (1.6 GB; a copy already on your Mac
+is reused instead), and build the editor;
 answer `y` (or pass `--yes`). It never installs Homebrew, Chrome or Node for
 you.
 

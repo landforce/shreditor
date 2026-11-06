@@ -3,7 +3,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { findExecutable, transcriptionConfig } from '../transcription.mjs'
-import { DEFAULT_MODEL } from '../transcription-setup.mjs'
+import { DEFAULT_MODEL, findExistingModel } from '../transcription-setup.mjs'
 import { depsState, linkedNodeModules, staleBuild } from './build-state.mjs'
 
 export const MIN_NODE_MAJOR = 22
@@ -24,6 +24,9 @@ export function realProbe(repo) {
       path: config.model,
       size: fs.statSync(config.model, { throwIfNoEntry: false })?.size ?? 0,
       isDefault: path.basename(config.model) === DEFAULT_MODEL.file,
+    },
+    get existingModel() {
+      return this.model.size === 0 && this.model.isDefault ? findExistingModel(config.model) : null
     },
     deps: depsState(repo),
     depsLinkedTo: linkedNodeModules(repo),
@@ -53,7 +56,7 @@ function brewCheck(id, label, found, formula, brew) {
       }
 }
 
-function modelCheck(model) {
+function modelCheck(model, existing) {
   const label = 'Whisper model'
   if (model.size > 0) return ok('model', label, `${model.path} (${gb(model.size)})`)
   if (!model.isDefault)
@@ -69,10 +72,12 @@ function modelCheck(model) {
     id: 'model',
     label,
     ok: false,
-    detail: 'not downloaded',
+    detail: existing ? `not set up (a copy is at ${existing})` : 'not downloaded',
     fix: {
       kind: 'model',
-      command: `download ${DEFAULT_MODEL.file} (${gb(DEFAULT_MODEL.size)}) from ${DEFAULT_MODEL.url}`,
+      command: existing
+        ? `use the copy at ${existing} (no download)`
+        : `download ${DEFAULT_MODEL.file} (${gb(DEFAULT_MODEL.size)}) from ${DEFAULT_MODEL.url}`,
     },
   }
 }
@@ -146,7 +151,7 @@ export function checkPrereqs(probe) {
       'whisper-cpp',
       brew,
     ),
-    modelCheck(probe.model),
+    modelCheck(probe.model, probe.existingModel),
     depsCheck(probe),
     probe.build
       ? {

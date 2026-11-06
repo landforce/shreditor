@@ -236,7 +236,7 @@ const CLONEFILE_JXA = `function run(argv) {
   return $.clonefile(argv[0], argv[1], 0) === 0 ? 'ok' : 'failed'
 }`
 
-async function cloneFile(source, target) {
+export async function cloneFile(source, target) {
   if (process.platform === 'darwin') {
     const out = await run('osascript', ['-l', 'JavaScript', '-e', CLONEFILE_JXA, source, target]).catch(() => '')
     if (out.trim() !== 'ok') {

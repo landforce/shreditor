@@ -290,3 +290,28 @@ test('model download is verified by size and sha256 before it is put in place', 
   await assert.rejects(downloadModel(bad, { fetchImpl, model: { ...model, size: 1 } }), /Size mismatch/)
   assert.ok(!fs.existsSync(bad) && !fs.existsSync(`${bad}.part`), 'nothing left behind')
 })
+
+test('an existing copy of the model is found by size and adopted only when its sha256 matches', async (t) => {
+  const crypto = await import('node:crypto')
+  const { adoptModel, findExistingModel } = await import('./transcription-setup.mjs')
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'shreditor-model-'))
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }))
+  const bytes = Buffer.from('ggml model bytes')
+  const model = { file: 'm.bin', size: bytes.length, sha256: crypto.createHash('sha256').update(bytes).digest('hex') }
+  const target = path.join(dir, 'shreditor', 'm.bin')
+  const elsewhere = path.join(dir, 'whisper.cpp')
+  fs.mkdirSync(elsewhere)
+  fs.writeFileSync(path.join(dir, 'm.bin'), 'wrong size')
+  fs.writeFileSync(path.join(elsewhere, 'm.bin'), bytes)
+  const opts = { dirs: [dir, elsewhere], search: () => [], model }
+  assert.equal(findExistingModel(target, opts), path.join(elsewhere, 'm.bin'))
+  assert.equal(findExistingModel(target, { ...opts, dirs: [dir] }), null)
+  assert.equal(findExistingModel(path.join(elsewhere, 'm.bin'), { ...opts, dirs: [elsewhere] }), null, 'the target itself is not a candidate')
+
+  assert.ok(['clone', 'link'].includes(await adoptModel(path.join(elsewhere, 'm.bin'), target, { model })))
+  assert.deepEqual(fs.readFileSync(target), bytes)
+
+  fs.writeFileSync(path.join(dir, 'same-size.bin'), Buffer.alloc(bytes.length))
+  await assert.rejects(adoptModel(path.join(dir, 'same-size.bin'), path.join(dir, 'other', 'm.bin'), { model }), /sha256/)
+  assert.ok(!fs.existsSync(path.join(dir, 'other', 'm.bin')))
+})
