@@ -21,11 +21,21 @@ const folderName = (p: string) => p.split(/[\\/]/).filter(Boolean).pop() ?? p
 const tilde = (p: string) =>
   p.replace(/^(\/Users\/[^/]+|\/home\/[^/]+|[A-Za-z]:\\Users\\[^\\]+)/, '~')
 
+// Older bridges don't say whether they have a chooser; they had one only on macOS.
+const hasChooser = (info: BridgeInfo) => info.chooser ?? info.platform === 'darwin'
+const anotherFolderLabel = (info: BridgeInfo) =>
+  hasChooser(info) ? 'Choose another folder…' : 'Open another folder by path…'
+
+/** The bridge's native chooser (`go(null)`), or a typed path where it has none. */
+function anotherFolder(info: BridgeInfo, go: (path: string | null) => Promise<void>) {
+  if (hasChooser(info)) return void go(null)
+  const typed = window.prompt('Folder to use as the workspace (full path):', info.root)?.trim()
+  if (typed) void go(typed)
+}
+
 export function BridgeWorkspaceIndicator({ info }: { info: BridgeInfo }) {
   const [open, setOpen] = useState(false)
   const [error, setError] = useState<string | null>(null)
-
-  const hasChooser = info.chooser ?? info.platform === 'darwin'
 
   const go = async (path: string | null) => {
     setError(null)
@@ -91,14 +101,10 @@ export function BridgeWorkspaceIndicator({ info }: { info: BridgeInfo }) {
           variant="ghost"
           size="sm"
           className="w-full justify-start gap-2"
-          onClick={() => {
-            if (hasChooser) return void go(null)
-            const typed = window.prompt('Folder to use as the workspace (full path):', info.root)
-            if (typed?.trim()) void go(typed.trim())
-          }}
+          onClick={() => anotherFolder(info, go)}
         >
           <Plus className="w-4 h-4" />
-          {hasChooser ? 'Choose another folder…' : 'Open another folder by path…'}
+          {anotherFolderLabel(info)}
         </Button>
         {error && <p className="px-2 py-1 text-xs text-destructive">{error}</p>}
       </PopoverContent>
