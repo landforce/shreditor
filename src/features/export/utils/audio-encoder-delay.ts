@@ -2,10 +2,11 @@
  * Measure an audio encoder's delay (priming) in samples by a round trip: an
  * impulse is encoded with the export's encoder settings, decoded again, and
  * the decoded impulse's position gives the samples the encoder put before the
- * input. Chrome's AAC encoder measures 2112 (44 ms at 48 kHz). The browser
- * does not report this anywhere, and it differs between platform encoders, so
- * it is measured once per settings and cached. Null when it cannot be measured
- * (no WebCodecs decoder, or an implausible result).
+ * input. Chrome's AAC encoder measures 2112 (44 ms at 48 kHz), Mediabunny's
+ * WASM fallback 1024. The browser does not report this anywhere, and it
+ * differs between encoders, so it is measured once per settings and cached.
+ * Null when it cannot be measured (no WebCodecs decoder, or an implausible
+ * result).
  */
 
 import { createLogger } from '@/shared/logging/logger'
@@ -39,42 +40,58 @@ export function encoderDelayFromImpulse(decodedImpulseIndex: number): number | n
   return delay >= 0 && delay <= MAX_PLAUSIBLE_DELAY ? delay : null
 }
 
+/**
+ * Encode the impulse through Mediabunny, which picks the encoder the export
+ * itself uses: the browser's AAC encoder where there is one, otherwise the
+ * registered WASM fallback (Chrome on Linux has no AAC encoder; that one
+ * primes 1024 samples). Probing WebCodecs directly measured nothing there and
+ * left those exports a frame late.
+ */
 async function encodeProbe(config: AudioEncoderConfig) {
-  const chunks: EncodedAudioChunk[] = []
-  let decoderConfig: AudioDecoderConfig | undefined
-  let failure: unknown = null
-  const encoder = new AudioEncoder({
-    output: (chunk, metadata) => {
-      chunks.push(chunk)
-      if (metadata?.decoderConfig) decoderConfig = metadata.decoderConfig
-    },
-    error: (error) => {
-      failure = error
-    },
+  const mb = await import('mediabunny')
+  const { numberOfChannels: channels, sampleRate } = config
+  const target = new mb.BufferTarget()
+  const output = new mb.Output({ format: new mb.Mp4OutputFormat(), target })
+  const source = new mb.AudioSampleSource({
+    codec: config.codec.startsWith('mp4a') ? 'aac' : 'opus',
+    bitrate: config.bitrate ?? 192_000,
+  })
+  output.addAudioTrack(source)
+  await output.start()
+  const planes = new Float32Array(PROBE_FRAMES * channels)
+  for (let channel = 0; channel < channels; channel++) {
+    planes[channel * PROBE_FRAMES + IMPULSE_AT] = 0.9
+  }
+  const sample = new mb.AudioSample({
+    format: 'f32-planar',
+    sampleRate,
+    numberOfChannels: channels,
+    timestamp: 0,
+    data: planes,
   })
   try {
-    encoder.configure(config)
-    const { numberOfChannels: channels } = config
-    const planes = new Float32Array(PROBE_FRAMES * channels)
-    for (let channel = 0; channel < channels; channel++) {
-      planes[channel * PROBE_FRAMES + IMPULSE_AT] = 0.9
-    }
-    const data = new AudioData({
-      format: 'f32-planar',
-      sampleRate: config.sampleRate,
-      numberOfChannels: channels,
-      numberOfFrames: PROBE_FRAMES,
-      timestamp: 0,
-      data: planes,
-    })
-    encoder.encode(data)
-    data.close()
-    await encoder.flush()
+    await source.add(sample)
   } finally {
-    if (encoder.state !== 'closed') encoder.close()
+    sample.close()
   }
-  if (failure) throw failure
-  return { chunks, decoderConfig }
+  await output.finalize()
+
+  const input = new mb.Input({
+    source: new mb.BufferSource(target.buffer!),
+    formats: mb.ALL_FORMATS,
+  })
+  try {
+    const track = await input.getPrimaryAudioTrack()
+    if (!track) return { chunks: [], decoderConfig: undefined }
+    const decoderConfig = (await track.getDecoderConfig()) ?? undefined
+    const chunks: EncodedAudioChunk[] = []
+    for await (const packet of new mb.EncodedPacketSink(track).packets()) {
+      chunks.push(packet.toEncodedAudioChunk())
+    }
+    return { chunks, decoderConfig }
+  } finally {
+    input.dispose()
+  }
 }
 
 async function decodeFirstChannel(
@@ -112,7 +129,7 @@ async function decodeFirstChannel(
 }
 
 async function measure(config: AudioEncoderConfig): Promise<number | null> {
-  if (typeof AudioEncoder === 'undefined' || typeof AudioDecoder === 'undefined') return null
+  if (typeof AudioDecoder === 'undefined') return null
   try {
     const { chunks, decoderConfig } = await encodeProbe(config)
     if (!decoderConfig || chunks.length === 0) return null
