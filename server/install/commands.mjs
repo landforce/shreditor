@@ -1,8 +1,8 @@
 // `shreditor install | uninstall | status | update | restart`: keep the editor
-// and the agent service running on this Mac as login items (launchd), and
-// update the checkout without losing anyone's unsaved work.
+// and the agent service running as login items (launchd on macOS, systemd user
+// units on Linux, the Startup folder on Windows: login-items.mjs), and update
+// the checkout without losing anyone's unsaved work.
 import { execFileSync, spawnSync } from 'node:child_process'
-import fs from 'node:fs'
 import path from 'node:path'
 import readline from 'node:readline/promises'
 import { fileURLToPath } from 'node:url'
@@ -20,18 +20,8 @@ import {
   treeDirty,
 } from './build-state.mjs'
 import { checkRestartSafe, updateSteps } from './guard.mjs'
-import {
-  DEFAULT_LABEL_PREFIX,
-  DEFAULT_PORTS,
-  bootout,
-  bootstrap,
-  jobLabel,
-  jobPlan,
-  jobStatus,
-  kickstart,
-  writePlist,
-} from './launchd.mjs'
-import { checkPrereqs, planFixes, realProbe } from './prereqs.mjs'
+import { DEFAULT_LABEL_PREFIX, DEFAULT_PORTS, jobLabel, loginItems } from './login-items.mjs'
+import { checkPrereqs, laterSteps, planFixes, realProbe } from './prereqs.mjs'
 import {
   editorInfo,
   logFile,
@@ -47,6 +37,9 @@ const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 const KINDS = ['editor', 'service']
 const NAMES = { editor: 'the editor', service: 'the agent service' }
 const say = (line = '') => process.stdout.write(`${line}\n`)
+const { jobPlan, jobStatus, bootout, bootstrap, kickstart } = loginItems
+const ITEM = loginItems.KIND_NAME
+const SHRED_UP = `node ${path.join(REPO, 'skills', 'shreditor-edit', 'scripts', 'shred.mjs')} up`
 
 const OPTIONS = {
   yes: { type: 'boolean', default: false },
@@ -65,7 +58,7 @@ const OPTIONS = {
 
 const answering = { editor: (url) => editorInfo(url), service: (url) => serviceHealth(url) }
 
-/** The two jobs as options and any installed plists say (installed ports win unless given). */
+/** The two jobs as options and any installed login items say (installed ports win unless given). */
 function jobsFor(opt) {
   const installed = Object.fromEntries(
     KINDS.map((kind) => [kind, jobStatus(jobLabel(opt['label-prefix'], kind))]),
@@ -104,11 +97,16 @@ async function confirm(question) {
 }
 
 async function runFix(fix) {
-  if (fix.kind === 'brew') {
-    const brew = realProbe(REPO).which('brew')
-    say(`$ brew install ${fix.formulas.join(' ')}`)
-    const r = spawnSync(brew, ['install', ...fix.formulas], { stdio: 'inherit' })
-    if (r.status !== 0) throw new Error(`brew install ${fix.formulas.join(' ')} failed`)
+  if (fix.steps) {
+    // A package install (brew, apt, dnf, pacman, winget); brew may be off PATH.
+    // root (a container) needs no sudo, and may not have it.
+    for (const argv of fix.steps) {
+      const asRoot = argv[0] === 'sudo' && process.getuid?.() === 0
+      const [command, ...args] = asRoot ? argv.slice(1) : argv
+      say(`$ ${[command, ...args].join(' ')}`)
+      const r = spawnSync(realProbe(REPO).which(command) ?? command, args, { stdio: 'inherit' })
+      if (r.status !== 0) throw new Error(`${[command, ...args].join(' ')} failed`)
+    }
   } else if (fix.kind === 'model') {
     const { setupWhisper } = await import('../transcription-setup.mjs')
     await setupWhisper({ yes: true, say })
@@ -122,6 +120,11 @@ async function prerequisites(opt) {
   let checks = checkPrereqs(realProbe(REPO))
   printChecks(checks)
   const { auto, manual } = planFixes(checks)
+  const later = laterSteps(checks)
+  if (later.length) {
+    say('\nOptional (Shreditor works without it; native transcription stays off until then):')
+    for (const c of later) say(`  - ${c.label}: ${c.manual}`)
+  }
   if (manual.length) {
     say('\nDo these first, then run this again:')
     for (const c of manual) say(`  - ${c.label}: ${c.manual}`)
@@ -140,13 +143,13 @@ async function prerequisites(opt) {
   }
   for (const fix of auto) await runFix(fix)
   checks = checkPrereqs(realProbe(REPO))
-  const still = checks.filter((c) => !c.ok)
+  const still = checks.filter((c) => !c.ok && !c.optional)
   for (const c of still) say(`still missing: ${c.label} (${c.detail})`)
   return !still.length
 }
 
 /**
- * Whatever already serves the jobs' ports outside launchd (e.g. `shred up`):
+ * Whatever already serves the jobs' ports outside the login items (e.g. `shred up`):
  * [{ kind, pid }] to stop. Throws when that would lose work or isn't Shreditor.
  */
 async function foreignProcesses(plan, installed, opt) {
@@ -213,12 +216,17 @@ async function waitUntilAnswering(job, { oldPid } = {}) {
 }
 
 async function install(opt) {
-  if (process.platform !== 'darwin')
-    throw new Error('shreditor install sets up macOS login items; on other systems run shred up')
   if (!(await prerequisites(opt))) return 1
+  const why = loginItems.unavailable()
+  if (why) {
+    say(`\nShreditor is ready, but it can't start on its own here: ${why}.`)
+    say(`Start it when you need it with: ${SHRED_UP}`)
+    say('(the editor on http://localhost:5273, the agent service on 127.0.0.1:8787)')
+    return 0
+  }
   const { plan, installed } = jobsFor(opt)
   for (const { kind, pid } of await foreignProcesses(plan, installed, opt)) {
-    say(`Stopping ${NAMES[kind]} that was started by hand (pid ${pid}); the login item takes over.`)
+    say(`Stopping ${NAMES[kind]} that was started by hand (pid ${pid}); the ${ITEM} takes over.`)
     await stopPid(pid)
   }
   if (KINDS.some((kind) => installed[kind].loaded))
@@ -229,9 +237,9 @@ async function install(opt) {
     )
   for (const kind of KINDS) {
     const job = plan[kind]
-    writePlist(job)
     if (installed[kind].loaded) bootout(job.label)
-    await bootstrap(job.plistPath)
+    loginItems.writeJob(job)
+    await bootstrap(job.itemPath)
   }
   say('\nStarting…')
   for (const kind of KINDS) {
@@ -253,11 +261,10 @@ async function uninstall(opt) {
   for (const kind of KINDS) {
     const label = plan[kind].label
     const unloaded = installed[kind].loaded && bootout(label)
-    const file = installed[kind].plistPath
-    const removed = fs.existsSync(file)
-    fs.rmSync(file, { force: true })
+    const file = installed[kind].itemPath
+    const removed = Boolean(file) && loginItems.removeJob(file)
     say(
-      `${kind.padEnd(8)} ${unloaded ? 'stopped, ' : ''}${removed ? `removed ${file}` : 'no login item'}`,
+      `${kind.padEnd(8)} ${unloaded ? 'stopped, ' : ''}${removed ? `removed ${file}` : `no ${ITEM}`}`,
     )
   }
   say('Logs, the workspace and ~/.shreditor are left as they are.')
@@ -267,9 +274,9 @@ async function uninstall(opt) {
 // ── status ─────────────────────────────────────────────────────────────────
 
 function launchdLine(status) {
-  if (!status.installed) return 'no login item'
-  if (!status.loaded) return `login item ${status.label}: installed, not loaded`
-  return `login item ${status.label}: ${status.state}${status.pid ? `, pid ${status.pid}` : ''}${status.lastExit !== null ? `, last exit ${status.lastExit}` : ''}`
+  if (!status.installed) return `no ${ITEM}`
+  if (!status.loaded) return `${ITEM} ${status.label}: installed, not loaded`
+  return `${ITEM} ${status.label}: ${status.state}${status.pid ? `, pid ${status.pid}` : ''}${status.lastExit !== null ? `, last exit ${status.lastExit}` : ''}`
 }
 
 function buildLine() {
@@ -328,7 +335,7 @@ async function restartAll(plan, installed, opt) {
 async function restartJob(job, status) {
   kickstart(job.label, { restart: true })
   const now = await waitUntilAnswering(job, { oldPid: status.pid })
-  say(`restarted ${NAMES[job.kind]} (login item, pid ${now.pid})`)
+  say(`restarted ${NAMES[job.kind]} (${ITEM}, pid ${now.pid})`)
 }
 
 async function restartProcess(kind, job) {
@@ -346,7 +353,7 @@ async function restartProcess(kind, job) {
   else spawnService({ repo: REPO, port: job.port, workspace })
   const now = await waitFor(() => answering[kind](job.url), { timeoutMs: 240_000 })
   if (!now) throw new Error(`${NAMES[kind]} did not come back; run shred up`)
-  say(`restarted ${NAMES[kind]} (not a login item; pid ${pid} -> ${now.pid ?? '?'})`)
+  say(`restarted ${NAMES[kind]} (not a ${ITEM}; pid ${pid} -> ${now.pid ?? '?'})`)
 }
 
 /** Pull, install dependencies if the lockfile moved, build: { from, to, commits } or null when current. */

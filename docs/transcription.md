@@ -10,7 +10,7 @@ computer; nothing is uploaded.
 
 1. An import finishes: `importMediaByPath` (path import, `shreditor import`)
    calls `autoTranscribe`, and the bridge sees the first `PUT` of
-   `media/<id>/metadata.json` from the editor (Finder chooser, browser upload).
+   `media/<id>/metadata.json` from the editor (native file chooser, browser upload).
    A CLI import hands the job to a running bridge (`SHREDITOR_PORT`, default
    5273); with none up it stays `queued` until the next bridge start.
 2. `server/transcription.mjs` queues it (one job at a time, 64 queued at most),

@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // The agent service as the login item runs it: the workspace is resolved each
 // time it starts ($SHREDITOR_WORKSPACE, else ~/.shreditor/config.json, else
-// ~/Movies/Shreditor), so `shreditor choose` then a restart moves it.
+// ~/Movies/Shreditor on a Mac, ~/Videos/Shreditor elsewhere), so `shreditor
+// choose` then a restart moves it.
 //
 //   node server/install/run-service.mjs --port 8787
 import { execFileSync } from 'node:child_process'
@@ -16,9 +17,10 @@ const say = (line) => console.log(`${new Date().toISOString()} ${line}`)
 // The headless Chrome this job launches carries a marker switch, so the one a
 // killed run left behind (Playwright can't close it after a SIGKILL) is found
 // and stopped on the next start instead of running on its own.
-const marker = `--shreditor-job=${process.env.XPC_SERVICE_NAME || 'service'}`
+// launchd names the job in XPC_SERVICE_NAME; the systemd and Windows items set SHREDITOR_JOB.
+const marker = `--shreditor-job=${process.env.XPC_SERVICE_NAME || process.env.SHREDITOR_JOB || 'service'}`
 
-/** pids of orphaned processes (parent launchd) started with `marker`. */
+/** pids of orphaned processes (parent launchd, or init) started with `marker`. */
 export function orphansWith(psOutput, marker) {
   return psOutput
     .split('\n')
@@ -28,7 +30,15 @@ export function orphansWith(psOutput, marker) {
 }
 
 function stopOrphanedBrowsers() {
-  const ps = execFileSync('ps', ['-axww', '-o', 'pid=,ppid=,command='], { encoding: 'utf8' })
+  // Windows: the supervisor stops the whole process tree. Linux: systemd stops
+  // the unit's cgroup, so this only finds ones left under init.
+  if (process.platform === 'win32') return
+  let ps
+  try {
+    ps = execFileSync('ps', ['-e', '-ww', '-o', 'pid=,ppid=,command='], { encoding: 'utf8' })
+  } catch {
+    return
+  }
   for (const pid of orphansWith(ps, marker)) {
     try {
       process.kill(pid, 'SIGKILL')
@@ -44,7 +54,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   fs.mkdirSync(workspace, { recursive: true })
   stopOrphanedBrowsers()
   say(`starting the agent service on ${workspace}`)
-  // launchd runs one copy of this job, so a writer lock whose process is dead is
+  // The system runs one copy of this job, so a writer lock whose process is dead is
   // one this job left behind (a crash); take it over rather than wait.
   main(['--workspace', workspace, '--port', values.port, '--break-lock']).catch((error) => {
     console.error(`Service failed to start: ${error.message ?? error}`)

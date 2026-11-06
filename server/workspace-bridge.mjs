@@ -5,7 +5,6 @@
 // Mounted by the Vite dev server (see vite.config.ts) and by `bin/shreditor.mjs`.
 // All routes live under /__shreditor/. Paths are relative to the workspace
 // root and may not escape it.
-import { execFile } from 'node:child_process'
 import crypto from 'node:crypto'
 import fs from 'node:fs'
 import os from 'node:os'
@@ -18,12 +17,15 @@ import { createMotionRoutes } from './motion-bridge.mjs'
 import { createKitRoutes } from './kit-bridge.mjs'
 import { createCutExportRoutes } from './cut-export-bridge.mjs'
 import { createTranscriptionRoutes } from './transcription.mjs'
+import { ChooserError, chooseFolder as showFolderChooser, chooserFor } from './native-dialogs.mjs'
+import { defaultWorkspace } from './platform.mjs'
 
 const PREFIX = '/__shreditor/'
 // $SHREDITOR_CONFIG points elsewhere (as server/transcription.mjs allows), e.g. for test login items.
 const CONFIG_FILE = process.env.SHREDITOR_CONFIG || path.join(os.homedir(), '.shreditor', 'config.json')
 const CONFIG_DIR = path.dirname(CONFIG_FILE)
-export const DEFAULT_WORKSPACE = path.join(os.homedir(), 'Movies', 'Shreditor')
+// ~/Movies/Shreditor on a Mac, ~/Videos/Shreditor on Linux and Windows.
+export const DEFAULT_WORKSPACE = defaultWorkspace()
 const MAX_RECENT = 8
 
 class HttpError extends Error {
@@ -55,7 +57,7 @@ export function currentWorkspace() {
 
 /** Make `dir` the workspace (creating it) and remember it in the recent list. */
 export function setWorkspace(dir) {
-  const resolved = path.resolve(dir.replace(/^~(?=$|\/)/, os.homedir()))
+  const resolved = path.resolve(dir.replace(/^~(?=$|[\\/])/, os.homedir()))
   fs.mkdirSync(resolved, { recursive: true })
   if (!fs.statSync(resolved).isDirectory()) throw new HttpError(400, 'TypeMismatchError', `${resolved} is not a folder`)
   const config = readConfig()
@@ -64,24 +66,17 @@ export function setWorkspace(dir) {
   return resolved
 }
 
-// Native macOS folder chooser, run by this process so it works in any browser.
-function chooseFolder(startIn) {
-  if (process.platform !== 'darwin') {
-    return Promise.reject(new HttpError(501, 'NotSupportedError', 'The folder chooser needs macOS; pass a path instead'))
+// Native folder chooser (Finder, zenity/kdialog, Windows), run by this process so
+// it works in any browser; 501 where there is none (see native-dialogs.mjs).
+async function chooseFolder(startIn) {
+  try {
+    return await showFolderChooser(startIn && fs.existsSync(startIn) ? startIn : undefined)
+  } catch (error) {
+    if (!(error instanceof ChooserError)) throw error
+    if (error.reason === 'cancelled') throw new HttpError(499, 'AbortError', 'Cancelled')
+    if (error.reason === 'unavailable') throw new HttpError(501, 'NotSupportedError', error.message)
+    throw new HttpError(500, 'UnknownError', error.message)
   }
-  const location = startIn && fs.existsSync(startIn) ? ` default location POSIX file ${JSON.stringify(startIn)}` : ''
-  const script = `POSIX path of (choose folder with prompt "Choose a Shreditor workspace folder"${location})`
-  return new Promise((resolve, reject) => {
-    execFile('osascript', ['-e', script], (error, stdout) => {
-      if (error) {
-        // -128 is "user cancelled".
-        if (String(error.message).includes('-128')) reject(new HttpError(499, 'AbortError', 'Cancelled'))
-        else reject(new HttpError(500, 'UnknownError', error.message))
-        return
-      }
-      resolve(stdout.trim().replace(/\/$/, ''))
-    })
-  })
 }
 
 function resolveInside(root, rel = '') {
@@ -199,7 +194,7 @@ export function createWorkspaceBridge({ mode = 'dev' } = {}) {
       switch (route) {
         case 'GET info': {
           const config = readConfig()
-          return sendJson(res, 200, { version: 1, root, name: path.basename(root), recent: config.recent ?? [root], platform: process.platform, mode, pid: process.pid })
+          return sendJson(res, 200, { version: 1, root, name: path.basename(root), recent: config.recent ?? [root], platform: process.platform, chooser: Boolean(chooserFor()), mode, pid: process.pid })
         }
         case 'POST workspace': {
           const { path: dir } = JSON.parse((await readBody(req)).toString() || '{}')

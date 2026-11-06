@@ -1,5 +1,5 @@
 // Starting, finding and stopping the editor and the agent service outside
-// launchd: what `shred up` / `shred start` run, and what `shreditor install`
+// the login items: what `shred up` / `shred start` run, and what `shreditor install`
 // and `shreditor update` stop (safely) or restart.
 import { execFileSync, spawn } from 'node:child_process'
 import fs from 'node:fs'
@@ -46,6 +46,9 @@ export function spawnEditor({ repo, port, dev = false, workspace, log = logFile(
       env: { ...process.env, ...(workspace ? { SHREDITOR_WORKSPACE: workspace } : {}) },
       detached: true,
       stdio: ['ignore', fs.openSync(log, 'a'), fs.openSync(log, 'a')],
+      // npm is npm.cmd on Windows, which only a shell runs.
+      shell: process.platform === 'win32',
+      windowsHide: true,
     },
   )
   child.unref()
@@ -61,6 +64,7 @@ export function spawnService({ repo, port, workspace, log = logFile('service') }
       cwd: repo,
       detached: true,
       stdio: ['ignore', fs.openSync(log, 'a'), fs.openSync(log, 'a')],
+      windowsHide: true,
     },
   )
   child.unref()
@@ -70,7 +74,7 @@ export function spawnService({ repo, port, workspace, log = logFile('service') }
 // What a Shreditor editor or service process looks like in `ps`.
 const SHREDITOR_COMMAND = {
   editor: /\b(vp|vite|vite\/node\/cli\.js) (preview|dev)\b/,
-  service: /headless\/serve\.mjs|server\/install\/run-service\.mjs/,
+  service: /headless[\\/]serve\.mjs|server[\\/]install[\\/]run-service\.mjs/,
 }
 
 const commandOf = (pid) => {

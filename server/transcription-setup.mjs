@@ -1,12 +1,15 @@
 // `shreditor setup whisper` / `shred setup`: check the tools native
 // transcription needs and, with consent, download the Whisper model.
-// Never installs packages: it prints the Homebrew command instead.
+// Never installs packages: it prints the install command for this system
+// (Homebrew, apt, winget...: server/install/packages.mjs) instead.
 import { execFileSync } from 'node:child_process'
 import crypto from 'node:crypto'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
+import { installCommands, managersHere, manualInstall, packageFor } from './install/packages.mjs'
 import { cloneFile } from './media-bridge.mjs'
+import { defaultModelPath, extraToolDirs } from './platform.mjs'
 import { DEFAULT_MODEL_PATH, engineInfo, findExecutable, transcriptionConfig } from './transcription.mjs'
 
 /**
@@ -59,34 +62,55 @@ export async function downloadModel(target, { fetchImpl = fetch, onProgress = ()
   }
 }
 
-/** Folders other whisper.cpp setups commonly keep the model in. */
-const MODEL_DIRS = [
-  path.join(os.homedir(), 'whisper.cpp', 'models'),
-  path.join(os.homedir(), 'Dev', 'whisper.cpp', 'models'),
-  path.join(os.homedir(), '.cache', 'whisper.cpp'),
-  path.join(os.homedir(), '.cache', 'whisper'),
-  path.join(os.homedir(), 'Library', 'Application Support', 'MacWhisper', 'models'),
-  path.join(os.homedir(), 'Downloads'),
-  '/opt/homebrew/share/whisper-cpp',
-  '/usr/local/share/whisper-cpp',
-]
+/** Folders other whisper.cpp setups commonly keep the model in, on this system. */
+export function modelDirs(platform = process.platform, home = os.homedir(), env = process.env) {
+  const p = platform === 'win32' ? path.win32 : path.posix
+  const common = [
+    p.join(home, 'whisper.cpp', 'models'),
+    p.join(home, 'Dev', 'whisper.cpp', 'models'),
+    p.join(home, '.cache', 'whisper.cpp'),
+    p.join(home, '.cache', 'whisper'),
+    p.join(home, 'Downloads'),
+  ]
+  // Where a Homebrew whisper-cpp keeps models: share/ beside its bin/.
+  const brewShare = extraToolDirs(platform, home, env)
+    .filter((dir) => /homebrew|linuxbrew|\/usr\/local/.test(dir))
+    .map((bin) => p.join(p.dirname(bin), 'share', 'whisper-cpp'))
+  if (platform === 'darwin')
+    return [...common.slice(0, 4), p.join(home, 'Library', 'Application Support', 'MacWhisper', 'models'), common[4], ...brewShare]
+  if (platform === 'win32') return [...common, p.dirname(defaultModelPath('win32', home, env))]
+  return [...common, p.dirname(defaultModelPath('linux', home, env)), '/usr/share/whisper.cpp/models', ...brewShare]
+}
+const MODEL_DIRS = modelDirs()
 
-/** Spotlight's matches for the model's file name; [] when mdfind is missing or slow. */
-function spotlight(name) {
+/** Lines of a command's output, or [] when it is missing, fails or is slow. */
+function lines(command, args) {
   try {
-    return execFileSync('mdfind', ['-name', name], { encoding: 'utf8', timeout: 5000, stdio: ['ignore', 'pipe', 'ignore'] })
-      .split('\n')
-      .filter((file) => path.basename(file) === name)
+    return execFileSync(command, args, { encoding: 'utf8', timeout: 5000, stdio: ['ignore', 'pipe', 'ignore'] }).split('\n')
   } catch {
     return []
   }
 }
 
 /**
+ * The system file index's matches for the model's file name: Spotlight on a
+ * Mac, locate (plocate/mlocate) on Linux; none on Windows.
+ */
+function systemSearch(name) {
+  const found =
+    process.platform === 'darwin'
+      ? lines('mdfind', ['-name', name])
+      : process.platform === 'linux'
+        ? lines('locate', ['-b', `\\${name}`])
+        : []
+  return found.filter((file) => path.basename(file) === name)
+}
+
+/**
  * A copy of the default model already on this Mac, somewhere other than
  * `target`, with the published size: its path, or null.
  */
-export function findExistingModel(target, { dirs = MODEL_DIRS, search = spotlight, model = DEFAULT_MODEL } = {}) {
+export function findExistingModel(target, { dirs = MODEL_DIRS, search = systemSearch, model = DEFAULT_MODEL } = {}) {
   const candidates = [...dirs.map((dir) => path.join(dir, model.file)), ...search(model.file)]
   for (const file of new Set(candidates)) {
     if (path.resolve(file) === path.resolve(target)) continue
@@ -97,8 +121,10 @@ export function findExistingModel(target, { dirs = MODEL_DIRS, search = spotligh
 
 /**
  * Put an existing copy of the model at `target` after checking its sha256:
- * an APFS clone (no extra disk space) on the same volume, a symlink otherwise.
- * Returns 'clone' or 'link'; throws when the copy doesn't match.
+ * a clone (APFS, btrfs, XFS: no extra disk space) on the same volume, a
+ * symlink otherwise, or a copy where symlinks need rights this user lacks
+ * (Windows without Developer Mode). Returns 'clone', 'link' or 'copy'; throws
+ * when the copy doesn't match.
  */
 export async function adoptModel(source, target, { model = DEFAULT_MODEL } = {}) {
   if ((await sha256File(source)) !== model.sha256) throw new Error(`${source} does not match the published sha256`)
@@ -108,9 +134,29 @@ export async function adoptModel(source, target, { model = DEFAULT_MODEL } = {})
     return 'clone'
   } catch {
     fs.rmSync(target, { force: true })
+  }
+  try {
     fs.symlinkSync(source, target)
     return 'link'
+  } catch (error) {
+    if (error.code !== 'EPERM') throw error
+    fs.copyFileSync(source, target)
+    return 'copy'
   }
+}
+
+/** How to install the missing tools here: one line per install command or manual step. */
+export function installHints(tools, { platform = process.platform, which = findExecutable } = {}) {
+  const missing = [!tools.ffmpeg || !tools.ffprobe ? 'ffmpeg' : null, !tools['whisper-cli'] ? 'whisper' : null].filter(Boolean)
+  const managers = managersHere(platform, which)
+  const packaged = missing.map((tool) => packageFor(tool, managers)).filter(Boolean)
+  const manual = missing.filter((tool) => !packageFor(tool, managers))
+  // A Mac without Homebrew keeps the old one-line hint.
+  if (platform === 'darwin' && manual.length) return [`install with: brew install ${missing.map((t) => (t === 'whisper' ? 'whisper-cpp' : t)).join(' ')}`]
+  return [
+    ...installCommands(packaged).map((fix) => `install with: ${fix.command}`),
+    ...manual.map((tool) => `${tool === 'whisper' ? 'whisper-cli' : tool}: ${manualInstall(tool, platform)}`),
+  ]
 }
 
 /**
@@ -125,8 +171,7 @@ export async function setupWhisper({ yes = false, verify = false, say = (line) =
     'whisper-cli': findExecutable(config.whisperCli),
   }
   for (const [name, found] of Object.entries(tools)) say(`${found ? 'ok     ' : 'missing'}  ${name}${found ? `  ${found}` : ''}`)
-  const brew = [!tools.ffmpeg || !tools.ffprobe ? 'ffmpeg' : null, !tools['whisper-cli'] ? 'whisper-cpp' : null].filter(Boolean)
-  if (brew.length) say(`         install with: brew install ${brew.join(' ')}`)
+  for (const line of installHints(tools)) say(`         ${line}`)
 
   let size = fs.statSync(config.model, { throwIfNoEntry: false })?.size ?? 0
   const isDefault = path.basename(config.model) === DEFAULT_MODEL.file
@@ -136,7 +181,7 @@ export async function setupWhisper({ yes = false, verify = false, say = (line) =
     try {
       const how = await adoptModel(existing, config.model)
       size = DEFAULT_MODEL.size
-      say(`         ${how === 'clone' ? 'cloned it' : 'linked it'} to ${config.model} instead of downloading${how === 'link' ? ` (keep ${existing} in place)` : ''}`)
+      say(`         ${{ clone: 'cloned it', link: 'linked it', copy: 'copied it' }[how]} to ${config.model} instead of downloading${how === 'link' ? ` (keep ${existing} in place)` : ''}`)
     } catch (error) {
       say(`         not used: ${error.message}`)
     }

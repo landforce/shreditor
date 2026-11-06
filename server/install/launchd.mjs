@@ -1,16 +1,20 @@
 // macOS login items for the editor and the agent service: launchd LaunchAgents
 // that start at login, restart after a crash (throttled), and log to
 // ~/Library/Logs/Shreditor/. `shreditor install` writes and loads them.
+// Linux and Windows have their own (systemd.mjs, windows-startup.mjs); all
+// three share this API, picked in login-items.mjs. `itemPath` is the file the
+// login item is (here, the plist).
 import { execFileSync, spawnSync } from 'node:child_process'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
+import { defaultLogDir as logDirFor } from '../platform.mjs'
 
 export const DEFAULT_LABEL_PREFIX = 'app.shreditor'
 export const DEFAULT_PORTS = { editor: 5273, service: 8787 }
 /** launchd starts a job at most once per this many seconds, so a crash loop can't spin. */
 export const THROTTLE_SECONDS = 10
-const KINDS = ['editor', 'service']
+export const KINDS = ['editor', 'service']
 // launchd's own PATH is /usr/bin:/bin:/usr/sbin:/sbin; ffmpeg, ffprobe and
 // whisper-cli live in Homebrew's prefix (Apple silicon, then Intel).
 const SYSTEM_PATH = [
@@ -23,30 +27,28 @@ const SYSTEM_PATH = [
 ]
 
 export const jobLabel = (prefix, kind) => `${prefix}.${kind}`
+export const jobUrl = (kind, port) =>
+  kind === 'editor' ? `http://localhost:${port}` : `http://127.0.0.1:${port}`
 export const agentsDir = (home = os.homedir()) => path.join(home, 'Library', 'LaunchAgents')
 export const plistPath = (label, home = os.homedir()) =>
   path.join(agentsDir(home), `${label}.plist`)
-export const defaultLogDir = (home = os.homedir()) =>
-  path.join(home, 'Library', 'Logs', 'Shreditor')
+export const defaultLogDir = (home = os.homedir()) => logDirFor('darwin', home)
 
 /** PATH for the jobs: this node's folder first (npm), then Homebrew, then the system. */
 export function jobPath(nodePath) {
   return [...new Set([path.dirname(nodePath), ...SYSTEM_PATH])].join(':')
 }
 
-function programArguments(kind, { repo, nodePath, port }) {
+/** What a job runs (shared with the Linux and Windows login items; `p`: their path module). */
+export function programArguments(
+  kind,
+  { repo, nodePath, port, p = path, editorBin = ['node_modules', '.bin', 'vp'] },
+) {
   // The editor: the built preview (`npm run preview`), on a fixed port.
   if (kind === 'editor')
-    return [
-      nodePath,
-      path.join(repo, 'node_modules', '.bin', 'vp'),
-      'preview',
-      '--port',
-      String(port),
-      '--strictPort',
-    ]
+    return [nodePath, p.join(repo, ...editorBin), 'preview', '--port', String(port), '--strictPort']
   // The service resolves the workspace from the config each time it starts.
-  return [nodePath, path.join(repo, 'server', 'install', 'run-service.mjs'), '--port', String(port)]
+  return [nodePath, p.join(repo, 'server', 'install', 'run-service.mjs'), '--port', String(port)]
 }
 
 /**
@@ -78,9 +80,10 @@ export function jobPlan({
       kind,
       label,
       port,
-      url: kind === 'editor' ? `http://localhost:${port}` : `http://127.0.0.1:${port}`,
+      url: jobUrl(kind, port),
       log,
       plistPath: plistPath(label, home),
+      itemPath: plistPath(label, home),
       plist: {
         Label: label,
         ProgramArguments: programArguments(kind, { repo, nodePath, port }),
@@ -181,6 +184,7 @@ export function jobStatus(label, { home = os.homedir(), run } = {}) {
   return {
     label,
     plistPath: file,
+    itemPath: file,
     installed: Boolean(plist),
     loaded,
     ...(loaded ? parsePrint(printed.stdout) : { state: 'not loaded', pid: null, lastExit: null }),
@@ -221,3 +225,16 @@ export function writePlist(job) {
   fs.mkdirSync(path.dirname(job.log), { recursive: true })
   fs.writeFileSync(job.plistPath, plistXml(job.plist))
 }
+export const writeJob = writePlist
+
+/** Remove an unloaded job's plist; true when there was one. */
+export function removeJob(file) {
+  const existed = fs.existsSync(file)
+  fs.rmSync(file, { force: true })
+  return existed
+}
+
+/** launchd is always there on a Mac: null (no reason it can't be used). */
+export const unavailable = () => null
+
+export const KIND_NAME = 'login item'

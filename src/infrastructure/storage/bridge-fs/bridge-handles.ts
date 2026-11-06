@@ -282,6 +282,8 @@ export interface BridgeInfo {
   name: string
   recent: string[]
   platform: string
+  /** Whether the bridge can show a native folder chooser (older bridges: macOS only). */
+  chooser?: boolean
 }
 
 /** The bridge's workspace, or null when the app isn't served with a bridge. */
@@ -306,7 +308,7 @@ export function isBridgeHandle(handle: unknown): boolean {
   return handle instanceof BridgeHandle
 }
 
-/** Switch workspace: a path, or `null` to open the macOS folder chooser. */
+/** Switch workspace: a path, or `null` to open the native folder chooser. */
 export async function setBridgeWorkspace(path: string | null): Promise<string | null> {
   const res = await fetch(path === null ? `${BASE}/workspace/choose` : `${BASE}/workspace`, {
     method: 'POST',

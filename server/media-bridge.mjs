@@ -15,10 +15,11 @@
 // Routes (mounted by workspace-bridge.mjs under /__shreditor/):
 //
 //   POST media/choose  { mode? }
-//     Opens a native macOS file chooser (multiple selection) run by this
-//     process, places the chosen files and returns { files: Placed[] }.
-//     The editor then probes them and writes their metadata like a normal
-//     import. 499 when cancelled, 501 off macOS.
+//     Opens a native file chooser (multiple selection; Finder, zenity/kdialog
+//     or Windows: native-dialogs.mjs) run by this process, places the chosen
+//     files and returns { files: Placed[] }. The editor then probes them and
+//     writes their metadata like a normal import. 499 when cancelled, 501
+//     where there is no chooser (the editor then uses the browser's picker).
 //
 //   POST media/import  { paths: string[], projectId?: string, mode? }
 //     For agents and scripts: imports files by absolute path, writes
@@ -81,6 +82,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { resolveMediaFile } from '../headless/lib/workspace.mjs'
 import { autoTranscribe } from './transcription.mjs'
+import { ChooserError, chooseFiles as showFileChooser } from './native-dialogs.mjs'
 import {
   metadataFromProbe,
   planFor,
@@ -336,31 +338,17 @@ async function placeMediaSource(root, sourcePath, { mode = 'auto' } = {}) {
   }
 }
 
-/* ───────────────────────── Finder file chooser ──────────────────────── */
+/* ───────────────────────── Native file chooser ──────────────────────── */
 
-const CHOOSE_FILES_SCRIPT = `
-set picked to choose file with prompt "Import media into Shreditor" with multiple selections allowed
-set out to ""
-repeat with f in picked
-  set out to out & POSIX path of f & linefeed
-end repeat
-return out`
-
-function chooseFiles() {
-  if (process.platform !== 'darwin') {
-    return Promise.reject(new MediaBridgeError(501, 'NotSupportedError', 'The file chooser needs macOS'))
+async function chooseFiles() {
+  try {
+    return await showFileChooser()
+  } catch (error) {
+    if (!(error instanceof ChooserError)) throw error
+    if (error.reason === 'cancelled') throw new MediaBridgeError(499, 'AbortError', 'Cancelled')
+    if (error.reason === 'unavailable') throw new MediaBridgeError(501, 'NotSupportedError', error.message)
+    throw new MediaBridgeError(500, 'UnknownError', error.message)
   }
-  return new Promise((resolve, reject) => {
-    execFile('osascript', ['-e', CHOOSE_FILES_SCRIPT], { maxBuffer: 4 * 1024 * 1024 }, (error, stdout) => {
-      if (error) {
-        // -128 is "user cancelled".
-        if (String(error.message).includes('-128')) reject(new MediaBridgeError(499, 'AbortError', 'Cancelled'))
-        else reject(new MediaBridgeError(500, 'UnknownError', error.message))
-        return
-      }
-      resolve(stdout.split('\n').map((line) => line.trim()).filter(Boolean))
-    })
-  })
 }
 
 /* ────────────────────── Agent import (with metadata) ─────────────────── */

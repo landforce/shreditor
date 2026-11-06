@@ -201,7 +201,8 @@
 //   shred cut remove <cutId> --yes       move a cut to the editor's Trash (restorable; media stays)
 //
 // Service: 127.0.0.1:8787 (SHRED_SERVICE to override). Workspace: SHRED_WORKSPACE,
-// else ~/.shreditor/config.json, else ~/Movies/Shreditor. Times are frames at the
+// else ~/.shreditor/config.json, else ~/Movies/Shreditor (~/Videos/Shreditor
+// off a Mac). Times are frames at the
 // project fps. Ops reference earlier results with {"$ref":"<callerId>#/detail/..."}.
 //
 // Commands start what they need: a command that talks to the agent service (or
@@ -252,9 +253,10 @@ import {
   templatePlan,
 } from './edit-templates.mjs'
 import { runBuild, gitHead, staleBuild } from '../../../server/install/build-state.mjs'
-import { DEFAULT_LABEL_PREFIX, jobLabel, jobStatus } from '../../../server/install/launchd.mjs'
+import { DEFAULT_LABEL_PREFIX, jobLabel, jobStatus } from '../../../server/install/login-items.mjs'
 import { logFile, spawnEditor, spawnService } from '../../../server/install/processes.mjs'
 import { createAutostart } from '../../../server/install/self-start.mjs'
+import { defaultWorkspace } from '../../../server/platform.mjs'
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..')
 const SERVICE = process.env.SHRED_SERVICE || 'http://127.0.0.1:8787'
@@ -363,7 +365,7 @@ function workspace() {
     )
     if (config.workspace) return config.workspace
   } catch {}
-  return path.join(os.homedir(), 'Movies', 'Shreditor')
+  return defaultWorkspace()
 }
 
 async function call(method, route, body, headers = {}) {
@@ -460,7 +462,7 @@ function build(reason) {
   built = true
 }
 
-// Login items (`shreditor install`) for these ports: launchd keeps them running.
+// Login items (`shreditor install`) for these ports: the system keeps them running.
 const LABEL_PREFIX = process.env.SHREDITOR_LABEL_PREFIX || DEFAULT_LABEL_PREFIX
 function loginItem(kind, url) {
   const job = jobStatus(jobLabel(LABEL_PREFIX, kind))
@@ -1049,7 +1051,7 @@ async function applyBatch(id, batch, revision) {
   return res
 }
 
-// The login item's log when launchd runs the service, else `shred start`'s.
+// The login item's log when one runs the service, else `shred start`'s.
 let serviceLogPath
 const serviceLog = () =>
   (serviceLogPath ??= loginItem('service', SERVICE)?.log ?? logFile('service'))

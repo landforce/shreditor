@@ -1,7 +1,7 @@
 // shreditor install / update / self-starting shred: plists, prerequisite
 // checks, the restart guard, update steps and start decisions.
 import assert from 'node:assert/strict'
-import { execFileSync, spawnSync } from 'node:child_process'
+import { execFileSync, spawn, spawnSync } from 'node:child_process'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
@@ -17,8 +17,20 @@ import {
   plistXml,
   readPlist,
 } from './install/launchd.mjs'
-import { checkPrereqs, planFixes } from './install/prereqs.mjs'
+import { CHROME_PATH, checkPrereqs, laterSteps, planFixes } from './install/prereqs.mjs'
+import { waitFor } from './install/processes.mjs'
 import { createAutostart, startPlan } from './install/self-start.mjs'
+import { alive, readState, supervisorRunning, withEnv } from './install/supervise.mjs'
+import * as systemd from './install/systemd.mjs'
+import * as windowsItems from './install/windows-startup.mjs'
+import { chooserFor } from './native-dialogs.mjs'
+import {
+  defaultLogDir,
+  defaultModelPath,
+  defaultWorkspace,
+  executableNames,
+  findChrome,
+} from './platform.mjs'
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const tmp = (name) => fs.mkdtempSync(path.join(os.tmpdir(), `shreditor-${name}-`))
@@ -512,4 +524,435 @@ test('the service launcher finds only orphaned browsers it marked', async () => 
     '  104     1 /Applications/Google Chrome.app/Contents/MacOS/Google Chrome --headless',
   ].join('\n')
   assert.deepEqual(orphansWith(ps, '--shreditor-job=app.shreditor.service'), [101])
+})
+
+// ── Linux and Windows ─────────────────────────────────────────────────────
+
+const linux = (overrides = {}) =>
+  machine({
+    platform: 'linux',
+    chrome: '/opt/google/chrome/chrome',
+    ...overrides,
+    tools: { brew: null, 'apt-get': '/usr/bin/apt-get', ...overrides.tools },
+  })
+const windows = (overrides = {}) =>
+  machine({
+    platform: 'win32',
+    chrome: 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
+    ...overrides,
+    tools: { brew: null, winget: 'C:\\winget.exe', ...overrides.tools },
+  })
+
+test('Linux: apt installs ffmpeg; whisper.cpp is explained but does not block', () => {
+  const checks = checkPrereqs(linux({ tools: { ffmpeg: null, 'whisper-cli': null } }))
+  assert.equal(
+    checks.find((c) => c.id === 'brew'),
+    undefined,
+    'Homebrew is not required off a Mac',
+  )
+  assert.deepEqual(failing(checks), ['ffmpeg', 'whisper'])
+  const { auto, manual } = planFixes(checks)
+  assert.deepEqual(
+    auto.map((f) => f.command),
+    ['sudo apt-get update && sudo apt-get install -y ffmpeg'],
+  )
+  assert.deepEqual(auto[0].steps, [
+    ['sudo', 'apt-get', 'update'],
+    ['sudo', 'apt-get', 'install', '-y', 'ffmpeg'],
+  ])
+  assert.deepEqual(manual, [])
+  const later = laterSteps(checks)
+  assert.deepEqual(
+    later.map((c) => c.id),
+    ['whisper'],
+  )
+  assert.match(later[0].manual, /github\.com\/ggml-org\/whisper\.cpp.*cmake/)
+})
+
+test('Linux: Homebrew is preferred when it is there; dnf and pacman otherwise', () => {
+  const tools = { ffmpeg: null, 'whisper-cli': null }
+  const brew = checkPrereqs(
+    linux({ tools: { ...tools, brew: '/home/linuxbrew/.linuxbrew/bin/brew' } }),
+  )
+  assert.deepEqual(
+    planFixes(brew).auto.map((f) => f.command),
+    ['brew install ffmpeg whisper-cpp'],
+  )
+  assert.deepEqual(laterSteps(brew), [])
+  const dnf = checkPrereqs(linux({ tools: { ...tools, 'apt-get': null, dnf: '/usr/bin/dnf' } }))
+  assert.deepEqual(
+    planFixes(dnf).auto.map((f) => f.command),
+    ['sudo dnf install -y ffmpeg'],
+  )
+  const pacman = checkPrereqs(
+    linux({ tools: { ...tools, 'apt-get': null, pacman: '/usr/bin/pacman' } }),
+  )
+  assert.deepEqual(
+    planFixes(pacman).auto.map((f) => f.command),
+    ['sudo pacman -S --needed --noconfirm ffmpeg'],
+  )
+  const none = checkPrereqs(linux({ tools: { ...tools, 'apt-get': null } }))
+  assert.deepEqual(
+    planFixes(none).manual.map((c) => c.id),
+    ['ffmpeg'],
+  )
+  assert.match(planFixes(none).manual[0].manual, /apt-get install ffmpeg.*RPM Fusion.*pacman/)
+})
+
+test('Linux and Windows: Chrome and Node are explained for that system', () => {
+  const l = planFixes(checkPrereqs(linux({ chrome: null, nodeVersion: '20.1.0' }))).manual
+  assert.deepEqual(
+    l.map((c) => c.id),
+    ['node', 'chrome'],
+  )
+  assert.match(l[1].manual, /npx playwright install --with-deps chrome/)
+  assert.equal(
+    checkPrereqs(linux({ chrome: null })).find((c) => c.id === 'chrome').detail,
+    'not at /opt/google/chrome',
+  )
+  const w = planFixes(checkPrereqs(windows({ chrome: null, nodeVersion: '20.1.0' }))).manual
+  assert.match(w[0].manual, /winget install -e --id OpenJS\.NodeJS\.LTS/)
+  assert.match(w[1].manual, /winget install -e --id Google\.Chrome/)
+})
+
+test('Windows: winget installs ffmpeg; without winget it is explained', () => {
+  const checks = checkPrereqs(windows({ tools: { ffmpeg: null, 'whisper-cli': null } }))
+  assert.deepEqual(
+    planFixes(checks).auto.map((f) => f.command),
+    ['winget install -e --id Gyan.FFmpeg --accept-source-agreements --accept-package-agreements'],
+  )
+  assert.match(laterSteps(checks)[0].manual, /whisper-bin-x64\.zip/)
+  const bare = checkPrereqs(windows({ tools: { ffmpeg: null, winget: null } }))
+  assert.match(planFixes(bare).manual[0].manual, /winget install -e --id Gyan\.FFmpeg.*gyan\.dev/)
+  assert.deepEqual(planFixes(checkPrereqs(windows())), { auto: [], manual: [] })
+})
+
+test('Chrome, the workspace, logs and the model have a place on each system', () => {
+  const have = (file) => (candidate) => candidate === file
+  assert.equal(
+    findChrome({ platform: 'darwin', env: {}, exists: have(CHROME_PATH) }),
+    '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+  )
+  assert.equal(
+    findChrome({ platform: 'linux', env: {}, exists: have('/opt/google/chrome/chrome') }),
+    '/opt/google/chrome/chrome',
+  )
+  const env = { LOCALAPPDATA: 'C:\\Users\\me\\AppData\\Local', PROGRAMFILES: 'C:\\Program Files' }
+  const userChrome = 'C:\\Users\\me\\AppData\\Local\\Google\\Chrome\\Application\\chrome.exe'
+  const machineChrome = 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe'
+  assert.equal(findChrome({ platform: 'win32', env, exists: have(machineChrome) }), machineChrome)
+  assert.equal(findChrome({ platform: 'win32', env, exists: () => true }), userChrome)
+  assert.equal(findChrome({ platform: 'linux', env: {}, exists: () => false }), null)
+
+  assert.equal(defaultWorkspace('darwin', '/Users/me'), '/Users/me/Movies/Shreditor')
+  assert.equal(defaultWorkspace('linux', '/home/me'), '/home/me/Videos/Shreditor')
+  assert.equal(defaultWorkspace('win32', 'C:\\Users\\me'), 'C:\\Users\\me\\Videos\\Shreditor')
+  assert.equal(defaultLogDir('darwin', '/Users/me', {}), '/Users/me/Library/Logs/Shreditor')
+  assert.equal(defaultLogDir('linux', '/home/me', {}), '/home/me/.local/state/shreditor/logs')
+  assert.equal(defaultLogDir('linux', '/home/me', { XDG_STATE_HOME: '/s' }), '/s/shreditor/logs')
+  assert.equal(
+    defaultLogDir('win32', 'C:\\Users\\me', env),
+    'C:\\Users\\me\\AppData\\Local\\Shreditor\\Logs',
+  )
+  assert.equal(
+    defaultModelPath('darwin', '/Users/me', {}),
+    '/Users/me/Library/Application Support/whisper.cpp/models/ggml-large-v3-turbo.bin',
+  )
+  assert.equal(
+    defaultModelPath('linux', '/home/me', {}),
+    '/home/me/.local/share/whisper.cpp/models/ggml-large-v3-turbo.bin',
+  )
+  assert.equal(
+    defaultModelPath('win32', 'C:\\Users\\me', env),
+    'C:\\Users\\me\\AppData\\Local\\whisper.cpp\\models\\ggml-large-v3-turbo.bin',
+  )
+  assert.deepEqual(executableNames('ffmpeg', 'win32', { PATHEXT: '.COM;.EXE' }), [
+    'ffmpeg.com',
+    'ffmpeg.exe',
+  ])
+  assert.deepEqual(executableNames('ffmpeg', 'linux', {}), ['ffmpeg'])
+})
+
+test('setup prints the install command for this system', async () => {
+  const { installHints } = await import('./transcription-setup.mjs')
+  const apt = (c) => (c === 'apt-get' ? '/usr/bin/apt-get' : null)
+  const hints = installHints(
+    { ffmpeg: null, ffprobe: '/x', 'whisper-cli': null },
+    { platform: 'linux', which: apt },
+  )
+  assert.equal(hints[0], 'install with: sudo apt-get update && sudo apt-get install -y ffmpeg')
+  assert.match(hints[1], /^whisper-cli: Build whisper\.cpp/)
+  const brew = (c) => (c === 'brew' ? '/opt/homebrew/bin/brew' : null)
+  assert.deepEqual(
+    installHints(
+      { ffmpeg: '/f', ffprobe: '/p', 'whisper-cli': null },
+      { platform: 'darwin', which: brew },
+    ),
+    ['install with: brew install whisper-cpp'],
+  )
+  assert.deepEqual(
+    installHints({ ffmpeg: null, 'whisper-cli': null }, { platform: 'darwin', which: () => null }),
+    ['install with: brew install ffmpeg whisper-cpp'],
+  )
+})
+
+// ── systemd (Linux login items) ───────────────────────────────────────────
+
+const unitPlan = systemd.jobPlan({
+  repo: '/r/shred editor',
+  nodePath: '/n/bin/node',
+  home: '/h',
+  prefix: 'app.shreditor.test',
+  ports: { editor: 5631, service: 8731 },
+  workspace: '/w/scratch',
+  pathEnv: '/usr/bin:/opt/whisper/bin',
+})
+
+test('systemd units: user units that restart, log to the XDG state folder and quote paths', () => {
+  const editor = unitPlan.editor
+  assert.equal(editor.itemPath, '/h/.config/systemd/user/app.shreditor.test.editor.service')
+  assert.equal(editor.log, '/h/.local/state/shreditor/logs/editor.log')
+  assert.equal(editor.url, 'http://localhost:5631')
+  const unit = editor.unit
+  assert.match(
+    unit,
+    /^ExecStart="\/n\/bin\/node" "\/r\/shred editor\/node_modules\/\.bin\/vp" "preview" "--port" "5631" "--strictPort"$/m,
+  )
+  assert.match(unit, /^WorkingDirectory=\/r\/shred editor$/m)
+  assert.match(unit, /^Restart=always$/m)
+  assert.match(unit, new RegExp(`^RestartSec=${THROTTLE_SECONDS}$`, 'm'))
+  assert.match(unit, /^StandardOutput=append:\/h\/\.local\/state\/shreditor\/logs\/editor\.log$/m)
+  assert.match(unit, /^WantedBy=default\.target$/m)
+  assert.match(unit, /^Environment="SHREDITOR_WORKSPACE=\/w\/scratch"$/m)
+  assert.match(unit, /^Environment="SHREDITOR_JOB=app\.shreditor\.test\.editor"$/m)
+  const PATH = /^Environment="PATH=(.*)"$/m.exec(unit)[1].split(':')
+  assert.deepEqual(PATH.slice(0, 2), ['/n/bin', '/home/linuxbrew/.linuxbrew/bin'])
+  assert.ok(PATH.includes('/opt/whisper/bin'), 'the PATH install ran with is kept')
+  assert.deepEqual(systemd.parseUnit(unitPlan.service.unit), {
+    port: 8731,
+    log: '/h/.local/state/shreditor/logs/service.log',
+  })
+  // % is a systemd specifier and $ expands in ExecStart.
+  const odd = systemd.jobPlan({ repo: '/r/100%$x', nodePath: '/n/node', home: '/h', pathEnv: '' })
+  assert.match(
+    odd.service.unit,
+    /^ExecStart="\/n\/node" "\/r\/100%%\$\$x\/server\/install\/run-service\.mjs"/m,
+  )
+})
+
+test('systemd status reads systemctl show; no user session means fall back', () => {
+  const home = tmp('systemd')
+  const job = systemd.jobPlan({ repo: '/r', nodePath: '/n/node', home, pathEnv: '' }).service
+  systemd.writeJob(job)
+  const calls = []
+  const run = (cmd, args) => {
+    calls.push([cmd, ...args].join(' '))
+    if (args[1] === 'show')
+      return {
+        status: 0,
+        stdout:
+          'UnitFileState=enabled\nActiveState=active\nSubState=running\nMainPID=4242\nExecMainStatus=0\n',
+      }
+    return { status: 0, stdout: '', stderr: '' }
+  }
+  const status = systemd.jobStatus(job.label, { home, run })
+  assert.deepEqual(
+    {
+      installed: status.installed,
+      loaded: status.loaded,
+      state: status.state,
+      pid: status.pid,
+      port: status.port,
+    },
+    { installed: true, loaded: true, state: 'active (running)', pid: 4242, port: 8787 },
+  )
+  assert.equal(status.log, job.log)
+  assert.match(
+    calls[0],
+    /^systemctl --user show app\.shreditor\.service\.service -p UnitFileState /,
+  )
+  assert.equal(systemd.jobStatus('app.shreditor.none', { home, run }).installed, false)
+  assert.deepEqual(
+    systemd.parseShow('UnitFileState=disabled\nActiveState=failed\nMainPID=0\nExecMainStatus=1'),
+    {
+      enabled: false,
+      state: 'failed',
+      pid: null,
+      lastExit: '1',
+    },
+  )
+  assert.equal(systemd.unavailable({ run }), null)
+  assert.match(
+    systemd.unavailable({
+      run: () => ({ status: 1, stderr: 'Failed to connect to bus: No medium found' }),
+    }),
+    /systemd user services aren't running here \(Failed to connect to bus/,
+  )
+  assert.match(
+    systemd.unavailable({
+      run: () => ({ status: null, error: new Error('spawnSync systemctl ENOENT') }),
+    }),
+    /ENOENT/,
+  )
+})
+
+// ── Windows (Startup folder login items) ──────────────────────────────────
+
+test('Windows items: a hidden Startup script runs each job under the supervisor', () => {
+  const env = {
+    APPDATA: 'C:\\Users\\me\\AppData\\Roaming',
+    LOCALAPPDATA: 'C:\\Users\\me\\AppData\\Local',
+    PATH: 'C:\\Tools',
+  }
+  const plan = windowsItems.jobPlan({
+    repo: 'C:\\src\\shreditor',
+    nodePath: 'C:\\Program Files\\nodejs\\node.exe',
+    home: 'C:\\Users\\me',
+    env,
+    ports: { editor: 5631, service: 8731 },
+  })
+  const editor = plan.editor
+  assert.equal(
+    editor.itemPath,
+    'C:\\Users\\me\\AppData\\Roaming\\Microsoft\\Windows\\Start Menu\\Programs\\Startup\\app.shreditor.editor.vbs',
+  )
+  assert.equal(editor.log, 'C:\\Users\\me\\AppData\\Local\\Shreditor\\Logs\\editor.log')
+  // node runs vite-plus's own script: .bin\vp is a shell shim on Windows.
+  assert.deepEqual(editor.command.slice(editor.command.indexOf('--') + 1), [
+    'C:\\Program Files\\nodejs\\node.exe',
+    'C:\\src\\shreditor\\node_modules\\vite-plus\\bin\\vp',
+    'preview',
+    '--port',
+    '5631',
+    '--strictPort',
+  ])
+  assert.match(
+    editor.script,
+    /^CreateObject\("WScript\.Shell"\)\.Run """C:\\Program Files\\nodejs\\node\.exe"" C:\\src\\shreditor\\server\\install\\supervise\.mjs /m,
+  )
+  assert.match(editor.script, /, 0, False\r\n$/)
+  const env2 =
+    editor.command[
+      editor.command.indexOf(
+        'PATH=C:\\Program Files\\nodejs;' +
+          'C:\\Users\\me\\AppData\\Local\\Microsoft\\WinGet\\Links;C:\\Tools',
+      )
+    ]
+  assert.ok(env2, 'PATH: node, winget links, then the PATH install ran with')
+  assert.deepEqual(windowsItems.parseScript(plan.service.script), {
+    state: 'C:\\Users\\me\\AppData\\Local\\Shreditor\\Logs\\service.state.json',
+    port: 8731,
+    log: 'C:\\Users\\me\\AppData\\Local\\Shreditor\\Logs\\service.log',
+  })
+  assert.equal(windowsItems.winQuote('plain'), 'plain')
+  assert.equal(windowsItems.winQuote('a b'), '"a b"')
+  assert.equal(windowsItems.winQuote('C:\\dir with space\\'), '"C:\\dir with space\\\\"')
+  assert.equal(windowsItems.winQuote('say "hi"'), '"say \\"hi\\""')
+})
+
+test('the supervisor keeps one copy, records the pid, and stops its command', async () => {
+  const dir = tmp('supervise')
+  const state = path.join(dir, 'job.state.json')
+  const log = path.join(dir, 'job.log')
+  const SUPERVISE = path.join(REPO, 'server/install/supervise.mjs')
+  const args = [
+    SUPERVISE,
+    '--state',
+    state,
+    '--log',
+    log,
+    '--cwd',
+    dir,
+    '--env',
+    'GREETING=hi there',
+    '--',
+    process.execPath,
+    '-e',
+    'console.log(process.env.GREETING); setInterval(() => {}, 1000)',
+  ]
+  const first = spawn(process.execPath, args, { stdio: 'ignore' })
+  const started = await waitFor(() => readState(state)?.childPid, {
+    timeoutMs: 10_000,
+    intervalMs: 50,
+  })
+  assert.ok(started, 'the command started')
+  assert.equal(readState(state).pid, first.pid)
+  assert.ok(supervisorRunning(readState(state)))
+  const second = spawnSync(process.execPath, args, { timeout: 10_000 })
+  assert.equal(second.status, 0, 'a second copy exits at once')
+  assert.equal(readState(state).pid, first.pid)
+  first.kill('SIGTERM')
+  const exited = await waitFor(() => !alive(started), { timeoutMs: 10_000, intervalMs: 50 })
+  assert.ok(exited, 'stopping the supervisor stops the command')
+  assert.match(fs.readFileSync(log, 'utf8'), /^hi there$/m)
+  assert.deepEqual(withEnv({ Path: 'old', HOME: 'h' }, { PATH: 'new' }), { HOME: 'h', PATH: 'new' })
+})
+
+// ── choosers ──────────────────────────────────────────────────────────────
+
+test('choosers: Finder, zenity or kdialog on a desktop, PowerShell on Windows, none headless', () => {
+  const which = (tools) => (c) => tools[c] ?? null
+  const mac = chooserFor({ platform: 'darwin', env: {}, which: which({}) })
+  assert.equal(mac.folder('/w')[0], 'osascript')
+  assert.match(mac.folder('/w')[1][1], /choose folder .* default location POSIX file "\/w"/)
+  assert.ok(mac.cancelled(new Error('execution error: User canceled. (-128)')))
+  assert.equal(
+    chooserFor({ platform: 'linux', env: {}, which: which({ zenity: '/usr/bin/zenity' }) }),
+    null,
+  )
+  const zenity = chooserFor({
+    platform: 'linux',
+    env: { DISPLAY: ':0' },
+    which: which({ zenity: '/usr/bin/zenity' }),
+  })
+  assert.deepEqual(zenity.folder('/w'), [
+    '/usr/bin/zenity',
+    [
+      '--file-selection',
+      '--directory',
+      '--title=Choose a Shreditor workspace folder',
+      '--filename=/w/',
+    ],
+  ])
+  assert.ok(zenity.files()[1].includes('--multiple'))
+  assert.ok(zenity.cancelled({ code: 1 }))
+  const kde = chooserFor({
+    platform: 'linux',
+    env: { WAYLAND_DISPLAY: 'wayland-0' },
+    which: which({ kdialog: '/usr/bin/kdialog' }),
+  })
+  assert.equal(kde.name, 'kdialog')
+  assert.equal(chooserFor({ platform: 'linux', env: { DISPLAY: ':0' }, which: which({}) }), null)
+  const win = chooserFor({ platform: 'win32', env: {}, which: which({}) })
+  const [cmd, argv, extra] = win.folder('C:\\w')
+  assert.equal(cmd, 'powershell.exe')
+  assert.ok(argv.includes('-STA'))
+  assert.match(argv.at(-1), /FolderBrowserDialog/)
+  assert.deepEqual(extra, { SHREDITOR_START: 'C:\\w' })
+  assert.match(win.files()[1].at(-1), /OpenFileDialog[\s\S]*Multiselect = \$true/)
+})
+
+test('without a chooser the bridge answers 501 so the editor falls back to a path', async () => {
+  const { chooseFolder, chooseFiles, ChooserError } = await import('./native-dialogs.mjs')
+  const options = { platform: 'linux', env: {}, which: () => null }
+  await assert.rejects(
+    chooseFolder('/w', options),
+    (e) =>
+      e instanceof ChooserError && e.reason === 'unavailable' && /shreditor open/.test(e.message),
+  )
+  await assert.rejects(
+    chooseFiles(options),
+    (e) => e.reason === 'unavailable' && /shreditor import/.test(e.message),
+  )
+})
+
+test('realProbe reads this machine and every check runs on it', async () => {
+  const { realProbe } = await import('./install/prereqs.mjs')
+  const probe = realProbe(REPO)
+  assert.equal(probe.platform, process.platform)
+  const ids = checkPrereqs(probe).map((c) => c.id)
+  assert.deepEqual(
+    ids.filter((id) => id !== 'brew'),
+    ['node', 'chrome', 'ffmpeg', 'whisper', 'model', 'deps', 'build'],
+  )
 })

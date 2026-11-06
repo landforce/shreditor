@@ -1,7 +1,8 @@
 /**
  * Workspace switcher when the app is served with the local workspace bridge.
- * Folders are chosen on the machine (a Finder dialog opened by the bridge),
- * and the bridge remembers recent ones. Switching reloads the page.
+ * Folders are chosen on the machine (a native dialog opened by the bridge, or
+ * a typed path where it has none), and the bridge remembers recent ones.
+ * Switching reloads the page.
  */
 
 import { useState } from 'react'
@@ -16,12 +17,15 @@ import {
 } from '@/infrastructure/storage/bridge-fs/bridge-handles'
 
 const logger = createLogger('BridgeWorkspaceIndicator')
-const folderName = (p: string) => p.split('/').filter(Boolean).pop() ?? p
-const tilde = (p: string) => p.replace(/^\/Users\/[^/]+/, '~')
+const folderName = (p: string) => p.split(/[\\/]/).filter(Boolean).pop() ?? p
+const tilde = (p: string) =>
+  p.replace(/^(\/Users\/[^/]+|\/home\/[^/]+|[A-Za-z]:\\Users\\[^\\]+)/, '~')
 
 export function BridgeWorkspaceIndicator({ info }: { info: BridgeInfo }) {
   const [open, setOpen] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  const hasChooser = info.chooser ?? info.platform === 'darwin'
 
   const go = async (path: string | null) => {
     setError(null)
@@ -87,12 +91,14 @@ export function BridgeWorkspaceIndicator({ info }: { info: BridgeInfo }) {
           variant="ghost"
           size="sm"
           className="w-full justify-start gap-2"
-          onClick={() => void go(null)}
+          onClick={() => {
+            if (hasChooser) return void go(null)
+            const typed = window.prompt('Folder to use as the workspace (full path):', info.root)
+            if (typed?.trim()) void go(typed.trim())
+          }}
         >
           <Plus className="w-4 h-4" />
-          {info.platform === 'darwin'
-            ? 'Choose another folder…'
-            : 'Run `shreditor open <folder>` to switch'}
+          {hasChooser ? 'Choose another folder…' : 'Open another folder by path…'}
         </Button>
         {error && <p className="px-2 py-1 text-xs text-destructive">{error}</p>}
       </PopoverContent>

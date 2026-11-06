@@ -15,6 +15,8 @@
 // Settings (optional) in ~/.shreditor/config.json (or $SHREDITOR_CONFIG):
 //   "transcription": { "enabled": true, "whisperCli": "whisper-cli",
 //     "model": "~/Library/Application Support/whisper.cpp/models/ggml-large-v3-turbo.bin",
+//     (the default on a Mac; ~/.local/share/whisper.cpp/models/ on Linux,
+//     %LOCALAPPDATA%\whisper.cpp\models\ on Windows: see server/platform.mjs)
 //     "language": "auto", "threads": 4 }
 // $SHREDITOR_WHISPER_CLI and $SHREDITOR_WHISPER_MODEL override them.
 import { execFile } from 'node:child_process'
@@ -31,15 +33,16 @@ import {
   NATIVE_SOURCE,
   segmentsFromWhisperJson,
 } from './transcription-core.mjs'
+import { defaultModelPath, executableNames, extraToolDirs } from './platform.mjs'
 
-export const DEFAULT_MODEL_PATH = path.join(os.homedir(), 'Library', 'Application Support', 'whisper.cpp', 'models', 'ggml-large-v3-turbo.bin')
+export const DEFAULT_MODEL_PATH = defaultModelPath()
 const MAX_QUEUE = 64
 const SOURCE_WAIT_MS = 120_000
 const PROBE_TIMEOUT_MS = 30_000
 const EXTRACT_TIMEOUT_MS = 10 * 60_000
 const SILENCE_DB = -50
 const ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/
-const INSTALL_HINT = 'Native transcription needs whisper.cpp and its model: run `shred setup` (brew install whisper-cpp, then the model download). In-app transcription still works.'
+const INSTALL_HINT = 'Native transcription needs whisper.cpp and its model: run `shred setup` (it says how to install whisper-cli here, then downloads the model). In-app transcription still works.'
 
 class TranscriptionError extends Error {
   constructor(status, name, message) {
@@ -51,7 +54,7 @@ class TranscriptionError extends Error {
 
 /* ───────────────────────────── Settings ──────────────────────────────── */
 
-const expandHome = (p) => String(p).replace(/^~(?=$|\/)/, os.homedir())
+const expandHome = (p) => String(p).replace(/^~(?=$|[\\/])/, os.homedir())
 
 export function transcriptionConfig() {
   let settings = {}
@@ -72,9 +75,10 @@ export function transcriptionConfig() {
 
 /** Absolute path of an executable (a path, or a name searched on PATH), or null. */
 export function findExecutable(command) {
-  const candidates = command.includes('/')
-    ? [command]
-    : [...String(process.env.PATH ?? '').split(path.delimiter), '/opt/homebrew/bin', '/usr/local/bin'].filter(Boolean).map((dir) => path.join(dir, command))
+  const names = executableNames(command)
+  const candidates = /[\\/]/.test(command)
+    ? names
+    : [...String(process.env.PATH ?? '').split(path.delimiter), ...extraToolDirs()].filter(Boolean).flatMap((dir) => names.map((name) => path.join(dir, name)))
   for (const candidate of candidates) {
     try {
       fs.accessSync(candidate, fs.constants.X_OK)

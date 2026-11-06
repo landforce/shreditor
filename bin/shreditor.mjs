@@ -3,7 +3,8 @@
 //
 //   shreditor open [folder] [--project <id>]   use a folder as the workspace and print the editor URL
 //   shreditor where                            print the current workspace folder
-//   shreditor choose                           pick the workspace folder in a Finder dialog
+//   shreditor choose                           pick the workspace folder in a native dialog (Finder,
+//                                              zenity/kdialog, Windows); where there is none, use open
 //   shreditor import <file...> [--project <id>] [--link] [--category <category>] [--no-wait] [--no-transcribe]
 //                                              import footage in place: an APFS clone on the
 //                                              workspace's volume, else a link to the original
@@ -34,10 +35,12 @@
 //                                              made in the app). See server/transcription.mjs.
 //   shreditor setup whisper [--yes] [--verify] check ffmpeg, whisper-cli and the model; --yes downloads
 //                                              the model (1.6 GB) and verifies its sha256
-//   shreditor install [--yes]                  check and fix what Shreditor needs (Chrome, Homebrew,
-//                                              ffmpeg, whisper-cli and model, npm ci, a build), then
-//                                              run the editor (5273) and the agent service (8787) as
-//                                              macOS login items: on at login, restarted if they stop
+//   shreditor install [--yes]                  check and fix what Shreditor needs (Chrome, ffmpeg and
+//                                              whisper-cli via Homebrew/apt/dnf/pacman/winget, the model,
+//                                              npm ci, a build), then run the editor (5273) and the agent
+//                                              service (8787) as login items (launchd on macOS, systemd
+//                                              user units on Linux, the Startup folder on Windows): on at
+//                                              login, restarted if they stop
 //   shreditor update [--force]                 git pull --ff-only, npm ci if the lockfile moved, build,
 //                                              restart; refuses while a project has unsaved changes
 //   shreditor restart [--force]                restart both (same safety check)

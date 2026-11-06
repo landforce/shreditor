@@ -1,9 +1,10 @@
 // `shred` commands start what they need: the agent service (and the editor,
 // for anything that reads the editor's unsaved state) when it isn't answering.
-// With the login item installed for that port, launchd starts it; otherwise it
-// is started the way `shred up` does. One line says what was started.
+// With the login item installed for that port, the system starts it (launchd,
+// systemd or the Startup folder: login-items.mjs); otherwise it is started the
+// way `shred up` does. One line says what was started.
 import os from 'node:os'
-import { DEFAULT_LABEL_PREFIX, bootstrap, jobLabel, jobStatus, kickstart } from './launchd.mjs'
+import { DEFAULT_LABEL_PREFIX, jobLabel, loginItems } from './login-items.mjs'
 import { waitFor } from './processes.mjs'
 
 /**
@@ -18,7 +19,7 @@ export function startPlan({ up, job, port, autostart = true }) {
   return job.loaded ? 'kickstart' : 'bootstrap'
 }
 
-/** The login item for `kind`, read from launchd; tests pass `status`. */
+/** The login item for `kind`, read from the system; tests pass `status`. */
 const loginItem = (kind, { prefix, home, status = jobStatus }) =>
   status(jobLabel(prefix, kind), { home })
 
@@ -32,7 +33,11 @@ export function createAutostart({
   autostart = process.env.SHRED_AUTOSTART !== '0',
   home = os.homedir(),
   say = (line) => process.stderr.write(`${line}\n`),
-  launchd = { bootstrap, kickstart, status: jobStatus },
+  launchd = {
+    bootstrap: (file) => loginItems.bootstrap(file),
+    kickstart: (label) => loginItems.kickstart(label),
+    status: (label, options) => loginItems.jobStatus(label, options),
+  },
 }) {
   const started = new Map()
   async function bringUp(kind, explicit) {
@@ -46,7 +51,7 @@ export function createAutostart({
       )
     if (plan === 'spawn') await target.spawn()
     // Loading the plist starts it (RunAtLoad); a loaded job is started now.
-    else if (plan === 'bootstrap') await launchd.bootstrap(job.plistPath)
+    else if (plan === 'bootstrap') await launchd.bootstrap(job.itemPath ?? job.plistPath)
     else launchd.kickstart(job.label)
     if (!(await waitFor(target.up, { timeoutMs: target.timeoutMs ?? 240_000 }))) {
       throw new Error(`${target.name} did not start${job?.log ? `; see ${job.log}` : ''}`)
