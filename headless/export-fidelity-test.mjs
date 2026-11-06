@@ -1,5 +1,5 @@
 // Browser-export fidelity against ffmpeg-made fixtures: A/V sync and the
-// decode colour of full-range BT.601 H.264. Needs ffmpeg/ffprobe (skips
+// decode colour of full-range BT.601 H.264. Needs ffmpeg/ffprobe 8+ (skips
 // without them) and a built harness (npm run build).
 //
 // - A/V: white flash frames and 2 ms clicks at the same instants, cut at a
@@ -294,6 +294,12 @@ async function main() {
       process.stdout.write(`Export fidelity skipped: ${tool} not found\n`)
       return
     }
+  }
+  // ffmpeg before 8 trims a Matroska Opus track's CodecDelay but still starts
+  // its timestamps at -CodecDelay, so a correct WebM measures 7 ms late.
+  const version = /ffmpeg version n?(\d+)\./.exec(spawnSync('ffmpeg', ['-version']).stdout.toString())
+  if (version && Number(version[1]) < 8) {
+    throw new Error(`ffmpeg ${version[1]} found; this check needs ffmpeg 8 or newer to measure WebM audio`)
   }
   const distDir = path.join(ROOT, 'dist')
   if (!fs.existsSync(path.join(distDir, 'headless.html'))) {
