@@ -75,6 +75,10 @@ jobs:
       - name: Build
         run: vp build
 
+      # The media and compatibility contracts probe and transcode real files.
+      - name: Install ffmpeg
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg
+
       # Portable Node, Chrome, edit-operation, and generated-media/audio
       # contracts. Reuses dist/ from Build and never requires WebGPU.
       - name: Portable headless contract suite
