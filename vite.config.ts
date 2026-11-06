@@ -193,6 +193,10 @@ export default defineConfig({
   },
   preview: {
     headers: crossOriginIsolationHeaders,
+    // Off macOS, Vite can bind "localhost" to ::1 alone while Node clients
+    // (shred, shreditor install) resolve it to 127.0.0.1 (no IPv6 route, e.g. a
+    // container) and are refused. Browsers try both, so bind IPv4 loopback there.
+    ...(process.platform === 'darwin' ? {} : { host: '127.0.0.1' }),
   },
   build: {
     target: 'esnext',
